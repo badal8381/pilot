@@ -37,14 +37,22 @@
         :options="{ selectable: false, showTooltip: false }"
       >
         <template #cell="{ column, row, item }">
-          <button
-            v-if="column.key === 'jti'"
-            class="block w-full font-mono text-ink-gray-6 text-xs text-left truncate"
-            title="Click to copy"
-            @click="copy(row.jti)"
-          >
-            {{ row.jti }}
-          </button>
+          <div v-if="column.key === 'jti'" class="flex items-center gap-2 w-full min-w-0">
+            <button
+              class="min-w-0 font-mono text-ink-gray-6 text-xs text-left truncate"
+              title="Click to copy"
+              @click="copy(row.jti)"
+            >
+              {{ row.jti }}
+            </button>
+            <Badge
+              v-if="row.jti === currentJti"
+              class="shrink-0"
+              theme="green"
+              variant="subtle"
+              label="This session"
+            />
+          </div>
           <span v-else-if="column.key === 'exp'" class="text-ink-gray-6 text-xs">
             {{ row.expires }}
           </span>
@@ -83,7 +91,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Alert, Button, Dialog, ListView, ListRowItem, TabButtons, toast } from 'frappe-ui'
+import { Alert, Badge, Button, Dialog, ListView, ListRowItem, TabButtons, toast } from 'frappe-ui'
 import { settingsApi } from '@/api/settings'
 import { sessionApi } from '@/api/session'
 import { fmtDateTime } from '@/utils/taskFormat'
@@ -114,6 +122,7 @@ const loading = ref(true)
 const loadError = ref('')
 const activeTokens = ref([])
 const revokedTokens = ref([])
+const currentJti = ref('')
 const activeTab = ref('active')
 const showRevoke = ref(false)
 const revoking = ref(null)
@@ -128,7 +137,7 @@ const info = computed(() => INFO[activeTab.value])
 
 const columns = computed(() => {
   const base = [
-    { label: 'Token ID (jti)', key: 'jti', align: 'left' },
+    { label: 'Token ID (jti)', key: 'jti', align: 'left', width: '13rem' },
     { label: 'Expires', key: 'exp', align: 'left', width: '11rem' },
   ]
   if (activeTab.value === 'active') {
@@ -188,6 +197,7 @@ async function load() {
     const auth = data.authentication || {}
     activeTokens.value = auth.active_tokens || []
     revokedTokens.value = auth.revoked_tokens || []
+    currentJti.value = auth.current_jti || ''
   } catch (e) {
     loadError.value = e.message || 'Could not load authentication data.'
   } finally {
