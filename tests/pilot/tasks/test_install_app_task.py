@@ -26,6 +26,21 @@ def make_task(bench_root: Path, site: str, app: str) -> InstallAppTask:
     return InstallAppTask(bench=bench, bench_root=bench_root, site=site, app=app)
 
 
+def test_queue_audits_who_queued_the_task(tmp_path: Path) -> None:
+    from pilot.core.bench.audit_log import AuditLog
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    with patch.object(type(bench.tasks), "run_task", lambda self, *a, **k: "task-123"):
+        InstallAppTask.queue(bench, site="site1.localhost", app="helpdesk")
+
+    queued = AuditLog(bench).entries(entry_type="task")
+    assert len(queued) == 1
+    assert queued[0]["event"] == "queued"
+    assert queued[0]["command"] == "install-app"
+    assert queued[0]["args"] == {"site": "site1.localhost", "app": "helpdesk"}
+
+
 def test_install_app_task_uses_site_install_app(tmp_path: Path) -> None:
     task = make_task(tmp_path, "site1.localhost", "helpdesk")
     make_app_dir(task.bench, "helpdesk")

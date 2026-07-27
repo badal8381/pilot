@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 
 from admin.backend.api.responses import error_response
 from admin.backend.api.v1.settings.config import ConfigPatcher
@@ -18,10 +18,12 @@ from pilot.config import (
 from pilot.core.bench import Bench
 from pilot.core.bench.settings import (
     SettingsApplyFailed,
+    active_tokens_payload,
     firewall_payload,
     is_restart_needed,
     llm_payload,
     restart_trigger_values,
+    revoked_tokens_payload,
     s3_payload,
     waf_payload,
     worker_groups_payload,
@@ -54,7 +56,9 @@ class _SettingsUpdateRejected(Exception):
     pass
 
 
-def build_settings_response(config: BenchConfig, bench_root: Path | None = None) -> dict:
+def build_settings_response(
+    config: BenchConfig, bench_root: Path | None = None, current_jti: str | None = None
+) -> dict:
     return {
         "is_linux": is_linux(),
         "native_process_manager": native_process_manager(),
@@ -117,6 +121,11 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
             "system_log_max_size": config.monitor.system_log_max_size,
             "application_log_max_size": config.monitor.application_log_max_size,
         },
+        "authentication": {
+            "active_tokens": active_tokens_payload(config, bench_root),
+            "revoked_tokens": revoked_tokens_payload(config, bench_root),
+            "current_jti": current_jti,
+        },
     }
 
 
@@ -153,7 +162,8 @@ def get_settings():
         config = BenchConfig.read(bench_root)
     except Exception:
         return error_response("settings_unavailable", "Could not read settings.", 500)
-    return jsonify(build_settings_response(config, bench_root))
+    current_jti = (getattr(g, "jwt_claims", None) or {}).get("jti")
+    return jsonify(build_settings_response(config, bench_root, current_jti))
 
 
 _AUDIT_LOG_DEFAULT_LIMIT = 50

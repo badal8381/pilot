@@ -154,6 +154,29 @@ def waf_payload(config: BenchConfig) -> dict:
     }
 
 
+def active_tokens_payload(config: BenchConfig, bench_root: Path | None = None) -> list[dict]:
+    if bench_root is None:
+        return []
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
+
+    return _token_rows(Session(Bench(config, bench_root)).active_jtis())
+
+
+def revoked_tokens_payload(config: BenchConfig, bench_root: Path | None = None) -> list[dict]:
+    if bench_root is None:
+        return []
+    from admin.backend.internal.session import RevokedTokens
+    from pilot.core.bench import Bench
+
+    return _token_rows(RevokedTokens(Bench(config, bench_root)).all())
+
+
+def _token_rows(entries: dict[str, int]) -> list[dict]:
+    """``{jti: exp}`` -> ``[{jti, exp}]`` sorted by soonest expiry first."""
+    return [{"jti": jti, "exp": exp} for jti, exp in sorted(entries.items(), key=lambda item: item[1])]
+
+
 def s3_payload(config: BenchConfig) -> dict:
     return {
         "access_key": config.s3.access_key,

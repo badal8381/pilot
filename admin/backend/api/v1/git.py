@@ -5,6 +5,7 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import error_response, no_content_response
+from pilot.core.bench import Bench
 from pilot.integrations.git import (
     TOKEN_HELP_URLS,
     GitAuthError,
@@ -21,6 +22,10 @@ git_bp = Blueprint("git", __name__)
 
 def _store() -> GitCredentialStore:
     return GitCredentialStore(Path(current_app.config["BENCH_ROOT"]))
+
+
+def _current_bench() -> Bench:
+    return Bench(Path(current_app.config["BENCH_ROOT"]))
 
 
 def _mask_token(token: str) -> str:
@@ -87,12 +92,16 @@ def save_integration():
     record = _store().save(
         provider_name, token, username=username or account.get("login", ""), expires_at=expires_at
     )
+    _current_bench().audit_action(
+        "git", {"event": "connected", "provider": provider_name, "username": record.get("username", "")}
+    )
     return jsonify(_status(record))
 
 
 @git_bp.delete("/connection")
 def delete_integration():
     _store().clear()
+    _current_bench().audit_action("git", {"event": "disconnected"})
     return no_content_response()
 
 

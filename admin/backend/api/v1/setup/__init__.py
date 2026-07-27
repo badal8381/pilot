@@ -110,13 +110,12 @@ def _update_configuration(bench_root: Path, data: dict):
 
 
 def _issue_setup_session(resp, toml_path: Path) -> None:
-    from admin.backend.auth import ensure_jwt_secret, issue_token
+    from admin.backend.internal.session import Session
 
-    set_session_cookie(
-        resp,
-        issue_token(ensure_jwt_secret(toml_path)),
-        current_app.config["SESSION_COOKIE_SECURE"],
-    )
+    bench = Bench(toml_path.parent)
+    token, jti = Session(bench).issue_session_token()
+    set_session_cookie(resp, token, current_app.config["SESSION_COOKIE_SECURE"])
+    bench.audit_action("session", {"event": "issued", "jti": jti, "scope": "bench", "via": "setup"})
 
 
 @setup_bp.post("/database-validations")

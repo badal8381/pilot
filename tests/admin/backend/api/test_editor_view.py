@@ -28,13 +28,14 @@ def _bench(tmp_path: Path, developer_mode: bool = True) -> Path:
 
 def _client(bench_root: Path, scope: str = "bench"):
     from admin.backend.app import create_app
-    from admin.backend.auth import ensure_jwt_secret, issue_site_token, issue_token
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
 
-    secret = ensure_jwt_secret(bench_root / "bench.toml")
+    session = Session(Bench(bench_root))
     app = create_app(bench_root)
     app.config["TESTING"] = True
     client = app.test_client()
-    token = issue_token(secret) if scope == "bench" else issue_site_token(secret, "site.local")
+    token = session.issue_session_token()[0] if scope == "bench" else session.issue_site_token("site.local")
     client.set_cookie("sid", token)
     return client
 

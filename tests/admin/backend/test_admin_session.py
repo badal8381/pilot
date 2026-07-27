@@ -1,53 +1,35 @@
 from __future__ import annotations
 
+import secrets
 import time
-import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
+import jwt as pyjwt
 import pytest
 
-from admin.backend.auth import (
-    decode_token,
-    has_scope,
-    is_token_valid,
-    issue_login_token,
-    issue_site_token,
-    issue_token,
-)
+from admin.backend.internal.session import Session
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
-from pilot.exceptions import BenchError
 
 
-def test_round_trip_is_valid() -> None:
-    assert is_token_valid(issue_token("k3y"), "k3y")
+def _session_token(secret: str = "k3y", scope: str = "bench", site: str | None = None, ttl: int = 300) -> str:
+    """A token signed with ``secret``, for authenticating a test client."""
+    payload = {"sub": "admin", "scope": scope, "exp": int(time.time()) + ttl}
+    if site:
+        payload["site"] = site
+    return pyjwt.encode(payload, secret, algorithm="HS256")
 
 
-def test_wrong_secret_rejected() -> None:
-    assert not is_token_valid(issue_token("k3y"), "other")
-
-
-def test_tampered_token_rejected() -> None:
-    assert not is_token_valid(issue_token("k3y") + "x", "k3y")
-
-
-def test_expired_token_rejected() -> None:
-    assert not is_token_valid(issue_token("k3y", ttl=10, issued_at=time.time() - 100), "k3y")
-
-
-def test_empty_inputs_rejected() -> None:
-    assert not is_token_valid("", "k3y")
-    assert not is_token_valid(issue_token("k3y"), "")
-
-
-def test_issue_requires_secret() -> None:
-    with pytest.raises(ValueError):
-        issue_token("")
-
-
-def test_login_token_carries_jti() -> None:
-    assert decode_token(issue_login_token("k3y"), "k3y").get("jti")
+def _login_token(secret: str = "k3y") -> str:
+    """A single-use ?sid= sign-in token signed with ``secret``."""
+    payload = {
+        "sub": "admin",
+        "scope": "bench",
+        "jti": secrets.token_urlsafe(8),
+        "exp": int(time.time()) + 300,
+    }
+    return pyjwt.encode(payload, secret, algorithm="HS256")
 
 
 def _bench(tmp_path: Path, password: str = "secret") -> Bench:
@@ -58,38 +40,6 @@ def _bench(tmp_path: Path, password: str = "secret") -> Bench:
 
 def _load_bench(tmp_path: Path) -> Bench:
     return Bench(BenchConfig.from_file(tmp_path / "bench.toml"), tmp_path)
-
-
-def test_command_issues_verifiable_token_and_persists_secret(tmp_path, capsys) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    GenerateSessionCommand(_bench(tmp_path)).run()
-    token = capsys.readouterr().out.strip()
-    secret = tomllib.loads((tmp_path / "bench.toml").read_text())["admin"]["jwt_secret"]
-    assert secret and is_token_valid(token, secret)
-
-
-def test_command_reuses_existing_secret(tmp_path) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    GenerateSessionCommand(_bench(tmp_path)).run()
-    first = tomllib.loads((tmp_path / "bench.toml").read_text())["admin"]["jwt_secret"]
-    GenerateSessionCommand(_load_bench(tmp_path)).run()
-    assert tomllib.loads((tmp_path / "bench.toml").read_text())["admin"]["jwt_secret"] == first
-
-
-def test_command_full_path_builds_url(tmp_path, capsys) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    GenerateSessionCommand(_bench(tmp_path), full_path=True).run()
-    assert capsys.readouterr().out.strip().startswith("http://")
-
-
-def test_command_requires_password(tmp_path) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    with pytest.raises(BenchError):
-        GenerateSessionCommand(_bench(tmp_path, password="")).run()
 
 
 def _initialized_bench(bench_dir: Path, password: str, jwt_secret: str) -> None:
@@ -118,7 +68,7 @@ def _client(tmp_path: Path, jwt_secret: str = "k3y"):
 
 def test_valid_jwt_cookie_authenticates(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    client.set_cookie("sid", issue_token("k3y"))
+    client.set_cookie("sid", _session_token())
     assert client.get("/api/v1/session").get_json() == {
         "authenticated": True,
         "scope": "bench",
@@ -128,14 +78,14 @@ def test_valid_jwt_cookie_authenticates(tmp_path: Path) -> None:
 
 def test_invalid_jwt_cookie_stays_unauthenticated(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    client.set_cookie("sid", issue_token("wrong-secret"))
+    client.set_cookie("sid", _session_token("wrong-secret"))
     assert client.get("/api/v1/session").get_json() == {"authenticated": False}
     assert client.get("/api/v1/benches").status_code == 401
 
 
 def test_bootstrap_does_not_report_session_state(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    client.set_cookie("sid", issue_token("k3y"))
+    client.set_cookie("sid", _session_token())
 
     body = client.get("/api/v1/bootstrap").get_json()
 
@@ -158,7 +108,7 @@ def test_fresh_bench_bootstrap_and_session_are_explicit(tmp_path: Path) -> None:
 
 def test_delete_session_clears_cookie(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    client.set_cookie("sid", issue_token("k3y"))
+    client.set_cookie("sid", _session_token())
 
     response = client.delete("/api/v1/session")
 
@@ -221,7 +171,7 @@ def test_bootstrap_reports_allow_bench_management_when_disabled(tmp_path: Path) 
 
 def test_login_with_sid_sets_httponly_cookie(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    resp = client.post("/api/v1/session", json={"sid": issue_login_token("k3y")})
+    resp = client.post("/api/v1/session", json={"sid": _login_token()})
     assert resp.status_code == 201
     assert resp.headers["Location"] == "/api/v1/session"
     assert resp.get_json() == {"authenticated": True, "scope": "bench"}
@@ -231,11 +181,36 @@ def test_login_with_sid_sets_httponly_cookie(tmp_path: Path) -> None:
     assert client.get("/api/v1/benches").status_code != 401
 
 
+def test_password_login_records_session_issued(tmp_path: Path) -> None:
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    assert client.post("/api/v1/session", json={"password": "secret"}).status_code == 201
+
+    issued = AuditLog(Bench(tmp_path / "benches" / "current")).entries(entry_type="session")
+    assert len(issued) == 1
+    assert issued[0]["event"] == "issued"
+    assert issued[0]["via"] == "password"
+    assert issued[0]["jti"]
+
+
+def test_sid_login_records_redeemed_and_issued(tmp_path: Path) -> None:
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    assert client.post("/api/v1/session", json={"sid": _login_token()}).status_code == 201
+
+    entries = AuditLog(Bench(tmp_path / "benches" / "current")).entries(entry_type="session")
+    assert {e["event"] for e in entries} == {"issued", "login_redeemed"}
+    issued = next(e for e in entries if e["event"] == "issued")
+    assert issued["via"] == "login_link"
+
+
 def test_login_cookie_uses_explicit_is_secure_cookie(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.application.config["SESSION_COOKIE_SECURE"] = True
 
-    response = client.post("/api/v1/session", json={"sid": issue_login_token("k3y")})
+    response = client.post("/api/v1/session", json={"sid": _login_token()})
 
     cookie = next(
         value for key, value in response.headers if key == "Set-Cookie" and value.startswith("sid=")
@@ -289,7 +264,7 @@ def test_is_secure_cookie_requires_tls_or_configured_proxy(monkeypatch) -> None:
 
 def test_login_with_invalid_sid_rejected(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    resp = client.post("/api/v1/session", json={"sid": issue_login_token("wrong-secret")})
+    resp = client.post("/api/v1/session", json={"sid": _login_token("wrong-secret")})
     assert resp.status_code == 401
     assert resp.get_json()["error"]["code"] == "invalid_login_token"
     assert client.get("/api/v1/benches").status_code == 401
@@ -310,7 +285,7 @@ def test_session_creation_requires_a_json_object(tmp_path: Path) -> None:
 
 def test_sid_is_single_use(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    sid = issue_login_token("k3y")
+    sid = _login_token()
     assert client.post("/api/v1/session", json={"sid": sid}).status_code == 201
     assert client.post("/api/v1/session", json={"sid": sid}).status_code == 401
 
@@ -378,7 +353,7 @@ def test_setup_endpoint_requires_auth_once_password_set(tmp_path: Path) -> None:
     client = _client(tmp_path)
     path = "/api/v1/setup/database-validations"
     assert client.post(path, json={"engine": "mariadb"}).status_code == 401
-    client.set_cookie("sid", issue_token("k3y"))
+    client.set_cookie("sid", _session_token())
     assert client.post(path, json={"engine": "mariadb"}).status_code != 401
 
 
@@ -409,53 +384,21 @@ def test_setup_endpoint_fails_closed_when_config_is_corrupt(tmp_path: Path) -> N
     assert response.status_code == 503
 
 
-def test_issue_token_defaults_to_bench_scope() -> None:
-    claims = decode_token(issue_token("k3y"), "k3y")
-    assert claims["scope"] == "bench"
-    assert "site" not in claims
-
-
-def test_issue_token_with_site_scope() -> None:
-    claims = decode_token(issue_token("k3y", scope="site", site="example.com"), "k3y")
-    assert claims["scope"] == "site"
-    assert claims["site"] == "example.com"
-
-
 def test_has_scope_bench_token_allows_any_site() -> None:
-    claims = decode_token(issue_token("k3y"), "k3y")
-    assert has_scope(claims, "example.com")
-    assert has_scope(claims, "other.com")
+    assert Session.has_scope({"scope": "bench"}, "example.com")
+    assert Session.has_scope({"scope": "bench"}, "other.com")
 
 
 def test_has_scope_site_token_allows_matching_site() -> None:
-    claims = decode_token(issue_token("k3y", scope="site", site="example.com"), "k3y")
-    assert has_scope(claims, "example.com")
+    assert Session.has_scope({"scope": "site", "site": "example.com"}, "example.com")
 
 
 def test_has_scope_site_token_rejects_different_site() -> None:
-    claims = decode_token(issue_token("k3y", scope="site", site="example.com"), "k3y")
-    assert not has_scope(claims, "other.com")
+    assert not Session.has_scope({"scope": "site", "site": "example.com"}, "other.com")
 
 
 def test_has_scope_none_claims_rejected() -> None:
-    assert not has_scope(None, "example.com")
-
-
-def test_issue_site_token_creates_scoped_token() -> None:
-    claims = decode_token(issue_site_token("k3y", "example.com"), "k3y")
-    assert claims["scope"] == "site"
-    assert claims["site"] == "example.com"
-
-
-def test_issue_site_token_requires_site() -> None:
-    with pytest.raises(ValueError):
-        issue_site_token("k3y", "")
-
-
-def test_issue_site_token_custom_ttl() -> None:
-    claims = decode_token(issue_site_token("k3y", "example.com", ttl=3600), "k3y")
-    assert claims["site"] == "example.com"
-    assert claims["exp"] - claims["iat"] == 3600
+    assert not Session.has_scope(None, "example.com")
 
 
 @pytest.mark.parametrize(
@@ -471,7 +414,7 @@ def test_non_bench_token_cannot_access_bench_route(
     site: str | None,
 ) -> None:
     client = _client(tmp_path)
-    token = issue_token("k3y", scope=scope, site=site)
+    token = _session_token(scope=scope, site=site)
 
     response = client.get("/api/v1/tasks", headers={"Authorization": f"Bearer {token}"})
 
@@ -495,7 +438,7 @@ def test_require_scope_allows_unscoped_token(tmp_path: Path) -> None:
         return jsonify({"ok": True})
 
     client = app.test_client()
-    client.set_cookie("sid", issue_token("k3y"))
+    client.set_cookie("sid", _session_token())
     assert client.get("/api/v1/test-scoped").status_code == 200
 
 
@@ -516,7 +459,7 @@ def test_require_scope_allows_matching_scoped_token(tmp_path: Path) -> None:
         return jsonify({"ok": True})
 
     client = app.test_client()
-    client.set_cookie("sid", issue_token("k3y", scope="site", site="example.com"))
+    client.set_cookie("sid", _session_token(scope="site", site="example.com"))
     assert client.get("/api/v1/test-scoped").status_code == 200
 
 
@@ -537,7 +480,7 @@ def test_require_scope_rejects_mismatched_scoped_token(tmp_path: Path) -> None:
         return jsonify({"ok": True})
 
     client = app.test_client()
-    client.set_cookie("sid", issue_token("k3y", scope="site", site="other.com"))
+    client.set_cookie("sid", _session_token(scope="site", site="other.com"))
     assert client.get("/api/v1/test-scoped").status_code == 403
 
 
@@ -558,7 +501,7 @@ def test_current_site_scope_returns_site_from_claims(tmp_path: Path) -> None:
         return jsonify({"site": current_site_scope()})
 
     client = app.test_client()
-    client.set_cookie("sid", issue_token("k3y", scope="site", site="example.com"))
+    client.set_cookie("sid", _session_token(scope="site", site="example.com"))
     assert client.get("/api/v1/test-scope").get_json()["site"] == "example.com"
 
 
@@ -578,13 +521,13 @@ def test_current_site_scope_returns_none_for_unscoped(tmp_path: Path) -> None:
         return jsonify({"site": current_site_scope()})
 
     client = app.test_client()
-    client.set_cookie("sid", issue_token("k3y"))
+    client.set_cookie("sid", _session_token())
     assert client.get("/api/v1/test-scope").get_json()["site"] is None
 
 
 def test_bearer_token_authenticates(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    token = issue_token("k3y")
+    token = _session_token()
     resp = client.get("/api/v1/benches", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code != 401
 
@@ -606,7 +549,7 @@ def test_bearer_token_with_site_scope(tmp_path: Path) -> None:
         return jsonify({"ok": True})
 
     client = app.test_client()
-    token = issue_site_token("k3y", "example.com")
+    token = _session_token(scope="site", site="example.com")
     resp = client.get("/api/v1/test-scoped", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 200
 
@@ -628,7 +571,7 @@ def test_bearer_token_wrong_site_rejected(tmp_path: Path) -> None:
         return jsonify({"ok": True})
 
     client = app.test_client()
-    token = issue_site_token("k3y", "other.com")
+    token = _session_token(scope="site", site="other.com")
     resp = client.get("/api/v1/test-scoped", headers={"Authorization": f"Bearer {token}"})
     assert resp.status_code == 403
 
@@ -650,6 +593,68 @@ def test_require_scope_with_callable(tmp_path: Path) -> None:
         return jsonify({"ok": True, "site": name})
 
     client = app.test_client()
-    client.set_cookie("sid", issue_token("k3y", scope="site", site="example.com"))
+    client.set_cookie("sid", _session_token(scope="site", site="example.com"))
     assert client.get("/api/v1/sites/example.com/action").status_code == 200
     assert client.get("/api/v1/sites/other.com/action").status_code == 403
+
+
+def test_revoke_session_endpoint_revokes_active_jti(tmp_path: Path) -> None:
+    from admin.backend.internal.session import ActiveTokens, RevokedTokens, Session
+
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    bench = Bench(tmp_path / "benches" / "current")
+    _, jti = Session(bench).issue_session_token()
+    assert jti in ActiveTokens(bench)
+
+    assert client.post("/api/v1/session/revoke", json={"jti": jti}).status_code == 204
+    assert jti in RevokedTokens(bench)
+
+
+def test_revoke_session_unknown_jti_is_404(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    assert client.post("/api/v1/session/revoke", json={"jti": "nope"}).status_code == 404
+
+
+def test_revoke_session_requires_jti(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    assert client.post("/api/v1/session/revoke", json={}).status_code == 400
+
+
+def test_revoke_session_requires_authentication(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    assert client.post("/api/v1/session/revoke", json={"jti": "x"}).status_code == 401
+
+
+def test_revoke_session_is_audited_with_request_context(tmp_path: Path) -> None:
+    from admin.backend.internal.session import Session
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    actor_token, actor_jti = Session(bench).issue_session_token()
+    client.set_cookie("sid", actor_token)
+    _, target_jti = Session(bench).issue_session_token()
+
+    assert client.post("/api/v1/session/revoke", json={"jti": target_jti}).status_code == 204
+
+    revoked = [e for e in AuditLog(bench).entries(entry_type="session") if e.get("event") == "revoked"]
+    assert len(revoked) == 1
+    assert revoked[0]["jti"] == target_jti  # the token acted on
+    assert revoked[0]["actor_jti"] == actor_jti  # who did it (their session)
+    assert revoked[0]["ip"]
+    # actor is the user.email claim; local admin tokens carry none.
+    assert revoked[0]["actor"] is None
+
+
+def test_settings_reports_current_session_jti(tmp_path: Path) -> None:
+    from admin.backend.internal.session import Session
+
+    client = _client(tmp_path)
+    token, jti = Session(Bench(tmp_path / "benches" / "current")).issue_session_token()
+    client.set_cookie("sid", token)
+
+    data = client.get("/api/v1/settings").get_json()
+    assert data["authentication"]["current_jti"] == jti
