@@ -28,7 +28,7 @@
 
     <div
       v-else-if="operations.length"
-      class="bg-surface-elevation-1 mt-4 divide-outline-gray-1 divide-y overflow-hidden"
+      class="mt-4 divide-outline-gray-1 divide-y overflow-hidden"
     >
       <RouterLink
         v-for="op in operations"

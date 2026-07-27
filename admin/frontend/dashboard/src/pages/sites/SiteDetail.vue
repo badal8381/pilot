@@ -171,6 +171,11 @@ const menuOptions = computed(() => [
     : []),
   { label: 'Login as admin', icon: 'lucide-log-in', onClick: loginAsAdmin },
   { label: 'Back up now', icon: 'lucide-archive', onClick: backupNow },
+  {
+    label: 'View jobs',
+    icon: 'lucide-list-checks',
+    onClick: () => router.push({ name: 'Tasks', query: { site: site.value.name } }),
+  },
 ])
 
 // Provisioning is a transient state (a new-site/reinstall task still running);
