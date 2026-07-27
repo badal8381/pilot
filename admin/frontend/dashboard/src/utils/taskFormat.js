@@ -103,8 +103,15 @@ export function siteRoute(task) {
   return { name: 'SiteDetail', params: { name: site } }
 }
 
+const REDIRECT_ON_SUCCESS_COMMANDS = [
+  'new-site',
+  'install-app',
+  'uninstall-app',
+  'get-and-install-app',
+]
+
 export function redirectRouteOnSuccess(task) {
-  if (task.command !== 'new-site') return null
+  if (!REDIRECT_ON_SUCCESS_COMMANDS.includes(task.command)) return null
   return siteRoute(task)
 }
 

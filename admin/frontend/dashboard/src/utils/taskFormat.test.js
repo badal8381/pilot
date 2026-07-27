@@ -36,10 +36,22 @@ test('siteRoute links to the site behind a site-scoped task', () => {
   assert.equal(siteRoute({ command: 'build', args: {} }), null)
 })
 
-test('only new-site redirects to the site page on success', () => {
+test('site-creating and app tasks redirect to the site page on success', () => {
   assert.deepEqual(redirectRouteOnSuccess({ command: 'new-site', args: { name: 'a.local' } }), {
     name: 'SiteDetail',
     params: { name: 'a.local' },
   })
+  assert.deepEqual(redirectRouteOnSuccess({ command: 'install-app', args: { site: 'a.local' } }), {
+    name: 'SiteDetail',
+    params: { name: 'a.local' },
+  })
+  assert.deepEqual(redirectRouteOnSuccess({ command: 'uninstall-app', args: { site: 'a.local' } }), {
+    name: 'SiteDetail',
+    params: { name: 'a.local' },
+  })
+  assert.deepEqual(
+    redirectRouteOnSuccess({ command: 'get-and-install-app', args: { site: 'a.local' } }),
+    { name: 'SiteDetail', params: { name: 'a.local' } },
+  )
   assert.equal(redirectRouteOnSuccess({ command: 'drop-site', args: { site: 'a.local' } }), null)
 })
