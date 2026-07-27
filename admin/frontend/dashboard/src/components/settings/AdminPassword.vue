@@ -48,8 +48,6 @@ import PasswordStrengthMeter from '@/components/common/PasswordStrengthMeter.vue
 import { settingsApi } from '@/api/settings'
 import { meetsPasswordRequirements } from '@/utils/passwordStrength'
 
-const emit = defineEmits(['changed'])
-
 const currentPassword = ref('')
 const newPassword = ref('')
 const confirmPassword = ref('')
@@ -85,7 +83,6 @@ async function save() {
     })
     reset()
     toast.success(signedOutMessage(result.revoked_sessions))
-    emit('changed')
   } catch (e) {
     error.value = e.message || 'Could not change the password.'
   } finally {
