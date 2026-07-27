@@ -658,3 +658,138 @@ def test_settings_reports_current_session_jti(tmp_path: Path) -> None:
 
     data = client.get("/api/v1/settings").get_json()
     assert data["authentication"]["current_jti"] == jti
+
+
+_NEW_PASSWORD = "N3wSecret!"
+
+
+def _change_password(client, **payload):
+    return client.post("/api/v1/settings/admin-password", json=payload)
+
+
+def test_change_admin_password_writes_config_and_revokes_sessions(tmp_path: Path) -> None:
+    from admin.backend.internal.session import RevokedTokens, Session
+
+    client = _client(tmp_path)
+    bench_root = tmp_path / "benches" / "current"
+    bench = Bench(bench_root)
+    token, old_jti = Session(bench).issue_session_token()
+    client.set_cookie("sid", token)
+
+    response = _change_password(client, current_password="secret", new_password=_NEW_PASSWORD)
+
+    assert response.status_code == 200
+    assert response.get_json() == {"revoked_sessions": 1}
+    assert BenchConfig.from_file(bench_root / "bench.toml").admin.password == _NEW_PASSWORD
+    assert old_jti in RevokedTokens(bench)
+
+
+def test_change_admin_password_keeps_caller_signed_in(tmp_path: Path) -> None:
+    from admin.backend.internal.session import Session
+
+    client = _client(tmp_path)
+    token, _ = Session(Bench(tmp_path / "benches" / "current")).issue_session_token()
+    client.set_cookie("sid", token)
+
+    response = _change_password(client, current_password="secret", new_password=_NEW_PASSWORD)
+
+    cookie = next(
+        value for key, value in response.headers if key == "Set-Cookie" and value.startswith("sid=")
+    )
+    assert "HttpOnly" in cookie
+    # The replacement cookie is live; the revoked original is not.
+    assert client.get("/api/v1/session").get_json()["authenticated"] is True
+
+
+def test_change_admin_password_rejects_wrong_current_password(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    response = _change_password(client, current_password="wrong", new_password=_NEW_PASSWORD)
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "invalid_credentials"
+    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.password == "secret"
+
+
+@pytest.mark.parametrize(
+    "new_password",
+    ["Sh0rt!", "n3wsecret!", "N3WSECRET!", "NewSecret!", "N3wSecret"],
+)
+def test_change_admin_password_enforces_strength(tmp_path: Path, new_password: str) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    response = _change_password(client, current_password="secret", new_password=new_password)
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == "invalid_password"
+
+
+def test_change_admin_password_rejects_unchanged_password(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    response = _change_password(client, current_password="secret", new_password="secret")
+
+    assert response.status_code == 422
+    assert "differ" in response.get_json()["error"]["message"]
+
+
+def test_change_admin_password_requires_authentication(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    response = _change_password(client, current_password="secret", new_password=_NEW_PASSWORD)
+
+    assert response.status_code == 401
+    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.password == "secret"
+
+
+def test_change_admin_password_rejects_site_scoped_token(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token(scope="site", site="example.com"))
+
+    response = _change_password(client, current_password="secret", new_password=_NEW_PASSWORD)
+
+    assert response.status_code == 403
+
+
+def test_change_admin_password_is_audited(tmp_path: Path) -> None:
+    from admin.backend.internal.session import Session
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    actor_token, actor_jti = Session(bench).issue_session_token()
+    client.set_cookie("sid", actor_token)
+
+    assert _change_password(client, current_password="secret", new_password=_NEW_PASSWORD).status_code == 200
+
+    entries = AuditLog(bench).entries(entry_type="session")
+    changed = [entry for entry in entries if entry.get("event") == "admin_password_changed"]
+    assert len(changed) == 1
+    assert changed[0]["actor_jti"] == actor_jti
+    assert changed[0]["revoked_sessions"] == 1
+    assert changed[0]["jti"] != actor_jti
+
+
+def test_settings_patch_ignores_admin_password(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    assert client.patch("/api/v1/settings", json={"admin_password": _NEW_PASSWORD}).status_code == 200
+    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.password == "secret"
+
+
+def test_change_admin_password_checks_scope_independently_of_middleware(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The handler re-checks bench scope, so a slip in the auth guard cannot expose it."""
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token(scope="site", site="example.com"))
+    monkeypatch.setattr("admin.backend.middleware.get_authorization_error", lambda *args: None)
+
+    response = _change_password(client, current_password="secret", new_password=_NEW_PASSWORD)
+
+    assert response.status_code == 403
+    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.password == "secret"

@@ -73,7 +73,8 @@
           <S3Bucket v-else-if="currentSection === 's3-bucket'" />
           <LLM v-else-if="currentSection === 'llm'" />
           <SshKeys v-else-if="currentSection === 'ssh-keys'" ref="sshKeysRef" />
-          <Authentication v-else-if="currentSection === 'authentication'" />
+          <AdminPassword v-else-if="currentSection === 'password'" />
+          <Sessions v-else-if="currentSection === 'sessions'" />
           <SystemInfo v-else-if="currentSection === 'system-info'" />
         </div>
       </div>
@@ -91,7 +92,8 @@ import Git from '@/components/settings/Git.vue'
 import S3Bucket from '@/components/settings/S3Bucket.vue'
 import LLM from '@/components/settings/LLM.vue'
 import SshKeys from '@/components/settings/SshKeys.vue'
-import Authentication from '@/components/settings/Authentication.vue'
+import AdminPassword from '@/components/settings/AdminPassword.vue'
+import Sessions from '@/components/settings/Sessions.vue'
 import SystemInfo from '@/components/settings/SystemInfo.vue'
 import Workers from '@/components/settings/Workers.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
@@ -109,7 +111,8 @@ const sections = computed(() => [
   { id: 'firewall', label: 'Firewall', icon: 'lucide-shield' },
   { id: 'waf', label: 'WAF', icon: 'lucide-shield-alert' },
   { id: 'ssh-keys', label: 'SSH Keys', icon: 'lucide-key-round' },
-  { id: 'authentication', label: 'Authentication', icon: 'lucide-lock' },
+  { id: 'password', label: 'Password', icon: 'lucide-lock' },
+  { id: 'sessions', label: 'Sessions', icon: 'lucide-monitor' },
   { id: 'system-info', label: 'System Info', icon: 'lucide-info' },
 ])
 const activeSection = ref(null)
