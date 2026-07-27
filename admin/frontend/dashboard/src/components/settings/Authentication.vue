@@ -10,6 +10,10 @@
       {{ loadError }}
     </div>
     <template v-else>
+      <AdminPassword @changed="load" />
+
+      <hr class="border-outline-gray-2" />
+
       <TabButtons v-model="activeTab" :options="tabs" />
 
       <Alert :title="info.title" theme="blue" :dismissible="false">
@@ -92,6 +96,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Alert, Badge, Button, Dialog, ListView, ListRowItem, TabButtons, toast } from 'frappe-ui'
+import AdminPassword from '@/components/settings/AdminPassword.vue'
 import { settingsApi } from '@/api/settings'
 import { sessionApi } from '@/api/session'
 import { fmtDateTime } from '@/utils/taskFormat'

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { API_V1_PREFIX, apiErrorMessage, apiUrl, unwrap } from '../api/client.js'
+import { API_V1_PREFIX, apiErrorMessage, apiUrl, isSessionExpired, unwrap } from '../api/client.js'
 
 test('builds relative and cross-origin v1 API URLs', () => {
   assert.equal(API_V1_PREFIX, '/api/v1')
@@ -31,4 +31,36 @@ test('unwrap rethrows a resolved error body as a rejection', async () => {
 
 test('unwrap passes a successful payload through', async () => {
   assert.deepEqual(await unwrap(Promise.resolve({ ssl: true })), { ssl: true })
+})
+
+const jsonResponse = (status, body) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+
+test('a revoked or expired session is recognised as signed out', async () => {
+  const response = jsonResponse(401, {
+    error: { code: 'authentication_required', message: 'Authentication is required.' },
+  })
+  assert.equal(await isSessionExpired(response), true)
+  // The hook clones before reading, so the caller still gets an unconsumed body.
+  assert.equal(response.bodyUsed, false)
+})
+
+test('a rejected credential is not treated as being signed out', async () => {
+  // Wrong password on login, or on a password change: the session is still fine.
+  const response = jsonResponse(401, {
+    error: { code: 'invalid_credentials', message: 'Incorrect password.' },
+  })
+  assert.equal(await isSessionExpired(response), false)
+})
+
+test('non-401 and unparsable responses are not signed out', async () => {
+  assert.equal(await isSessionExpired(jsonResponse(200, { authenticated: true })), false)
+  assert.equal(
+    await isSessionExpired(jsonResponse(403, { error: { code: 'forbidden' } })),
+    false,
+  )
+  assert.equal(await isSessionExpired(new Response('<html>gateway</html>', { status: 401 })), false)
 })
