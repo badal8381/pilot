@@ -64,6 +64,7 @@ admin/backend/static/dashboard/
 admin/backend/static/editor/
 admin/frontend/dashboard/components.d.ts
 admin/frontend/editor/components.d.ts
+admin/frontend/dashboard/src/types/
 *.timestamp-*
 .env
 .env.local

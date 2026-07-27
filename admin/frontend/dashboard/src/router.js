@@ -36,6 +36,12 @@ const routes = [
     meta: { group: 'Sites' },
   },
   {
+    path: '/server',
+    name: 'Server',
+    component: () => import('./pages/server/Server.vue'),
+    meta: { title: 'Server' },
+  },
+  {
     path: '/marketplace',
     name: 'Marketplace',
     component: () => import('./pages/marketplace/Marketplace.vue'),
