@@ -37,6 +37,15 @@ class _JtiStore:
             entries[jti] = int(exp)
             replace_private_text_locked(self._path, json.dumps(entries))
 
+    def extend(self, entries: dict[str, int]) -> None:
+        """Add many ``{jti: exp}`` entries under a single lock."""
+        if not entries:
+            return
+        with exclusive_file_lock(self._path):
+            merged = self._prune(self._load_raw())
+            merged.update({jti: int(exp) for jti, exp in entries.items()})
+            replace_private_text_locked(self._path, json.dumps(merged))
+
     def all(self) -> dict[str, int]:
         return self._read()
 
@@ -181,6 +190,12 @@ class Session:
             return False
         RevokedTokens(self.bench).add(jti, exp)
         return True
+
+    def revoke_all(self) -> int:
+        """Revoke every live session. Returns how many were revoked."""
+        live = self.active_jtis()
+        RevokedTokens(self.bench).extend(live)
+        return len(live)
 
     def active_jtis(self) -> dict[str, int]:
         """Issued session jtis that are still live: unexpired and not revoked."""

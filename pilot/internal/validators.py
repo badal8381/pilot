@@ -12,6 +12,10 @@ _EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 _GIT_HTTP_RE = re.compile(r"^https?://.+")
 _GIT_SSH_RE = re.compile(r"^git@.+:.+")
 _GIT_LOCAL_RE = re.compile(r"^(/|~|\.\.?/).+")
+_LOWERCASE_RE = re.compile(r"[a-z]")
+_UPPERCASE_RE = re.compile(r"[A-Z]")
+_DIGIT_RE = re.compile(r"\d")
+_SYMBOL_RE = re.compile(r"[^A-Za-z0-9]")
 
 
 def validate_app_name(name: str) -> str | None:
@@ -59,6 +63,19 @@ def validate_cron_expression(expr: str) -> str | None:
         return "Schedule expression is required."
     if not _CRON_RE.match(expr.strip()):
         return "Invalid cron expression. Expected 5 fields: minute hour day month weekday (e.g. '0 2 * * *')."
+    return None
+
+
+def validate_admin_password(password: str) -> str | None:
+    """Mirror of the dashboard's PASSWORD_REQUIREMENTS (utils/passwordStrength.js)."""
+    if len(password) < 8:
+        return "Password must be at least 8 characters."
+    if not (_LOWERCASE_RE.search(password) and _UPPERCASE_RE.search(password)):
+        return "Password must contain upper and lower case letters."
+    if not _DIGIT_RE.search(password):
+        return "Password must contain at least one number."
+    if not _SYMBOL_RE.search(password):
+        return "Password must contain at least one symbol."
     return None
 
 
