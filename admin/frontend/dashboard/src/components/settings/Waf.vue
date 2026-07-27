@@ -2,7 +2,7 @@
   <div v-if="loading" class="flex justify-center items-center h-40">
     <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
   </div>
-  <div v-else class="space-y-8">
+  <div v-else class="space-y-6">
     <div class="space-y-6">
       <Switch
         label="Enable WAF"

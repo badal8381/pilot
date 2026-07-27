@@ -42,37 +42,19 @@
           <div class="flex justify-between items-center pb-4">
             <div class="flex items-center gap-2">
               <Button
-                class="sm:hidden -ml-2"
+                v-if="subSection || activeSection"
+                :class="{ 'sm:hidden': !subSection }"
+                class="-ml-2"
                 variant="subtle"
                 icon="lucide-arrow-left"
-                @click="activeSection = null"
+                @click="goBack"
               />
-              <h3 class="font-semibold text-ink-gray-9 text-lg">{{ activeSectionLabel }}</h3>
+              <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
             </div>
             <div id="settings-header-actions" class="contents"></div>
-            <Button
-              v-if="currentSection === 'workers'"
-              variant="subtle"
-              icon-left="lucide-plus"
-              @click="workersRef?.addGroup()"
-              >Add</Button
-            >
-            <Button
-              v-else-if="currentSection === 'ssh-keys'"
-              variant="subtle"
-              icon-left="lucide-plus"
-              @click="sshKeysRef?.openAdd()"
-              >Add</Button
-            >
           </div>
-          <General v-if="currentSection === 'general'" />
-          <Workers v-else-if="currentSection === 'workers'" ref="workersRef" />
-          <Firewall v-else-if="currentSection === 'firewall'" />
-          <Waf v-else-if="currentSection === 'waf'" />
-          <Git v-else-if="currentSection === 'github'" />
-          <S3Bucket v-else-if="currentSection === 's3-bucket'" />
-          <LLM v-else-if="currentSection === 'llm'" />
-          <SshKeys v-else-if="currentSection === 'ssh-keys'" ref="sshKeysRef" />
+          <General v-if="currentSection === 'general'" v-model:open-section="subSection" />
+          <Security v-else-if="currentSection === 'security'" v-model:open-section="subSection" />
           <SystemInfo v-else-if="currentSection === 'system-info'" />
         </div>
       </div>
@@ -81,39 +63,56 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Button } from 'frappe-ui'
 import General from '@/components/settings/General.vue'
-import Firewall from '@/components/settings/Firewall.vue'
-import Waf from '@/components/settings/Waf.vue'
-import Git from '@/components/settings/Git.vue'
-import S3Bucket from '@/components/settings/S3Bucket.vue'
-import LLM from '@/components/settings/LLM.vue'
-import SshKeys from '@/components/settings/SshKeys.vue'
+import Security from '@/components/settings/Security.vue'
 import SystemInfo from '@/components/settings/SystemInfo.vue'
-import Workers from '@/components/settings/Workers.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
+import { GENERAL_SECTIONS, SECURITY_SECTIONS } from '@/components/settings/sections'
 
 const open = defineModel()
 
 const isMobile = useIsMobile()
+const route = useRoute()
+const router = useRouter()
 
 const sections = computed(() => [
   { id: 'general', label: 'General', icon: 'lucide-settings' },
-  { id: 'github', label: 'Git', icon: 'lucide-git-branch' },
-  { id: 'workers', label: 'Workers', icon: 'lucide-server-cog' },
-  { id: 's3-bucket', label: 'Object Storage', icon: 'lucide-archive' },
-  { id: 'llm', label: 'AI Assistant', icon: 'lucide-sparkles' },
-  { id: 'firewall', label: 'Firewall', icon: 'lucide-shield' },
-  { id: 'waf', label: 'WAF', icon: 'lucide-shield-alert' },
-  { id: 'ssh-keys', label: 'SSH Keys', icon: 'lucide-key-round' },
+  { id: 'security', label: 'Security', icon: 'lucide-shield' },
   { id: 'system-info', label: 'System Info', icon: 'lucide-info' },
 ])
-const activeSection = ref(null)
-const workersRef = ref(null)
-const sshKeysRef = ref(null)
+// Both section and sub-section are routed (deep-linkable, back button
+// closes/steps back). Sub-section options come from a shared registry so
+// this dialog can resolve a route id without General/Security exposing one.
+const activeSection = computed({
+  get: () => route.params.section || null,
+  set: (id) => router.push(id ? { name: 'Settings', params: { section: id } } : { name: 'Settings' }),
+})
 const currentSection = computed(() => activeSection.value ?? sections.value[0].id)
 const activeSectionLabel = computed(
   () => sections.value.find((s) => s.id === currentSection.value)?.label,
 )
+
+const subSectionOptions = computed(() => {
+  if (currentSection.value === 'general') return GENERAL_SECTIONS
+  if (currentSection.value === 'security') return SECURITY_SECTIONS
+  return []
+})
+const subSection = computed({
+  get: () => subSectionOptions.value.find((s) => s.id === route.params.subSection) ?? null,
+  set: (section) =>
+    router.push({
+      name: 'Settings',
+      params: { section: currentSection.value, subSection: section?.id },
+    }),
+})
+
+const headerTitle = computed(() => subSection.value?.label ?? activeSectionLabel.value)
+
+function goBack() {
+  if (subSection.value) subSection.value = null
+  else activeSection.value = null
+}
 </script>

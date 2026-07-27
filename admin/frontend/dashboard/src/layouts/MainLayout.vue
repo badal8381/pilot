@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Breadcrumbs,
   BottomSheet,
@@ -21,10 +21,30 @@ import { useSession } from '@/composables/auth/useSession'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 
 const route = useRoute()
+const router = useRouter()
 const { items, resetBreadcrumbs } = useBreadcrumbs()
 const isMobile = useIsMobile()
 const { session } = useSession()
-const { showSettings, showBenches, showNewBench } = useAppMenu()
+const { showBenches, showNewBench } = useAppMenu()
+
+// Remembers the last non-Settings route so dismissing the dialog (backdrop
+// click, Escape, close button) exits to it directly instead of stepping back
+// through every section/subsection push made while the dialog was open.
+const lastNonSettingsRoute = ref(null)
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.name !== 'Settings') lastNonSettingsRoute.value = route.fullPath
+  },
+  { immediate: true },
+)
+
+const showSettings = computed({
+  get: () => route.name === 'Settings',
+  set: (value) => {
+    if (!value) router.push(lastNonSettingsRoute.value || { name: 'Sites' })
+  },
+})
 
 const mobileNavDrawer = ref(false)
 
@@ -81,8 +101,8 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
         <MobileNavItem
           label="Settings"
           icon="lucide-settings"
-          to="/settings"
-          :active="route.name == 'Settings'"
+          to="/mobile/settings"
+          :active="route.name == 'MobileSettings'"
         />
       </MobileNav>
     </template>

@@ -2,7 +2,10 @@
   <div v-if="loading" class="flex justify-center items-center h-40">
     <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
   </div>
-  <template v-else>
+  <div v-else class="space-y-6">
+    <div class="flex justify-end">
+      <Button variant="subtle" icon-left="lucide-plus" @click="openAdd">Add</Button>
+    </div>
     <div
       v-if="loadError"
       class="py-12 border border-dashed rounded-xl border-outline-red-2 text-ink-red-3 text-p-sm text-center"
@@ -43,7 +46,7 @@
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
     </ListView>
-  </template>
+  </div>
 
   <Dialog v-model="showAdd" :options="{ title: 'Add SSH key', size: 'md' }">
     <template #body-content>
@@ -183,8 +186,6 @@ async function confirmRemove() {
     removingBusy.value = false
   }
 }
-
-defineExpose({ openAdd })
 
 onMounted(load)
 </script>
