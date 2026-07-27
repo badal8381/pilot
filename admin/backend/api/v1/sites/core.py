@@ -259,4 +259,5 @@ def _site_resource(site: SiteInfo) -> dict:
         "framework_branch": framework_branch if isinstance(framework_branch, str) else "",
         "broken": site.broken,
         "provisioning": site.provisioning,
+        "setup_complete": site.setup_complete,
     }

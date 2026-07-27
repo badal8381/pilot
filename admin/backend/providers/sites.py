@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from pilot.core.site import query_installed_apps_via_db
+from pilot.core.site import is_setup_complete, query_installed_apps_via_db
 from pilot.internal.site_paths import resolve_site_path
 from pilot.managers.task import TaskReader
 
@@ -25,6 +25,7 @@ class SiteInfo:
     site_config: dict
     broken: bool = False
     provisioning: bool = False
+    setup_complete: bool = False
 
 
 class SiteProvider:
@@ -85,6 +86,7 @@ class SiteProvider:
         is_provisioning = site_name in provisioning
         installed_apps: list[str] = []
         broken = False
+        setup_complete = False
 
         if exists:
             if isinstance(site_config.get("installed_apps"), list):
@@ -96,6 +98,9 @@ class SiteProvider:
                 else:
                     broken = True
 
+            if not is_provisioning and not broken:
+                setup_complete = bool(is_setup_complete(site_config))
+
         return SiteInfo(
             name=site_name,
             exists=exists,
@@ -106,4 +111,5 @@ class SiteProvider:
             site_config=site_config,
             broken=broken,
             provisioning=is_provisioning,
+            setup_complete=setup_complete,
         )

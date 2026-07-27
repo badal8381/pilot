@@ -60,6 +60,23 @@ def list_installed_apps(site_config: dict, bench_root: Path, site_name: str) -> 
 
 
 def query_installed_apps_via_db(site_config: dict) -> list[str] | None:
+    output = _run_mysql_query(site_config, "SELECT app_name FROM `tabInstalled Application` ORDER BY idx")
+    if output is None:
+        return None
+    return [line.strip() for line in output.splitlines() if line.strip()]
+
+
+def is_setup_complete(site_config: dict) -> bool | None:
+    output = _run_mysql_query(
+        site_config,
+        "SELECT value FROM `tabSingles` WHERE doctype='System Settings' AND field='setup_complete'",
+    )
+    if output is None:
+        return None
+    return output.strip() == "1"
+
+
+def _run_mysql_query(site_config: dict, sql: str) -> str | None:
     import shutil
     import subprocess
 
@@ -86,22 +103,14 @@ def query_installed_apps_via_db(site_config: dict) -> list[str] | None:
 
     try:
         result = subprocess.run(
-            [
-                cli,
-                *conn_args,
-                "--batch",
-                "--skip-column-names",
-                db_name,
-                "-e",
-                "SELECT app_name FROM `tabInstalled Application` ORDER BY idx",
-            ],
+            [cli, *conn_args, "--batch", "--skip-column-names", db_name, "-e", sql],
             capture_output=True,
             text=True,
             timeout=5,
         )
         if result.returncode != 0:
             return None
-        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        return result.stdout
     except Exception:
         return None
 

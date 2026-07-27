@@ -73,10 +73,15 @@
   />
 
   <Teleport defer to="#header-actions">
-    <Button variant="subtle" size="sm" @click="openSite">
+    <Button
+      :variant="site?.setup_complete ? 'subtle' : 'solid'"
+      size="sm"
+      :loading="settingUpSite"
+      @click="site?.setup_complete ? openSite() : setupSite()"
+    >
       <template #prefix><span class="size-4 lucide-external-link" /></template>
-      <span class="hidden sm:inline">Open site</span>
-      <span class="sm:hidden">Open</span>
+      <span class="hidden sm:inline">{{ site?.setup_complete ? 'Open site' : 'Setup site' }}</span>
+      <span class="sm:hidden">{{ site?.setup_complete ? 'Open' : 'Setup' }}</span>
     </Button>
   </Teleport>
 </template>
@@ -170,6 +175,18 @@ const isMobile = useIsMobile()
 
 function openSite() {
   window.open(`https://${site.value.name}`, '_blank')
+}
+
+const settingUpSite = ref(false)
+async function setupSite() {
+  settingUpSite.value = true
+  try {
+    await login()
+  } catch (caught) {
+    toast.error(caught.message || 'Could not open the setup wizard')
+  } finally {
+    settingUpSite.value = false
+  }
 }
 
 function goToMarketplace() {
