@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem } from 'frappe-ui'
+import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem, SidebarCollapseToggle } from 'frappe-ui'
 import { sidebarSections } from './list'
 import { useAppMenu } from './useAppMenu'
 import PilotLogo from '@/components/common/PilotLogo.vue'
@@ -60,5 +60,7 @@ function isActive(to) {
         </SidebarItem>
       </template>
     </nav>
+
+    <SidebarCollapseToggle class="mt-auto mx-2 mb-2" />
   </Sidebar>
 </template>
