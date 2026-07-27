@@ -245,6 +245,21 @@ def test_no_admin_vhost_without_domain(tmp_path: Path) -> None:
     assert "location = /api/v1/health" not in config
 
 
+def test_setup_finish_gets_open_cors(tmp_path: Path) -> None:
+    config = _renderer(tmp_path, _ADMIN_DATA).generate_bench_config([], admin_ssl=False)
+
+    assert "location = /api/v1/setup/actions/finish" in config
+    assert "if ($request_method = OPTIONS)" in config
+    assert 'Access-Control-Allow-Methods "GET, POST, OPTIONS" always' in config
+
+
+def test_http_to_https_redirect_still_serves_cors_paths_directly(tmp_path: Path) -> None:
+    config = _renderer(tmp_path, _ADMIN_DATA).generate_bench_config([], admin_ssl=True)
+
+    # One location block in the :80 redirect server, one in the :443 admin server.
+    assert config.count("location = /api/v1/setup/actions/finish") == 2
+
+
 # --- access log --------------------------------------------------------------
 
 

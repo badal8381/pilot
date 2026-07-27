@@ -29,8 +29,6 @@ DB_TYPE = os.environ.get("E2E_DB_TYPE", "mariadb")  # 'mariadb' | 'postgres'
 BENCH_NAME = f"e2e-{DB_TYPE}"
 
 SITE = "site1.localhost"
-MARIADB_PASSWORD = os.environ.get("E2E_MARIADB_PASSWORD", "admin")
-POSTGRES_PASSWORD = os.environ.get("E2E_POSTGRES_PASSWORD", "admin")
 
 # An extra app installed from a public repo. Defaults to a light, known-good
 # frappe app so CI stays fast; point it at erpnext / india-compliance to widen.
@@ -50,8 +48,6 @@ def test_completes_setup_wizard(bench, page):
             page,
             admin_password=bench.admin_password,
             db_type=DB_TYPE,
-            mariadb_password=MARIADB_PASSWORD,
-            postgres_password=POSTGRES_PASSWORD,
         )
     except Exception as err:
         # Attach the failed setup task's output so the failure is diagnosable

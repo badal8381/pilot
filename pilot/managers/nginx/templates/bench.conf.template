@@ -49,6 +49,31 @@ server {
         try_files $uri =404;
     }
 
+    {% if vhost.kind != "site" %}
+    {% for path in cors_paths %}
+    location = {{ path }} {
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type" always;
+            add_header Content-Length 0;
+            return 204;
+        }
+        proxy_pass         http://127.0.0.1:{{ vhost.port }};
+        proxy_read_timeout 120;
+        proxy_redirect     off;
+        proxy_set_header   Host               $host;
+        proxy_set_header   X-Real-IP          $remote_addr;
+        proxy_set_header   X-Forwarded-For    {% if proxy_servers %}$http_x_forwarded_for{% else %}$proxy_add_x_forwarded_for{% endif %};
+        proxy_set_header   X-Forwarded-Proto  $scheme;
+        proxy_hide_header  Access-Control-Allow-Origin;
+        add_header         Access-Control-Allow-Origin * always;
+        add_header         Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+        add_header         Access-Control-Allow-Headers "Content-Type" always;
+    }
+
+    {% endfor %}
+    {% endif %}
     location / {
         return 301 https://$host$request_uri;
     }
@@ -188,6 +213,13 @@ server {
     {# health/bootstrap answered with open CORS regardless of the app #}
     {% for path in cors_paths %}
     location = {{ path }} {
+        if ($request_method = OPTIONS) {
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type" always;
+            add_header Content-Length 0;
+            return 204;
+        }
         proxy_pass         http://127.0.0.1:{{ vhost.port }};
         proxy_read_timeout 120;
         proxy_redirect     off;
@@ -197,6 +229,8 @@ server {
         proxy_set_header   X-Forwarded-Proto  $scheme;
         proxy_hide_header  Access-Control-Allow-Origin;
         add_header         Access-Control-Allow-Origin * always;
+        add_header         Access-Control-Allow-Methods "GET, POST, OPTIONS" always;
+        add_header         Access-Control-Allow-Headers "Content-Type" always;
     }
 
     {% endfor %}

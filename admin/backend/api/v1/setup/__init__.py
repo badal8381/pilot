@@ -5,7 +5,11 @@ from pathlib import Path
 from flask import Blueprint, current_app, g, jsonify, request
 
 from admin.backend.api.responses import accepted_task_response, error_response, no_content_response
-from admin.backend.api.v1.setup.config import read_defaults, validate_configuration
+from admin.backend.api.v1.setup.config import (
+    apply_existing_local_database,
+    read_defaults,
+    validate_configuration,
+)
 from admin.backend.api.v1.setup.database import database_validation, database_validation_state
 from admin.backend.api.v1.setup.state import (
     clear_wizard_marker_if_idle,
@@ -77,6 +81,7 @@ def _update_configuration(bench_root: Path, data: dict):
             401,
         )
 
+    data = apply_existing_local_database(bench_root, data)
     settings = {**current, **data, "admin_enabled": True}
     error = validate_configuration(settings)
     if error:
@@ -241,19 +246,9 @@ def _validate_finished_setup_task(bench_root: Path, task_id: str):
         )
     marker = wizard_marker_path(bench_root)
     with exclusive_file_lock(marker):
-        handoff = setup_handoff_task(bench_root)
-        if handoff is None or handoff.task_id != task_id:
-            return error_response(
-                "setup_task_mismatch",
-                "Task is not the current setup attempt.",
-                409,
-            )
-        if running_setup_task(bench_root):
-            return error_response(
-                "setup_active",
-                "Another setup task is still active.",
-                409,
-            )
+        error = _check_marker_claims_this_task(bench_root, marker, task_id)
+        if error is not None:
+            return error
         if not (bench_root / "config" / "Procfile").exists():
             return error_response(
                 "setup_not_initialized",
@@ -261,4 +256,21 @@ def _validate_finished_setup_task(bench_root: Path, task_id: str):
                 409,
             )
         marker.unlink(missing_ok=True)
+    return None
+
+
+def _check_marker_claims_this_task(bench_root: Path, marker: Path, task_id: str):
+    """Caller must already hold the marker's exclusive lock."""
+    if running_setup_task(bench_root):
+        return error_response("setup_active", "Another setup task is still active.", 409)
+
+    if not marker.exists():
+        return None
+    handoff = setup_handoff_task(bench_root)
+    if handoff is None or handoff.task_id != task_id:
+        return error_response(
+            "setup_task_mismatch",
+            "Task is not the current setup attempt.",
+            409,
+        )
     return None
