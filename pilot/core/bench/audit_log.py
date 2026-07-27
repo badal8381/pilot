@@ -2,11 +2,30 @@
 
 import json
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from pilot.utils import open_private
 
 _FILE_RE = re.compile(r"^audit_\d{4}_\d{2}\.jsonl$")
+
+# Extra fields merged into every audit entry. The admin backend registers a provider that
+# reads the current request (IP + actor); the CLI/worker leave the empty default.
+def _context_provider() -> dict:
+    return {}
+
+
+def set_audit_context_provider(provider: Callable[[], dict]) -> None:
+    global _context_provider
+    _context_provider = provider
+
+
+def audit_context() -> dict:
+    """Registered context fields, or empty if none/failing. Never raises."""
+    try:
+        return _context_provider() or {}
+    except Exception:
+        return {}
 
 
 class AuditLog:

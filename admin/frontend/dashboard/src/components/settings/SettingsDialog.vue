@@ -55,6 +55,8 @@
           </div>
           <General v-if="currentSection === 'general'" v-model:open-section="subSection" />
           <Security v-else-if="currentSection === 'security'" v-model:open-section="subSection" />
+          <AdminPassword v-else-if="currentSection === 'password'" />
+          <Sessions v-else-if="currentSection === 'sessions'" />
           <SystemInfo v-else-if="currentSection === 'system-info'" />
         </div>
       </div>
@@ -68,6 +70,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Button } from 'frappe-ui'
 import General from '@/components/settings/General.vue'
 import Security from '@/components/settings/Security.vue'
+import AdminPassword from '@/components/settings/AdminPassword.vue'
+import Sessions from '@/components/settings/Sessions.vue'
 import SystemInfo from '@/components/settings/SystemInfo.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { GENERAL_SECTIONS, SECURITY_SECTIONS } from '@/components/settings/sections'
@@ -81,6 +85,8 @@ const router = useRouter()
 const sections = computed(() => [
   { id: 'general', label: 'General', icon: 'lucide-settings' },
   { id: 'security', label: 'Security', icon: 'lucide-shield' },
+  { id: 'password', label: 'Password', icon: 'lucide-lock' },
+  { id: 'sessions', label: 'Sessions', icon: 'lucide-monitor' },
   { id: 'system-info', label: 'System Info', icon: 'lucide-info' },
 ])
 // Both section and sub-section are routed (deep-linkable, back button

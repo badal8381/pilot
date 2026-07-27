@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import hmac
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, current_app, g, jsonify, request
 
 from admin.backend.api.responses import error_response
 from admin.backend.api.v1.settings.config import ConfigPatcher
-from admin.backend.middleware import client_ip
+from admin.backend.internal.session import Session
+from admin.backend.middleware import client_ip, rate_limit, set_session_cookie
 from pilot.config import (
     WAF_MODES,
     WAF_RULE_ACTIONS,
@@ -18,10 +20,12 @@ from pilot.config import (
 from pilot.core.bench import Bench
 from pilot.core.bench.settings import (
     SettingsApplyFailed,
+    active_tokens_payload,
     firewall_payload,
     is_restart_needed,
     llm_payload,
     restart_trigger_values,
+    revoked_tokens_payload,
     s3_payload,
     waf_payload,
     worker_groups_payload,
@@ -54,7 +58,9 @@ class _SettingsUpdateRejected(Exception):
     pass
 
 
-def build_settings_response(config: BenchConfig, bench_root: Path | None = None) -> dict:
+def build_settings_response(
+    config: BenchConfig, bench_root: Path | None = None, current_jti: str | None = None
+) -> dict:
     return {
         "is_linux": is_linux(),
         "native_process_manager": native_process_manager(),
@@ -117,6 +123,11 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
             "system_log_max_size": config.monitor.system_log_max_size,
             "application_log_max_size": config.monitor.application_log_max_size,
         },
+        "authentication": {
+            "active_tokens": active_tokens_payload(config, bench_root),
+            "revoked_tokens": revoked_tokens_payload(config, bench_root),
+            "current_jti": current_jti,
+        },
     }
 
 
@@ -133,6 +144,14 @@ def llm_provider_options() -> list[dict]:
     from pilot.integrations.llm.registry import provider_options
 
     return provider_options()
+
+
+def _validate_new_password(new_password: str, current_password: str) -> str | None:
+    from pilot.internal.validators import validate_admin_password
+
+    if hmac.compare_digest(new_password, current_password):
+        return "New password must differ from the current password."
+    return validate_admin_password(new_password)
 
 
 @settings_bp.get("/llm/models")
@@ -153,7 +172,8 @@ def get_settings():
         config = BenchConfig.read(bench_root)
     except Exception:
         return error_response("settings_unavailable", "Could not read settings.", 500)
-    return jsonify(build_settings_response(config, bench_root))
+    current_jti = (getattr(g, "jwt_claims", None) or {}).get("jti")
+    return jsonify(build_settings_response(config, bench_root, current_jti))
 
 
 _AUDIT_LOG_DEFAULT_LIMIT = 50
@@ -188,6 +208,43 @@ def audit_log():
 def my_ip():
     """Return the client IP the firewall should allow-list."""
     return jsonify({"ip": client_ip(default="")})
+
+
+@settings_bp.post("/admin-password")
+@rate_limit(5, 60, user_ip=True)
+def change_admin_password():
+    """Rotate the admin password with a bench scoped token, then revoke every session and re-issue one for the caller."""
+    claims = getattr(g, "jwt_claims", None) or {}
+    if claims.get("scope") != "bench":
+        return error_response("forbidden", "Not authorized for this bench", 403)
+
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    bench = Bench(bench_root)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return error_response("malformed_request", "Expected a JSON object.", 400)
+
+    current_password = str(data.get("current_password", ""))
+    new_password = str(data.get("new_password", ""))
+    if not hmac.compare_digest(current_password, bench.config.admin.password):
+        return error_response("invalid_credentials", "Incorrect password.", 401)
+    if error := _validate_new_password(new_password, current_password):
+        return error_response("invalid_password", error, 422)
+
+    with BenchConfig.open(bench_root) as config:
+        config.admin.password = new_password
+
+    session = Session(bench)
+    revoked = session.revoke_all()
+    token, jti = session.issue_session_token()
+    bench.audit_action(
+        "session",
+        {"event": "admin_password_changed", "jti": jti, "revoked_sessions": revoked},
+    )
+
+    response = jsonify({"revoked_sessions": revoked})
+    set_session_cookie(response, token, current_app.config["SESSION_COOKIE_SECURE"])
+    return response
 
 
 @settings_bp.patch("")

@@ -66,17 +66,15 @@ class SiteProvisioner:
             site.install_app(self.bench.app(app_name))
 
     def write_pilot_communication_config(self, site: "Site") -> None:
-        from admin.backend.auth import ensure_jwt_secret, issue_site_token
+        from admin.backend.internal.session import Session
         from pilot.utils import admin_url, write_private_text
 
         config_path = site.path / "site_config.json"
         if not config_path.exists():
             return
         config = json.loads(config_path.read_text())
-        secret = ensure_jwt_secret(self.bench.path / "bench.toml")
         config["pilot_endpoint"] = admin_url(self.bench.config)
-        config["pilot_auth_token"] = issue_site_token(
-            secret,
+        config["pilot_auth_token"] = Session(self.bench).issue_site_token(
             site.config.name,
             ttl=365 * 24 * 3600,
         )

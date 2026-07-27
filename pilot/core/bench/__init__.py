@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from functools import cached_property
 from pathlib import Path
@@ -251,6 +252,16 @@ class Bench:
         from pilot.core.bench.runtime import BenchRuntime
 
         BenchRuntime(self).install_requirements(on_progress)
+
+    def audit_action(self, category: str, fields: dict) -> None:
+        """Record a bench-level audit entry, enriched with any registered context (e.g. the
+        request IP and actor). Best-effort: a logging failure never fails the caller."""
+        from pilot.core.bench.audit_log import AuditLog, audit_context
+
+        try:
+            AuditLog(self).append(category, {**audit_context(), **fields})
+        except Exception as exc:
+            logging.warning("Audit log update skipped: %s", exc)
 
     def apply_saved_settings(
         self,

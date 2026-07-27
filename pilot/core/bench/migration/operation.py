@@ -295,7 +295,9 @@ class MigrationOperation:
             {"action": "bypass_patch", "site": self.failed_site, "patch": patch, "at": _now()}
         )
         self._save()
-        self._record_audit("bypass_patch", {"site": self.failed_site, "patch": patch})
+        self.bench.audit_action(
+            "bypass_patch", {"operation": self.id, "site": self.failed_site, "patch": patch}
+        )
 
     def revert_arm(self) -> None:
         """Re-arm from needs_attention/revert_failed and enter the next revert phase."""
@@ -383,11 +385,6 @@ class MigrationOperation:
             if site.name == name:
                 return site
         raise BenchError(f"Site {name!r} is not part of migration {self.id}")
-
-    def _record_audit(self, entry_type: str, fields: dict) -> None:
-        from pilot.core.bench.audit_log import AuditLog
-
-        AuditLog(self.bench).append(entry_type, {"operation": self.id, **fields})
 
     def _enter_first_phase(self) -> None:
         if not self.safeguards_disabled and self.sites:

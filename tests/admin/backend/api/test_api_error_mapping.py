@@ -6,8 +6,9 @@ from unittest.mock import Mock, patch
 import pytest
 
 from admin.backend.app import create_app
-from admin.backend.auth import ensure_jwt_secret, issue_token
+from admin.backend.internal.session import Session
 from pilot.config import BenchConfig
+from pilot.core.bench import Bench
 from pilot.core.server.ssh_keys import (
     InvalidSSHKeyError,
     LastSSHKeyError,
@@ -30,11 +31,10 @@ def _client(bench_root: Path):
             {"admin_enabled": True, "admin_password": "secret"},
         ).dumps()
     )
-    secret = ensure_jwt_secret(bench_root / "bench.toml")
     app = create_app(bench_root)
     app.config["TESTING"] = True
     client = app.test_client()
-    client.set_cookie("sid", issue_token(secret))
+    client.set_cookie("sid", Session(Bench(bench_root)).issue_session_token()[0])
     return client
 
 
