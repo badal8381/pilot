@@ -30,6 +30,11 @@ def create_app(bench_root: Path) -> Flask:
 
     app.extensions["used_logins"] = UsedTokens()
 
+    from admin.backend.middleware import request_audit_context
+    from pilot.core.bench.audit_log import set_audit_context_provider
+
+    set_audit_context_provider(request_audit_context)
+
     install_auth_guard(app, bench_root)
     register_blueprints(app)
     register_editor_frontend(app)

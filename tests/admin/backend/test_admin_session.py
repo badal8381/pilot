@@ -628,7 +628,7 @@ def test_revoke_session_requires_authentication(tmp_path: Path) -> None:
     assert client.post("/api/v1/session/revoke", json={"jti": "x"}).status_code == 401
 
 
-def test_revoke_session_is_audited_with_actor_and_ip(tmp_path: Path) -> None:
+def test_revoke_session_is_audited_with_request_context(tmp_path: Path) -> None:
     from admin.backend.internal.session import Session
     from pilot.core.bench.audit_log import AuditLog
 
@@ -642,9 +642,11 @@ def test_revoke_session_is_audited_with_actor_and_ip(tmp_path: Path) -> None:
 
     revoked = [e for e in AuditLog(bench).entries(entry_type="session") if e.get("event") == "revoked"]
     assert len(revoked) == 1
-    assert revoked[0]["jti"] == target_jti
-    assert revoked[0]["actor"] == actor_jti
+    assert revoked[0]["jti"] == target_jti  # the token acted on
+    assert revoked[0]["actor_jti"] == actor_jti  # who did it (their session)
     assert revoked[0]["ip"]
+    # actor is the user.email claim; local admin tokens carry none.
+    assert revoked[0]["actor"] is None
 
 
 def test_settings_reports_current_session_jti(tmp_path: Path) -> None:

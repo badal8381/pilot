@@ -5,7 +5,6 @@ from pathlib import Path
 from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import error_response, no_content_response
-from admin.backend.middleware import audit_request_action
 from pilot.core.bench import Bench
 from pilot.integrations.git import (
     TOKEN_HELP_URLS,
@@ -93,8 +92,8 @@ def save_integration():
     record = _store().save(
         provider_name, token, username=username or account.get("login", ""), expires_at=expires_at
     )
-    audit_request_action(
-        _current_bench(), "git", {"event": "connected", "provider": provider_name, "username": record.get("username", "")}
+    _current_bench().audit_action(
+        "git", {"event": "connected", "provider": provider_name, "username": record.get("username", "")}
     )
     return jsonify(_status(record))
 
@@ -102,7 +101,7 @@ def save_integration():
 @git_bp.delete("/connection")
 def delete_integration():
     _store().clear()
-    audit_request_action(_current_bench(), "git", {"event": "disconnected"})
+    _current_bench().audit_action("git", {"event": "disconnected"})
     return no_content_response()
 
 

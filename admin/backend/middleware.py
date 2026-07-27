@@ -179,13 +179,18 @@ def client_ip(default: str = "unknown") -> str:
     return peer or default
 
 
-def audit_request_action(bench: Bench, category: str, fields: dict) -> None:
-    """Record an audit entry enriched with the requesting actor's IP and session jti.
+def request_audit_context() -> dict:
+    """Audit context for the current request: caller IP and session jti (actor).
 
-    Backend/request-only. Tasks and the CLI call ``bench.audit_action`` directly.
+    Registered as the audit-log context provider by ``create_app``; returns nothing
+    outside a request context, so tasks and the CLI record no actor.
     """
+    from flask import has_request_context
+
+    if not has_request_context():
+        return {}
     claims = getattr(g, "jwt_claims", None) or {}
-    bench.audit_action(category, {**fields, "ip": client_ip(), "actor": claims.get("jti")})
+    return {"ip": client_ip(), "actor_jti": claims.get("jti"), "actor": claims.get("user.email")}
 
 
 def rate_limit(attempts: int, seconds: int, user_ip: bool = True):
