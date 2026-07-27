@@ -11,6 +11,7 @@ from admin.backend.api.v1.setup import wizard_marker_path
 from admin.backend.internal.session import Session
 from admin.backend.middleware import (
     allow_unauthenticated,
+    audit_request_action,
     decode_session_token,
     is_request_authenticated,
     rate_limit,
@@ -123,8 +124,18 @@ def create_session():
         return error
 
     if redeemed_jti:
-        bench.audit_action("session", {"event": "login_redeemed", "jti": redeemed_jti})
-    token, _ = Session(bench).issue_session_token(via="login_link" if redeemed_jti else "password")
+        audit_request_action(bench, "session", {"event": "login_redeemed", "jti": redeemed_jti})
+    token, jti = Session(bench).issue_session_token()
+    audit_request_action(
+        bench,
+        "session",
+        {
+            "event": "issued",
+            "jti": jti,
+            "scope": "bench",
+            "via": "login_link" if redeemed_jti else "password",
+        },
+    )
     response = created_response(
         {"authenticated": True, "scope": "bench"},
         url_for("core.get_session"),
@@ -155,6 +166,7 @@ def revoke_session():
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
     if not Session(bench).revoke_jti(jti):
         return error_response("unknown_session", "No such active session.", 404)
+    audit_request_action(bench, "session", {"event": "revoked", "jti": jti})
     return no_content_response()
 
 

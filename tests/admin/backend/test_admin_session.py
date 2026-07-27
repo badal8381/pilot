@@ -626,3 +626,33 @@ def test_revoke_session_requires_jti(tmp_path: Path) -> None:
 def test_revoke_session_requires_authentication(tmp_path: Path) -> None:
     client = _client(tmp_path)
     assert client.post("/api/v1/session/revoke", json={"jti": "x"}).status_code == 401
+
+
+def test_revoke_session_is_audited_with_actor_and_ip(tmp_path: Path) -> None:
+    from admin.backend.internal.session import Session
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    actor_token, actor_jti = Session(bench).issue_session_token()
+    client.set_cookie("sid", actor_token)
+    _, target_jti = Session(bench).issue_session_token()
+
+    assert client.post("/api/v1/session/revoke", json={"jti": target_jti}).status_code == 204
+
+    revoked = [e for e in AuditLog(bench).entries(entry_type="session") if e.get("event") == "revoked"]
+    assert len(revoked) == 1
+    assert revoked[0]["jti"] == target_jti
+    assert revoked[0]["actor"] == actor_jti
+    assert revoked[0]["ip"]
+
+
+def test_settings_reports_current_session_jti(tmp_path: Path) -> None:
+    from admin.backend.internal.session import Session
+
+    client = _client(tmp_path)
+    token, jti = Session(Bench(tmp_path / "benches" / "current")).issue_session_token()
+    client.set_cookie("sid", token)
+
+    data = client.get("/api/v1/settings").get_json()
+    assert data["authentication"]["current_jti"] == jti

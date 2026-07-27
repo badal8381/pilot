@@ -9,7 +9,6 @@ import pytest
 from admin.backend.internal.session import ActiveTokens, Session
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
-from pilot.core.bench.audit_log import AuditLog
 
 
 def _bench(tmp_path: Path, password: str = "secret", jwt_secret: str | None = None) -> Bench:
@@ -23,19 +22,14 @@ def _bench(tmp_path: Path, password: str = "secret", jwt_secret: str | None = No
     return Bench(BenchConfig.from_file(toml_path), tmp_path)
 
 
-def test_issue_session_token_is_verifiable_and_audited(tmp_path: Path) -> None:
+def test_issue_session_token_is_verifiable_and_active(tmp_path: Path) -> None:
     session = Session(_bench(tmp_path))
-    token, jti = session.issue_session_token(via="password")
+    token, jti = session.issue_session_token()
 
     claims = session.verify_token(token)
     assert claims["jti"] == jti
     assert claims["scope"] == "bench"
-
-    entries = AuditLog(session.bench).entries(entry_type="session")
-    assert len(entries) == 1
-    assert entries[0]["event"] == "issued"
-    assert entries[0]["jti"] == jti
-    assert entries[0]["via"] == "password"
+    assert jti in ActiveTokens(session.bench)
 
 
 def test_ensure_jwt_secret_generates_and_persists(tmp_path: Path) -> None:

@@ -122,12 +122,15 @@ class Session:
         return self.admin_config.jwt_secret
 
     def issue_session_token(
-        self, scope: str = "bench", site: str | None = None, ttl: int = DEFAULT_TTL, via: str = "password"
+        self, scope: str = "bench", site: str | None = None, ttl: int = DEFAULT_TTL
     ) -> tuple[str, str]:
-        """Mint an admin session token (with a jti) and audit-log its issuance."""
+        """Mint an admin session token (with a jti) and register it as active.
+
+        Auditing the issuance is the caller's job -- it happens in the request handler so
+        the entry carries the actor's IP.
+        """
         jti = secrets.token_urlsafe(16)
         token = self._encode(ttl=ttl, scope=scope, jti=jti, site=site)
-        self.bench.audit_action("session", {"event": "issued", "jti": jti, "scope": scope, "via": via})
         ActiveTokens(self.bench).add(jti, int(time.time()) + ttl)
         return token, jti
 

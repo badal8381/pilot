@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-from flask import Blueprint, jsonify, request
+from pathlib import Path
+
+from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import created_response, error_response, no_content_response
+from admin.backend.middleware import audit_request_action
+from pilot.core.bench import Bench
 from pilot.core.server import (
     InvalidSSHKeyError,
     LastSSHKeyError,
@@ -13,6 +17,10 @@ from pilot.core.server import (
 )
 
 ssh_keys_bp = Blueprint("ssh_keys", __name__)
+
+
+def _current_bench() -> Bench:
+    return Bench(Path(current_app.config["BENCH_ROOT"]))
 
 
 def _serialize(key: SSHKey) -> dict:
@@ -41,6 +49,7 @@ def add_key():
         return error_response("ssh_key_already_exists", "That key is already authorized.", 409)
     except InvalidSSHKeyError as error:
         return error_response("invalid_ssh_key", str(error), 422)
+    audit_request_action(_current_bench(), "ssh_key", {"event": "added", "fingerprint": key.fingerprint})
     return created_response(_serialize(key), f"/api/v1/ssh-keys/{key.fingerprint}")
 
 
@@ -52,4 +61,5 @@ def remove_key(fingerprint: str):
         return error_response("ssh_key_not_found", "SSH key was not found.", 404)
     except LastSSHKeyError as error:
         return error_response("ssh_key_removal_rejected", str(error), 409)
+    audit_request_action(_current_bench(), "ssh_key", {"event": "removed", "fingerprint": fingerprint})
     return no_content_response()

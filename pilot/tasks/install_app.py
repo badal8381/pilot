@@ -21,6 +21,7 @@ class InstallAppTask(Task):
         site = self.bench.site(self.site)
         dependencies = self.install(site, app)
         self.build_assets([app, *dependencies])
+        self.bench.audit_action("app", {"event": "installed", "app": self.app, "site": self.site})
 
     @step("install", lambda self: f"Install {self.app} into {self.site}")
     def install(self, site: "Site", app: "App") -> list["App"]:

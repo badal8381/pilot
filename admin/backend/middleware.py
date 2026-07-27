@@ -179,6 +179,15 @@ def client_ip(default: str = "unknown") -> str:
     return peer or default
 
 
+def audit_request_action(bench: Bench, category: str, fields: dict) -> None:
+    """Record an audit entry enriched with the requesting actor's IP and session jti.
+
+    Backend/request-only. Tasks and the CLI call ``bench.audit_action`` directly.
+    """
+    claims = getattr(g, "jwt_claims", None) or {}
+    bench.audit_action(category, {**fields, "ip": client_ip(), "actor": claims.get("jti")})
+
+
 def rate_limit(attempts: int, seconds: int, user_ip: bool = True):
     """Allow at most `attempts` calls per `seconds` for this view, else respond 429."""
 
