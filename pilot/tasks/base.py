@@ -58,6 +58,10 @@ class Task:
     command: ClassVar[str] = ""
     has_done_step: ClassVar[bool] = True
     required_submit_args: ClassVar[tuple[str, ...]] = ()
+    # Audit "who queued this" on queue. Turn off for frequent polling/read-only tasks.
+    audit_on_queue: ClassVar[bool] = True
+    # Non-sensitive queue args safe to record in the audit entry.
+    _AUDIT_ARG_KEYS: ClassVar[tuple[str, ...]] = ("site", "app", "name", "repo", "branch", "marketplace_app")
 
     bench: "Bench"
     bench_root: Path
@@ -73,7 +77,7 @@ class Task:
         **args,
     ) -> str:
         callbacks = cls._queue_callbacks(bench, args, callbacks)
-        return bench.tasks.run_task(
+        task_id = bench.tasks.run_task(
             cls,
             callbacks=callbacks,
             idempotency_key=idempotency_key,
@@ -81,6 +85,19 @@ class Task:
             resource_handoff_from=resource_handoff_from,
             **args,
         )
+        cls._audit_queued(bench, task_id, args)
+        return task_id
+
+    @classmethod
+    def _audit_queued(cls, bench: "Bench", task_id: str, args: dict) -> None:
+        """Record who queued this task. Actor/IP are added by the audit context provider."""
+        if not cls.audit_on_queue:
+            return
+        fields = {"event": "queued", "command": cls.command, "task_id": task_id}
+        safe = {key: args[key] for key in cls._AUDIT_ARG_KEYS if key in args}
+        if safe:
+            fields["args"] = safe
+        bench.audit_action("task", fields)
 
     @classmethod
     def queue_submission(
