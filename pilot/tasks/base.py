@@ -164,14 +164,6 @@ class Task:
         if self.bench.config.production.enabled and not NginxManager(self.bench).has_passwordless_sudo:
             raise BenchError("Production site operations require non-interactive system privileges.")
 
-    def record_audit(self, category: str, fields: dict) -> None:
-        from pilot.core.bench.audit_log import AuditLog
-
-        try:
-            AuditLog(self.bench).append(category, fields)
-        except Exception as exc:
-            print(f"Audit log update skipped due to error: {exc!s}")
-
     @classmethod
     def main(cls) -> None:
         from pilot.internal.tasks.authoring import run_task_main
