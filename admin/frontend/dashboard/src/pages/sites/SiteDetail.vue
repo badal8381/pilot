@@ -64,6 +64,14 @@
     <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
   </div>
 
+  <AppActionDialog
+    v-if="appAction"
+    v-model:open="showAppAction"
+    :app-name="appAction.app"
+    :action="appAction.action"
+    :site-name="siteName"
+  />
+
   <Teleport defer to="#header-actions">
     <Button variant="subtle" size="sm" @click="openSite">
       <template #prefix><span class="size-4 lucide-external-link" /></template>
@@ -82,6 +90,7 @@ import SiteBackups from '@/components/sites/Backups.vue'
 import SiteMonitoring from '@/components/sites/Monitoring.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
+import AppActionDialog from '@/components/sites/AppActionDialog.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
@@ -135,6 +144,26 @@ watch(
 const tabLabel = computed(() => tabs.find((t) => t.value === activeTab.value)?.label ?? '')
 watchEffect(() => {
   if (site.value) document.title = `${site.value.name} | ${tabLabel.value}`
+})
+
+const APP_ACTIONS = ['install-app', 'uninstall-app']
+const appAction = computed(() => {
+  const app = route.query.app
+  const action = route.query.action
+  if (typeof app !== 'string' || !APP_ACTIONS.includes(action)) return null
+  return { app, action }
+})
+const showAppAction = ref(false)
+watch(
+  appAction,
+  (value) => {
+    showAppAction.value = Boolean(value)
+  },
+  { immediate: true },
+)
+watch(showAppAction, (open) => {
+  if (open) return
+  router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
 })
 
 const isMobile = useIsMobile()

@@ -110,9 +110,26 @@ const REDIRECT_ON_SUCCESS_COMMANDS = [
   'get-and-install-app',
 ]
 
+const APP_ARG_KEY = {
+  'install-app': 'app',
+  'uninstall-app': 'app',
+  'get-and-install-app': 'marketplace_app',
+}
+
+const APP_ACTION_FOR_COMMAND = {
+  'install-app': 'install-app',
+  'uninstall-app': 'uninstall-app',
+  'get-and-install-app': 'install-app',
+}
+
 export function redirectRouteOnSuccess(task) {
   if (!REDIRECT_ON_SUCCESS_COMMANDS.includes(task.command)) return null
-  return siteRoute(task)
+  const route = siteRoute(task)
+  if (!route) return null
+  const appKey = APP_ARG_KEY[task.command]
+  const app = appKey && task.args?.[appKey]
+  if (!app) return route
+  return { ...route, query: { app, action: APP_ACTION_FOR_COMMAND[task.command] } }
 }
 
 export function relativeTime(iso) {

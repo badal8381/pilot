@@ -41,16 +41,38 @@ test('site-creating and app tasks redirect to the site page on success', () => {
     name: 'SiteDetail',
     params: { name: 'a.local' },
   })
-  assert.deepEqual(redirectRouteOnSuccess({ command: 'install-app', args: { site: 'a.local' } }), {
-    name: 'SiteDetail',
-    params: { name: 'a.local' },
-  })
-  assert.deepEqual(redirectRouteOnSuccess({ command: 'uninstall-app', args: { site: 'a.local' } }), {
-    name: 'SiteDetail',
-    params: { name: 'a.local' },
-  })
   assert.deepEqual(
-    redirectRouteOnSuccess({ command: 'get-and-install-app', args: { site: 'a.local' } }),
+    redirectRouteOnSuccess({ command: 'install-app', args: { site: 'a.local', app: 'erpnext' } }),
+    {
+      name: 'SiteDetail',
+      params: { name: 'a.local' },
+      query: { app: 'erpnext', action: 'install-app' },
+    },
+  )
+  assert.deepEqual(
+    redirectRouteOnSuccess({
+      command: 'uninstall-app',
+      args: { site: 'a.local', app: 'erpnext' },
+    }),
+    {
+      name: 'SiteDetail',
+      params: { name: 'a.local' },
+      query: { app: 'erpnext', action: 'uninstall-app' },
+    },
+  )
+  assert.deepEqual(
+    redirectRouteOnSuccess({
+      command: 'get-and-install-app',
+      args: { site: 'a.local', marketplace_app: 'erpnext' },
+    }),
+    {
+      name: 'SiteDetail',
+      params: { name: 'a.local' },
+      query: { app: 'erpnext', action: 'install-app' },
+    },
+  )
+  assert.deepEqual(
+    redirectRouteOnSuccess({ command: 'get-and-install-app', args: { site: 'a.local', repo: 'x' } }),
     { name: 'SiteDetail', params: { name: 'a.local' } },
   )
   assert.equal(redirectRouteOnSuccess({ command: 'drop-site', args: { site: 'a.local' } }), null)
