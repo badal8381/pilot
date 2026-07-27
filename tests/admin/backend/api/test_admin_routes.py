@@ -69,7 +69,7 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         if rule.rule.startswith(f"{API_ROOT_PREFIX}/") and not rule.rule.startswith(f"{API_V1_PREFIX}/")
     ]
 
-    assert len(routes) == 148
+    assert len(routes) == 149
     assert unversioned == []
     assert len({(method, path) for method, path, _, _ in routes}) == 148
     assert Counter(method for method, _, _, _ in routes) == {
