@@ -92,6 +92,16 @@ export function useMarketplace(initialSiteName = '') {
   )
   const installedOnCurrentSite = computed(() => new Set(currentSite.value?.installed_apps || []))
 
+  function isInstalledOnAllSites(appName) {
+    return Boolean(sites.value.length) && sites.value.every((site) => site.installed_apps?.includes(appName))
+  }
+
+  function isAppInstalled(appName) {
+    return currentSiteName.value
+      ? installedOnCurrentSite.value.has(appName)
+      : isInstalledOnAllSites(appName)
+  }
+
   // Only Frappe-made apps that some marketplace app depends on.
   const worksWithOptions = computed(() => {
     const names = new Set(registry.value.flatMap((app) => Object.keys(app.dependencies || {})))
@@ -122,7 +132,7 @@ export function useMarketplace(initialSiteName = '') {
       .filter((app) => matchesSearch(app, query))
       .map((app) => ({
         ...app,
-        installed: installedOnCurrentSite.value.has(app.name),
+        installed: isAppInstalled(app.name),
         compatible: app.is_installable,
         needs: app.required_version,
         label: app.version ? `v${app.version}` : '',

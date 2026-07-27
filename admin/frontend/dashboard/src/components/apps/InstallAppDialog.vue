@@ -40,7 +40,13 @@
             @click="selection = s.name"
           >
             <span class="place-items-center grid bg-surface-gray-2 rounded-md size-8 shrink-0">
-              <span class="size-4 text-ink-gray-6 lucide-globe" />
+              <span
+                v-if="isInstalled(s)"
+                class="size-4 text-ink-green-6 lucide-check"
+                role="img"
+                aria-label="Installed"
+              />
+              <span v-else class="size-4 text-ink-gray-6 lucide-globe" />
             </span>
             <div class="flex-1 min-w-0">
               <p class="font-medium text-ink-gray-8 text-sm truncate">{{ s.name }}</p>
