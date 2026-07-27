@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
 
@@ -17,6 +18,48 @@ _SCHEMA_SIZE_QUERY = (
 _PG_DATABASE_SIZE_QUERY = (
     "SELECT datname, pg_database_size(datname) FROM pg_database WHERE datistemplate = false"
 )
+
+
+@dataclass
+class DatabaseRow:
+    schema: str
+    site: str | None
+    system: bool
+    bytes: int
+
+
+@dataclass
+class DatabaseBreakdown:
+    engine: str
+    supported: bool
+    used_bytes: int
+    binlog_bytes: int
+    core_bytes: int
+    databases: list[DatabaseRow] = field(default_factory=list)
+
+
+@dataclass
+class StorageItem:
+    name: str
+    bytes: int
+
+
+@dataclass
+class BenchBreakdown:
+    used_bytes: int
+    apps: list[StorageItem]
+    apps_bytes: int
+    sites: list[StorageItem]
+    sites_bytes: int
+    logs_bytes: int
+
+
+@dataclass
+class StorageBreakdown:
+    disk_total: int
+    disk_used: int
+    database: DatabaseBreakdown
+    bench: BenchBreakdown
 
 
 @lru_cache(maxsize=256)
@@ -36,21 +79,25 @@ class StorageProvider:
         self._config = BenchConfig.read(bench_root, validate=False)
         self._bench = Bench(self._config, bench_root)
 
-    def get_breakdown(self) -> dict:
-        return {
-            "database": self._database_breakdown(),
-            "bench": self._bench_breakdown(),
-        }
+    def get_breakdown(self, disk_total: int, disk_used: int) -> StorageBreakdown:
+        return StorageBreakdown(
+            disk_total=disk_total,
+            disk_used=disk_used,
+            database=self._database_breakdown(),
+            bench=self._bench_breakdown(),
+        )
 
-    def _database_breakdown(self) -> dict:
+    def _database_breakdown(self) -> DatabaseBreakdown:
         engine = self._config.db_type
         if engine == "mariadb":
             return self._mariadb_breakdown()
         if engine == "postgres":
             return self._postgres_breakdown()
-        return {"engine": engine, "supported": False, "used_bytes": 0, "databases": []}
+        return DatabaseBreakdown(
+            engine=engine, supported=False, used_bytes=0, binlog_bytes=0, core_bytes=0
+        )
 
-    def _mariadb_breakdown(self) -> dict:
+    def _mariadb_breakdown(self) -> DatabaseBreakdown:
         from pilot.managers.database.mariadb import MariaDBManager
 
         data_dir = MariaDBManager(self._config.mariadb).data_dir
@@ -58,40 +105,40 @@ class StorageProvider:
         database = make_database(self._config)
         databases = self._schema_sizes(database, _SCHEMA_SIZE_QUERY)
         binlog_bytes = database.get_binlog_status().size_bytes
-        schema_bytes = sum(entry["bytes"] for entry in databases)
+        schema_bytes = sum(row.bytes for row in databases)
         core_bytes = max(total_bytes - binlog_bytes - schema_bytes, 0)
-        return {
-            "engine": "mariadb",
-            "supported": True,
-            "used_bytes": total_bytes,
-            "binlog_bytes": binlog_bytes,
-            "core_bytes": core_bytes,
-            "databases": databases,
-        }
+        return DatabaseBreakdown(
+            engine="mariadb",
+            supported=True,
+            used_bytes=total_bytes,
+            binlog_bytes=binlog_bytes,
+            core_bytes=core_bytes,
+            databases=databases,
+        )
 
-    def _postgres_breakdown(self) -> dict:
+    def _postgres_breakdown(self) -> DatabaseBreakdown:
         database = make_database(self._config)
         databases = self._schema_sizes(database, _PG_DATABASE_SIZE_QUERY)
-        used_bytes = sum(entry["bytes"] for entry in databases)
-        return {
-            "engine": "postgres",
-            "supported": True,
-            "used_bytes": used_bytes,
-            "binlog_bytes": 0,
-            "core_bytes": 0,
-            "databases": databases,
-        }
+        used_bytes = sum(row.bytes for row in databases)
+        return DatabaseBreakdown(
+            engine="postgres",
+            supported=True,
+            used_bytes=used_bytes,
+            binlog_bytes=0,
+            core_bytes=0,
+            databases=databases,
+        )
 
-    def _schema_sizes(self, database, query: str) -> list[dict]:
+    def _schema_sizes(self, database, query: str) -> list[DatabaseRow]:
         site_by_db = self._site_by_database_name()
         result = database.execute(query)
         return [
-            {
-                "schema": row[0],
-                "site": site_by_db.get(row[0]),
-                "system": row[0] in _SYSTEM_SCHEMAS,
-                "bytes": int(row[1]),
-            }
+            DatabaseRow(
+                schema=row[0],
+                site=site_by_db.get(row[0]),
+                system=row[0] in _SYSTEM_SCHEMAS,
+                bytes=int(row[1]),
+            )
             for row in result.rows
             if row[0] is not None
         ]
@@ -107,23 +154,23 @@ class StorageProvider:
                 mapping[db_name] = site.config.name
         return mapping
 
-    def _bench_breakdown(self) -> dict:
+    def _bench_breakdown(self) -> BenchBreakdown:
         apps = [
-            {"name": app.config.name, "bytes": directory_size_bytes(str(app.path))}
+            StorageItem(name=app.config.name, bytes=directory_size_bytes(str(app.path)))
             for app in self._bench.apps()
         ]
         sites = [
-            {"name": site.config.name, "bytes": directory_size_bytes(str(site.path))}
+            StorageItem(name=site.config.name, bytes=directory_size_bytes(str(site.path)))
             for site in self._bench.sites()
         ]
         logs_bytes = directory_size_bytes(str(self._bench.logs_path))
-        apps_bytes = sum(entry["bytes"] for entry in apps)
-        sites_bytes = sum(entry["bytes"] for entry in sites)
-        return {
-            "used_bytes": apps_bytes + sites_bytes + logs_bytes,
-            "apps": apps,
-            "apps_bytes": apps_bytes,
-            "sites": sites,
-            "sites_bytes": sites_bytes,
-            "logs_bytes": logs_bytes,
-        }
+        apps_bytes = sum(item.bytes for item in apps)
+        sites_bytes = sum(item.bytes for item in sites)
+        return BenchBreakdown(
+            used_bytes=apps_bytes + sites_bytes + logs_bytes,
+            apps=apps,
+            apps_bytes=apps_bytes,
+            sites=sites,
+            sites_bytes=sites_bytes,
+            logs_bytes=logs_bytes,
+        )

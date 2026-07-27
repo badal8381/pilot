@@ -214,12 +214,14 @@ def stats():
 
 @stats_bp.get("/storage")
 def storage_breakdown():
+    from dataclasses import asdict
+
     from admin.backend.providers.storage import StorageProvider
 
     bench_root = Path(current_app.config["BENCH_ROOT"])
     disk = psutil.disk_usage("/")
     try:
-        breakdown = StorageProvider(bench_root).get_breakdown()
+        breakdown = StorageProvider(bench_root).get_breakdown(disk.total, disk.used)
     except Exception:
         return error_response("storage_unavailable", "Could not read storage breakdown.", 500)
-    return jsonify({"disk_total": disk.total, "disk_used": disk.used, **breakdown})
+    return jsonify(asdict(breakdown))

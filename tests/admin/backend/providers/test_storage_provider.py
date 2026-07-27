@@ -41,18 +41,16 @@ def test_bench_breakdown_sums_apps_sites_and_logs(tmp_path: Path) -> None:
 
     breakdown = StorageProvider(tmp_path)._bench_breakdown()
 
-    assert [entry["name"] for entry in breakdown["apps"]] == ["frappe"]
-    assert [entry["name"] for entry in breakdown["sites"]] == ["site1.local"]
-    assert breakdown["apps_bytes"] > 0
-    assert breakdown["sites_bytes"] > 0
-    assert breakdown["logs_bytes"] > 0
-    assert breakdown["used_bytes"] == (
-        breakdown["apps_bytes"] + breakdown["sites_bytes"] + breakdown["logs_bytes"]
-    )
+    assert [entry.name for entry in breakdown.apps] == ["frappe"]
+    assert [entry.name for entry in breakdown.sites] == ["site1.local"]
+    assert breakdown.apps_bytes > 0
+    assert breakdown.sites_bytes > 0
+    assert breakdown.logs_bytes > 0
+    assert breakdown.used_bytes == (breakdown.apps_bytes + breakdown.sites_bytes + breakdown.logs_bytes)
 
 
 def test_mariadb_breakdown_shapes_schemas_and_reconciles_core(tmp_path: Path) -> None:
-    from admin.backend.providers.storage import StorageProvider
+    from admin.backend.providers.storage import DatabaseBreakdown, DatabaseRow, StorageProvider
 
     _write_bench(tmp_path)
     _make_site(tmp_path, "site1.local", "site1_db")
@@ -71,24 +69,26 @@ def test_mariadb_breakdown_shapes_schemas_and_reconciles_core(tmp_path: Path) ->
     ):
         breakdown = StorageProvider(tmp_path)._mariadb_breakdown()
 
-    assert breakdown == {
-        "engine": "mariadb",
-        "supported": True,
-        "used_bytes": 1000,
-        "binlog_bytes": 50,
-        "core_bytes": 350,  # 1000 - 50 - (500 + 100)
-        "databases": [
-            {"schema": "site1_db", "site": "site1.local", "system": False, "bytes": 500},
-            {"schema": "mysql", "site": None, "system": True, "bytes": 100},
+    assert breakdown == DatabaseBreakdown(
+        engine="mariadb",
+        supported=True,
+        used_bytes=1000,
+        binlog_bytes=50,
+        core_bytes=350,  # 1000 - 50 - (500 + 100)
+        databases=[
+            DatabaseRow(schema="site1_db", site="site1.local", system=False, bytes=500),
+            DatabaseRow(schema="mysql", site=None, system=True, bytes=100),
         ],
-    }
+    )
 
 
 def test_sqlite_engine_is_not_supported(tmp_path: Path) -> None:
-    from admin.backend.providers.storage import StorageProvider
+    from admin.backend.providers.storage import DatabaseBreakdown, StorageProvider
 
     _write_bench(tmp_path, db_type="sqlite")
 
     breakdown = StorageProvider(tmp_path)._database_breakdown()
 
-    assert breakdown == {"engine": "sqlite", "supported": False, "used_bytes": 0, "databases": []}
+    assert breakdown == DatabaseBreakdown(
+        engine="sqlite", supported=False, used_bytes=0, binlog_bytes=0, core_bytes=0
+    )
