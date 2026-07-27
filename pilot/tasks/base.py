@@ -93,7 +93,7 @@ class Task:
         """Record who queued this task. Actor/IP are added by the audit context provider."""
         if not cls.audit_on_queue:
             return
-        fields = {"event": "queued", "command": cls.command, "task_id": task_id}
+        fields: dict[str, Any] = {"event": "queued", "command": cls.command, "task_id": task_id}
         safe = {key: args[key] for key in cls._AUDIT_ARG_KEYS if key in args}
         if safe:
             fields["args"] = safe
