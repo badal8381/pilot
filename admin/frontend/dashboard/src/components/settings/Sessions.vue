@@ -92,7 +92,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Alert, Badge, Button, Dialog, ListView, ListRowItem, TabButtons, toast } from 'frappe-ui'
-import { settingsApi } from '@/api/settings'
 import { sessionApi } from '@/api/session'
 import { fmtDateTime } from '@/utils/taskFormat'
 
@@ -193,11 +192,10 @@ async function confirmRevoke() {
 
 async function load() {
   try {
-    const data = await settingsApi.get()
-    const auth = data.authentication || {}
-    activeTokens.value = auth.active_tokens || []
-    revokedTokens.value = auth.revoked_tokens || []
-    currentJti.value = auth.current_jti || ''
+    const data = await sessionApi.list()
+    activeTokens.value = data.active_tokens || []
+    revokedTokens.value = data.revoked_tokens || []
+    currentJti.value = data.current_jti || ''
   } catch (e) {
     loadError.value = e.message || 'Could not load authentication data.'
   } finally {

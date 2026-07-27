@@ -22,7 +22,9 @@
         :label="section.label"
         :description="section.description"
       >
-        <Button size="sm" variant="subtle" @click="openSection = section">Manage</Button>
+        <Button size="sm" variant="subtle" @click="openSection = section">
+          {{ section.action || 'Manage' }}
+        </Button>
       </SettingsRow>
 
       <Version />

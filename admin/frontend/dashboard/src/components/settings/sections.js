@@ -5,6 +5,7 @@ import LLM from '@/components/settings/LLM.vue'
 import Firewall from '@/components/settings/Firewall.vue'
 import Waf from '@/components/settings/Waf.vue'
 import SshKeys from '@/components/settings/SshKeys.vue'
+import ChangeAdminPassword from '@/components/settings/ChangeAdminPassword.vue'
 
 // Single source of truth for id/label/component so SettingsDialog can resolve
 // a routed subsection id without each page owning its own private mapping.
@@ -36,6 +37,13 @@ export const GENERAL_SECTIONS = [
 ]
 
 export const SECURITY_SECTIONS = [
+  {
+    id: 'password',
+    label: 'Change password',
+    description: 'Update the password that signs in to this bench.',
+    component: ChangeAdminPassword,
+    action: 'Change',
+  },
   {
     id: 'firewall',
     label: 'Firewall settings',
