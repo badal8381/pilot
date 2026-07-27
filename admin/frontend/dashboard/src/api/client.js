@@ -1,5 +1,5 @@
 import ky from 'ky'
-import { reportSignedOut } from '../composables/auth/useSignedOut.js'
+import { isSignedOut, reportSignedOut } from '../composables/auth/useSignedOut.js'
 
 export const API_V1_PREFIX = '/api/v1'
 
@@ -17,7 +17,13 @@ export function apiErrorMessage(payload, fallback = 'Request failed.') {
 
 export async function unwrap(parsed) {
   const data = await parsed
-  if (data?.error) throw new Error(apiErrorMessage(data))
+  if (data?.error) {
+    // Once the signed-out modal owns the screen, every in-flight call fails for the same
+    // reason. Never settling leaves callers in their loading state rather than painting
+    // error text behind the modal; the page is about to be replaced by a fresh sign-in.
+    if (isSignedOut()) return new Promise(() => {})
+    throw new Error(apiErrorMessage(data))
+  }
   return data
 }
 

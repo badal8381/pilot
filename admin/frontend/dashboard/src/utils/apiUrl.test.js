@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { API_V1_PREFIX, apiErrorMessage, apiUrl, isSessionExpired, unwrap } from '../api/client.js'
+import { useSignedOut } from '../composables/auth/useSignedOut.js'
 
 test('builds relative and cross-origin v1 API URLs', () => {
   assert.equal(API_V1_PREFIX, '/api/v1')
@@ -63,4 +64,30 @@ test('non-401 and unparsable responses are not signed out', async () => {
     false,
   )
   assert.equal(await isSessionExpired(new Response('<html>gateway</html>', { status: 401 })), false)
+})
+
+test('unwrap stops resolving once the signed-out modal has taken over', async () => {
+  const { signedOut } = useSignedOut()
+  signedOut.value = true
+  try {
+    const settled = await Promise.race([
+      unwrap(Promise.resolve({ error: { message: 'Could not load settings.' } })).then(
+        () => 'resolved',
+        () => 'rejected',
+      ),
+      new Promise((resolve) => setTimeout(() => resolve('pending'), 20)),
+    ])
+    // Neither branch runs, so no component sets error text under the modal.
+    assert.equal(settled, 'pending')
+  } finally {
+    signedOut.value = false
+  }
+})
+
+test('unwrap still rejects normally when the session is intact', async () => {
+  const { signedOut } = useSignedOut()
+  assert.equal(signedOut.value, false)
+  await assert.rejects(unwrap(Promise.resolve({ error: { message: 'Bad input.' } })), {
+    message: 'Bad input.',
+  })
 })

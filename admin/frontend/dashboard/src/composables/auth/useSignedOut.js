@@ -7,6 +7,10 @@ export function reportSignedOut() {
   signedOut.value = true
 }
 
+export function isSignedOut() {
+  return signedOut.value
+}
+
 export function useSignedOut() {
   return { signedOut }
 }
