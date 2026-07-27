@@ -596,3 +596,33 @@ def test_require_scope_with_callable(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token(scope="site", site="example.com"))
     assert client.get("/api/v1/sites/example.com/action").status_code == 200
     assert client.get("/api/v1/sites/other.com/action").status_code == 403
+
+
+def test_revoke_session_endpoint_revokes_active_jti(tmp_path: Path) -> None:
+    from admin.backend.internal.session import ActiveTokens, RevokedTokens, Session
+
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    bench = Bench(tmp_path / "benches" / "current")
+    _, jti = Session(bench).issue_session_token()
+    assert jti in ActiveTokens(bench)
+
+    assert client.post("/api/v1/session/revoke", json={"jti": jti}).status_code == 204
+    assert jti in RevokedTokens(bench)
+
+
+def test_revoke_session_unknown_jti_is_404(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    assert client.post("/api/v1/session/revoke", json={"jti": "nope"}).status_code == 404
+
+
+def test_revoke_session_requires_jti(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    assert client.post("/api/v1/session/revoke", json={}).status_code == 400
+
+
+def test_revoke_session_requires_authentication(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    assert client.post("/api/v1/session/revoke", json={"jti": "x"}).status_code == 401

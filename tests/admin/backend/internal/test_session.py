@@ -95,28 +95,31 @@ def test_issue_login_token_carries_jti(tmp_path: Path) -> None:
     assert session.verify_token(session.issue_login_token())["jti"]
 
 
-def test_revoke_token_blocks_verification(tmp_path: Path) -> None:
+def test_revoked_jtis_are_shared_across_sessions(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    token, jti = Session(bench).issue_session_token()
+    Session(bench).revoke_jti(jti)
+    assert Session(bench).verify_token(token) is None
+
+
+def test_revoke_jti_revokes_active_session(tmp_path: Path) -> None:
     session = Session(_bench(tmp_path))
-    token, _ = session.issue_session_token()
-    assert session.verify_token(token) is not None
-    session.revoke_token(token)
+    token, jti = session.issue_session_token()
+    assert session.revoke_jti(jti) is True
     assert session.verify_token(token) is None
 
 
-def test_revoked_jtis_are_shared_across_sessions(tmp_path: Path) -> None:
-    bench = _bench(tmp_path)
-    token, _ = Session(bench).issue_session_token()
-    Session(bench).revoke_token(token)
-    assert Session(bench).verify_token(token) is None
+def test_revoke_jti_unknown_returns_false(tmp_path: Path) -> None:
+    assert Session(_bench(tmp_path)).revoke_jti("not-a-session") is False
 
 
 def test_active_jtis_tracks_issued_and_drops_revoked(tmp_path: Path) -> None:
     session = Session(_bench(tmp_path))
-    token_a, jti_a = session.issue_session_token()
+    _, jti_a = session.issue_session_token()
     _, jti_b = session.issue_session_token()
     assert set(session.active_jtis()) == {jti_a, jti_b}
 
-    session.revoke_token(token_a)
+    session.revoke_jti(jti_a)
     assert set(session.active_jtis()) == {jti_b}
 
 
