@@ -97,6 +97,17 @@ export function siteLabel(task) {
   return (key && task.args?.[key]) || 'Server-level'
 }
 
+export function siteRoute(task) {
+  const site = siteLabel(task)
+  if (site === 'Server-level') return null
+  return { name: 'SiteDetail', params: { name: site } }
+}
+
+export function redirectRouteOnSuccess(task) {
+  if (task.command !== 'new-site') return null
+  return siteRoute(task)
+}
+
 export function relativeTime(iso) {
   if (!iso) return ''
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
