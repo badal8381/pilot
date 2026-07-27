@@ -38,9 +38,12 @@
     <DatabaseInsights v-if="view === 'database'" :window="dbWindow" />
 
     <!-- Loading state -->
-    <div v-else-if="pageLoading" class="flex justify-center h-[50vh]">
-      <LoadingText />
-    </div>
+    <template v-else-if="pageLoading">
+      <Skeleton v-if="!isHistorical" class="mb-6 rounded-lg h-[88px]" />
+      <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
+        <Skeleton v-for="i in 6" :key="i" class="rounded-lg h-[340px]" />
+      </div>
+    </template>
 
     <template v-else>
       <!-- Live stats bar: CPU / Memory / Storage -->
@@ -130,7 +133,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dropdown, LoadingText, ErrorMessage, AxisChart } from 'frappe-ui'
+import { Button, Dropdown, LoadingText, ErrorMessage, AxisChart, Skeleton } from 'frappe-ui'
 import ChartCard from '@/components/common/ChartCard.vue'
 import WafAnalytics from '@/components/common/WafAnalytics.vue'
 import DatabaseInsights from '@/components/dashboard/DatabaseInsights.vue'
