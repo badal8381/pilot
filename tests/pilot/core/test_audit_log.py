@@ -90,3 +90,19 @@ def test_missing_and_corrupt_lines_are_tolerated(tmp_path) -> None:
     log.append("backup", {"site": "b"})
 
     assert [e["site"] for e in log.entries()] == ["b", "a"]
+
+
+def test_audit_action_swallows_append_failure(tmp_path, caplog) -> None:
+    """bench.audit_action is best-effort: a write failure is logged, never raised."""
+    import logging
+    from unittest.mock import patch
+
+    from pilot.config import BenchConfig
+    from pilot.core.bench import Bench
+
+    bench = Bench(BenchConfig.from_flat("t", {}), tmp_path)
+    caplog.set_level(logging.WARNING)
+    with patch("pilot.core.bench.audit_log.AuditLog.append", side_effect=OSError("disk full")):
+        bench.audit_action("session", {"event": "issued"})
+
+    assert "Audit log update skipped" in caplog.text

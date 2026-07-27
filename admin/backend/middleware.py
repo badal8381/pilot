@@ -11,6 +11,7 @@ from admin.backend.api.responses import error_response
 from admin.backend.api.routes import is_api_path
 from admin.backend.internal.rate_limiter import SlidingWindow
 from pilot.config import BenchConfig
+from pilot.core.bench import Bench
 
 _AUTH_POLICY = "_auth_policy"
 _SITE_SCOPE_RESOLVER = "_site_scope_resolver"
@@ -38,13 +39,13 @@ def get_auth_policy(view) -> AuthPolicy:
     return getattr(view, _AUTH_POLICY, AuthPolicy.AUTHENTICATED)
 
 
-def is_request_authenticated(config) -> bool:
+def is_request_authenticated(bench) -> bool:
     authorization = request.headers.get("Authorization", "")
     token = authorization[7:] if authorization.startswith("Bearer ") else None
     token = token or request.cookies.get("sid")
     if not token:
         return False
-    claims = decode_session_token(token, config)
+    claims = decode_session_token(token, bench)
     if claims is None:
         return False
     g.jwt_claims = claims
@@ -62,18 +63,11 @@ def set_session_cookie(response, token: str, secure: bool) -> None:
     )
 
 
-def decode_session_token(token: str, config) -> dict | None:
-    """Decode via the local HS256 secret, falling back to remote JWKS keys."""
-    from admin.backend.auth import decode_token
+def decode_session_token(token: str, bench) -> dict | None:
+    """Verify a token via Session (local HS256, then the bench's remote JWKS keys)."""
+    from admin.backend.internal.session import Session
 
-    claims = decode_token(token, config.admin.jwt_secret)
-    if claims is not None:
-        return claims
-    if config.admin.jwks_url:
-        from admin.backend.internal.jwks import verify_jwks_token
-
-        return verify_jwks_token(token, config.admin.jwks_url, config.admin.jwks_audience)
-    return None
+    return Session(bench).verify_token(token)
 
 
 def current_site_scope() -> str | None:
@@ -126,13 +120,13 @@ def _check_auth_request(app: Flask, bench_root):
     if policy == AuthPolicy.OPEN:
         return None
 
-    config, response = _auth_config(bench_root, policy)
+    bench, response = _auth_config(bench_root, policy)
     if response is not None:
         return response
-    if config is None:
+    if bench is None:
         return None
 
-    response = _admin_session_response(config)
+    response = _admin_session_response(bench)
     if response is not None:
         return response
 
@@ -143,7 +137,7 @@ def _check_auth_request(app: Flask, bench_root):
 def _auth_config(bench_root, policy: AuthPolicy):
     allowed_before_setup = policy == AuthPolicy.SETUP_CONDITIONAL
     try:
-        config = BenchConfig.read(bench_root)
+        bench = Bench(bench_root)
     except Exception:
         if allowed_before_setup and not BenchConfig.exists(bench_root):
             return None, None
@@ -154,19 +148,20 @@ def _auth_config(bench_root, policy: AuthPolicy):
             {"enabled": False},
         )
 
-    if allowed_before_setup and not config.admin.password:
+    if allowed_before_setup and not bench.config.admin.password:
         return None, None
-    return config, None
+    return bench, None
 
 
-def _admin_session_response(config):
-    if not config.admin.enabled:
+def _admin_session_response(bench):
+    admin = bench.config.admin
+    if not admin.enabled:
         return error_response("admin_disabled", "Admin is disabled.", 503, {"enabled": False})
-    if not config.admin.password:
+    if not admin.password:
         return error_response(
             "session_unavailable", "No admin password is configured.", 503, {"enabled": False}
         )
-    if not is_request_authenticated(config):
+    if not is_request_authenticated(bench):
         return error_response("authentication_required", "Authentication is required.", 401)
     return None
 

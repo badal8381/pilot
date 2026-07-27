@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import time
-import tomllib
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,7 +16,6 @@ from admin.backend.auth import (
 )
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
-from pilot.exceptions import BenchError
 
 
 def test_round_trip_is_valid() -> None:
@@ -58,38 +56,6 @@ def _bench(tmp_path: Path, password: str = "secret") -> Bench:
 
 def _load_bench(tmp_path: Path) -> Bench:
     return Bench(BenchConfig.from_file(tmp_path / "bench.toml"), tmp_path)
-
-
-def test_command_issues_verifiable_token_and_persists_secret(tmp_path, capsys) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    GenerateSessionCommand(_bench(tmp_path)).run()
-    token = capsys.readouterr().out.strip()
-    secret = tomllib.loads((tmp_path / "bench.toml").read_text())["admin"]["jwt_secret"]
-    assert secret and is_token_valid(token, secret)
-
-
-def test_command_reuses_existing_secret(tmp_path) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    GenerateSessionCommand(_bench(tmp_path)).run()
-    first = tomllib.loads((tmp_path / "bench.toml").read_text())["admin"]["jwt_secret"]
-    GenerateSessionCommand(_load_bench(tmp_path)).run()
-    assert tomllib.loads((tmp_path / "bench.toml").read_text())["admin"]["jwt_secret"] == first
-
-
-def test_command_full_path_builds_url(tmp_path, capsys) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    GenerateSessionCommand(_bench(tmp_path), full_path=True).run()
-    assert capsys.readouterr().out.strip().startswith("http://")
-
-
-def test_command_requires_password(tmp_path) -> None:
-    from pilot.commands.admin.generate_session import GenerateSessionCommand
-
-    with pytest.raises(BenchError):
-        GenerateSessionCommand(_bench(tmp_path, password="")).run()
 
 
 def _initialized_bench(bench_dir: Path, password: str, jwt_secret: str) -> None:
@@ -229,6 +195,31 @@ def test_login_with_sid_sets_httponly_cookie(tmp_path: Path) -> None:
     assert "HttpOnly" in cookie
     assert "Secure" not in cookie
     assert client.get("/api/v1/benches").status_code != 401
+
+
+def test_password_login_records_session_issued(tmp_path: Path) -> None:
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    assert client.post("/api/v1/session", json={"password": "secret"}).status_code == 201
+
+    issued = AuditLog(Bench(tmp_path / "benches" / "current")).entries(entry_type="session")
+    assert len(issued) == 1
+    assert issued[0]["event"] == "issued"
+    assert issued[0]["via"] == "password"
+    assert issued[0]["jti"]
+
+
+def test_sid_login_records_redeemed_and_issued(tmp_path: Path) -> None:
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    assert client.post("/api/v1/session", json={"sid": issue_login_token("k3y")}).status_code == 201
+
+    entries = AuditLog(Bench(tmp_path / "benches" / "current")).entries(entry_type="session")
+    assert {e["event"] for e in entries} == {"issued", "login_redeemed"}
+    issued = next(e for e in entries if e["event"] == "issued")
+    assert issued["via"] == "login_link"
 
 
 def test_login_cookie_uses_explicit_is_secure_cookie(tmp_path: Path) -> None:

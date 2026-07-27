@@ -11,8 +11,8 @@ from jwt import PyJWKClient
 from jwt.algorithms import ECAlgorithm, RSAAlgorithm
 
 from admin.backend.auth import issue_token
-from admin.backend.internal import jwks
-from admin.backend.internal.jwks import verify_jwks_token
+from admin.backend.internal import session
+from admin.backend.internal.session import verify_jwks_token
 from admin.backend.middleware import decode_session_token
 
 JWKS_URL = "https://issuer.example.com/.well-known/jwks.json"
@@ -48,9 +48,9 @@ def _mint(key=_RSA, alg: str = "RS256", kid: str = "rsa-key", **claims) -> str:
 @pytest.fixture(autouse=True)
 def _stub_fetch(monkeypatch):
     monkeypatch.setattr(PyJWKClient, "fetch_data", lambda self: _jwks_document())
-    jwks._clients.clear()
+    session._jwks_clients.clear()
     yield
-    jwks._clients.clear()
+    session._jwks_clients.clear()
 
 
 def test_rsa_token_verifies() -> None:
@@ -121,30 +121,32 @@ def test_no_audience_config_rejects_remote_token() -> None:
     assert verify_jwks_token(_mint(aud="anything"), JWKS_URL, "") is None
 
 
-class _Config:
-    class admin:
-        jwt_secret = "local-secret"
-        jwks_url = JWKS_URL
-        jwks_audience = AUDIENCE
+class _Bench:
+    class config:
+        class admin:
+            jwt_secret = "local-secret"
+            jwks_url = JWKS_URL
+            jwks_audience = AUDIENCE
 
 
 def test_session_decode_accepts_local_secret() -> None:
-    assert decode_session_token(issue_token("local-secret"), _Config)["scope"] == "bench"
+    assert decode_session_token(issue_token("local-secret"), _Bench)["scope"] == "bench"
 
 
 def test_session_decode_falls_back_to_jwks() -> None:
-    assert decode_session_token(_mint(), _Config)["sub"] == "admin"
+    assert decode_session_token(_mint(), _Bench)["sub"] == "admin"
 
 
 def test_session_decode_rejects_unknown() -> None:
-    assert decode_session_token(issue_token("stranger"), _Config) is None
+    assert decode_session_token(issue_token("stranger"), _Bench) is None
 
 
 def test_session_decode_skips_jwks_when_unconfigured() -> None:
     class NoJwks:
-        class admin:
-            jwt_secret = "local-secret"
-            jwks_url = ""
+        class config:
+            class admin:
+                jwt_secret = "local-secret"
+                jwks_url = ""
 
     assert decode_session_token(_mint(), NoJwks) is None
 
