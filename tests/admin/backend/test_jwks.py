@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import jwt
 import pytest
@@ -10,9 +11,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from jwt import PyJWKClient
 from jwt.algorithms import ECAlgorithm, RSAAlgorithm
 
-from admin.backend.auth import issue_token
-from admin.backend.internal import session
-from admin.backend.internal.session import verify_jwks_token
+from admin.backend.internal.session import Session
 from admin.backend.middleware import decode_session_token
 
 JWKS_URL = "https://issuer.example.com/.well-known/jwks.json"
@@ -45,27 +44,39 @@ def _mint(key=_RSA, alg: str = "RS256", kid: str = "rsa-key", **claims) -> str:
     return jwt.encode(payload, key, algorithm=alg, headers={"kid": kid})
 
 
+def _verify(token, jwks_url=JWKS_URL, audience=AUDIENCE):
+    """Verify a remotely-issued token via a Session whose bench carries the given JWKS config."""
+    admin = SimpleNamespace(jwt_secret="", jwks_url=jwks_url, jwks_audience=audience)
+    return Session(SimpleNamespace(config=SimpleNamespace(admin=admin))).verify_token(token)
+
+
+def _local(secret: str, **claims) -> str:
+    """A locally-signed HS256 token, for exercising the local branch of verification."""
+    payload = {"sub": "admin", "scope": "bench", "exp": int(time.time()) + 300, **claims}
+    return jwt.encode(payload, secret, algorithm="HS256")
+
+
 @pytest.fixture(autouse=True)
 def _stub_fetch(monkeypatch):
     monkeypatch.setattr(PyJWKClient, "fetch_data", lambda self: _jwks_document())
-    session._jwks_clients.clear()
+    Session._jwks_clients.clear()
     yield
-    session._jwks_clients.clear()
+    Session._jwks_clients.clear()
 
 
 def test_rsa_token_verifies() -> None:
-    claims = verify_jwks_token(_mint(scope="site", site="a.com"), JWKS_URL, AUDIENCE)
+    claims = _verify(_mint(scope="site", site="a.com"), JWKS_URL, AUDIENCE)
     assert claims and claims["site"] == "a.com"
 
 
 def test_ec_token_verifies() -> None:
     # The reason for switching to PyJWT: EC (ES256) keys work too.
-    claims = verify_jwks_token(_mint(_EC, alg="ES256", kid="ec-key"), JWKS_URL, AUDIENCE)
+    claims = _verify(_mint(_EC, alg="ES256", kid="ec-key"), JWKS_URL, AUDIENCE)
     assert claims and claims["sub"] == "admin"
 
 
 def test_expired_token_rejected() -> None:
-    assert verify_jwks_token(_mint(exp=int(time.time()) - 10), JWKS_URL, AUDIENCE) is None
+    assert _verify(_mint(exp=int(time.time()) - 10), JWKS_URL, AUDIENCE) is None
 
 
 def test_token_without_exp_rejected() -> None:
@@ -77,15 +88,15 @@ def test_token_without_exp_rejected() -> None:
         algorithm="RS256",
         headers={"kid": "rsa-key"},
     )
-    assert verify_jwks_token(forever, JWKS_URL, AUDIENCE) is None
+    assert _verify(forever, JWKS_URL, AUDIENCE) is None
 
 
 def test_tampered_signature_rejected() -> None:
-    assert verify_jwks_token(_mint()[:-4] + "AAAA", JWKS_URL, AUDIENCE) is None
+    assert _verify(_mint()[:-4] + "AAAA", JWKS_URL, AUDIENCE) is None
 
 
 def test_unknown_kid_rejected() -> None:
-    assert verify_jwks_token(_mint(kid="rotated-away"), JWKS_URL, AUDIENCE) is None
+    assert _verify(_mint(kid="rotated-away"), JWKS_URL, AUDIENCE) is None
 
 
 def test_symmetric_algorithm_not_accepted() -> None:
@@ -96,29 +107,29 @@ def test_symmetric_algorithm_not_accepted() -> None:
         algorithm="HS256",
         headers={"kid": "rsa-key"},
     )
-    assert verify_jwks_token(forged, JWKS_URL, AUDIENCE) is None
+    assert _verify(forged, JWKS_URL, AUDIENCE) is None
 
 
 def test_no_jwks_url_rejected() -> None:
-    assert verify_jwks_token(_mint(), "", AUDIENCE) is None
+    assert _verify(_mint(), "", AUDIENCE) is None
 
 
 def test_audience_accepted_when_matching() -> None:
-    assert verify_jwks_token(_mint(aud="bench-a"), JWKS_URL, "bench-a")
+    assert _verify(_mint(aud="bench-a"), JWKS_URL, "bench-a")
 
 
 def test_audience_rejected_when_mismatched() -> None:
-    assert verify_jwks_token(_mint(aud="bench-b"), JWKS_URL, "bench-a") is None
+    assert _verify(_mint(aud="bench-b"), JWKS_URL, "bench-a") is None
 
 
 def test_audience_required_but_absent_rejected() -> None:
-    assert verify_jwks_token(_mint(aud=None), JWKS_URL, "bench-a") is None
+    assert _verify(_mint(aud=None), JWKS_URL, "bench-a") is None
 
 
 def test_no_audience_config_rejects_remote_token() -> None:
     # Audience is mandatory for JWKS: with no configured audience a remote token
     # is not bound to this bench, so verification fails closed.
-    assert verify_jwks_token(_mint(aud="anything"), JWKS_URL, "") is None
+    assert _verify(_mint(aud="anything"), JWKS_URL, "") is None
 
 
 class _Bench:
@@ -130,7 +141,7 @@ class _Bench:
 
 
 def test_session_decode_accepts_local_secret() -> None:
-    assert decode_session_token(issue_token("local-secret"), _Bench)["scope"] == "bench"
+    assert decode_session_token(_local("local-secret"), _Bench)["scope"] == "bench"
 
 
 def test_session_decode_falls_back_to_jwks() -> None:
@@ -138,7 +149,7 @@ def test_session_decode_falls_back_to_jwks() -> None:
 
 
 def test_session_decode_rejects_unknown() -> None:
-    assert decode_session_token(issue_token("stranger"), _Bench) is None
+    assert decode_session_token(_local("stranger"), _Bench) is None
 
 
 def test_session_decode_skips_jwks_when_unconfigured() -> None:

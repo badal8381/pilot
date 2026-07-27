@@ -4,13 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from admin.backend.internal.session import Session, issue_token
+from admin.backend.internal.session import Session
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 from pilot.core.bench.audit_log import AuditLog
 
 
 def _bench(tmp_path: Path, password: str = "secret", jwt_secret: str | None = None) -> Bench:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     toml_path = tmp_path / "bench.toml"
     toml_path.write_text(BenchConfig.from_flat(tmp_path.name, {"admin_password": password}).dumps())
     if jwt_secret is not None:
@@ -52,8 +53,21 @@ def test_verify_token_without_secret_returns_none(tmp_path: Path) -> None:
 
 
 def test_verify_token_rejects_foreign_secret(tmp_path: Path) -> None:
-    session = Session(_bench(tmp_path, jwt_secret="k3y"))
-    assert session.verify_token(issue_token("other-secret", jti="x")) is None
+    session = Session(_bench(tmp_path / "mine", jwt_secret="k3y"))
+    other = Session(_bench(tmp_path / "other", jwt_secret="other-secret"))
+    assert session.verify_token(other.issue_session_token()[0]) is None
+
+
+def test_verify_token_rejects_tampered_token(tmp_path: Path) -> None:
+    session = Session(_bench(tmp_path))
+    token, _ = session.issue_session_token()
+    assert session.verify_token(token[:-4] + "AAAA") is None
+
+
+def test_verify_token_rejects_expired_token(tmp_path: Path) -> None:
+    session = Session(_bench(tmp_path))
+    expired, _ = session.issue_session_token(ttl=-10)
+    assert session.verify_token(expired) is None
 
 
 def test_issue_site_token_is_scoped(tmp_path: Path) -> None:
@@ -61,6 +75,17 @@ def test_issue_site_token_is_scoped(tmp_path: Path) -> None:
     claims = session.verify_token(session.issue_site_token("a.com"))
     assert claims["scope"] == "site"
     assert claims["site"] == "a.com"
+
+
+def test_issue_site_token_requires_site(tmp_path: Path) -> None:
+    with pytest.raises(ValueError):
+        Session(_bench(tmp_path)).issue_site_token("")
+
+
+def test_issue_site_token_custom_ttl(tmp_path: Path) -> None:
+    session = Session(_bench(tmp_path))
+    claims = session.verify_token(session.issue_site_token("a.com", ttl=3600))
+    assert claims["exp"] - claims["iat"] == 3600
 
 
 def test_issue_login_token_carries_jti(tmp_path: Path) -> None:

@@ -25,16 +25,16 @@ def _write_raw_bench_toml(bench_dir: Path, name: str, admin_port: int) -> None:
 
 def _client(bench_root: Path, password: str = "secret", **extra_settings):
     from admin.backend.app import create_app
-    from admin.backend.auth import ensure_jwt_secret, issue_token
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
 
     _write_bench_toml(
         bench_root, bench_root.name, admin_enabled=True, admin_password=password, **extra_settings
     )
-    secret = ensure_jwt_secret(bench_root / "bench.toml")
     app = create_app(bench_root)
     app.config["TESTING"] = True
     client = app.test_client()
-    client.set_cookie("sid", issue_token(secret))
+    client.set_cookie("sid", Session(Bench(bench_root)).issue_session_token()[0])
     return client
 
 
@@ -264,13 +264,13 @@ def test_api_benches_create_routes_wizard_at_domain_when_production(tmp_path: Pa
             'enabled = true\nprocess_manager = "systemd"\nuse_companion_manager',
         )
     )
-    from admin.backend.auth import ensure_jwt_secret, issue_token
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
 
-    secret = ensure_jwt_secret(current / "bench.toml")
     app = create_app(current)
     app.config["TESTING"] = True
     client = app.test_client()
-    client.set_cookie("sid", issue_token(secret))
+    client.set_cookie("sid", Session(Bench(current)).issue_session_token()[0])
 
     with (
         patch("pilot.managers.processes.systemd.SystemdProcessManager.start_admin") as mock_admin,
