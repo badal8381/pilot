@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import os
-import subprocess
 import time
 from datetime import UTC
-from functools import lru_cache
 from pathlib import Path
 
 import psutil
@@ -76,23 +74,15 @@ def _memory_breakdown(mem, swap) -> dict:
     }
 
 
-@lru_cache(maxsize=16)
-def _directory_size(path: str) -> int:
-    try:
-        result = subprocess.run(["du", "-sb", path], capture_output=True, timeout=10)
-        return int(result.stdout.split()[0]) if result.returncode == 0 else 0
-    except Exception:
-        return 0
-
-
 def _path_sizes(bench_root: Path, config: BenchConfig) -> list[dict]:
+    from admin.backend.providers.storage import directory_size_bytes
     from pilot.managers.database import MariaDBManager
 
     benches_dir = str(bench_root)
     mariadb_dir = str(MariaDBManager(config.mariadb).data_dir)
     return [
-        {"label": "Benches", "path": benches_dir, "used_bytes": _directory_size(benches_dir)},
-        {"label": "MariaDB", "path": mariadb_dir, "used_bytes": _directory_size(mariadb_dir)},
+        {"label": "Benches", "path": benches_dir, "used_bytes": directory_size_bytes(benches_dir)},
+        {"label": "MariaDB", "path": mariadb_dir, "used_bytes": directory_size_bytes(mariadb_dir)},
     ]
 
 
@@ -220,3 +210,16 @@ def stats():
             "paths": paths,
         }
     )
+
+
+@stats_bp.get("/storage")
+def storage_breakdown():
+    from admin.backend.providers.storage import StorageProvider
+
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    disk = psutil.disk_usage("/")
+    try:
+        breakdown = StorageProvider(bench_root).get_breakdown()
+    except Exception:
+        return error_response("storage_unavailable", "Could not read storage breakdown.", 500)
+    return jsonify({"disk_total": disk.total, "disk_used": disk.used, **breakdown})
