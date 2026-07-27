@@ -91,11 +91,11 @@ def require_scope(site):
 
 
 def get_authorization_error(claims: dict | None, view, view_args: dict) -> str | None:
-    from admin.backend.auth import has_scope
+    from admin.backend.internal.session import Session
 
     resolve_site = getattr(view, _SITE_SCOPE_RESOLVER, None)
     if resolve_site is not None:
-        return None if has_scope(claims, resolve_site(view_args)) else "Not authorized for this site"
+        return None if Session.has_scope(claims, resolve_site(view_args)) else "Not authorized for this site"
     if claims and claims.get("scope") == "bench":
         return None
     return "Not authorized for this bench"

@@ -9,9 +9,9 @@ from pilot.commands import Arg, Command
 def _default_ttl() -> int:
     # Discovery imports every command module, so this stays lazy - pilot.core
     # must not load just to build --help.
-    from admin.backend.internal.session import DEFAULT_TTL
+    from admin.backend.internal.session import Session
 
-    return DEFAULT_TTL
+    return Session.DEFAULT_TTL
 
 
 @dataclass(kw_only=True)

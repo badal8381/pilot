@@ -122,6 +122,8 @@ def create_session():
     if error is not None:
         return error
 
+    if redeemed_jti:
+        bench.audit_action("session", {"event": "login_redeemed", "jti": redeemed_jti})
     token, _ = Session(bench).issue_session_token(via="login_link" if redeemed_jti else "password")
     response = created_response(
         {"authenticated": True, "scope": "bench"},
