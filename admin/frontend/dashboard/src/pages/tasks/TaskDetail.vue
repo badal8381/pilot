@@ -61,7 +61,7 @@
 
     <!-- Metadata -->
     <div
-      class="gap-4 grid grid-cols-2 bg-surface-elevation-1 mt-4 px-0 py-4 rounded-xl"
+      class="gap-4 grid grid-cols-2 bg-surface-elevation-1 mt-4 p-4 rounded-xl"
       :class="metadata.length > 3 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'"
     >
       <div v-for="item in metadata" :key="item.label">
@@ -115,7 +115,7 @@ const taskId = route.params.taskId
 const { setBreadcrumbs } = useBreadcrumbs()
 const { task, rawLines, loading, error, load } = useTaskDetail(taskId)
 
-setBreadcrumbs([{ label: 'Tasks', route: { name: 'Tasks' } }, { label: taskId }])
+setBreadcrumbs([{ label: 'Task', route: { name: 'Tasks' } }])
 
 const actionError = ref('')
 const showDebug = ref(false)

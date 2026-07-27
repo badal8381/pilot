@@ -50,7 +50,7 @@
 
     <div
       v-else-if="visibleTasks.length"
-      class="bg-surface-elevation-1 mt-4 divide-outline-gray-1 divide-y overflow-hidden"
+      class="px-3 rounded bg-surface-elevation-1 mt-4 divide-outline-gray-1 divide-y overflow-hidden"
     >
       <RouterLink
         v-for="task in visibleTasks"
