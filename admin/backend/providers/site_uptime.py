@@ -4,7 +4,7 @@ from pathlib import Path
 
 from admin.backend.providers.windowed_log import WindowedLogProvider
 
-_MAX_BUCKETS = 60
+_MAX_BUCKETS = 45
 
 
 class SiteUptimeProvider(WindowedLogProvider):

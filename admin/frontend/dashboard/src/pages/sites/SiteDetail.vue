@@ -59,7 +59,6 @@
     <!-- Sections -->
     <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
     <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
-    <SiteMonitoring v-else-if="activeTab === 'analytics'" :site-name="siteName" />
     <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />
     <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
   </div>
@@ -92,7 +91,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, ErrorMessage, LoadingText, TabButtons, toast } from 'frappe-ui'
 import SiteApps from '@/components/sites/Apps.vue'
 import SiteBackups from '@/components/sites/Backups.vue'
-import SiteMonitoring from '@/components/sites/Monitoring.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
 import AppActionDialog from '@/components/sites/AppActionDialog.vue'
@@ -127,7 +125,6 @@ const statusBadgeTheme = computed(() => STATUS_THEMES[status.value] ?? 'gray')
 const tabs = [
   { value: 'apps', label: 'Apps' },
   { value: 'backups', label: 'Backups' },
-  { value: 'analytics', label: 'Analytics' },
   { value: 'config', label: 'Config' },
   { value: 'settings', label: 'Settings' },
 ]
@@ -217,6 +214,12 @@ const menuOptions = computed(() => [
     : []),
   { label: 'Login as admin', icon: 'lucide-log-in', onClick: loginAsAdmin },
   { label: 'Back up now', icon: 'lucide-archive', onClick: backupNow },
+  {
+    label: 'View analytics',
+    icon: 'lucide-chart-line',
+    onClick: () =>
+      router.push({ name: 'Analytics', query: { view: 'site', window: '24h', site: siteName } }),
+  },
   {
     label: 'View jobs',
     icon: 'lucide-list-checks',
