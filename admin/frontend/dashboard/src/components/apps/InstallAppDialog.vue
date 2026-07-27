@@ -11,6 +11,7 @@
 
         <div v-else class="gap-2 grid max-h-96 overflow-y-auto">
           <button
+            v-if="showAllSitesOption"
             type="button"
             class="flex items-center gap-3 p-3 border rounded-lg text-left transition duration-150 ease-[var(--ease-out)] active:scale-[0.98]"
             :class="rowClass('all')"
@@ -43,9 +44,8 @@
             </span>
             <div class="flex-1 min-w-0">
               <p class="font-medium text-ink-gray-8 text-sm truncate">{{ s.name }}</p>
-              <p class="text-ink-gray-5 text-p-sm truncate">
-                {{ s.name }}
-                · {{ isInstalled(s) ? 'already installed' : siteVersion(s) || 'latest' }}
+              <p v-if="isInstalled(s) || siteVersion(s)" class="text-ink-gray-5 text-p-sm truncate">
+                {{ isInstalled(s) ? 'Already installed' : siteVersion(s) }}
               </p>
             </div>
           </button>
@@ -105,6 +105,8 @@ watch(open, (isOpen) => {
 })
 
 const installableSites = computed(() => props.sites.filter((s) => !isInstalled(s)))
+// Hide "All sites" when there's only one site on the bench, or only one site left to install on.
+const showAllSitesOption = computed(() => props.sites.length > 1 && installableSites.value.length > 1)
 
 function isInstalled(site) {
   return Boolean(props.app && site.installed_apps?.includes(props.app.name))
