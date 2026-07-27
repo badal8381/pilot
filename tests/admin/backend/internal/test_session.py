@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
+import time
 from pathlib import Path
 
 import pytest
 
-from admin.backend.internal.session import Session
+from admin.backend.internal.session import ActiveTokens, Session
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 from pilot.core.bench.audit_log import AuditLog
@@ -93,6 +95,46 @@ def test_issue_login_token_carries_jti(tmp_path: Path) -> None:
     assert session.verify_token(session.issue_login_token())["jti"]
 
 
-def test_revoke_token_not_implemented(tmp_path: Path) -> None:
-    with pytest.raises(NotImplementedError):
-        Session(_bench(tmp_path)).revoke_token("token")
+def test_revoke_token_blocks_verification(tmp_path: Path) -> None:
+    session = Session(_bench(tmp_path))
+    token, _ = session.issue_session_token()
+    assert session.verify_token(token) is not None
+    session.revoke_token(token)
+    assert session.verify_token(token) is None
+
+
+def test_revoked_jtis_are_shared_across_sessions(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    token, _ = Session(bench).issue_session_token()
+    Session(bench).revoke_token(token)
+    assert Session(bench).verify_token(token) is None
+
+
+def test_active_jtis_tracks_issued_and_drops_revoked(tmp_path: Path) -> None:
+    session = Session(_bench(tmp_path))
+    token_a, jti_a = session.issue_session_token()
+    _, jti_b = session.issue_session_token()
+    assert set(session.active_jtis()) == {jti_a, jti_b}
+
+    session.revoke_token(token_a)
+    assert set(session.active_jtis()) == {jti_b}
+
+
+def test_verify_registers_unseen_valid_jti(tmp_path: Path) -> None:
+    session = Session(_bench(tmp_path))
+    token, jti = session.issue_session_token()
+    # Simulate the tracker not knowing this jti yet (e.g. issued by another worker).
+    (session.bench.path / ActiveTokens.FILENAME).unlink()
+    assert jti not in ActiveTokens(session.bench)
+
+    assert session.verify_token(token) is not None
+    assert jti in ActiveTokens(session.bench)
+
+
+def test_expired_jtis_are_purged_from_disk_on_read(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    path = bench.path / ActiveTokens.FILENAME
+    path.write_text(json.dumps({"dead": int(time.time()) - 5, "live": int(time.time()) + 300}))
+
+    assert set(ActiveTokens(bench).all()) == {"live"}  # read drops the expired entry
+    assert set(json.loads(path.read_text(encoding="utf-8"))) == {"live"}  # ...from disk too

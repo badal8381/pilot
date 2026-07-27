@@ -4,6 +4,7 @@ management. Session is the single entry point -- construct it with a bench and c
 
 from __future__ import annotations
 
+import json
 import secrets
 import time
 from typing import TYPE_CHECKING, ClassVar
@@ -12,9 +13,71 @@ import jwt
 from jwt import PyJWKClient
 
 from pilot.config import BenchConfig
+from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
 
 if TYPE_CHECKING:
     from pilot.core.bench import Bench
+
+
+class _JtiStore:
+    """A private, lock-guarded ``{jti: exp}`` file. Expired entries are dropped from disk
+    on every read, and every gunicorn worker shares one view through an exclusive lock.
+
+    Subclasses set ``FILENAME``.
+    """
+
+    FILENAME: ClassVar[str]
+
+    def __init__(self, bench: Bench) -> None:
+        self._path = bench.path / self.FILENAME
+
+    def add(self, jti: str, exp: int) -> None:
+        with exclusive_file_lock(self._path):
+            entries = self._prune(self._load_raw())
+            entries[jti] = int(exp)
+            replace_private_text_locked(self._path, json.dumps(entries))
+
+    def all(self) -> dict[str, int]:
+        return self._read()
+
+    def __contains__(self, jti: str) -> bool:
+        return jti in self._read()
+
+    def _read(self) -> dict[str, int]:
+        """Live entries, purging any expired ones from disk when found."""
+        entries = self._load_raw()
+        live = self._prune(entries)
+        if len(live) != len(entries):
+            # Re-read under the lock so a concurrent add of a still-valid jti survives.
+            with exclusive_file_lock(self._path):
+                live = self._prune(self._load_raw())
+                replace_private_text_locked(self._path, json.dumps(live))
+        return live
+
+    def _load_raw(self) -> dict[str, int]:
+        """Raw ``{jti: exp}`` from disk; empty if missing or unreadable."""
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _prune(entries: dict[str, int]) -> dict[str, int]:
+        now = int(time.time())
+        return {jti: exp for jti, exp in entries.items() if isinstance(exp, int) and exp > now}
+
+
+class ActiveTokens(_JtiStore):
+    """Live token jtis this bench has issued or verified (a registry for listing/management)."""
+
+    FILENAME = ".active-jtis.json"
+
+
+class RevokedTokens(_JtiStore):
+    """Token jtis revoked before their expiry; checked on every verification."""
+
+    FILENAME = ".revoked-jtis.json"
 
 
 class Session:
@@ -65,6 +128,7 @@ class Session:
         jti = secrets.token_urlsafe(16)
         token = self._encode(ttl=ttl, scope=scope, jti=jti, site=site)
         self.bench.audit_action("session", {"event": "issued", "jti": jti, "scope": scope, "via": via})
+        ActiveTokens(self.bench).add(jti, int(time.time()) + ttl)
         return token, jti
 
     def issue_login_token(self) -> str:
@@ -78,13 +142,22 @@ class Session:
         return self._encode(ttl=ttl, scope="site", site=site)
 
     def verify_token(self, token: str) -> dict | None:
-        """Verify a token: local HS256 first, then the bench's JWKS keys if configured."""
-        claims = self._decode_local(token)
-        if claims is not None:
-            return claims
-        if self.admin_config.jwks_url:
-            return self._decode_jwks(token)
-        return None
+        """Verify a token: local HS256 first, then the bench's JWKS keys if configured.
+
+        A token whose jti has been revoked is rejected. A valid, previously unseen jti is
+        recorded in the active tracker.
+        """
+        claims = self._decode(token)
+        if claims is None:
+            return None
+        jti, exp = claims.get("jti"), claims.get("exp")
+        if jti:
+            if jti in RevokedTokens(self.bench):
+                return None
+            active = ActiveTokens(self.bench)
+            if exp and jti not in active:
+                active.add(jti, exp)
+        return claims
 
     @staticmethod
     def has_scope(claims: dict | None, site: str) -> bool:
@@ -96,7 +169,25 @@ class Session:
         return scope == "site" and claims.get("site") == site
 
     def revoke_token(self, token: str) -> None:
-        raise NotImplementedError("Token revocation is not yet supported.")
+        """Revoke a valid token by its jti, so verification rejects it until it expires."""
+        claims = self._decode(token)
+        if not claims:
+            return
+        jti, exp = claims.get("jti"), claims.get("exp")
+        if jti and exp:
+            RevokedTokens(self.bench).add(jti, exp)
+
+    def active_jtis(self) -> dict[str, int]:
+        """Issued session jtis that are still live: unexpired and not revoked."""
+        revoked = RevokedTokens(self.bench)
+        return {jti: exp for jti, exp in ActiveTokens(self.bench).all().items() if jti not in revoked}
+
+    def _decode(self, token: str) -> dict | None:
+        """Signature/expiry-checked claims: local HS256, then JWKS if configured."""
+        claims = self._decode_local(token)
+        if claims is None and self.admin_config.jwks_url:
+            claims = self._decode_jwks(token)
+        return claims
 
     def _encode(self, ttl: int, scope: str, jti: str | None = None, site: str | None = None) -> str:
         now = int(time.time())
