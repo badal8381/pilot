@@ -145,6 +145,19 @@ def delete_session():
     return response
 
 
+@core_bp.post("/session/revoke")
+def revoke_session():
+    """Revoke an active session by its jti. Requires an authenticated bench session."""
+    data = request.get_json(silent=True)
+    jti = data.get("jti") if isinstance(data, dict) else None
+    if not jti:
+        return error_response("malformed_request", "Expected a jti.", 400)
+    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
+    if not Session(bench).revoke_jti(jti):
+        return error_response("unknown_session", "No such active session.", 404)
+    return no_content_response()
+
+
 def _validate_login(data: dict, bench):
     """Return (error_response_or_None, redeemed_login_jti_or_None)."""
     sid = data.get("sid")

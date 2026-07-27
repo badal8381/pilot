@@ -168,14 +168,16 @@ class Session:
             return True
         return scope == "site" and claims.get("site") == site
 
-    def revoke_token(self, token: str) -> None:
-        """Revoke a valid token by its jti, so verification rejects it until it expires."""
-        claims = self._decode(token)
-        if not claims:
-            return
-        jti, exp = claims.get("jti"), claims.get("exp")
-        if jti and exp:
-            RevokedTokens(self.bench).add(jti, exp)
+    def revoke_jti(self, jti: str) -> bool:
+        """Revoke an active session by its jti, using its tracked expiry.
+
+        Returns False when the jti is not a known active session (nothing to revoke).
+        """
+        exp = ActiveTokens(self.bench).all().get(jti)
+        if exp is None:
+            return False
+        RevokedTokens(self.bench).add(jti, exp)
+        return True
 
     def active_jtis(self) -> dict[str, int]:
         """Issued session jtis that are still live: unexpired and not revoked."""

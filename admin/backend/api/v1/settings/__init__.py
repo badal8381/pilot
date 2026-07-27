@@ -18,10 +18,12 @@ from pilot.config import (
 from pilot.core.bench import Bench
 from pilot.core.bench.settings import (
     SettingsApplyFailed,
+    active_tokens_payload,
     firewall_payload,
     is_restart_needed,
     llm_payload,
     restart_trigger_values,
+    revoked_tokens_payload,
     s3_payload,
     waf_payload,
     worker_groups_payload,
@@ -116,6 +118,10 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
             "log_path": str(config.monitor.log_path) if config.monitor.log_path else "",
             "system_log_max_size": config.monitor.system_log_max_size,
             "application_log_max_size": config.monitor.application_log_max_size,
+        },
+        "authentication": {
+            "active_tokens": active_tokens_payload(config, bench_root),
+            "revoked_tokens": revoked_tokens_payload(config, bench_root),
         },
     }
 
