@@ -9,6 +9,7 @@ from unittest.mock import ANY, MagicMock, patch
 import pytest
 
 from pilot.config import AppConfig, BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig, WorkerGroup
+from pilot.config.common import CommonConfig
 from pilot.core.bench import Bench
 from pilot.exceptions import BenchAlreadyExistsError, BenchError
 
@@ -103,8 +104,9 @@ def test_new_command_second_bench_gets_next_offset(tmp_path: Path, monkeypatch: 
 def test_new_command_inherits_sibling_jwks_url_and_audience(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The remote JWKS issuer is server-wide, so a new bench carries both the
-    URL and the audience forward from a sibling that already trusts one."""
+    """The remote JWKS issuer is server-wide (common_config.toml), so a new
+    bench carries both the URL and the audience forward from a sibling that
+    already trusts one."""
     from pilot.commands.bench.create import NewCommand
     from pilot.config import BenchConfig
     from pilot.core.bench.creator import BenchCreator
@@ -113,17 +115,14 @@ def test_new_command_inherits_sibling_jwks_url_and_audience(
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "first", bench_name="first").run()
-    data = BenchConfig.read_raw(benches_dir / "first")
-    admin = data.setdefault("admin", {})
-    admin["jwks_url"] = "https://issuer.example.com/jwks.json"
-    admin["jwks_audience"] = "bench-fleet"
-    BenchConfig.write_raw(benches_dir / "first", data)
+    with BenchConfig.open(benches_dir / "first") as config:
+        config.admin.jwks_url = "https://issuer.example.com/jwks.json"
+        config.admin.jwks_audience = "bench-fleet"
 
     NewCommand(target_directory=benches_dir / "second", bench_name="second").run()
-    with open(benches_dir / "second" / "bench.toml", "rb") as f:
-        inherited = tomllib.load(f)["admin"]
-    assert inherited["jwks_url"] == "https://issuer.example.com/jwks.json"
-    assert inherited["jwks_audience"] == "bench-fleet"
+    inherited = BenchConfig.read(benches_dir / "second").admin
+    assert inherited.jwks_url == "https://issuer.example.com/jwks.json"
+    assert inherited.jwks_audience == "bench-fleet"
 
 
 def test_new_command_first_bench_has_no_jwks_url(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -134,8 +133,7 @@ def test_new_command_first_bench_has_no_jwks_url(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     target = tmp_path / "benches" / "only"
     NewCommand(target_directory=target, bench_name="only").run()
-    with open(target / "bench.toml", "rb") as f:
-        assert "jwks_url" not in tomllib.load(f).get("admin", {})
+    assert BenchConfig.read(target).admin.jwks_url == ""
 
 
 def test_new_command_postgres_bench(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -151,7 +149,7 @@ def test_new_command_postgres_bench(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     with open(benches_dir / "pg" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "postgres"
-    assert data["postgres"]["root_password"]  # generated for provisioning
+    assert CommonConfig.read(benches_dir).postgres.root_password  # generated for provisioning
 
 
 def test_new_command_second_postgres_bench_inherits_password(
@@ -165,13 +163,11 @@ def test_new_command_second_postgres_bench_inherits_password(
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "pg1", bench_name="pg1", database="postgres").run()
+    password = CommonConfig.read(benches_dir).postgres.root_password
     NewCommand(target_directory=benches_dir / "pg2", bench_name="pg2", database="postgres").run()
 
-    with open(benches_dir / "pg1" / "bench.toml", "rb") as f:
-        first = tomllib.load(f)
-    with open(benches_dir / "pg2" / "bench.toml", "rb") as f:
-        second = tomllib.load(f)
-    assert first["postgres"]["root_password"] == second["postgres"]["root_password"]
+    assert CommonConfig.read(benches_dir).postgres.root_password == password
+    assert BenchConfig.read(benches_dir / "pg2").postgres.root_password == password
 
 
 def test_new_command_postgres_port_is_not_offset_between_benches(
@@ -189,7 +185,7 @@ def test_new_command_postgres_port_is_not_offset_between_benches(
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert data["postgres"]["port"] == 5432
+    assert CommonConfig.read(benches_dir).postgres.port == 5432
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -206,9 +202,7 @@ def test_new_command_postgres_port_ignores_live_scan_on_macos(
     with patch("pilot.managers.platform.is_macos", return_value=True):
         NewCommand(target_directory=tmp_path / "benches" / "pg", bench_name="pg", database="postgres").run()
 
-    with open(tmp_path / "benches" / "pg" / "bench.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["postgres"]["port"] == 5432
+    assert CommonConfig.read(tmp_path / "benches").postgres.port == 5432
 
 
 def test_new_command_mariadb_bench_has_no_postgres_password(
@@ -224,7 +218,8 @@ def test_new_command_mariadb_bench_has_no_postgres_password(
     with open(tmp_path / "benches" / "m" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "mariadb"
-    assert not data["postgres"]["root_password"]  # not provisioned for mariadb benches
+    # not provisioned for mariadb benches
+    assert not CommonConfig.read(tmp_path / "benches").postgres.root_password
 
 
 def test_new_command_mariadb_port_is_not_offset_between_benches(
@@ -242,7 +237,7 @@ def test_new_command_mariadb_port_is_not_offset_between_benches(
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert data["mariadb"]["port"] == 3306
+    assert CommonConfig.read(benches_dir).mariadb.port == 3306
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -259,9 +254,7 @@ def test_new_command_mariadb_port_ignores_live_scan_on_macos(
     with patch("pilot.managers.platform.is_macos", return_value=True):
         NewCommand(target_directory=tmp_path / "benches" / "m", bench_name="m").run()
 
-    with open(tmp_path / "benches" / "m" / "bench.toml", "rb") as f:
-        data = tomllib.load(f)
-    assert data["mariadb"]["port"] == 3306
+    assert CommonConfig.read(tmp_path / "benches").mariadb.port == 3306
 
 
 def test_new_command_second_mariadb_bench_inherits_password(
@@ -275,16 +268,14 @@ def test_new_command_second_mariadb_bench_inherits_password(
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "m1", bench_name="m1").run()
-    with open(benches_dir / "m1" / "bench.toml", "rb") as f:
-        first = tomllib.load(f)
+    password = CommonConfig.read(benches_dir).mariadb.root_password
     # Random, not the old guessable hardcoded default.
-    assert first["mariadb"]["root_password"] != "root"
-    assert len(first["mariadb"]["root_password"]) == 16  # secrets.token_hex(nbytes=8)
+    assert password != "root"
+    assert len(password) == 16  # secrets.token_hex(nbytes=8)
 
     NewCommand(target_directory=benches_dir / "m2", bench_name="m2").run()
-    with open(benches_dir / "m2" / "bench.toml", "rb") as f:
-        second = tomllib.load(f)
-    assert second["mariadb"]["root_password"] == first["mariadb"]["root_password"]
+    assert CommonConfig.read(benches_dir).mariadb.root_password == password
+    assert BenchConfig.read(benches_dir / "m2").mariadb.root_password == password
 
 
 def test_new_command_skips_offset_with_live_port(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

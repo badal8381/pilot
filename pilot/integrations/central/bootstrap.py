@@ -95,14 +95,16 @@ def _persist(bench: "Bench", result: dict[str, Any]) -> None:
     central["auth_token"] = result["auth_token"]
     central.pop("bootstrap_token", None)
 
-    admin = config.setdefault("admin", {})
-    admin["jwks_url"] = result["jwks_url"]
-    admin["jwks_audience"] = result["audience_id"]
-
     BenchConfig.write_raw(bench.path, config)
 
     bench.config.central.endpoint = central["endpoint"]
     bench.config.central.auth_token = central["auth_token"]
     bench.config.central.bootstrap_token = ""
+
+    # admin.jwks_* is host-shared (common_config.toml); BenchConfig.open()
+    # writes it there, not into this bench's own bench.toml.
+    with BenchConfig.open(bench.path) as typed_config:
+        typed_config.admin.jwks_url = result["jwks_url"]
+        typed_config.admin.jwks_audience = result["audience_id"]
     bench.config.admin.jwks_url = result["jwks_url"]
     bench.config.admin.jwks_audience = result["audience_id"]
