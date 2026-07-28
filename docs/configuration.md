@@ -99,7 +99,7 @@ allow_bench_management = true
 
 ## Other Groups
 
-- `[monitor]`: monitoring settings.
+- `[monitor]`: per-bench `log_path` for this bench's own application metrics. `system_log_path`/`db_log_path`/`slow_query_log_path` are host-shared - see [Common Config](#common-config).
 - `[nginx]`: nginx rendering settings.
 - `[gunicorn]`: Gunicorn process settings.
 - `[central]`: Central endpoint and Pilot auth token.
@@ -111,7 +111,7 @@ Unknown fields are ignored by normal loads for compatibility. Strict validation 
 
 ## Common Config
 
-Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
+Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer, one host-wide system/DB monitor. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
 
 ```toml
 [mariadb]
@@ -136,8 +136,13 @@ webroot_path = "/var/www/letsencrypt"
 [admin]
 jwks_url = "https://issuer.example.com/jwks.json"
 jwks_audience = "bench-fleet"
+
+[monitor]
+system_log_path = "/path/to/cli_root/system/monitor/bench-system-stats.log"
+db_log_path = "/path/to/cli_root/system/monitor/bench-db-stats.log"
+slow_query_log_path = "/path/to/cli_root/system/monitor/bench-slow-queries.json"
 ```
 
-`BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
+`BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, `config.admin.jwks_url`/`jwks_audience`, and `config.monitor.system_log_path`/`db_log_path`/`slow_query_log_path` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
 
 A pre-upgrade bench whose `bench.toml` still carries these fields directly is migrated by the `merge_common_config` patch - see [pilot/patches](../pilot/patches) and `bench admin run-patches`.
