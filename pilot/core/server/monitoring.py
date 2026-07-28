@@ -132,12 +132,7 @@ class Monitor:
     def slow_query_log_path(self) -> Path:
         return self.bench.config.monitor.slow_query_log_path
 
-    def is_system_log_authority(self) -> bool:
-        return self._configurator.is_system_log_authority()
-
     def collect_system_metrics(self) -> None:
-        if not self._configurator.is_system_log_authority():
-            return
         self._append(
             self.system_log_path,
             {
@@ -154,8 +149,6 @@ class Monitor:
 
     def collect_database_metrics(self) -> None:
         """One raw MariaDB sample per host. Never crashes the daemon on a bad DB."""
-        if not self._configurator.is_system_log_authority():
-            return
         if self.bench.config.db_type != "mariadb":
             return
         try:
@@ -180,8 +173,6 @@ class Monitor:
     def collect_slow_queries(self) -> None:
         """Append new slow-log rows to the occurrence log. Skips quietly if the
         slow log is off or the DB is unreachable so the daemon never crashes."""
-        if not self._configurator.is_system_log_authority():
-            return
         if self.bench.config.db_type != "mariadb":
             return
         try:
@@ -315,9 +306,12 @@ def main() -> None:
         monitor.compute_cpu()
         monitor.compute_io()
         monitor.collect_application_metrics()
-        monitor.collect_system_metrics()
-        monitor.collect_database_metrics()
-        monitor.collect_slow_queries()
+    # System/DB-wide metrics describe the shared host, not any one bench -
+    # collect them exactly once per tick, not once per bench.
+    if monitors:
+        monitors[0].collect_system_metrics()
+        monitors[0].collect_database_metrics()
+        monitors[0].collect_slow_queries()
 
 
 if __name__ == "__main__":

@@ -207,6 +207,9 @@ class BenchConfig:
         )
         config.admin.jwks_url = common.jwks_url
         config.admin.jwks_audience = common.jwks_audience
+        config.monitor.system_log_path = common.system_log_path
+        config.monitor.db_log_path = common.db_log_path
+        config.monitor.slow_query_log_path = common.slow_query_log_path
         return config
 
     @staticmethod
@@ -419,15 +422,18 @@ class BenchConfig:
 
     def _write_common(self, bench_root: Path) -> None:
         """Persist this config's shared subset (mariadb/postgres/letsencrypt/
-        jwks) to common_config.toml, the single source every bench merges.
-        A no-op when nothing shared changed, so an unrelated bench.toml write
-        never disturbs the file other benches are reading."""
+        jwks/monitor) to common_config.toml, the single source every bench
+        merges. A no-op when nothing shared changed, so an unrelated
+        bench.toml write never disturbs the file other benches are reading."""
         common = CommonConfig(
             mariadb=self.mariadb,
             postgres=self.postgres,
             letsencrypt=self.letsencrypt,
             jwks_url=self.admin.jwks_url,
             jwks_audience=self.admin.jwks_audience,
+            system_log_path=self.monitor.system_log_path,
+            db_log_path=self.monitor.db_log_path,
+            slow_query_log_path=self.monitor.slow_query_log_path,
         )
         benches_root = self._benches_root(bench_root)
         if common != CommonConfig.read(benches_root):
@@ -603,15 +609,10 @@ class BenchConfig:
         }
 
     def _monitor_section(self) -> ConfigDict:
+        # system_log_path/db_log_path/slow_query_log_path are host-shared
+        # (common_config.toml), not written here.
         monitor = self.monitor
-        data: ConfigDict = {
-            "system_log_path": str(monitor.system_log_path),
-            "db_log_path": str(monitor.db_log_path),
-            "slow_query_log_path": str(monitor.slow_query_log_path),
-            "authority_file_path": str(monitor.authority_file_path),
-            "system_log_max_size": monitor.system_log_max_size,
-            "application_log_max_size": monitor.application_log_max_size,
-        }
+        data: ConfigDict = {}
         if monitor.log_path:
             data["log_path"] = str(monitor.log_path)
         return data
@@ -764,7 +765,7 @@ _SECTIONS: tuple[_Section, ...] = (
     _Section(
         "monitor",
         lambda data: MonitorConfig.from_dict(data.get("monitor", {})),
-        lambda config: config._monitor_section() if config.production.enabled else None,
+        lambda config: config._monitor_section() if config.monitor.log_path else None,
     ),
     _Section(
         "llm",
