@@ -136,21 +136,23 @@ const hiddenCount = computed(() =>
         <Badge :label="String(data.databases.length)" />
       </div>
 
-      <dl
-        v-for="row in visibleDatabases"
-        :key="row.schema"
-        class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
-      >
-        <dt class="flex items-center gap-2">
-          <span class="text-ink-gray-5" :class="row.site ? 'lucide-globe' : 'lucide-database'" />
-          <span class="text-ink-gray-7 text-sm truncate">{{ row.site || row.schema }}</span>
-          <Badge v-if="row.system" label="system" theme="gray" size="sm" />
-        </dt>
+      <div class="max-h-72 overflow-y-auto">
+        <dl
+          v-for="row in visibleDatabases"
+          :key="row.schema"
+          class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
+        >
+          <dt class="flex items-center gap-2">
+            <span class="text-ink-gray-5" :class="row.site ? 'lucide-globe' : 'lucide-database'" />
+            <span class="text-ink-gray-7 text-sm truncate">{{ row.site || row.schema }}</span>
+            <Badge v-if="row.system" label="system" theme="gray" size="sm" />
+          </dt>
 
-        <dd class="text-ink-gray-8 text-sm tabular-nums shrink-0">
-          {{ formatBytes(row.bytes) }}
-        </dd>
-      </dl>
+          <dd class="text-ink-gray-8 text-sm tabular-nums shrink-0">
+            {{ formatBytes(row.bytes) }}
+          </dd>
+        </dl>
+      </div>
 
       <button
         type="button"
