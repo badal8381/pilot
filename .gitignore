@@ -60,12 +60,15 @@ htmlcov/
 # Admin
 admin/frontend/dashboard/node_modules/
 admin/frontend/editor/node_modules/
+admin/frontend/in-app-embed/node_modules/
 admin/backend/static/dashboard/
 admin/backend/static/editor/
+admin/backend/static/in-app-embed/
 admin/frontend/node_modules
 admin/frontend/components.d.ts
 admin/frontend/dashboard/components.d.ts
 admin/frontend/editor/components.d.ts
+admin/frontend/in-app-embed/components.d.ts
 admin/frontend/dashboard/src/types/
 *.timestamp-*
 .env

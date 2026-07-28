@@ -39,4 +39,18 @@ def central_proxy(name: str, method_path: str):
     try:
         return jsonify(_central().forward(method_path, request.method, data))
     except CentralClientError as exc:
+        # Central rejecting the input is not an outage; relaying a 502 would read
+        # as though Central is down.
+        if exc.status_code and 400 <= exc.status_code < 500:
+            return error_response("central_rejected", str(exc), exc.status_code)
         return error_response("central_unreachable", str(exc), 502)
+
+
+@sites_bp.get("/<name>/account-url")
+@require_scope(site_name)
+def account_url(name: str):
+    """The configured Central base URL, safe for the site's browser to open."""
+    endpoint = _central().bench.config.central.endpoint.rstrip("/")
+    if not endpoint:
+        return error_response("central_not_configured", "Central is not configured.", 503)
+    return jsonify({"url": endpoint})
