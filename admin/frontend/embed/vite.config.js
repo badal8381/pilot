@@ -56,7 +56,7 @@ export default defineConfig({
     // no asset URL has to resolve against the Desk site's origin.
     assetsInlineLimit: 1024 * 1024,
     rolldownOptions: {
-      input: path.resolve(__dirname, "src/embed/cloud-settings/index.js"),
+      input: path.resolve(__dirname, "src/cloud-settings/index.js"),
       output: {
         format: "iife",
         name: "FrappeCloudSettingsEmbed",

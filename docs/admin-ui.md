@@ -4,7 +4,7 @@ The Admin UI is the browser surface for benches, sites, apps, tasks, logs, and s
 
 ## Layout
 
-The Vue app lives under `admin/frontend/dashboard`. Backend API routes live under `admin/backend/api/v1`.
+The Vue app lives under `admin/frontend/dashboard`. The Desk Cloud Settings embed lives under `admin/frontend/embed`. Backend API routes live under `admin/backend/api/v1`.
 
 Keep UI code organized by feature area: benches, sites, apps, tasks, logs, settings, setup, and shared utilities.
 

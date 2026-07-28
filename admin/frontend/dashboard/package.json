@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && npm run build:embed",
-    "build:embed": "vite build --config vite.embed.config.js",
+    "build": "vite build",
     "test": "node --test src/utils/*.test.js",
     "preview": "vite preview"
   },

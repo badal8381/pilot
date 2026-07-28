@@ -24,6 +24,8 @@ admin/backend/
   providers/     backend provider integrations
 
 admin/frontend/dashboard/  Vue Admin UI
+admin/frontend/editor/     Vue code editor
+admin/frontend/embed/      Desk-embeddable Cloud Settings (IIFE)
 ```
 
 ## Install Modes

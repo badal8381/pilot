@@ -32,8 +32,8 @@ def ensure_admin_frontend(on_progress: Callable[[str], None] = lambda message: N
 def build_admin_frontend(
     on_progress: Callable[[str], None] = lambda message: None, *, force: bool = False
 ) -> None:
-    """Build the admin frontend and editor from source, skipping either whose dist
-    already exists unless force is set."""
+    """Build dashboard, editor, and embed frontends from source, skipping any
+    whose dist already exists unless force is set."""
     from pilot.utils import cli_root
 
     _check_node_version()
@@ -44,6 +44,13 @@ def build_admin_frontend(
     _build_frontend(
         _find_editor(), root / "admin" / "backend" / "static" / "editor", "editor", on_progress, force=force
     )
+    _build_frontend(
+        _find_embed(),
+        root / "admin" / "backend" / "static" / "dist" / "embed" / "cloud-settings",
+        "embed",
+        on_progress,
+        force=force,
+    )
     on_progress("\nAdmin frontend up to date.")
 
 
@@ -52,7 +59,7 @@ def _build_frontend(
 ) -> None:
     from pilot.utils import run_command
 
-    if not force and (dist / "assets").exists():
+    if not force and _is_built(dist):
         on_progress(f"{label} frontend is already built, skipping.")
         return
     on_progress(f"Building {label} frontend at {frontend}...")
@@ -61,6 +68,13 @@ def _build_frontend(
         run_command(["npm", "install"], cwd=frontend, stream_output=True)
     on_progress(f"Running npm run build for {label}")
     run_command(["npm", "run", "build"], cwd=frontend, stream_output=True)
+
+
+def _is_built(dist: Path) -> bool:
+    if not dist.is_dir():
+        return False
+    # Dashboard/editor write an assets/ folder; the embed ships a single IIFE.
+    return (dist / "assets").exists() or any(dist.glob("*.js"))
 
 
 def _has_frontend_source(root: Path) -> bool:
@@ -92,6 +106,18 @@ def _find_editor() -> Path:
     raise BenchError(
         "admin/frontend/editor not found. This command requires the bench-cli source directory "
         "with admin/frontend/editor/."
+    )
+
+
+def _find_embed() -> Path:
+    from pilot.utils import cli_root
+
+    candidate = cli_root() / "admin" / "frontend" / "embed"
+    if (candidate / "package.json").exists():
+        return candidate
+    raise BenchError(
+        "admin/frontend/embed not found. This command requires the bench-cli source directory "
+        "with admin/frontend/embed/."
     )
 
 
