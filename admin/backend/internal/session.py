@@ -1,7 +1,3 @@
-"""Bench session tokens: issuing, verifying (local HS256 + remote JWKS), and secret
-management. Session is the single entry point -- construct it with a bench and call it.
-"""
-
 from __future__ import annotations
 
 import json

@@ -523,8 +523,12 @@ class BenchConfig:
             "tls": self.admin.tls,
             "allow_bench_management": self.admin.allow_bench_management,
         }
-        if self.admin.jwt_secret:
-            admin["jwt_secret"] = self.admin.jwt_secret
+        # jwks_url/jwks_audience are host-shared (common_config.toml), not written here.
+        optional_admin = {
+            "jwt_secret": self.admin.jwt_secret,
+            "recovery_codes": self.admin.recovery_codes,
+        }
+        admin.update({key: value for key, value in optional_admin.items() if value})
         return admin
 
     def _central_section(self) -> ConfigDict:

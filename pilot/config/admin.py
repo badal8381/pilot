@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pilot.exceptions import ConfigError
 
@@ -21,6 +21,10 @@ class AdminConfig:
     domain: str = ""
     tls: bool = False
     allow_bench_management: bool = True
+    # Break-glass codes for when no enrolled device is available. Stored in the clear so
+    # an operator with server access can still read them; the API returns them only when
+    # they are issued, never on demand.
+    recovery_codes: list[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data: dict) -> "AdminConfig":
@@ -35,6 +39,7 @@ class AdminConfig:
             domain=data.get("domain", ""),
             tls=data.get("tls", False),
             allow_bench_management=data.get("allow_bench_management", True),
+            recovery_codes=list(data.get("recovery_codes", [])),
         )
 
     @property
