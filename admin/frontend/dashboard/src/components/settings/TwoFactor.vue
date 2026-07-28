@@ -45,16 +45,16 @@
       v-else
       :columns="columns"
       :rows="devices"
-      row-key="id"
+      row-key="name"
       :options="{ selectable: false, showTooltip: false }"
     >
       <template #cell="{ column, row, item }">
         <span
-          v-if="column.key === 'label'"
+          v-if="column.key === 'name'"
           class="block min-w-0 max-w-full text-ink-gray-7 text-sm truncate"
-          :title="row.label"
+          :title="row.name"
         >
-          {{ row.label }}
+          {{ row.name }}
         </span>
         <span v-else-if="column.key === 'confirmed_at'" class="text-ink-gray-6 text-xs">
           {{ fmtTimestamp(row.confirmed_at) }}
@@ -84,9 +84,10 @@
       <div class="space-y-3">
         <FormControl
           v-if="!enrollment"
-          v-model="label"
+          v-model="deviceName"
           label="Device name"
           placeholder="My Phone"
+          maxlength="40"
           @keydown.enter="startEnrollment"
         />
 
@@ -124,7 +125,7 @@
           v-if="!enrollment"
           variant="solid"
           :loading="busy"
-          :disabled="!label.trim()"
+          :disabled="!deviceName.trim()"
           @click="startEnrollment"
           >Get QR code</Button
         >
@@ -162,7 +163,7 @@
   <Dialog v-model="showRemove" :options="{ title: 'Remove device', size: 'md' }">
     <template #body-content>
       <p class="text-ink-gray-7 text-p-sm">
-        Remove <strong>{{ removing?.label }}</strong
+        Remove <strong>{{ removing?.name }}</strong
         >? Its codes stop working. Removing the last device turns two-factor off.
       </p>
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
@@ -199,7 +200,7 @@ import { fmtDateTime } from '@/utils/taskFormat'
 const columns = [
   // Fixed widths, not fractions: ListView's row wrapper is `w-max`, so a fractional
   // track sizes to its content and a long device name would stretch the table instead.
-  { label: 'Device', key: 'label', align: 'left', width: '12rem' },
+  { label: 'Device', key: 'name', align: 'left', width: '12rem' },
   { label: 'Added', key: 'confirmed_at', align: 'left', width: '9rem' },
   { label: 'Last used', key: 'last_used_at', align: 'left', width: '9rem' },
   { label: '', key: 'actions', align: 'right', width: '3rem' },
@@ -231,7 +232,7 @@ const showCodes = ref(false)
 const showRemove = ref(false)
 const showRegenerate = ref(false)
 
-const label = ref('')
+const deviceName = ref('')
 const otp = ref('')
 const enrollment = ref(null)
 const codes = ref([])
@@ -244,7 +245,7 @@ watch(showAdd, async (open) => {
   const abandoned = enrollment.value
   enrollment.value = null
   try {
-    await twoFactorApi.removeDevice(abandoned.id)
+    await twoFactorApi.removeDevice(abandoned.name)
   } catch {
     // Nothing to do: it expires on its own, and the user has already moved on.
   }
@@ -252,7 +253,7 @@ watch(showAdd, async (open) => {
 })
 
 function openAdd() {
-  label.value = ''
+  deviceName.value = ''
   otp.value = ''
   enrollment.value = null
   error.value = ''
@@ -261,11 +262,11 @@ function openAdd() {
 
 async function startEnrollment() {
   // Fired on blur and Enter, so guard against re-enrolling an already-named device.
-  if (enrollment.value || busy.value || !label.value.trim()) return
+  if (enrollment.value || busy.value || !deviceName.value.trim()) return
   error.value = ''
   busy.value = true
   try {
-    enrollment.value = await twoFactorApi.startEnrollment(label.value)
+    enrollment.value = await twoFactorApi.startEnrollment(deviceName.value)
   } catch (e) {
     error.value = e.message || 'Could not start enrollment.'
   } finally {
@@ -277,7 +278,7 @@ async function confirmEnrollment() {
   error.value = ''
   busy.value = true
   try {
-    const result = await twoFactorApi.confirm(enrollment.value.id, otp.value)
+    const result = await twoFactorApi.confirm(enrollment.value.name, otp.value)
     status.value = result
     // Cleared before closing: the close handler deletes whatever enrollment is still
     // pending, and this one is now confirmed.
@@ -305,7 +306,7 @@ async function confirmRemove() {
   error.value = ''
   busy.value = true
   try {
-    status.value = await twoFactorApi.removeDevice(removing.value.id)
+    status.value = await twoFactorApi.removeDevice(removing.value.name)
     showRemove.value = false
     toast.success('Device removed')
   } catch (e) {
