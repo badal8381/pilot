@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from collections.abc import Callable
@@ -10,6 +11,7 @@ Progress = Callable[[str], None]
 _PHASES = ("pre_update", "post_update")
 PATCHES_DIR = Path(__file__).parent.parent / "patches"
 PATCHES_TXT = PATCHES_DIR / "patches.txt"
+_CLI_ROOT = PATCHES_DIR.parent.parent
 
 
 def patch_names(phase: str) -> list[str]:
@@ -44,4 +46,8 @@ def _run_one(name: str, on_progress: Progress) -> None:
         on_progress(f"Skipping '{name}': no such patch file ({patch_file}).")
         return
     on_progress(f"Running patch '{name}'...")
-    subprocess.run([sys.executable, str(patch_file)], check=True)
+    # bench is a plain script, not a pip install, so "pilot" is only on
+    # sys.path inside this already-running process - a fresh subprocess needs
+    # it via PYTHONPATH to import anything from the runtime.
+    env = {**os.environ, "PYTHONPATH": str(_CLI_ROOT)}
+    subprocess.run([sys.executable, str(patch_file)], check=True, env=env)

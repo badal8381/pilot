@@ -72,6 +72,26 @@ def test_run_patches_all_runs_both_phases_in_order(
     assert marker.read_text() == "alpha\nbeta\n"
 
 
+def test_run_patches_passes_cli_root_as_pythonpath(
+    _patches_dir: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """bench is a plain script, not a pip install, so "pilot" is only on
+    sys.path inside this already-running process - a patch subprocess needs
+    PYTHONPATH set to the cli root or its own `import pilot` fails."""
+    _write_patches_txt(_patches_dir, "[pre_update]\nalpha\n\n[post_update]\n")
+    (_patches_dir / "alpha.py").write_text("")
+    captured = {}
+
+    def fake_run(cmd, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    runner.run_patches("pre_update")
+
+    assert captured["env"]["PYTHONPATH"] == str(runner._CLI_ROOT)
+
+
 def test_run_patches_skips_a_missing_patch_file_without_raising(_patches_dir: Path) -> None:
     _write_patches_txt(_patches_dir, "[pre_update]\nghost\n\n[post_update]\n")
     messages: list[str] = []
