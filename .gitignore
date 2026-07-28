@@ -66,6 +66,7 @@ admin/frontend/node_modules
 admin/frontend/components.d.ts
 admin/frontend/dashboard/components.d.ts
 admin/frontend/editor/components.d.ts
+admin/frontend/dashboard/src/types/
 *.timestamp-*
 .env
 .env.local
