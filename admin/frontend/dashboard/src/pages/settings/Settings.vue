@@ -1,9 +1,11 @@
 <script setup>
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { Button, TabButtons, useTheme } from 'frappe-ui'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 
-const { showSettings, showBenches, logout, session } = useAppMenu()
+const router = useRouter()
+const { showBenches, logout, session } = useAppMenu()
 const { currentTheme, setTheme } = useTheme()
 
 const themeOptions = computed(() => [
@@ -30,7 +32,7 @@ const themeOptions = computed(() => [
       <Button
         variant="ghost"
         class="w-full !h-auto !justify-between !px-3 !py-2.5"
-        @click="showSettings = true"
+        @click="router.push({ name: 'Settings' })"
       >
         <span class="flex items-center gap-3">
           <span class="size-4 text-ink-gray-6 lucide-server-cog" />

@@ -66,7 +66,11 @@
     >
       <div v-for="item in metadata" :key="item.label">
         <p class="text-ink-gray-4 text-xs">{{ item.label }}</p>
-        <p class="mt-1 text-ink-gray-8 text-sm truncate">{{ item.value }}</p>
+        <RouterLink v-if="item.route" :to="item.route"
+          class="block mt-1 text-ink-gray-8 text-sm truncate hover:underline">
+          {{ item.value }}
+        </RouterLink>
+        <p v-else class="mt-1 text-ink-gray-8 text-sm truncate">{{ item.value }}</p>
       </div>
     </div>
 
@@ -78,7 +82,7 @@
         :empty-text="task.status === 'queued' ? 'Waiting for this task to start…' : 'No output yet…'"
         v-slot="{ rawLines: streamedLines, streaming }"
         @status="updateStatus"
-        @done="load"
+        @done="handleDone"
       >
         <TaskSteps :raw-lines="streamedLines" :streaming="streaming" :task-status="task.status" />
       </TaskStream>
@@ -104,7 +108,9 @@ import {
   fmtDateTime,
   fmtDuration,
   isTaskActive,
+  redirectRouteOnSuccess,
   siteLabel,
+  siteRoute,
   statusConfig,
 } from '@/utils/taskFormat'
 
@@ -143,7 +149,9 @@ const metadata = computed(() => {
     items.unshift({ label: 'Queue position', value: `#${task.value.queue_position}` })
   }
   const site = siteLabel(task.value)
-  if (site !== 'Server-level') items.unshift({ label: 'Site', value: site })
+  if (site !== 'Server-level') {
+    items.unshift({ label: 'Site', value: site, route: siteRoute(task.value) })
+  }
   return items
 })
 
@@ -151,6 +159,13 @@ function updateStatus(event) {
   if (!['queued', 'running'].includes(event.status)) return
   task.value.status = event.status
   task.value.queue_position = event.queue_position
+}
+
+function handleDone(success) {
+  load()
+  if (!success) return
+  const redirect = redirectRouteOnSuccess(task.value)
+  if (redirect) router.push(redirect)
 }
 
 async function cancelTask() {

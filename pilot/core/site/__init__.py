@@ -288,6 +288,12 @@ def query_installed_apps_via_db(site_config: dict) -> list[str] | None:
     return _query_installed_apps_via_db(site_config)
 
 
+def is_setup_complete(site_config: dict) -> bool | None:
+    from pilot.core.site.config import is_setup_complete as _is_setup_complete
+
+    return _is_setup_complete(site_config)
+
+
 def set_site_ssl_flag(sites_root: Path, site_name: str, enabled: bool) -> None:
     """Flip a site's ssl flag after resolving the path safely."""
     from pilot.core.site.config import set_site_ssl_flag as _set_site_ssl_flag

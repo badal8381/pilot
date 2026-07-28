@@ -1,6 +1,11 @@
 <template>
   <template v-if="status">
-    <Button variant="outline" :theme="status.kind === 'failed' ? 'red' : 'gray'" @click="onClick">
+    <Button
+      variant="outline"
+      :theme="status.kind === 'failed' ? 'red' : 'gray'"
+      class="order-first"
+      @click="onClick"
+    >
       <template #prefix>
         <span class="size-4" :class="[status.icon, { 'animate-spin': status.kind === 'active' }]" />
       </template>

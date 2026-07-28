@@ -2,6 +2,32 @@
   <div v-if="loading" class="flex justify-center items-center h-40">
     <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
   </div>
+  <div v-else-if="jti">
+    <div v-if="activityLoading" class="flex justify-center items-center h-40">
+      <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    </div>
+    <div
+      v-else-if="!activity.length"
+      class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
+    >
+      <p class="font-medium text-ink-gray-7 text-sm">No activity recorded</p>
+      <p class="max-w-xs text-ink-gray-5 text-xs">Actions taken by this session will show up here.</p>
+    </div>
+    <ListView
+      v-else
+      :columns="activityColumns"
+      :rows="activityRows"
+      row-key="key"
+      :options="{ selectable: false, showTooltip: true }"
+    >
+      <template #cell="{ column, row, item }">
+        <div v-if="column.key === 'actions'" class="flex justify-end">
+          <Button variant="ghost" size="sm" icon="lucide-info" @click="openDetail(row)" />
+        </div>
+        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      </template>
+    </ListView>
+  </div>
   <div v-else class="space-y-5">
     <div
       v-if="loadError"
@@ -10,61 +36,31 @@
       {{ loadError }}
     </div>
     <template v-else>
-      <TabButtons v-model="activeTab" :options="tabs" />
-
-      <Alert :title="info.title" theme="blue" :dismissible="false">
-        <template #description>
-          <p class="text-ink-gray-6 text-p-sm">{{ info.description }}</p>
-        </template>
-      </Alert>
-
       <div
-        v-if="!currentRows.length"
+        v-if="!activeTokens.length"
         class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
       >
         <div class="flex justify-center items-center bg-surface-gray-2 rounded-full size-11">
-          <span :class="info.emptyIcon" class="size-5 text-ink-gray-5"></span>
+          <span class="size-5 text-ink-gray-5 lucide-key-round"></span>
         </div>
-        <p class="font-medium text-ink-gray-7 text-sm">{{ info.emptyTitle }}</p>
-        <p class="max-w-xs text-ink-gray-5 text-xs">{{ info.emptyHint }}</p>
+        <p class="font-medium text-ink-gray-7 text-sm">No active sessions</p>
+        <p class="max-w-xs text-ink-gray-5 text-xs">Sign-ins appear here while their tokens are valid.</p>
       </div>
 
       <ListView
         v-else
         :columns="columns"
-        :rows="currentRows"
+        :rows="rows"
         row-key="jti"
-        :options="{ selectable: false, showTooltip: false }"
+        :options="{ selectable: false, showTooltip: true }"
       >
         <template #cell="{ column, row, item }">
-          <div v-if="column.key === 'jti'" class="flex items-center gap-2 w-full min-w-0">
-            <button
-              class="min-w-0 font-mono text-ink-gray-6 text-xs text-left truncate"
-              title="Click to copy"
-              @click="copy(row.jti)"
-            >
-              {{ row.jti }}
-            </button>
-            <Badge
-              v-if="row.jti === currentJti"
-              class="shrink-0"
-              theme="green"
-              variant="subtle"
-              label="This session"
-            />
-          </div>
-          <span v-else-if="column.key === 'exp'" class="text-ink-gray-6 text-xs">
-            {{ row.expires }}
-          </span>
-          <div v-else-if="column.key === 'actions'" class="flex justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              theme="red"
-              icon="lucide-log-out"
-              title="Revoke session"
-              @click="promptRevoke(row)"
-            />
+          <div v-if="column.key === 'actions'" class="flex justify-end">
+            <Dropdown :options="menuOptions(row)" placement="left">
+              <template #default="{ open }">
+                <Button variant="ghost" size="sm" :active="open" icon="lucide-ellipsis" />
+              </template>
+            </Dropdown>
           </div>
           <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
         </template>
@@ -78,7 +74,7 @@
         Revoke this session? Its token stops working immediately and whoever holds it must sign in
         again.
       </p>
-      <p class="mt-2 font-mono text-ink-gray-5 text-xs break-all">{{ revoking?.jti }}</p>
+      <p class="mt-2 font-mono text-ink-gray-5 text-xs">{{ revoking?.ip }}</p>
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
         <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
@@ -87,85 +83,191 @@
       </div>
     </template>
   </Dialog>
+
+  <Dialog v-model="showDetail" :options="{ title: 'Activity details', size: 'md' }">
+    <template #body-content>
+      <div class="space-y-2 max-h-96 overflow-y-auto">
+        <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
+          <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
+          <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
+        </div>
+      </div>
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { Alert, Badge, Button, Dialog, ListView, ListRowItem, TabButtons, toast } from 'frappe-ui'
-import { settingsApi } from '@/api/settings'
+import { computed, onMounted, ref, watch } from 'vue'
+import { Button, Dialog, Dropdown, ListView, ListRowItem, toast } from 'frappe-ui'
 import { sessionApi } from '@/api/session'
-import { fmtDateTime } from '@/utils/taskFormat'
+import { auditApi } from '@/api/audit'
+import { commandLabel, fmtDateTime, relativeTime } from '@/utils/taskFormat'
 
-const INFO = {
-  active: {
-    title: 'Active sessions',
-    description:
-      'Each row is a sign-in that is currently valid — a browser logged into this ' +
-      'bench. The token ID (jti) uniquely identifies that session, and it stops working on its ' +
-      'own once it expires. Revoke one to sign it out immediately.',
-    emptyIcon: 'lucide-key-round',
-    emptyTitle: 'No active sessions',
-    emptyHint: 'Sign-ins appear here while their tokens are valid.',
-  },
-  revoked: {
-    title: 'Revoked sessions',
-    description:
-      'Sessions that were signed out before they expired. A revoked token is rejected on ' +
-      'every request until its original expiry, then it drops off this list automatically.',
-    emptyIcon: 'lucide-shield-off',
-    emptyTitle: 'No revoked sessions',
-    emptyHint: 'Tokens you revoke early are listed here until they expire.',
-  },
-}
+const nestedView = defineModel('nestedView')
+// The session whose activity is showing - a route param (owned by SettingsDialog),
+// so a specific session's activity view is a real, deep-linkable URL.
+const jti = defineModel('jti')
 
 const loading = ref(true)
 const loadError = ref('')
 const activeTokens = ref([])
-const revokedTokens = ref([])
 const currentJti = ref('')
-const activeTab = ref('active')
 const showRevoke = ref(false)
 const revoking = ref(null)
 const revokeBusy = ref(false)
 
-const tabs = computed(() => [
-  { label: `Active (${activeTokens.value.length})`, value: 'active' },
-  { label: `Revoked (${revokedTokens.value.length})`, value: 'revoked' },
-])
+const activityLoading = ref(false)
+const activity = ref([])
 
-const info = computed(() => INFO[activeTab.value])
+// Titled by jti, not IP - the same IP can hold multiple sessions, so IP alone
+// wouldn't identify which one this view is showing.
+watch(
+  jti,
+  (currentTarget) => {
+    nestedView.value = currentTarget ? { title: `Session - ${currentTarget}` } : null
+  },
+  { immediate: true },
+)
 
-const columns = computed(() => {
-  const base = [
-    { label: 'Token ID (jti)', key: 'jti', align: 'left', width: '13rem' },
-    { label: 'Expires', key: 'exp', align: 'left', width: '11rem' },
-  ]
-  if (activeTab.value === 'active') {
-    base.push({ label: '', key: 'actions', align: 'right', width: '3.5rem' })
-  }
-  return base
-})
+watch(
+  jti,
+  async (target) => {
+    if (!target) {
+      activity.value = []
+      return
+    }
+    activityLoading.value = true
+    try {
+      const result = await auditApi.list({ jti: target, limit: 50 })
+      activity.value = result.data || []
+    } catch (e) {
+      toast.error(e.message || 'Could not load activity.')
+    } finally {
+      activityLoading.value = false
+    }
+  },
+  { immediate: true },
+)
 
-const currentRows = computed(() =>
-  (activeTab.value === 'active' ? activeTokens.value : revokedTokens.value).map((t) => ({
-    jti: t.jti,
-    exp: t.exp,
-    expires: formatExpiry(t.exp),
+// Numeric widths are fr units (ListView convention) so columns stretch to fill the
+// row instead of leaving dead space; actions stays a fixed icon-sized column.
+const columns = [
+  { label: 'IP address', key: 'ip', align: 'left', width: 1 },
+  { label: 'Last activity', key: 'activity', align: 'left', width: 1, getTooltip: (row) => row.activityTooltip },
+  { label: 'Expires', key: 'exp', align: 'left', width: 1 },
+  { label: '', key: 'actions', align: 'right', width: '3rem' },
+]
+
+const activityColumns = [
+  { label: 'Event', key: 'event', align: 'left', width: 2, getTooltip: (row) => row.eventTooltip },
+  { label: 'IP address', key: 'ip', align: 'left', width: 1 },
+  { label: 'Time', key: 'time', align: 'left', width: 1, getTooltip: (row) => row.timeExact },
+  { label: '', key: 'actions', align: 'right', width: '3rem' },
+]
+
+// All display formatting happens here, not in the template - rows already hold the
+// exact strings/tooltips each column renders.
+const rows = computed(() =>
+  activeTokens.value
+    .map((t) => {
+      const isCurrent = t.jti === currentJti.value
+      return {
+        jti: t.jti,
+        ip: t.ip || '-',
+        isCurrent,
+        lastSeen: t.last_seen || 0,
+        activity: isCurrent ? 'Current session' : relativeTimeOrDash(t.last_seen),
+        activityTooltip: isCurrent ? '' : formatDate(t.last_seen),
+        exp: formatDate(t.exp),
+      }
+    })
+    .sort((a, b) => b.isCurrent - a.isCurrent || b.lastSeen - a.lastSeen),
+)
+
+const activityRows = computed(() =>
+  activity.value.map((entry, i) => ({
+    key: i,
+    event: auditEntryHead(entry),
+    eventTooltip: auditEntryDetail(entry),
+    ip: entry.ip || '-',
+    time: relativeTime(entry.logged_at),
+    timeExact: fmtDateTime(entry.logged_at),
+    raw: entry,
   })),
 )
 
-function formatExpiry(exp) {
-  if (!exp) return '-'
-  return fmtDateTime(new Date(exp * 1000).toISOString())
+const showDetail = ref(false)
+const viewingDetail = ref(null)
+
+function openDetail(row) {
+  viewingDetail.value = row.raw
+  showDetail.value = true
 }
 
-async function copy(jti) {
-  try {
-    await navigator.clipboard.writeText(jti)
-    toast.success('Token ID copied')
-  } catch {
-    toast.error('Could not copy')
-  }
+// Flattens args into the top level and drops empties, so the dialog is a plain,
+// complete key/value dump of the raw audit record - no per-type formatting to maintain.
+const detailEntries = computed(() => {
+  if (!viewingDetail.value) return []
+  const { args, ...rest } = viewingDetail.value
+  return Object.entries({ ...rest, ...args })
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => ({
+      key,
+      value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+    }))
+})
+
+const AUDIT_TYPE_LABELS = { ssh_key: 'SSH Key' }
+
+function auditTypeLabel(type) {
+  if (!type) return ''
+  return AUDIT_TYPE_LABELS[type] || type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+}
+
+// A "task" entry's real name is its command (e.g. backup-site); everything else is
+// already a distinct audit type (session, backup, ssh_key, git...). Whatever
+// identifying detail the entry carries (queued tasks nest theirs under `args`, other
+// audit types put them at the top level) is appended so the row is self-contained.
+const DETAIL_KEYS = [
+  'site',
+  'app',
+  'name',
+  'repo',
+  'branch',
+  'marketplace_app',
+  'timestamp',
+  'file',
+  'fingerprint',
+  'status',
+]
+
+// Short enough to fit the column without forcing the row wider than its container -
+// full context (below) only shows up in the hover tooltip.
+function auditEntryHead(entry) {
+  const label = entry.type === 'task' ? commandLabel(entry.command) : auditTypeLabel(entry.type)
+  return entry.event ? `${label} ${entry.event}` : label
+}
+
+function auditEntryDetail(entry) {
+  const source = { ...entry, ...entry.args }
+  const detail = [...new Set(DETAIL_KEYS.map((key) => source[key]).filter(Boolean))].join(' · ')
+  const head = auditEntryHead(entry)
+  return detail ? `${head} — ${detail}` : head
+}
+
+function relativeTimeOrDash(seconds) {
+  return seconds ? relativeTime(new Date(seconds * 1000).toISOString()) : '-'
+}
+
+function formatDate(seconds) {
+  return seconds ? fmtDateTime(new Date(seconds * 1000).toISOString()) : '-'
+}
+
+function menuOptions(row) {
+  return [
+    { label: 'View activity', icon: 'lucide-history', onClick: () => (jti.value = row.jti) },
+    { label: 'Revoke session', icon: 'lucide-log-out', theme: 'red', onClick: () => promptRevoke(row) },
+  ]
 }
 
 function promptRevoke(row) {
@@ -193,11 +295,9 @@ async function confirmRevoke() {
 
 async function load() {
   try {
-    const data = await settingsApi.get()
-    const auth = data.authentication || {}
-    activeTokens.value = auth.active_tokens || []
-    revokedTokens.value = auth.revoked_tokens || []
-    currentJti.value = auth.current_jti || ''
+    const data = await sessionApi.list()
+    activeTokens.value = data.active_tokens || []
+    currentJti.value = data.current_jti || ''
   } catch (e) {
     loadError.value = e.message || 'Could not load authentication data.'
   } finally {

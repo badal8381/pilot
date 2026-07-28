@@ -50,8 +50,8 @@ def _is_key_type(token: str) -> bool:
 
 
 def _fingerprint(blob: str) -> str:
-    digest = hashlib.sha256(base64.b64decode(blob)).digest()
-    return "SHA256:" + base64.b64encode(digest).decode().rstrip("=")
+    digest = hashlib.md5(base64.b64decode(blob)).digest()
+    return "MD5:" + ":".join(f"{b:02x}" for b in digest)
 
 
 def _parse_line(line: str) -> tuple[str, str, str] | None:

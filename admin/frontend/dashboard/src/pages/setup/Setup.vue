@@ -37,27 +37,23 @@
         <!-- Database -->
         <div v-show="currentStep === 'database'" class="flex flex-col gap-4">
           <Select label="Database engine" v-model="dbType" :options="dbTypeOptions" />
-          <Switch
-            v-model="useExistingDb"
-            label="Connect to an existing database server"
-            description="Leave off to let pilot set up and manage its own user owned database server if not already present."
-          />
-          <div v-show="useExistingDb" class="flex gap-4">
-            <TextInput class="flex-1" label="Host" v-model="dbHost" placeholder="db.example.com" />
-            <TextInput
-              class="w-28"
-              label="Port"
-              v-model="dbPort"
-              :placeholder="dbPortPlaceholder"
-            />
-          </div>
-          <TextInput
-            v-show="showRootUsername"
-            label="Root username"
-            v-model="dbUser"
-            :placeholder="rootUserPlaceholder"
-          />
-          <div>
+          <Select label="Database setup" v-model="dbMode" :options="dbModeOptions" />
+          <template v-if="dbMode === 'external'">
+            <div class="flex gap-4">
+              <TextInput
+                class="flex-1"
+                label="Host"
+                v-model="dbHost"
+                placeholder="db.example.com"
+              />
+              <TextInput
+                class="w-28"
+                label="Port"
+                v-model="dbPort"
+                :placeholder="dbPortPlaceholder"
+              />
+            </div>
+            <TextInput label="Root username" v-model="dbUser" :placeholder="rootUserPlaceholder" />
             <Password
               label="Root user password"
               v-model="dbPassword"
@@ -68,10 +64,7 @@
               data-bwignore
               @keydown.enter="goToNextStep"
             />
-            <p v-show="rootPasswordDescription" class="mt-1.5 text-ink-gray-6 text-p-sm">
-              {{ rootPasswordDescription }}
-            </p>
-          </div>
+          </template>
           <ErrorMessage v-show="errorMessage" :message="errorMessage" />
         </div>
 
@@ -177,13 +170,21 @@
           Next
         </Button>
         <Button
-          v-show="isConfiguring && currentStep === 'database'"
+          v-show="isConfiguring && currentStep === 'database' && dbMode === 'external'"
           variant="solid"
           :loading="isSubmitting"
           class="flex-1"
           @click="goToNextStep"
         >
           Verify credentials
+        </Button>
+        <Button
+          v-show="isConfiguring && currentStep === 'database' && dbMode !== 'external'"
+          variant="solid"
+          class="flex-1"
+          @click="goToNextStep"
+        >
+          Next
         </Button>
         <Button
           v-show="isConfiguring && currentStep !== 'passwords' && currentStep !== 'database' && !isLastConfigStep"
@@ -211,7 +212,6 @@
 import {
   Button,
   Select,
-  Switch,
   TextInput,
   FormLabel,
   Password,
@@ -240,15 +240,14 @@ const {
   dbType,
   dbUser,
   dbPassword,
-  useExistingDb,
+  dbMode,
+  dbModeOptions,
   dbHost,
   dbPort,
   dbPortPlaceholder,
   appRepo,
   appBranch,
-  showRootUsername,
   rootUserPlaceholder,
-  rootPasswordDescription,
   dbTypeOptions,
   branchOptions,
   stepSequence,

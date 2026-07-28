@@ -120,6 +120,27 @@ def test_download_backup_file_serves_the_file(tmp_path: Path) -> None:
     assert response.data == b"data"
 
 
+def test_download_backup_file_is_audited(tmp_path: Path) -> None:
+    from pilot.core.bench import Bench
+    from pilot.core.bench.audit_log import AuditLog
+
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site.localhost")
+    _make_backup_file(bench_root, "site.localhost", "20240101_000000", "database.sql.gz")
+    client = _client(bench_root)
+
+    client.get(
+        "/api/v1/sites/site.localhost/backups/20240101_000000/files/"
+        "20240101_000000-site.localhost-database.sql.gz/content"
+    )
+
+    entries = AuditLog(Bench(bench_root)).entries(entry_type="backup")
+    assert entries[0]["event"] == "download"
+    assert entries[0]["site"] == "site.localhost"
+    assert entries[0]["timestamp"] == "20240101_000000"
+    assert entries[0]["file"] == "20240101_000000-site.localhost-database.sql.gz"
+
+
 def test_download_backup_file_rejects_a_timestamp_mismatch(tmp_path: Path) -> None:
     bench_root = tmp_path / "benches" / "current"
     _make_site(bench_root, "site.localhost")
@@ -160,6 +181,29 @@ def test_backup_download_links_returns_urls_directly(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.get_json() == {"database": "https://bucket.example/signed"}
+
+
+def test_backup_download_links_is_audited(tmp_path: Path) -> None:
+    from pilot.core.bench import Bench
+    from pilot.core.bench.audit_log import AuditLog
+
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site.localhost")
+    client = _client(bench_root)
+    offsite = Mock()
+    offsite.get_backup.return_value = {"database": "20240101_000000-database.sql.gz"}
+    offsite.presigned_url.return_value = "https://bucket.example/signed"
+
+    with patch(
+        "pilot.integrations.s3.backups.OffsiteBackup.from_config",
+        return_value=offsite,
+    ):
+        client.get("/api/v1/sites/site.localhost/backups/20240101_000000/download-links")
+
+    entries = AuditLog(Bench(bench_root)).entries(entry_type="backup")
+    assert entries[0]["event"] == "download"
+    assert entries[0]["site"] == "site.localhost"
+    assert entries[0]["via"] == "s3"
 
 
 def test_backup_schedule_put_returns_the_saved_resource(tmp_path: Path) -> None:

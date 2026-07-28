@@ -9,6 +9,12 @@
           Your bench is up to date.
         </p>
         <template v-else>
+          <div class="flex items-center justify-between">
+            <span class="text-ink-gray-5 text-sm">{{ selected.size }} of {{ appNames.length }} selected</span>
+            <Button variant="ghost" size="sm" @click="toggleAll">
+              {{ selected.size === appNames.length ? 'Unselect all' : 'Select all' }}
+            </Button>
+          </div>
           <div class="flex flex-col gap-1 max-h-80 overflow-y-auto">
             <button
               v-for="name in appNames"
@@ -112,6 +118,10 @@ function toggle(name) {
   const next = new Set(selected.value)
   next.has(name) ? next.delete(name) : next.add(name)
   selected.value = next
+}
+
+function toggleAll() {
+  selected.value = selected.value.size === appNames.value.length ? new Set() : new Set(appNames.value)
 }
 
 async function runUpdate() {

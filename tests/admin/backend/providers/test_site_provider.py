@@ -39,3 +39,12 @@ def test_site_provider_skips_symlinked_site(tmp_path: Path) -> None:
 def test_site_provider_refuses_site_path_outside_bench(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="within the bench"):
         SiteProvider(tmp_path).get_one("../outside")
+
+
+def test_site_provider_defaults_setup_complete_false_without_db_access(tmp_path: Path) -> None:
+    sites = tmp_path / "sites"
+    _make_site(sites, "site.localhost", {"installed_apps": ["frappe"]})
+
+    info = SiteProvider(tmp_path).get_one("site.localhost")
+
+    assert info.setup_complete is False
