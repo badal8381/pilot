@@ -33,7 +33,12 @@ def test_in_app_embed_bundle_is_served_at_desk_contract_url(
     assert response.status_code == 200
     assert response.content_type.startswith("text/javascript")
     assert b"frappe.cloudSettings" in response.data
-    assert "immutable" in response.headers.get("Cache-Control", "")
+    # Fixed filename: it must revalidate so a rebuild is picked up, never pin the
+    # old bytes with `immutable`. ETag lets revalidation settle for a cheap 304.
+    cache_control = response.headers.get("Cache-Control", "")
+    assert "no-cache" in cache_control
+    assert "immutable" not in cache_control
+    assert response.headers.get("ETag")
 
 
 def test_in_app_embed_bundle_is_not_swallowed_by_dashboard_spa(

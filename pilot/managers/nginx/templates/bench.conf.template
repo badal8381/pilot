@@ -245,8 +245,10 @@ server {
     location /embed/cloud-settings/ {
         alias {{ admin_static }}/in-app-embed/cloud-settings/;
         try_files $uri =404;
-        expires 1y;
-        add_header Cache-Control "public, immutable";
+        # Fixed filename (cloud-settings.js), so it must revalidate: a rebuild
+        # changes the bytes, not the URL. nginx's ETag/Last-Modified keeps this
+        # to a 304 until the bundle actually changes. Never `immutable` here.
+        add_header Cache-Control "no-cache";
     }
 
     location /assets/ {
