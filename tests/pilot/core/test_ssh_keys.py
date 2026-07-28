@@ -12,9 +12,9 @@ from pilot.core.server.ssh_keys import (
     SSHKeyNotFoundError,
 )
 
-# Real keys; fingerprints cross-checked against `ssh-keygen -lf`.
+# Real keys; fingerprints cross-checked against `ssh-keygen -lf -E md5`.
 ED25519 = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILy2dBvqIXocjo05vcMZnMBRje9nYWi5k1e8Hy/GIl3A alice@example.com"
-ED25519_FP = "SHA256:bJnE8PiSW6WTGg6SJL+YuJLt2RZ+WeId5NsjdrDlRXE"
+ED25519_FP = "MD5:96:b3:eb:c7:61:45:9a:e3:23:59:d0:d0:dd:67:94:f0"
 RSA = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDDWjHTLhNKgp0DzgnYSDbFi+U3TvAMlQCZT0TTkL/EqXoS"
     "DC+QfuFRiqmevqDxD841uKqhJT/UKSvmkPYP5Zar5MHgDmt1FCtevuwulECAO28SuMELoFiQeBqWTBF8524l"
@@ -22,7 +22,7 @@ RSA = (
     "XqakGY645NmUBFlQ71GmJC5Ob0QkSov3NWO7E5xg0u5V7tDaRAOJhbYUlAL3CLxuFhHcdnzY56n4t1OYN/lG"
     "ob79gHhYUwTGIyd14IpP5niWyux+m64zFDquDQwHtD+3 bob@example.com"
 )
-RSA_FP = "SHA256:pQqcRYHWO0kJwaYa6//DYV5oJphkdTVyOCwHpGvkq3Y"
+RSA_FP = "MD5:91:e2:99:b3:d2:40:49:60:88:16:ae:5f:16:71:df:6b"
 
 
 @pytest.fixture
@@ -100,7 +100,7 @@ def test_remove_unknown_fingerprint_raises(store):
     store.add(ED25519)
     store.add(RSA)
     with pytest.raises(SSHKeyNotFoundError, match="matches"):
-        store.remove("SHA256:doesnotexist")
+        store.remove("MD5:doesnotexist")
 
 
 def test_writes_are_atomic_and_leave_no_temp_files(store):

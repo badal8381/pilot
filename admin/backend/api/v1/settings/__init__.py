@@ -185,6 +185,7 @@ def audit_log():
                 entry_type=request.args.get("type") or None,
                 site=request.args.get("site") or None,
                 status=request.args.get("status") or None,
+                jti=request.args.get("jti") or None,
                 limit=count,
             )
 

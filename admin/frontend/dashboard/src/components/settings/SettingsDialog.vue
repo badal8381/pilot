@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model="open" bare size="3xl">
+  <Dialog v-model="open" bare size="4xl">
     <template #default="{ close }">
       <div class="relative flex sm:h-[70vh] max-h-[85vh]">
         <div
@@ -42,8 +42,8 @@
           <div class="flex justify-between items-center pb-4">
             <div class="flex items-center gap-2">
               <Button
-                v-if="subSection || activeSection"
-                :class="{ 'sm:hidden': !subSection }"
+                v-if="subSection || sessionJti || activeSection"
+                :class="{ 'sm:hidden': !subSection && !sessionJti }"
                 class="-ml-2"
                 variant="subtle"
                 icon="lucide-arrow-left"
@@ -55,7 +55,11 @@
           </div>
           <General v-if="currentSection === 'general'" v-model:open-section="subSection" />
           <Security v-else-if="currentSection === 'security'" v-model:open-section="subSection" />
-          <Sessions v-else-if="currentSection === 'sessions'" />
+          <Sessions
+            v-else-if="currentSection === 'sessions'"
+            v-model:nested-view="nestedView"
+            v-model:jti="sessionJti"
+          />
           <SystemInfo v-else-if="currentSection === 'system-info'" />
         </div>
       </div>
@@ -64,7 +68,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Button } from 'frappe-ui'
 import General from '@/components/settings/General.vue'
@@ -112,10 +116,29 @@ const subSection = computed({
     }),
 })
 
-const headerTitle = computed(() => subSection.value?.label ?? activeSectionLabel.value)
+// Sessions doesn't use the sub-section registry (its "sub-pages" are individual,
+// dynamically-fetched sessions, not a fixed list) - the same :subSection route slot
+// carries a jti instead, so a specific session's activity view is a real deep link.
+const sessionJti = computed({
+  get: () => (currentSection.value === 'sessions' ? route.params.subSection || null : null),
+  set: (jti) =>
+    router.push({ name: 'Settings', params: { section: 'sessions', subSection: jti || undefined } }),
+})
+
+// Sessions reports the human title (an IP, once it resolves the jti) since the route
+// only carries the raw id - reset whenever the visible section changes so re-entering
+// the tab later never inherits a stale title.
+const nestedView = ref(null)
+watch(currentSection, () => (nestedView.value = null))
+
+const headerTitle = computed(() => {
+  if (sessionJti.value) return nestedView.value?.title ?? sessionJti.value
+  return subSection.value?.label ?? activeSectionLabel.value
+})
 
 function goBack() {
-  if (subSection.value) subSection.value = null
+  if (sessionJti.value) sessionJti.value = null
+  else if (subSection.value) subSection.value = null
   else activeSection.value = null
 }
 </script>
