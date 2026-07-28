@@ -69,18 +69,18 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         if rule.rule.startswith(f"{API_ROOT_PREFIX}/") and not rule.rule.startswith(f"{API_V1_PREFIX}/")
     ]
 
-    assert len(routes) == 155
+    assert len(routes) == 156
     assert unversioned == []
-    assert len({(method, path) for method, path, _, _ in routes}) == 155
+    assert len({(method, path) for method, path, _, _ in routes}) == 156
     assert Counter(method for method, _, _, _ in routes) == {
         "DELETE": 12,
         "GET": 80,
         "PATCH": 4,
-        "POST": 54,
+        "POST": 55,
         "PUT": 5,
     }
     assert Counter(policy for _, _, _, policy in routes) == {
-        "authenticated": 105,
+        "authenticated": 106,
         "authenticated+bench-management": 9,
         "authenticated+site-scope": 30,
         "open": 5,
@@ -107,7 +107,7 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         "network": 1,
         "updates": 1,
         "runtime": 4,
-        "auth": 11,
+        "auth": 12,
         "settings": 3,
         "setup": 6,
         "sites": 33,
@@ -212,6 +212,7 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         ("POST", "/api/v1/auth/two-factor/enrollment"),
         ("POST", "/api/v1/auth/two-factor/<credential_id>"),
         ("DELETE", "/api/v1/auth/two-factor/<credential_id>"),
+        ("POST", "/api/v1/auth/two-factor/recovery-codes"),
         ("GET", "/api/v1/audit-events"),
         ("GET", "/api/v1/network/client"),
         ("GET", "/api/v1/ssh-keys"),

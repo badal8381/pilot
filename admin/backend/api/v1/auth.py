@@ -176,7 +176,11 @@ def change_admin_password():
 
 def two_factor_payload(bench: Bench) -> dict:
     two_factor = TwoFactorAuthentication(bench)
-    return {"enabled": two_factor.is_enabled, "credentials": two_factor.get_credentials()}
+    return {
+        "enabled": two_factor.is_enabled,
+        "credentials": two_factor.get_credentials(),
+        "recovery_codes_remaining": two_factor.unused_recovery_code_count,
+    }
 
 
 def _password_matches(bench: Bench, data: dict | None) -> bool:
@@ -220,10 +224,18 @@ def confirm_two_factor_credential(credential_id: str):
     if not two_factor.confirm_enrollment(credential_id, str(data.get("otp", ""))):
         return error_response("invalid_otp", "That code is not valid. Try the next one.", 422)
     bench.audit_action("session", {"event": "two_factor_device_added", "credential": credential_id})
+
+    codes = None
     if not was_enabled:
+        # First device: mint the break-glass codes now, while someone is here to save them.
+        codes = two_factor.generate_recovery_codes()
         # Tokens issued before 2FA existed would otherwise skip it until they expired.
         Session(bench).revoke_all()
-    return jsonify(two_factor_payload(bench))
+
+    payload = two_factor_payload(bench)
+    if codes is not None:
+        payload["recovery_codes"] = codes
+    return jsonify(payload)
 
 
 @auth_bp.delete("/two-factor/<credential_id>")
@@ -288,3 +300,15 @@ def revoke_session(jti: str):
         return error_response("unknown_session", "No such active session.", 404)
     bench.audit_action("session", {"event": "revoked", "jti": jti})
     return no_content_response()
+
+
+@auth_bp.post("/two-factor/recovery-codes")
+@rate_limit(5, 60, user_ip=True)
+def regenerate_recovery_codes():
+    """Replace the whole set. Any code saved from the previous set stops working."""
+    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
+    if not _password_matches(bench, request.get_json(silent=True)):
+        return error_response("invalid_credentials", "Incorrect password.", 401)
+    codes = TwoFactorAuthentication(bench).generate_recovery_codes()
+    bench.audit_action("session", {"event": "recovery_codes_regenerated"})
+    return jsonify({"recovery_codes": codes})

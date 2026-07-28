@@ -7,6 +7,7 @@ import time
 
 import pyotp
 
+from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 from pilot.exceptions import TwoFactorError
 from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
@@ -15,6 +16,8 @@ from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text
 DRIFT_STEPS = 1
 # An enrollment nobody completes is dropped, so an abandoned secret cannot linger.
 PENDING_TTL = 24 * 3600
+# Let's give 10 recovery codes to bypass the second factor, if exhausted users will have to regenerate them.
+RECOVERY_CODE_COUNT = 10
 
 
 class TotpCredentialStore:
@@ -179,11 +182,56 @@ class TwoFactorAuthentication:
     def remove_credential(self, credential_id: str) -> bool:
         return self.store.remove(credential_id)
 
+    @property
+    def unused_recovery_code_count(self) -> int:
+        return len(self.bench.config.admin.recovery_codes)
+
+    def generate_recovery_codes(self) -> list[str]:
+        """Issue a fresh set and return it, the only time these are handed out.
+
+        Replaces any previous set, so codes someone wrote down stop working the moment a
+        new set is issued.
+        """
+        codes = [secrets.token_urlsafe(10) for _ in range(RECOVERY_CODE_COUNT)]
+        self._store_recovery_codes(codes)
+        return codes
+
+    def redeem_recovery_code(self, code: str) -> bool:
+        """Spend one recovery code. Each works once."""
+        code = code.strip()
+        # compare_digest raises on non-ASCII, so a pasted smart quote would 500 the login.
+        if not code or not code.isascii():
+            return False
+        with BenchConfig.open(self.bench.path, mode="rw") as config:
+            remaining = [
+                stored for stored in config.admin.recovery_codes if not hmac.compare_digest(stored, code)
+            ]
+            # Guard against invalid recovery code as well.
+            if len(remaining) == len(config.admin.recovery_codes):
+                return False
+            config.admin.recovery_codes = remaining
+        self.bench.config.admin.recovery_codes = remaining
+        return True
+
+    def _store_recovery_codes(self, codes: list[str]) -> None:
+        with BenchConfig.open(self.bench.path, mode="rw") as config:
+            config.admin.recovery_codes = list(codes)
+        self.bench.config.admin.recovery_codes = list(codes)
+
+    def verify_second_factor(self, code: str) -> bool:
+        """Accept either an authenticator code or a recovery code from the sign-in form.
+
+        One entry point so the login screen has a single field: a six-digit code never
+        collides with a recovery code, so trying both is unambiguous.
+        """
+        return self.verify_otp(code) or self.redeem_recovery_code(code)
+
     def verify_otp(self, otp: str) -> bool:
         """Accept a code from any enrolled device, burning that device's time step."""
-        if not otp:
-            return False
         otp = otp.strip()
+        # compare_digest raises on non-ASCII, so a pasted smart quote would 500 the login.
+        if not otp or not otp.isascii():
+            return False
         for credential_id, entry in self.store.confirmed().items():
             timestep = self._matching_timestep(entry["secret"], otp)
             if timestep is not None:

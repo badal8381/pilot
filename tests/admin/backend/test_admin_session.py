@@ -862,6 +862,7 @@ def _enroll_device(client, label: str = "phone") -> dict:
     code = pyotp.TOTP(enrollment["secret"]).at(int(time.time()) - 30)
     confirmed = client.post(f"/api/v1/auth/two-factor/{enrollment['id']}", json={"otp": code})
     assert confirmed.status_code == 200
+    enrollment["confirmation"] = confirmed.get_json()
     return enrollment
 
 
@@ -872,6 +873,7 @@ def test_two_factor_starts_disabled_with_no_devices(tmp_path: Path) -> None:
     assert client.get("/api/v1/auth/two-factor").get_json() == {
         "enabled": False,
         "credentials": [],
+        "recovery_codes_remaining": 0,
     }
 
 
@@ -983,7 +985,9 @@ def test_removing_a_device_requires_the_password(tmp_path: Path) -> None:
 
     response = client.delete(path, json={"password": "secret"})
     assert response.status_code == 200
-    assert response.get_json() == {"enabled": False, "credentials": []}
+    body = response.get_json()
+    assert body["enabled"] is False
+    assert body["credentials"] == []
 
 
 def test_removing_an_unknown_device_is_404(tmp_path: Path) -> None:
@@ -1016,3 +1020,33 @@ def test_two_factor_changes_are_audited(tmp_path: Path) -> None:
     events = [e["event"] for e in AuditLog(bench).entries(entry_type="session")]
     assert "two_factor_device_added" in events
     assert "two_factor_device_removed" in events
+
+
+def test_first_device_returns_recovery_codes_once(tmp_path: Path) -> None:
+    """The codes are minted on enable, while someone is present to save them."""
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    body = _enroll_device(client)["confirmation"]
+
+    assert len(body["recovery_codes"]) == 10
+    assert body["recovery_codes_remaining"] == 10
+    # A second device must not mint a new set.
+    second = _enroll_device(client, "laptop")["confirmation"]
+    assert "recovery_codes" not in second
+
+
+
+def test_regenerating_recovery_codes_requires_the_password(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    original = _enroll_device(client)["confirmation"]["recovery_codes"]
+
+    rejected = client.post("/api/v1/auth/two-factor/recovery-codes", json={"password": "wrong"})
+    assert rejected.status_code == 401
+
+    accepted = client.post("/api/v1/auth/two-factor/recovery-codes", json={"password": "secret"})
+    assert accepted.status_code == 200
+    assert set(accepted.get_json()["recovery_codes"]).isdisjoint(original)
+
+

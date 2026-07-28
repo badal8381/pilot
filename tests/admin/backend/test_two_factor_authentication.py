@@ -10,6 +10,7 @@ import pytest
 
 from admin.backend.internal.two_factor_authentication import (
     PENDING_TTL,
+    RECOVERY_CODE_COUNT,
     TotpCredentialStore,
     TwoFactorAuthentication,
     TwoFactorError,
@@ -254,3 +255,95 @@ def test_state_survives_a_fresh_object(tmp_path: Path) -> None:
     _enroll(TwoFactorAuthentication(bench), "phone")
 
     assert TwoFactorAuthentication(_bench(tmp_path)).is_enabled is True
+
+
+def test_recovery_codes_are_generated_and_persisted(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+
+    codes = two_factor.generate_recovery_codes()
+
+    assert len(codes) == RECOVERY_CODE_COUNT
+    assert len(set(codes)) == RECOVERY_CODE_COUNT
+    assert BenchConfig.from_file(tmp_path / "bench.toml").admin.recovery_codes == codes
+
+
+def test_a_recovery_code_works_once(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    codes = two_factor.generate_recovery_codes()
+
+    assert two_factor.redeem_recovery_code(codes[3]) is True
+    assert two_factor.redeem_recovery_code(codes[3]) is False
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT - 1
+    assert codes[3] not in BenchConfig.from_file(tmp_path / "bench.toml").admin.recovery_codes
+
+
+def test_unknown_and_empty_recovery_codes_are_rejected(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    two_factor.generate_recovery_codes()
+
+    assert two_factor.redeem_recovery_code("not-a-real-code") is False
+    assert two_factor.redeem_recovery_code("   ") is False
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT
+
+
+def test_regenerating_invalidates_the_previous_set(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    old = two_factor.generate_recovery_codes()
+
+    new = two_factor.generate_recovery_codes()
+
+    assert set(old).isdisjoint(new)
+    assert two_factor.redeem_recovery_code(old[0]) is False
+    assert two_factor.redeem_recovery_code(new[0]) is True
+
+
+def test_recovery_codes_survive_a_fresh_object(tmp_path: Path) -> None:
+    codes = TwoFactorAuthentication(_bench(tmp_path)).generate_recovery_codes()
+
+    # Re-read bench.toml rather than rewriting it, the way a later request would.
+    reloaded = Bench(BenchConfig.from_file(tmp_path / "bench.toml"), tmp_path)
+    assert TwoFactorAuthentication(reloaded).redeem_recovery_code(codes[0]) is True
+
+
+def test_second_factor_accepts_an_authenticator_code(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _, secret = _enroll(two_factor)
+    two_factor.generate_recovery_codes()
+
+    assert two_factor.verify_second_factor(_code(secret)) is True
+    # The TOTP path was taken, so no recovery code was spent.
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT
+
+
+def test_second_factor_falls_back_to_a_recovery_code(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _enroll(two_factor)
+    codes = two_factor.generate_recovery_codes()
+
+    assert two_factor.verify_second_factor(codes[0]) is True
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT - 1
+    assert two_factor.verify_second_factor(codes[0]) is False
+
+
+def test_second_factor_rejects_anything_else(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _enroll(two_factor)
+    two_factor.generate_recovery_codes()
+
+    assert two_factor.verify_second_factor("000000") is False
+    assert two_factor.verify_second_factor("") is False
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT
+
+
+def test_non_ascii_codes_are_rejected_not_raised(tmp_path: Path) -> None:
+    """compare_digest raises on non-ASCII input, which would 500 the sign-in form."""
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _enroll(two_factor)
+    two_factor.generate_recovery_codes()
+
+    assert two_factor.redeem_recovery_code("café-code-xyz") is False
+    assert two_factor.redeem_recovery_code("—dash—") is False
+    # Both paths matter: the TOTP field is the one people paste into.
+    assert two_factor.verify_otp("café12") is False
+    assert two_factor.verify_second_factor("café-code-xyz") is False
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT
