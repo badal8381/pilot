@@ -73,18 +73,24 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
     >
       <div class="flex items-center justify-between">
         <template v-if="route.name == 'Home'">
-          <PilotLogo class="size-6 rounded-sm" />
-          <span class="flex-1 text-center text-ink-gray-9">Home</span>
+          <div class="flex items-center gap-2">
+            <PilotLogo class="size-6 rounded-sm" />
+            <span class="text-ink-gray-9">Home</span>
+          </div>
         </template>
 
-        <button v-else class="flex items-center gap-1" @click="mobileNavDrawer = true">
-          <Breadcrumbs :items="breadcrumbs" />
-          <lucide-chevron-down class="size-4 text-ink-gray-5" />
+        <button
+          v-else
+          class="flex items-center gap-1 max-w-[50%] min-w-0"
+          @click="mobileNavDrawer = true"
+        >
+          <Breadcrumbs :items="breadcrumbs" class="min-w-0" />
+          <lucide-chevron-down class="size-4 text-ink-gray-5 shrink-0" />
         </button>
 
         <div id="header-badge" class="flex items-center" />
         <div id="header-actions" class="flex items-center gap-2 ml-auto">
-          <MigrationStatusButton />
+          <MigrationStatusButton v-if="route.name !== 'SiteDetail'" />
         </div>
       </div>
     </header>
