@@ -63,6 +63,7 @@ admin/frontend/editor/node_modules/
 admin/frontend/embed/node_modules/
 admin/backend/static/dashboard/
 admin/backend/static/editor/
+admin/backend/static/embed/
 admin/frontend/node_modules
 admin/frontend/components.d.ts
 admin/frontend/dashboard/components.d.ts
