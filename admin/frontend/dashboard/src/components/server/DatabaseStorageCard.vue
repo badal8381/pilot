@@ -21,6 +21,8 @@ const COLORS = {
   binlogIndex: 'blue-7',
 }
 
+const GROUP_SHOWN_COUNT = 3
+
 const groupParts = computed(() => {
   const schemaBytes = props.data.databases.reduce((sum, row) => sum + row.bytes, 0)
   const systemNames = props.data.databases.filter((row) => row.system).map((row) => row.schema)
@@ -37,32 +39,23 @@ const groupParts = computed(() => {
     },
     { label: databasesLabel, bytes: schemaBytes, color: COLORS.databases },
     { label: `${props.data.engine} core files`, bytes: props.data.core_bytes, color: COLORS.core },
+    {
+      label: `${props.data.engine} error log`,
+      bytes: props.data.error_log_bytes,
+      color: COLORS.errorLog,
+    },
+    {
+      label: `${props.data.engine} slow log`,
+      bytes: props.data.slow_log_bytes,
+      color: COLORS.slowLog,
+    },
+    {
+      label: `${props.data.engine} binlog indexes`,
+      bytes: props.data.binlog_index_bytes,
+      color: COLORS.binlogIndex,
+    },
   ]
 })
-
-const extraGroupParts = computed(() => [
-  {
-    label: `${props.data.engine} error log`,
-    bytes: props.data.error_log_bytes,
-    color: COLORS.errorLog,
-  },
-  {
-    label: `${props.data.engine} slow log`,
-    bytes: props.data.slow_log_bytes,
-    color: COLORS.slowLog,
-  },
-  {
-    label: `${props.data.engine} binlog indexes`,
-    bytes: props.data.binlog_index_bytes,
-    color: COLORS.binlogIndex,
-  },
-])
-
-const showExtraGroups = ref(false)
-
-const visibleGroupParts = computed(() =>
-  showExtraGroups.value ? [...groupParts.value, ...extraGroupParts.value] : groupParts.value,
-)
 
 const sortedDatabases = computed(() => [...props.data.databases].sort((a, b) => b.bytes - a.bytes))
 
@@ -101,35 +94,12 @@ const hiddenCount = computed(() =>
 
     <!-- data -->
     <template v-else>
-      <UsageMeter :parts="groupParts" :total="diskTotal" :legend="false" />
-
-      <dl class="mt-3">
-        <div
-          v-for="part in visibleGroupParts"
-          :key="part.label"
-          class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
-        >
-          <dt class="flex items-center gap-2 min-w-0">
-            <span
-              class="rounded-full size-2 shrink-0"
-              :style="{ backgroundColor: `var(--ink-${part.color})` }"
-            />
-            <span class="text-ink-gray-7 text-sm truncate">{{ part.label }}</span>
-          </dt>
-          <dd class="text-ink-gray-8 text-sm tabular-nums shrink-0">
-            {{ formatBytes(part.bytes) }}
-          </dd>
-        </div>
-      </dl>
-
-      <button
-        type="button"
-        @click="showExtraGroups = !showExtraGroups"
-        class="flex items-center gap-2 text-sm text-ink-gray-6 hover:text-ink-gray-8 mt-2"
-      >
-        <lucide-chevron-up class="size-3.5" :class="{ 'rotate-180': !showExtraGroups }" />
-        <span>{{ showExtraGroups ? 'Show less' : 'Show 3 more' }}</span>
-      </button>
+      <UsageMeter
+        :parts="groupParts"
+        :total="diskTotal"
+        :visible-count="GROUP_SHOWN_COUNT"
+        bar-height="h-5"
+      />
 
       <div class="flex items-center gap-2 mt-4 py-3 border-t border-outline-alpha-gray-1">
         <span class="font-medium text-ink-gray-8 text-sm">Usage per database</span>

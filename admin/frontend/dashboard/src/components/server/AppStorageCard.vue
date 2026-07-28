@@ -77,7 +77,7 @@ const groups = computed(() => [
       </div>
     </div>
 
-    <UsageMeter :parts="groupParts" :total="diskTotal" :legend="false" />
+    <UsageMeter :parts="groupParts" :total="diskTotal" :legend="false" bar-height="h-5" />
 
     <div class="mt-3" />
 

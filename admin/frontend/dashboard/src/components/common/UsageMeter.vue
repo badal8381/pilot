@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { formatBytes } from '@/utils/format'
 
 interface UsagePart {
@@ -12,9 +12,18 @@ interface Props {
   parts: UsagePart[]
   total?: number | null
   legend?: boolean
+  barHeight?: string
+  visibleCount?: number | null
 }
 
-const props = withDefaults(defineProps<Props>(), { total: null, legend: true })
+const props = withDefaults(defineProps<Props>(), {
+  total: null,
+  legend: true,
+  barHeight: 'h-7',
+  visibleCount: null,
+})
+
+const showAll = ref(false)
 
 const formattedParts = computed(() =>
   props.parts.map((part) => ({
@@ -24,7 +33,15 @@ const formattedParts = computed(() =>
   })),
 )
 
-const parts = computed(() => formattedParts.value)
+const visibleParts = computed(() =>
+  showAll.value || props.visibleCount == null
+    ? formattedParts.value
+    : formattedParts.value.slice(0, props.visibleCount),
+)
+
+const hiddenCount = computed(() =>
+  props.visibleCount == null ? 0 : Math.max(formattedParts.value.length - props.visibleCount, 0),
+)
 
 const barParts = computed(() => {
   const known = formattedParts.value.filter((part) => (part.bytes ?? 0) > 0)
@@ -35,7 +52,7 @@ const barParts = computed(() => {
 </script>
 
 <template>
-  <div class="flex bg-surface-gray-4 rounded-full w-full h-7 overflow-hidden">
+  <div class="flex bg-surface-gray-4 rounded-full w-full overflow-hidden" :class="barHeight">
     <div
       v-for="part in barParts"
       :key="part.label"
@@ -46,7 +63,7 @@ const barParts = computed(() => {
 
   <dl v-if="legend" class="mt-3">
     <div
-      v-for="part in parts"
+      v-for="part in visibleParts"
       :key="part.label"
       class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
     >
@@ -57,4 +74,14 @@ const barParts = computed(() => {
       <dd class="text-ink-gray-8 text-sm tabular-nums shrink-0">{{ part.text }}</dd>
     </div>
   </dl>
+
+  <button
+    v-if="legend && hiddenCount > 0"
+    type="button"
+    @click="showAll = !showAll"
+    class="flex items-center gap-2 text-sm text-ink-gray-6 hover:text-ink-gray-8 mt-2"
+  >
+    <lucide-chevron-up class="size-3.5" :class="{ 'rotate-180': !showAll }" />
+    <span>{{ showAll ? 'Show less' : `Show ${hiddenCount} more` }}</span>
+  </button>
 </template>
