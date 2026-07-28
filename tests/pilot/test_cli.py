@@ -124,8 +124,8 @@ def test_command_discovery_matches_baseline() -> None:
     commands = registry._discover()
     identities = {(command.group, command.name) for command in commands}
 
-    assert len(commands) == 33
-    assert len(identities) == 33
+    assert len(commands) == 34
+    assert len(identities) == 34
     assert registry.command_names() == {
         "admin",
         "build",
@@ -155,6 +155,7 @@ def test_command_discovery_matches_baseline() -> None:
         "build",
         "enroll",
         "issue-site-token",
+        "run-patches",
         "set-central-config",
         "upgrade",
     }
