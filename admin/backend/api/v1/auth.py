@@ -44,7 +44,7 @@ def _second_factor_error(bench: Bench, otp: str):
         # The password was right; the form now needs a code. Not an error the user can fix.
         return jsonify({"authenticated": False, "two_factor_required": True})
     if not two_factor.verify_second_factor(otp):
-        return error_response("invalid_otp", "That code is not valid. Try the next one.", 401)
+        return error_response("invalid_otp", "That code is not valid.", 401)
     return None
 
 
@@ -234,7 +234,7 @@ def confirm_two_factor_credential(credential_id: str):
     two_factor = TwoFactorAuthentication(bench)
     was_enabled = two_factor.is_enabled
     if not two_factor.confirm_enrollment(credential_id, str(data.get("otp", ""))):
-        return error_response("invalid_otp", "That code is not valid. Try the next one.", 422)
+        return error_response("invalid_otp", "That code is not valid.", 422)
     bench.audit_action("session", {"event": "two_factor_device_added", "credential": credential_id})
 
     codes = None
