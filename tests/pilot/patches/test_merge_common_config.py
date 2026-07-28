@@ -4,8 +4,11 @@ import importlib.util
 from pathlib import Path
 from types import ModuleType
 
+import pytest
+
 from pilot.config import BenchConfig
 from pilot.config.common import CommonConfig
+from pilot.exceptions import ConfigError
 from pilot.internal import patch_state as state
 
 _PATCH_PATH = Path(__file__).parent.parent.parent.parent / "pilot" / "patches" / "merge_common_config.py"
@@ -71,10 +74,13 @@ count = 1
 """
 
 
-def _write_old_style_bench(benches_root: Path, name: str) -> Path:
+def _write_old_style_bench(benches_root: Path, name: str, root_password: str = "realpw") -> Path:
     bench_dir = benches_root / name
     bench_dir.mkdir(parents=True)
-    (bench_dir / "bench.toml").write_text(_OLD_STYLE_BENCH_TOML.format(name=name))
+    content = _OLD_STYLE_BENCH_TOML.format(name=name).replace(
+        'root_password = "realpw"', f'root_password = "{root_password}"'
+    )
+    (bench_dir / "bench.toml").write_text(content)
     return bench_dir
 
 
@@ -136,6 +142,75 @@ def test_is_idempotent(tmp_path: Path) -> None:
     PATCH.run(tmp_path)
 
     assert (bench_dir / "bench.toml").stat().st_mtime_ns == first_mtime
+
+
+def test_backs_up_bench_toml_before_trimming(tmp_path: Path) -> None:
+    bench_dir = _write_old_style_bench(tmp_path, "bench1")
+    original = (bench_dir / "bench.toml").read_text()
+
+    PATCH.run(tmp_path)
+
+    assert (bench_dir / "bench.toml.bak").read_text() == original
+    assert (bench_dir / "bench.toml").read_text() != original
+
+
+def test_backup_increments_when_one_already_exists(tmp_path: Path) -> None:
+    bench_dir = _write_old_style_bench(tmp_path, "bench1")
+    (bench_dir / "bench.toml.bak").write_text("pre-existing backup")
+
+    PATCH.run(tmp_path)
+
+    assert (bench_dir / "bench.toml.bak").read_text() == "pre-existing backup"
+    assert (bench_dir / "bench.toml.bak.1").exists()
+
+
+def test_no_backup_when_bench_has_nothing_to_trim(tmp_path: Path) -> None:
+    bench_dir = tmp_path / "fresh"
+    bench_dir.mkdir(parents=True)
+    (bench_dir / "bench.toml").write_text(BenchConfig.from_flat("fresh").dumps())
+
+    PATCH.run(tmp_path)
+
+    assert not (bench_dir / "bench.toml.bak").exists()
+
+
+def test_raises_when_benches_disagree_on_mariadb(tmp_path: Path) -> None:
+    _write_old_style_bench(tmp_path, "bench1", root_password="realpw")
+    _write_old_style_bench(tmp_path, "bench2", root_password="different-pw")
+
+    with pytest.raises(ConfigError, match="mariadb"):
+        PATCH.run(tmp_path)
+
+    # Nothing was modified - validation ran before any write.
+    assert not CommonConfig.path(tmp_path).exists()
+    assert 'root_password = "realpw"' in (tmp_path / "bench1" / "bench.toml").read_text()
+    assert 'root_password = "different-pw"' in (tmp_path / "bench2" / "bench.toml").read_text()
+    assert not (tmp_path / "bench1" / "bench.toml.bak").exists()
+    assert not (tmp_path / "bench2" / "bench.toml.bak").exists()
+
+
+def test_raises_when_benches_disagree_on_jwks(tmp_path: Path) -> None:
+    _write_old_style_bench(tmp_path, "bench1")
+    bench2 = _write_old_style_bench(tmp_path, "bench2")
+    (bench2 / "bench.toml").write_text(
+        (bench2 / "bench.toml").read_text().replace("fleet", "other-audience")
+    )
+
+    with pytest.raises(ConfigError, match="jwks"):
+        PATCH.run(tmp_path)
+
+    assert not CommonConfig.path(tmp_path).exists()
+
+
+def test_agreeing_benches_pass_validation(tmp_path: Path) -> None:
+    """Identical values across benches are fine - this isn't about forbidding
+    more than one bench, only disagreement between them."""
+    _write_old_style_bench(tmp_path, "bench1")
+    _write_old_style_bench(tmp_path, "bench2")
+
+    PATCH.run(tmp_path)
+
+    assert CommonConfig.read(tmp_path).mariadb.root_password == "realpw"
 
 
 def test_bench_without_legacy_sections_is_untouched(tmp_path: Path) -> None:
