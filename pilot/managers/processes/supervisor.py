@@ -14,6 +14,7 @@ from pilot.managers.processes.base import (
     override,
 )
 from pilot.managers.processes.local import ProcessDefinition
+from pilot.managers.processes.systemd_render import reject_control_chars, supervisor_escape
 from pilot.utils import cli_root, run_command
 
 
@@ -26,15 +27,16 @@ class SupervisorRenderer(ServiceRenderer):
 
     @override
     def render(self, pd: ProcessDefinition) -> str:
+        reject_control_chars(pd)
         directory = f"directory={pd.working_dir}\n" if pd.working_dir else ""
         env = ""
         if pd.env:
-            pairs = ",".join(f'{k}="{v}"' for k, v in pd.env.items())
+            pairs = ",".join(f'{k}="{supervisor_escape(v)}"' for k, v in pd.env.items())
             env = f"environment={pairs}\n"
         stop = f"stopwaitsecs={pd.stop_timeout}\n" if pd.stop_timeout is not None else ""
         return (
             f"[program:{self.get_program_name(pd)}]\n"
-            f"command={shlex.join(pd.argv)}\n"
+            f"command={supervisor_escape(shlex.join(pd.argv))}\n"
             f"{env}{directory}"
             f"autostart=true\n"
             f"autorestart=true\n"
@@ -142,6 +144,13 @@ class SupervisorProcessManager(ManagedProcessManager):
         if (action == "stop" or (action == "restart" and role is UnitGroup.ADMIN)) and not self.is_alive():
             return
         run_command([*self._supervisorctl(), action, self._target(role)])
+
+    def control_process(self, name: str, action: str) -> None:
+        if action not in ("start", "stop", "restart"):
+            raise ValueError(f"unsupported action '{action}'")
+        bench = self.bench.config.name
+        target = f"{bench}:{bench}-{name.replace('_', '-')}"
+        run_command([*self._supervisorctl(), action, target])
 
     @override
     def are_units_running(self, role: UnitGroup) -> bool:

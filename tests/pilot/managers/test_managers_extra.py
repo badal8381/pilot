@@ -328,8 +328,8 @@ def test_systemd_unit_renders_env_vars(tmp_path: Path) -> None:
         env={"PYTHONPATH": "/cli", "FOO": "bar"},
     )
     unit = SystemdRenderer("test-bench").render(pd)
-    assert "Environment=PYTHONPATH=/cli" in unit
-    assert "Environment=FOO=bar" in unit
+    assert 'Environment="PYTHONPATH=/cli"' in unit
+    assert 'Environment="FOO=bar"' in unit
     assert "ExecStart=/env/bin/python" in unit
 
 
@@ -402,7 +402,7 @@ def test_systemd_admin_service_runs_gunicorn_with_idle_timeout(tmp_path: Path) -
     mgr = _make_systemd_manager(tmp_path)
     service = mgr._admin_service_text()
     assert "admin.backend.wsgi:application" in service
-    assert "Environment=BENCH_ADMIN_IDLE_TIMEOUT=60" in service
+    assert 'Environment="BENCH_ADMIN_IDLE_TIMEOUT=60"' in service
     assert "Requires=test-bench-admin.socket" in service
     assert "After=test-bench-admin.socket" in service
     # Re-activation is via the socket, not a systemd restart loop.

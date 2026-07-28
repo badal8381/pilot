@@ -66,6 +66,12 @@ const routes = [
     meta: { title: 'Tasks', group: 'Insights' },
   },
   {
+    path: '/insights/processes',
+    name: 'Processes',
+    component: () => import('./pages/processes/Processes.vue'),
+    meta: { title: 'Processes', group: 'Insights' },
+  },
+  {
     path: '/insights/tasks/:taskId',
     name: 'TaskDetail',
     component: () => import('./pages/tasks/TaskDetail.vue'),

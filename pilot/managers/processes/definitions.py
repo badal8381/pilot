@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -55,6 +56,18 @@ class ProcessDefinitionBuilder:
             ]
         defs.append(self.redis_definition("redis_cache", "redis_cache.conf"))
         defs.append(self.redis_definition("redis_queue", "redis_queue.conf"))
+        defs.extend(self.app_process_definitions())
+        return defs
+
+    def app_process_definitions(self) -> list[ProcessDefinition]:
+        defs: list[ProcessDefinition] = []
+        for app in self.bench.apps():
+            try:
+                defs.extend(app.requirements.process_definitions())
+            except Exception as exc:
+                logging.getLogger(__name__).warning(
+                    "Skipping declared processes for app %s: %s", app.config.name, exc
+                )
         return defs
 
     def process_definitions(self) -> list[ProcessDefinition]:

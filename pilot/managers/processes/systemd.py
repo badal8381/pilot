@@ -131,6 +131,14 @@ class SystemdProcessManager(SystemdUserMixin, ManagedProcessManager):
         else:
             run_command(self._systemctl(action, self._target_name()), env=env)
 
+    def control_process(self, name: str, action: str) -> None:
+        if action not in ("start", "stop", "restart"):
+            raise ValueError(f"unsupported action '{action}'")
+        env = self._systemctl_env()
+        unit = self._unit_name(name)
+        subprocess.run(self._systemctl("reset-failed", unit), capture_output=True, env=env)
+        run_command(self._systemctl(action, unit), env=env, timeout=_SYSTEMCTL_TIMEOUT)
+
     @override
     def are_units_running(self, role: UnitGroup) -> bool:
         env = self._systemctl_env()

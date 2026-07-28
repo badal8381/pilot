@@ -578,7 +578,7 @@ def test_malloc_arena_max_in_units(tmp_path: Path) -> None:
     bench = make_bench(tmp_path, gunicorn=GunicornConfig())  # default arena 2
     systemd = SystemdProcessManager(bench)
     web = next(pd for pd in systemd._prod_process_definitions() if pd.name == "web")
-    assert "Environment=MALLOC_ARENA_MAX=2" in SystemdRenderer("test-bench").render(web)
+    assert 'Environment="MALLOC_ARENA_MAX=2"' in SystemdRenderer("test-bench").render(web)
     assert 'MALLOC_ARENA_MAX="2"' in SupervisorRenderer("test-bench", bench.logs_path).render(web)
 
     # 0 disables the cap (no env emitted).

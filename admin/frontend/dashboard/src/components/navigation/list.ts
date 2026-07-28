@@ -13,6 +13,7 @@ export const sidebarSections = [
       { label: 'Migrations', icon: 'lucide-git-pull-request-arrow', to: '/migrations' },
       { label: 'Logs', icon: 'lucide-scroll-text', to: '/insights/logs' },
       { label: 'Tasks', icon: 'lucide-list-checks', to: '/insights/tasks' },
+      { label: 'Processes', icon: 'lucide-cpu', to: '/insights/processes' },
     ],
   },
   {

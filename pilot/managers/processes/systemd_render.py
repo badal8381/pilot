@@ -1,9 +1,36 @@
 from __future__ import annotations
 
+import re
 import shlex
 
 from pilot.managers.processes.base import ServiceRenderer, override
 from pilot.managers.processes.local import ProcessDefinition
+
+_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def reject_control_chars(pd: ProcessDefinition) -> None:
+    """Guard against unit-directive injection: a control char in any declared
+    field would let an app inject arbitrary systemd directives into the unit."""
+    fields = [pd.name, str(pd.working_dir or ""), *pd.argv]
+    for key, value in pd.env.items():
+        fields += [key, value]
+    if any(_CONTROL_RE.search(field) for field in fields):
+        raise ValueError(f"process '{pd.name}' has a control character in a unit field")
+
+
+def supervisor_escape(value: str) -> str:
+    # Double '%' (supervisord expands %(...)s) and escape '"' in quoted values.
+    return value.replace("%", "%%").replace('"', '\\"')
+
+
+def _render_env(env: dict) -> str:
+    # Quote every value: an unquoted value with a space would be split by
+    # systemd into a second, bogus assignment.
+    def escape(value: str) -> str:
+        return value.replace("\\", "\\\\").replace('"', '\\"')
+
+    return "".join(f'Environment="{k}={escape(v)}"\n' for k, v in env.items())
 
 
 class SystemdRenderer(ServiceRenderer):
@@ -11,8 +38,9 @@ class SystemdRenderer(ServiceRenderer):
 
     @override
     def render(self, pd: ProcessDefinition) -> str:
+        reject_control_chars(pd)
         working_dir = f"WorkingDirectory={pd.working_dir}\n" if pd.working_dir else ""
-        env = "".join(f"Environment={k}={v}\n" for k, v in pd.env.items())
+        env = _render_env(pd.env)
         stop = f"TimeoutStopSec={pd.stop_timeout}\n" if pd.stop_timeout is not None else ""
         return (
             f"[Unit]\n"
@@ -40,7 +68,8 @@ class SystemdRenderer(ServiceRenderer):
         )
 
     def render_admin_service(self, pd: ProcessDefinition, socket_name: str) -> str:
-        env = "".join(f"Environment={k}={v}\n" for k, v in pd.env.items())
+        reject_control_chars(pd)
+        env = _render_env(pd.env)
         return (
             f"[Unit]\n"
             f"Description={self.bench_name} admin\n"

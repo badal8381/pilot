@@ -3,7 +3,7 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify
+from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import error_response
 from admin.backend.providers.processes import ProcessProvider
@@ -71,8 +71,17 @@ def _process_list_response():
                 for p in processes
             ],
             "production": conf is not None,
+            # Gates the UI's per-process controls; production runs a managed manager.
+            "controllable": _is_production(bench_root),
         }
     )
+
+
+def _is_production(bench_root: Path) -> bool:
+    try:
+        return BenchConfig.read(bench_root, validate=False).production.enabled
+    except Exception:
+        return False
 
 
 @processes_bp.get("/processes")
@@ -140,3 +149,44 @@ def start():
     if result.returncode != 0:
         return error_response("process_start_failed", "Could not start processes.", 500)
     return _process_list_response()
+
+
+_VALID_ACTIONS = ("start", "stop", "restart")
+
+
+@processes_bp.post("/actions/<action>/process")
+def control_one(action: str):
+    if action not in _VALID_ACTIONS:
+        return error_response("invalid_action", "Unsupported action.", 400)
+
+    name = (request.get_json(silent=True) or {}).get("name")
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    known = {process.name for process in ProcessProvider(bench_root).get_all()}
+    if not name or name not in known:
+        return error_response("unknown_process", "No such process for this bench.", 404)
+
+    manager = _running_manager(bench_root)
+    if manager is None:
+        return error_response(
+            "process_control_unavailable", "Process control is only supported in production mode.", 409
+        )
+    try:
+        manager.control_process(name, action)
+    except Exception:
+        return error_response("process_control_failed", f"Could not {action} '{name}'.", 500)
+    return _process_list_response()
+
+
+def _running_manager(bench_root: Path):
+    from pilot.core.bench import Bench
+    from pilot.managers.processes.supervisor import SupervisorProcessManager
+    from pilot.managers.processes.systemd import SystemdProcessManager
+
+    bench = Bench(bench_root)
+    systemd = SystemdProcessManager(bench)
+    if systemd.is_running():
+        return systemd
+    supervisor = SupervisorProcessManager(bench)
+    if supervisor.is_running():
+        return supervisor
+    return None
