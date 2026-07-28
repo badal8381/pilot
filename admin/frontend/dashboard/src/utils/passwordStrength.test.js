@@ -4,7 +4,7 @@ import test from 'node:test'
 import { PASSWORD_REQUIREMENTS, meetsPasswordRequirements } from './passwordStrength.js'
 
 // These rules must stay in step with validate_admin_password in pilot/internal/validators.py,
-// which the POST /settings/admin-password route enforces.
+// which the POST /auth/password route enforces.
 test('accepts a password meeting every requirement', () => {
   assert.equal(meetsPasswordRequirements('N3wSecret!'), true)
 })

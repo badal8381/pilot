@@ -21,6 +21,16 @@ def _immutable(response):
     return response
 
 
+def _revalidate(response):
+    """Cache a fixed-name asset but force revalidation, so a rebuild is picked up.
+
+    `send_file`/`send_from_directory` already attach ETag and Last-Modified, so
+    revalidation costs a 304 until the file changes. Never `_immutable` for a
+    fixed filename: the browser would pin the old bytes for a year."""
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 def create_app(bench_root: Path) -> Flask:
     app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
     app.config["BENCH_ROOT"] = bench_root
@@ -38,6 +48,7 @@ def create_app(bench_root: Path) -> Flask:
     install_auth_guard(app, bench_root)
     register_blueprints(app)
     register_editor_frontend(app)
+    register_in_app_embed_frontend(app)
     register_frontend(app)
     install_api_error_handlers(app)
 
@@ -46,6 +57,7 @@ def create_app(bench_root: Path) -> Flask:
 
 def register_blueprints(app: Flask) -> None:
     from admin.backend.api.v1.apps import apps_bp, marketplace_bp
+    from admin.backend.api.v1.auth import auth_bp
     from admin.backend.api.v1.benches import bench_readiness_bp, benches_bp
     from admin.backend.api.v1.core import core_bp
     from admin.backend.api.v1.databases import database_bp
@@ -54,7 +66,6 @@ def register_blueprints(app: Flask) -> None:
     from admin.backend.api.v1.logs import logs_bp
     from admin.backend.api.v1.migrations import migrations_bp
     from admin.backend.api.v1.processes import processes_bp
-    from admin.backend.api.v1.sessions import sessions_bp
     from admin.backend.api.v1.settings import audit_bp, network_bp, settings_bp
     from admin.backend.api.v1.setup import setup_bp
     from admin.backend.api.v1.sites import sites_bp
@@ -76,7 +87,7 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(tasks_bp, url_prefix=f"{API_V1_PREFIX}/tasks")
     app.register_blueprint(task_worker_bp, url_prefix=API_V1_PREFIX)
     app.register_blueprint(settings_bp, url_prefix=f"{API_V1_PREFIX}/settings")
-    app.register_blueprint(sessions_bp, url_prefix=f"{API_V1_PREFIX}/sessions")
+    app.register_blueprint(auth_bp, url_prefix=f"{API_V1_PREFIX}/auth")
     app.register_blueprint(audit_bp, url_prefix=API_V1_PREFIX)
     app.register_blueprint(network_bp, url_prefix=API_V1_PREFIX)
     app.register_blueprint(updates_bp, url_prefix=API_V1_PREFIX)
@@ -110,6 +121,33 @@ def register_editor_frontend(app: Flask) -> None:
             return _immutable(send_from_directory(editor_dist, path))
         except NotFound:
             return error_response("not_found", "Asset not found.", 404)
+
+
+def register_in_app_embed_frontend(app: Flask) -> None:
+    """Serve Desk's Cloud Settings IIFE at the URL Frappe boots into desk.
+
+    Desk loads `{pilot_endpoint}/embed/cloud-settings/cloud-settings.js` cross-origin.
+    This must be registered before the dashboard SPA catch-all, which would otherwise
+    answer with index.html and break script load.
+    """
+    in_app_embed_dist = STATIC_DIR / "in-app-embed" / "cloud-settings"
+
+    @app.route("/embed/cloud-settings/<path:path>")
+    @allow_unauthenticated
+    def serve_cloud_settings_in_app_embed(path):
+        if not in_app_embed_dist.exists():
+            return (
+                "Cloud Settings in-app embed not built. "
+                "Run: cd admin/frontend/in-app-embed && npm install && npm run build",
+                503,
+            )
+        try:
+            # Fixed filename, so it must revalidate — a rebuild changes the bytes
+            # but not the URL. `?v=cloud_settings_embed_version` is an extra hint
+            # for CDNs/hard reloads, not something to pin bytes on.
+            return _revalidate(send_from_directory(in_app_embed_dist, path))
+        except NotFound:
+            return error_response("not_found", "In-app embed asset not found.", 404)
 
 
 def register_frontend(app: Flask) -> None:

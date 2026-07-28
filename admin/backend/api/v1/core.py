@@ -1,22 +1,13 @@
 from __future__ import annotations
 
-import hmac
 import logging
 from pathlib import Path
 
-from flask import Blueprint, current_app, g, jsonify, request, url_for
+from flask import Blueprint, current_app, jsonify
 
-from admin.backend.api.responses import created_response, error_response, no_content_response
+from admin.backend.api.responses import error_response
 from admin.backend.api.v1.setup import wizard_marker_path
-from admin.backend.internal.session import Session
-from admin.backend.middleware import (
-    allow_unauthenticated,
-    client_ip,
-    decode_session_token,
-    is_request_authenticated,
-    rate_limit,
-    set_session_cookie,
-)
+from admin.backend.middleware import allow_unauthenticated
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 from pilot.internal.atomic_file import exclusive_file_lock
@@ -74,124 +65,6 @@ def bootstrap():
             "task_worker": TaskActivityReader(bench_root).read().public_dict,
         }
     )
-
-
-@core_bp.get("/session")
-@allow_unauthenticated
-def get_session():
-    bench_root = Path(current_app.config["BENCH_ROOT"])
-    try:
-        bench = Bench(bench_root)
-    except Exception:
-        if not BenchConfig.exists(bench_root):
-            return jsonify({"authenticated": False})
-        return error_response(
-            "configuration_unavailable",
-            "Bench configuration is unavailable.",
-            503,
-        )
-    authenticated = is_request_authenticated(bench)
-    response = {"authenticated": authenticated}
-    if authenticated:
-        response["scope"] = g.jwt_claims.get("scope", "bench")
-    return jsonify(response)
-
-
-@core_bp.post("/session")
-@allow_unauthenticated
-@rate_limit(5, 60, user_ip=True)
-def create_session():
-    bench_root = Path(current_app.config["BENCH_ROOT"])
-    try:
-        bench = Bench(bench_root)
-    except Exception:
-        return error_response(
-            "configuration_unavailable",
-            "Bench configuration is unavailable.",
-            503,
-        )
-    if not bench.config.admin.password:
-        return error_response(
-            "session_unavailable",
-            "No admin password configured in bench.toml",
-            503,
-        )
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("malformed_request", "Expected a JSON object.", 400)
-    error, redeemed_jti = _validate_login(data, bench)
-    if error is not None:
-        return error
-
-    if redeemed_jti:
-        bench.audit_action("session", {"event": "login_redeemed", "jti": redeemed_jti})
-    token, jti = Session(bench).issue_session_token(ip=client_ip())
-    bench.audit_action(
-        "session",
-        {
-            "event": "issued",
-            "jti": jti,
-            "scope": "bench",
-            "via": "login_link" if redeemed_jti else "password",
-        },
-    )
-    response = created_response(
-        {"authenticated": True, "scope": "bench"},
-        url_for("core.get_session"),
-    )
-    set_session_cookie(
-        response,
-        token,
-        current_app.config["SESSION_COOKIE_SECURE"],
-    )
-    return response
-
-
-@core_bp.delete("/session")
-@allow_unauthenticated
-def delete_session():
-    """Sign out: revoke this session's jti so the token itself stops working, not just
-    the cookie in this browser."""
-    token = request.cookies.get("sid")
-    if token:
-        try:
-            bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-        except Exception:
-            bench = None
-        if bench:
-            claims = decode_session_token(token, bench, client_ip())
-            if claims and claims.get("jti"):
-                Session(bench).revoke_jti(claims["jti"])
-                bench.audit_action("session", {"event": "revoked", "jti": claims["jti"], "via": "logout"})
-    response = no_content_response()
-    response.delete_cookie("sid")
-    return response
-
-
-def _validate_login(data: dict, bench):
-    """Return (error_response_or_None, redeemed_login_jti_or_None)."""
-    sid = data.get("sid")
-    if sid is not None:
-        payload = decode_session_token(sid, bench, client_ip())
-        jti = payload.get("jti") if payload else None
-        expires = payload.get("exp") if payload else None
-        used_logins = current_app.extensions["used_logins"]
-        if (
-            payload is None
-            or not jti
-            or not expires
-            or payload.get("scope", "bench") != "bench"
-            or not used_logins.use(jti, expires)
-        ):
-            return error_response(
-                "invalid_login_token",
-                "Invalid or expired sign-in link.",
-                401,
-            ), None
-        return None, jti
-    if not hmac.compare_digest(str(data.get("password", "")), bench.config.admin.password):
-        return error_response("invalid_credentials", "Incorrect password.", 401), None
-    return None, None
 
 
 def _setup_bootstrap(bench_root: Path) -> dict:

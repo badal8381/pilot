@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import current_app, jsonify, request
+from flask import current_app, jsonify, request, url_for
 
-from admin.backend.api.responses import accepted_task_response, error_response
+from admin.backend.api.responses import accepted_response, accepted_task_response, error_response
 from admin.backend.api.v1.sites import sites_bp
 from admin.backend.api.v1.sites.shared import (
     internal_error,
@@ -19,9 +19,15 @@ from admin.backend.middleware import require_scope
 from admin.backend.providers.apps import AppProvider
 from admin.backend.providers.sites import SiteProvider
 from pilot.core.bench import Bench
-from pilot.exceptions import BenchError
+from pilot.exceptions import (
+    BenchError,
+    MigrationConflictError,
+    MigrationNotFoundError,
+    TaskNotFoundError,
+)
 from pilot.internal.site_paths import site_exists
 from pilot.internal.validators import validate_app_name, validate_repo_url
+from pilot.managers.task import TaskReader
 from pilot.tasks.get_and_install_app import GetAndInstallAppTask
 from pilot.tasks.install_app import InstallAppTask
 from pilot.tasks.uninstall_app import UninstallAppTask
@@ -71,6 +77,23 @@ def site_apps(name: str):
     return jsonify({"apps": result})
 
 
+@sites_bp.get("/<name>/marketplace")
+@require_scope(site_name)
+def site_marketplace(name: str):
+    """The bench app catalog, read-only. Scoped to a site because the bench-wide
+    /marketplace/apps needs a bench token, which a managed site does not hold."""
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    if not site_exists(bench_root, name):
+        return site_not_found()
+    try:
+        from pilot.integrations.marketplace import Marketplace
+
+        apps = Marketplace(Bench(bench_root)).read_all_apps()
+    except Exception:
+        return internal_error("Could not read marketplace apps.")
+    return jsonify([app.to_dict() for app in apps])
+
+
 @sites_bp.post("/<name>/apps")
 @require_scope(site_name)
 def install_site_app(name: str):
@@ -112,6 +135,111 @@ def _is_app_cloned(bench_root: Path, app: str) -> bool:
         return Bench(bench_root).app(app).is_cloned
     except BenchError:
         return False
+
+
+@sites_bp.post("/<name>/actions/update-apps")
+@require_scope(site_name)
+def update_site_apps(name: str):
+    """Update apps installed on this site through Pilot's safeguarded migration flow."""
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    if not site_exists(bench_root, name):
+        return site_not_found()
+
+    requested, request_error = _requested_update_apps()
+    if request_error is not None:
+        return request_error
+    try:
+        installed = set(SiteProvider(bench_root).get_one(name).installed_apps)
+    except Exception:
+        return internal_error("Could not read site apps.")
+    apps = requested if requested is not None else installed - {"frappe"}
+    if not apps:
+        return invalid_fields()
+    not_installed = sorted(apps - installed)
+    if not_installed:
+        return error_response(
+            "app_not_installed",
+            f"App '{not_installed[0]}' is not installed on this site.",
+            422,
+        )
+
+    try:
+        migrations = Bench(bench_root).migrations
+        operation = migrations.create_update(apps)
+        task_id = operation.begin()
+    except MigrationConflictError:
+        raise  # the app-wide handler answers 409 migration_conflict with its message
+    except Exception as error:
+        if "operation" in locals():
+            migrations.delete(operation.id)
+        return task_failure(error)
+
+    return accepted_response(
+        {"operation_id": operation.id, "task_id": task_id},
+        url_for("sites.site_task", name=name, task_id=task_id),
+    )
+
+
+def _requested_update_apps():
+    data = request.get_json(silent=True)
+    if data is None:
+        data = {}
+    if not isinstance(data, dict):
+        return None, malformed_body()
+    requested = data.get("apps")
+    if requested is not None and (
+        not isinstance(requested, list) or not all(isinstance(app, str) for app in requested)
+    ):
+        return None, invalid_fields()
+    if requested is None:
+        return None, None
+    apps = {app.strip() for app in requested}
+    if not apps or any(validate_app_name(app) for app in apps):
+        return None, invalid_fields()
+    return apps, None
+
+
+@sites_bp.get("/<name>/tasks/<task_id>")
+@require_scope(site_name)
+def site_task(name: str, task_id: str):
+    """Poll a task this site started. Scoped because the bench-wide /tasks/<id>
+    needs a bench token, and ownership is checked so one site can't read another's."""
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    try:
+        task = TaskReader(bench_root).read_task(task_id)
+    except TaskNotFoundError:
+        raise  # the app-wide handler answers 404 task_not_found
+    except Exception:
+        return internal_error("Could not read task.")
+    args = task.args or {}
+    operation = _task_operation(bench_root, args)
+    if operation is not None:
+        if name not in {site.name for site in operation.sites}:
+            return error_response("forbidden", "Task does not belong to this site.", 403)
+        return jsonify(_operation_task_data(task.as_dict(), str(operation.state)))
+    if args.get("site") != name and name not in (args.get("sites") or []):
+        return error_response("forbidden", "Task does not belong to this site.", 403)
+    return jsonify(task.as_dict())
+
+
+def _task_operation(bench_root: Path, args: dict):
+    operation_id = args.get("operation_id")
+    if not isinstance(operation_id, str):
+        return None
+    try:
+        return Bench(bench_root).migrations.get(operation_id)
+    except MigrationNotFoundError:
+        return None
+
+
+def _operation_task_data(data: dict, state: str) -> dict:
+    if state == "completed":
+        data.update(status="success", exit_code=0)
+    elif state in {"needs_attention", "revert_failed", "reverted"}:
+        data.update(status="failed", exit_code=1)
+    else:
+        data.update(status="running", exit_code=None)
+    return data
 
 
 @sites_bp.delete("/<name>/apps/<app>")

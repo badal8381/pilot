@@ -496,6 +496,7 @@ class BenchConfig:
         }
         optional_admin = {
             "jwt_secret": self.admin.jwt_secret,
+            "recovery_codes": self.admin.recovery_codes,
             "jwks_url": self.admin.jwks_url,
             "jwks_audience": self.admin.jwks_audience,
         }
