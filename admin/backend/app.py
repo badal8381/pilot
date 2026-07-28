@@ -21,6 +21,16 @@ def _immutable(response):
     return response
 
 
+def _revalidate(response):
+    """Cache a fixed-name asset but force revalidation, so a rebuild is picked up.
+
+    `send_file`/`send_from_directory` already attach ETag and Last-Modified, so
+    revalidation costs a 304 until the file changes. Never `_immutable` for a
+    fixed filename: the browser would pin the old bytes for a year."""
+    response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 def create_app(bench_root: Path) -> Flask:
     app = Flask(__name__, static_folder=str(STATIC_DIR), static_url_path="/static")
     app.config["BENCH_ROOT"] = bench_root
@@ -132,8 +142,10 @@ def register_in_app_embed_frontend(app: Flask) -> None:
                 503,
             )
         try:
-            # Fixed filename; Desk busts cache with ?v= from cloud_settings_embed_version.
-            return _immutable(send_from_directory(in_app_embed_dist, path))
+            # Fixed filename, so it must revalidate — a rebuild changes the bytes
+            # but not the URL. `?v=cloud_settings_embed_version` is an extra hint
+            # for CDNs/hard reloads, not something to pin bytes on.
+            return _revalidate(send_from_directory(in_app_embed_dist, path))
         except NotFound:
             return error_response("not_found", "In-app embed asset not found.", 404)
 
