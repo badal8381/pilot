@@ -53,7 +53,7 @@ const groupParts = computed(() => {
       bytes: props.data.binlog_index_bytes,
       color: COLORS.binlogIndex,
     },
-  ]
+  ].sort((a, b) => b.bytes - a.bytes)
 })
 
 const sortedDatabases = computed(() => [...props.data.databases].sort((a, b) => b.bytes - a.bytes))
@@ -106,21 +106,29 @@ const hiddenCount = computed(() =>
       </div>
 
       <div class="max-h-40 overflow-y-auto">
-        <dl
+        <component
+          :is="row.site ? 'router-link' : 'div'"
           v-for="row in visibleDatabases"
           :key="row.schema"
-          class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
+          :to="row.site ? { path: '/database/analyzer', query: { site: row.site } } : undefined"
+          class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0 no-underline"
         >
-          <dt class="flex items-center gap-2">
+          <div class="flex items-center gap-2">
             <span class="text-ink-gray-5" :class="row.site ? 'lucide-globe' : 'lucide-database'" />
-            <span class="text-ink-gray-7 text-sm truncate">{{ row.site || row.schema }}</span>
+            <span
+              class="text-sm truncate"
+              :class="row.site ? 'text-ink-gray-8' : 'text-ink-gray-7'"
+            >
+              {{ row.site || row.schema }}
+            </span>
             <Badge v-if="row.system" label="system" theme="gray" size="sm" />
-          </dt>
+            <lucide-chevron-right v-if="row.site" class="size-3.5 text-ink-gray-5" />
+          </div>
 
-          <dd class="text-ink-gray-8 text-sm tabular-nums shrink-0">
+          <div class="text-ink-gray-8 text-sm tabular-nums shrink-0">
             {{ formatBytes(row.bytes) }}
-          </dd>
-        </dl>
+          </div>
+        </component>
       </div>
 
       <button
