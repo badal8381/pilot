@@ -3,22 +3,11 @@
     <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
   </div>
   <div v-else class="space-y-5">
-    <Alert :title="status.enabled ? 'Two-factor is on' : 'Two-factor is off'" theme="blue" :dismissible="false">
-      <template #description>
-        <p class="text-ink-gray-6 text-p-sm">
-          Requires a code from any enrolled device at every sign-in. Up to
-          {{ status.max_devices }} devices can be enrolled. To set up more than one
-          authenticator app for the same person, share that device's setup key instead of
-          enrolling again.
-        </p>
-      </template>
-    </Alert>
-
     <div class="flex justify-between items-center">
       <p class="font-medium text-ink-gray-8 text-sm">
         Devices
         <span class="font-normal text-ink-gray-5">
-          ({{ status.credentials.length }} of {{ status.max_devices }})
+          ({{ devices.length }} of {{ status.max_devices }})
         </span>
       </p>
       <Button
@@ -39,30 +28,39 @@
     </div>
 
     <div
-      v-if="!status.credentials.length"
-      class="py-10 border border-dashed rounded-lg border-outline-gray-2 text-ink-gray-5 text-p-sm text-center"
+      v-if="!devices.length"
+      class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
     >
-      No devices enrolled. Add one to turn on two-factor authentication.
+      <div class="flex justify-center items-center bg-surface-gray-2 rounded-full size-11">
+        <span class="size-5 text-ink-gray-5 lucide-shield"></span>
+      </div>
+      <p class="font-medium text-ink-gray-7 text-sm">No devices enrolled</p>
+      <p class="max-w-xs text-ink-gray-5 text-xs">
+        Sign-in needs only the admin password. Add a device to require a code from an
+        authenticator app as well.
+      </p>
     </div>
+
     <ListView
       v-else
       :columns="columns"
-      :rows="status.credentials"
+      :rows="devices"
       row-key="id"
       :options="{ selectable: false, showTooltip: false }"
     >
       <template #cell="{ column, row, item }">
-        <span v-if="column.key === 'label'" class="text-ink-gray-7 text-sm truncate">
+        <span
+          v-if="column.key === 'label'"
+          class="block min-w-0 max-w-full text-ink-gray-7 text-sm truncate"
+          :title="row.label"
+        >
           {{ row.label }}
         </span>
-        <Badge
-          v-else-if="column.key === 'status'"
-          :theme="row.confirmed ? 'green' : 'orange'"
-          variant="subtle"
-          :label="row.confirmed ? 'Active' : 'Awaiting setup'"
-        />
+        <span v-else-if="column.key === 'confirmed_at'" class="text-ink-gray-6 text-xs">
+          {{ fmtTimestamp(row.confirmed_at) }}
+        </span>
         <span v-else-if="column.key === 'last_used_at'" class="text-ink-gray-6 text-xs">
-          {{ row.last_used_at ? fmtDateTime(new Date(row.last_used_at * 1000).toISOString()) : 'Never' }}
+          {{ fmtTimestamp(row.last_used_at) }}
         </span>
         <div v-else-if="column.key === 'actions'" class="flex justify-end">
           <Button variant="ghost" size="sm" theme="red" icon="lucide-trash-2" @click="promptRemove(row)" />
@@ -83,36 +81,51 @@
 
   <Dialog v-model="showAdd" :options="{ title: 'Add device', size: 'md' }">
     <template #body-content>
-      <div v-if="!enrollment" class="space-y-3">
-        <FormControl v-model="label" label="Device name" placeholder="My Phone" />
-      </div>
-      <div v-else class="space-y-3">
-        <p class="text-ink-gray-6 text-p-sm">
-          Scan this with an authenticator app, then enter the code it shows. Scan it with every
-          app that should hold this device now — it is shown only once and cannot be retrieved
-          afterwards.
-        </p>
-        <div class="flex justify-center bg-surface-white p-4 border border-outline-gray-2 rounded-lg">
-          <QrcodeVue :value="enrollment.provisioning_url" :size="176" level="M" render-as="svg" />
-        </div>
-        <details class="text-ink-gray-6 text-p-sm">
-          <summary class="cursor-pointer">Can't scan? Enter the key by hand</summary>
-          <div class="bg-surface-gray-2 mt-2 p-3 rounded-lg">
-            <p class="font-mono text-ink-gray-8 text-sm break-all">{{ enrollment.secret }}</p>
-            <button class="mt-1 text-ink-blue-3 text-xs" @click="copy(enrollment.secret)">
-              Copy key
-            </button>
+      <div class="space-y-3">
+        <FormControl
+          v-model="label"
+          label="Device name"
+          placeholder="My Phone"
+          :disabled="Boolean(enrollment)"
+          @keydown.enter="startEnrollment"
+        />
+
+        <template v-if="enrollment">
+          <p class="text-ink-gray-6 text-p-sm">
+            Scan with Authy, Bitwarden, Microsoft Authenticator or any TOTP app.
+          </p>
+          <div
+            class="flex justify-center bg-surface-white p-4 border border-outline-gray-2 rounded-lg"
+          >
+            <QrcodeVue :value="enrollment.provisioning_url" :size="176" level="M" render-as="svg" />
           </div>
-        </details>
-        <FormControl v-model="otp" label="Code from the app" placeholder="123456" />
+          <details class="text-ink-gray-6 text-p-sm">
+            <summary class="cursor-pointer">Can't scan? Enter the key by hand</summary>
+            <div class="bg-surface-gray-2 mt-2 p-3 rounded-lg">
+              <p class="font-mono text-ink-gray-8 text-sm break-all">{{ enrollment.secret }}</p>
+              <button class="mt-1 text-ink-blue-3 text-xs" @click="copy(enrollment.secret)">
+                Copy key
+              </button>
+            </div>
+          </details>
+          <FormControl v-model="otp" label="Code from the app" placeholder="123456" autofocus />
+        </template>
       </div>
+
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-        <Button v-if="!enrollment" variant="solid" :loading="busy" @click="startEnrollment">
-          Continue
-        </Button>
-        <Button v-else variant="solid" :loading="busy" @click="confirmEnrollment">Verify</Button>
+        <Button
+          v-if="!enrollment"
+          variant="solid"
+          :loading="busy"
+          :disabled="!label.trim()"
+          @click="startEnrollment"
+          >Get QR code</Button
+        >
+        <Button v-else variant="solid" :loading="busy" :disabled="!otp" @click="confirmEnrollment"
+          >Verify</Button
+        >
       </div>
     </template>
   </Dialog>
@@ -123,14 +136,20 @@
         These are shown once. Store them somewhere safe — each one signs you in when no device
         is available, and works only once.
       </p>
-      <div class="gap-2 grid grid-cols-2 bg-surface-gray-2 mt-3 p-3 rounded-lg">
-        <span v-for="code in codes" :key="code" class="font-mono text-ink-gray-8 text-xs">
+      <div class="gap-x-6 gap-y-2 grid grid-cols-2 bg-surface-gray-2 mt-3 px-4 py-3.5 rounded-lg">
+        <span
+          v-for="code in codes"
+          :key="code"
+          class="font-mono text-ink-gray-8 text-xs text-center"
+        >
           {{ code }}
         </span>
       </div>
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="subtle" @click="copy(codes.join('\n'))">Copy all</Button>
-        <Button variant="solid" @click="showCodes = false">Continue</Button>
+        <Button variant="solid" icon-left="lucide-download" @click="downloadCodes">
+          Download
+        </Button>
       </div>
     </template>
   </Dialog>
@@ -165,18 +184,20 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { Alert, Badge, Button, Dialog, ErrorMessage, FormControl, ListView, ListRowItem, toast } from 'frappe-ui'
+import { computed, onMounted, ref, watch } from 'vue'
+import { Button, Dialog, ErrorMessage, FormControl, ListView, ListRowItem, toast } from 'frappe-ui'
 import QrcodeVue from 'qrcode.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { twoFactorApi } from '@/api/twoFactor'
 import { fmtDateTime } from '@/utils/taskFormat'
 
 const columns = [
-  { label: 'Device', key: 'label', align: 'left' },
-  { label: 'Status', key: 'status', align: 'left', width: '9rem' },
-  { label: 'Last used', key: 'last_used_at', align: 'left', width: '11rem' },
-  { label: '', key: 'actions', align: 'right', width: '3.5rem' },
+  // Fixed widths, not fractions: ListView's row wrapper is `w-max`, so a fractional
+  // track sizes to its content and a long device name would stretch the table instead.
+  { label: 'Device', key: 'label', align: 'left', width: '12rem' },
+  { label: 'Added', key: 'confirmed_at', align: 'left', width: '9rem' },
+  { label: 'Last used', key: 'last_used_at', align: 'left', width: '9rem' },
+  { label: '', key: 'actions', align: 'right', width: '3rem' },
 ]
 
 const loading = ref(true)
@@ -193,6 +214,13 @@ const atDeviceLimit = computed(
   () => status.value.max_devices > 0 && status.value.credentials.length >= status.value.max_devices,
 )
 
+function fmtTimestamp(seconds) {
+  return seconds ? fmtDateTime(new Date(seconds * 1000).toISOString()) : 'Never'
+}
+
+// A device only counts once its code has been verified; half-finished ones are noise.
+const devices = computed(() => status.value.credentials.filter((row) => row.confirmed))
+
 const showAdd = ref(false)
 const showCodes = ref(false)
 const showRemove = ref(false)
@@ -204,6 +232,20 @@ const enrollment = ref(null)
 const codes = ref([])
 const removing = ref(null)
 
+// Dismissing the dialog abandons the pending credential, which would otherwise sit in
+// the store consuming one of the device slots until it expires.
+watch(showAdd, async (open) => {
+  if (open || !enrollment.value) return
+  const abandoned = enrollment.value
+  enrollment.value = null
+  try {
+    await twoFactorApi.removeDevice(abandoned.id)
+  } catch {
+    // Nothing to do: it expires on its own, and the user has already moved on.
+  }
+  await load()
+})
+
 function openAdd() {
   label.value = ''
   otp.value = ''
@@ -213,6 +255,8 @@ function openAdd() {
 }
 
 async function startEnrollment() {
+  // Fired on blur and Enter, so guard against re-enrolling an already-named device.
+  if (enrollment.value || busy.value || !label.value.trim()) return
   error.value = ''
   busy.value = true
   try {
@@ -230,6 +274,9 @@ async function confirmEnrollment() {
   try {
     const result = await twoFactorApi.confirm(enrollment.value.id, otp.value)
     status.value = result
+    // Cleared before closing: the close handler deletes whatever enrollment is still
+    // pending, and this one is now confirmed.
+    enrollment.value = null
     showAdd.value = false
     if (result.recovery_codes) {
       codes.value = result.recovery_codes
@@ -277,6 +324,18 @@ async function regenerate() {
   } finally {
     busy.value = false
   }
+}
+
+function downloadCodes() {
+  const body = `Pilot recovery codes\n\nEach code signs you in once when no device is available.\n\n${codes.value.join('\n')}\n`
+  const url = URL.createObjectURL(new Blob([body], { type: 'text/plain' }))
+  const link = Object.assign(document.createElement('a'), {
+    href: url,
+    download: 'pilot-recovery-codes.txt',
+  })
+  link.click()
+  URL.revokeObjectURL(url)
+  showCodes.value = false
 }
 
 async function copy(text) {
