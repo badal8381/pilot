@@ -8,6 +8,7 @@ from admin.backend.middleware import AuthPolicy, get_auth_policy
 SITE_SCOPED_ENDPOINTS = {
     "sites.add_domain",
     "sites.backup_site",
+    "sites.account_url",
     "sites.central_proxy",
     "sites.clear_cache",
     "sites.delete_backup_schedule",
@@ -32,8 +33,11 @@ SITE_SCOPED_ENDPOINTS = {
     "sites.remove_domain",
     "sites.set_backup_schedule",
     "sites.site_apps",
+    "sites.site_marketplace",
+    "sites.site_task",
     "sites.update_configuration",
     "sites.update_domain",
+    "sites.update_site_apps",
     "sites.create_login_link",
 }
 
@@ -69,20 +73,20 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         if rule.rule.startswith(f"{API_ROOT_PREFIX}/") and not rule.rule.startswith(f"{API_V1_PREFIX}/")
     ]
 
-    assert len(routes) == 157
+    assert len(routes) == 161
     assert unversioned == []
-    assert len({(method, path) for method, path, _, _ in routes}) == 157
+    assert len({(method, path) for method, path, _, _ in routes}) == 161
     assert Counter(method for method, _, _, _ in routes) == {
         "DELETE": 12,
-        "GET": 81,
+        "GET": 84,
         "PATCH": 4,
-        "POST": 55,
+        "POST": 56,
         "PUT": 5,
     }
     assert Counter(policy for _, _, _, policy in routes) == {
         "authenticated": 107,
         "authenticated+bench-management": 9,
-        "authenticated+site-scope": 30,
+        "authenticated+site-scope": 34,
         "open": 5,
         "setup-conditional": 6,
     }
@@ -110,7 +114,7 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         "auth": 12,
         "settings": 3,
         "setup": 6,
-        "sites": 33,
+        "sites": 37,
         "ssh-keys": 3,
         "metrics": 1,
         "storage": 1,
@@ -150,12 +154,15 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         ("POST", "/api/v1/sites/<name>/actions/reinstall"),
         ("POST", "/api/v1/sites/<name>/actions/clear-cache"),
         ("POST", "/api/v1/sites/<name>/actions/migrate"),
+        ("POST", "/api/v1/sites/<name>/actions/update-apps"),
         ("POST", "/api/v1/sites/<name>/actions/enable-tls"),
         ("GET", "/api/v1/sites/<name>/configuration"),
         ("PATCH", "/api/v1/sites/<name>/configuration"),
         ("GET", "/api/v1/sites/<name>/apps"),
         ("POST", "/api/v1/sites/<name>/apps"),
         ("DELETE", "/api/v1/sites/<name>/apps/<app>"),
+        ("GET", "/api/v1/sites/<name>/marketplace"),
+        ("GET", "/api/v1/sites/<name>/tasks/<task_id>"),
         ("GET", "/api/v1/sites/<name>/domains"),
         ("POST", "/api/v1/sites/<name>/domains"),
         ("GET", "/api/v1/sites/<name>/domains/<domain>"),
@@ -172,6 +179,7 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         ("DELETE", "/api/v1/sites/<name>/backup-schedule"),
         ("GET", "/api/v1/sites/<name>/central/<path:method_path>"),
         ("POST", "/api/v1/sites/<name>/central/<path:method_path>"),
+        ("GET", "/api/v1/sites/<name>/account-url"),
     } <= route_keys
     assert {
         ("GET", "/api/v1/tasks"),
