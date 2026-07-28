@@ -31,9 +31,9 @@ jobs:
           npm ci
           npm run build
 
-      - name: Build cloud settings embed
+      - name: Build cloud settings in-app embed
         run: |
-          cd admin/frontend/embed
+          cd admin/frontend/in-app-embed
           npm ci
           npm run build
 
