@@ -6,6 +6,7 @@ import Firewall from '@/components/settings/Firewall.vue'
 import Waf from '@/components/settings/Waf.vue'
 import SshKeys from '@/components/settings/SshKeys.vue'
 import ChangeAdminPassword from '@/components/settings/ChangeAdminPassword.vue'
+import TwoFactor from '@/components/settings/TwoFactor.vue'
 
 // Single source of truth for id/label/component so SettingsDialog can resolve
 // a routed subsection id without each page owning its own private mapping.
@@ -43,6 +44,12 @@ export const SECURITY_SECTIONS = [
     description: 'Update the password that signs in to this bench.',
     component: ChangeAdminPassword,
     action: 'Change',
+  },
+  {
+    id: 'two-factor',
+    label: 'Two-factor authentication',
+    description: 'Require a code from an enrolled device at every sign-in.',
+    component: TwoFactor,
   },
   {
     id: 'firewall',
