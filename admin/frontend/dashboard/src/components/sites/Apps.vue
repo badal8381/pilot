@@ -29,7 +29,11 @@
   <Dialog v-model="showUninstall" :options="{ title: 'Uninstall App', size: 'sm' }">
     <template #body-content>
       <p class="text-ink-gray-7 text-sm">
-        Uninstall <strong>{{ uninstallTarget }}</strong> from {{ siteName }}?
+        Uninstall <span class="font-semibold text-ink-gray-8 break-all">{{ uninstallTarget }}</span>
+        from <span class="font-semibold text-ink-gray-8 break-all">{{ siteName }}</span>?
+      </p>
+      <p class="mt-2 text-ink-red-6 text-sm">
+        This action will drop the doctype of {{ uninstallTarget }} and can't be undone.
       </p>
       <ErrorMessage v-if="uninstallError" :message="uninstallError" class="mt-2" />
       <div class="flex justify-end gap-2 mt-4">

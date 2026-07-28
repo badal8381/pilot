@@ -1,7 +1,7 @@
 <template>
   <div class="mx-auto">
     <!-- Header with time window selector -->
-    <div class="flex justify-between items-start gap-3 mb-6">
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-6">
       <div>
         <h1 class="font-semibold text-ink-gray-9 text-xl">Analytics</h1>
         <p class="mt-1 text-ink-gray-5 text-sm sm:hidden">System and app metrics.</p>
@@ -9,38 +9,57 @@
           System and application metrics for this bench.
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <Dropdown :options="windowOptions" placement="bottom-end">
-          <template #default="{ open }">
-            <Button variant="outline" size="sm" :active="open">
-              <template #prefix>
-                <span
-                  v-if="!isHistorical"
-                  class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
-                />
-              </template>
-              <template #suffix><span class="size-4 lucide-chevron-down" /></template>
-              {{ windowLabel }}
-            </Button>
-          </template>
-        </Dropdown>
-        <Dropdown :options="viewOptions" placement="bottom-end">
-          <template #default="{ open }">
-            <Button variant="outline" size="sm" :active="open">
-              <template #suffix><span class="size-4 lucide-chevron-down" /></template>
-              {{ viewLabel }}
-            </Button>
-          </template>
-        </Dropdown>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <div class="w-[30%] sm:w-auto">
+          <Dropdown :options="windowOptions" placement="bottom-end">
+            <template #default="{ open }">
+              <Button variant="outline" size="sm" :active="open" class="w-full sm:w-auto">
+                <template #prefix>
+                  <span
+                    v-if="!isHistorical"
+                    class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
+                  />
+                </template>
+                <template #suffix><span class="size-4 lucide-chevron-down" /></template>
+                {{ windowLabel }}
+              </Button>
+            </template>
+          </Dropdown>
+        </div>
+        <div class="w-[70%] sm:w-auto">
+          <Dropdown :options="scopeOptions" placement="bottom-end">
+            <template #default="{ open }">
+              <Button variant="outline" size="sm" :active="open" class="w-full sm:w-auto max-w-[250px] overflow-hidden">
+                <template #prefix v-if="view === 'site'"><span class="size-4 lucide-globe" /></template>
+                <template #suffix><span class="size-4 lucide-chevron-down" /></template>
+                <span class="truncate">{{ scopeLabel }}</span>
+              </Button>
+            </template>
+          </Dropdown>
+        </div>
       </div>
     </div>
 
-    <DatabaseInsights v-if="view === 'database'" :window="dbWindow" />
+    <DatabaseInsights v-if="view === 'database'" :window="historyWindow" />
+
+    <template v-else-if="view === 'site'">
+      <SiteInsights v-if="activeSite" :site-name="activeSite" :window="historyWindow" />
+      <div
+        v-else-if="!sitesLoading"
+        class="flex flex-col justify-center items-center gap-2 h-[40vh] text-center"
+      >
+        <span class="size-10 text-ink-gray-3 lucide-globe" />
+        <p class="font-medium text-ink-gray-7 text-sm">No sites on this bench yet</p>
+      </div>
+    </template>
 
     <!-- Loading state -->
-    <div v-else-if="pageLoading" class="flex justify-center h-[50vh]">
-      <LoadingText />
-    </div>
+    <template v-else-if="pageLoading">
+      <Skeleton v-if="!isHistorical" class="mb-6 rounded-lg h-[88px]" />
+      <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
+        <Skeleton v-for="i in 6" :key="i" class="rounded-lg h-[340px]" />
+      </div>
+    </template>
 
     <template v-else>
       <!-- Live stats bar: CPU / Memory / Storage -->
@@ -130,12 +149,14 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dropdown, LoadingText, ErrorMessage, AxisChart } from 'frappe-ui'
+import { Button, Dropdown, LoadingText, ErrorMessage, AxisChart, Skeleton } from 'frappe-ui'
 import ChartCard from '@/components/common/ChartCard.vue'
 import WafAnalytics from '@/components/common/WafAnalytics.vue'
 import DatabaseInsights from '@/components/dashboard/DatabaseInsights.vue'
+import SiteInsights from '@/components/dashboard/SiteInsights.vue'
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
+import { useSites } from '@/composables/sites/useSites'
 
 const WINDOWS = [
   { key: 'live', label: 'Live' },
@@ -195,22 +216,26 @@ const router = useRouter()
 const VIEWS = [
   { key: 'system', label: 'System' },
   { key: 'database', label: 'Database' },
+  { key: 'site', label: 'Site' },
 ]
+const VIEW_KEYS = VIEWS.map((v) => v.key)
 const WINDOW_KEYS = WINDOWS.map((w) => w.key)
 
-const view = ref(route.query.view === 'database' ? 'database' : 'system')
+const view = ref(VIEW_KEYS.includes(route.query.view) ? route.query.view : 'system')
 const initialWindow = WINDOW_KEYS.includes(route.query.window) ? route.query.window : 'live'
 const activeWindow = ref(
-  view.value === 'database' && initialWindow === 'live' ? '1h' : initialWindow,
+  view.value !== 'system' && initialWindow === 'live' ? '1h' : initialWindow,
 )
 const isHistorical = computed(() => activeWindow.value !== 'live')
 
 const viewLabel = computed(() => VIEWS.find((v) => v.key === view.value)?.label ?? '')
-const viewOptions = computed(() =>
-  VIEWS.map((v) => ({ label: v.label, onClick: () => setView(v.key) })),
-)
+const scopeLabel = computed(() => (view.value === 'site' ? activeSite.value || 'Select site' : viewLabel.value))
+const scopeOptions = computed(() => [
+  ...VIEWS.filter((v) => v.key !== 'site').map((v) => ({ label: v.label, onClick: () => setView(v.key) })),
+  { group: 'Sites', options: sites.value.map((site) => ({ label: site.name, onClick: () => selectSite(site.name) })) },
+])
 
-// The database view has no live mode, so hide it there.
+// Only the system view has a live mode, so hide it elsewhere.
 const windowLabel = computed(() => WINDOWS.find((w) => w.key === activeWindow.value)?.label ?? '')
 const windowOptions = computed(() =>
   WINDOWS.filter((w) => view.value === 'system' || w.key !== 'live').map((w) => ({
@@ -218,24 +243,50 @@ const windowOptions = computed(() =>
     onClick: () => selectWindow(w.key),
   })),
 )
-// Database charts never receive 'live'.
-const dbWindow = computed(() => (activeWindow.value === 'live' ? '1h' : activeWindow.value))
+// Database and site charts never receive 'live'.
+const historyWindow = computed(() => (activeWindow.value === 'live' ? '1h' : activeWindow.value))
 
 function setView(key) {
   view.value = key
-  if (key === 'database' && activeWindow.value === 'live') selectWindow('1h')
+  if (key !== 'system' && activeWindow.value === 'live') selectWindow('1h')
   else if (key === 'system') setWindow(activeWindow.value)
 }
 
-function selectWindow(key) {
-  if (view.value === 'database') activeWindow.value = key
-  else setWindow(key)
+function selectSite(name) {
+  setView('site')
+  activeSite.value = name
 }
 
-// Persist view + window so a reload restores the same chart.
-watch([view, activeWindow], () => {
-  router.replace({ query: { view: view.value, window: activeWindow.value } })
+function selectWindow(key) {
+  if (view.value === 'system') setWindow(key)
+  else activeWindow.value = key
+}
+
+// Site view
+const { sites, loading: sitesLoading, load: loadSites } = useSites()
+const activeSite = ref(typeof route.query.site === 'string' ? route.query.site : '')
+
+// Persist view + window + site so a reload restores the same chart.
+watch([view, activeWindow, activeSite], () => {
+  router.replace({
+    query: {
+      view: view.value,
+      window: activeWindow.value,
+      ...(view.value === 'site' && activeSite.value ? { site: activeSite.value } : {}),
+    },
+  })
 })
+
+watch(
+  view,
+  async (value) => {
+    if (!sites.value.length) await loadSites()
+    if (value === 'site' && !sites.value.some((site) => site.name === activeSite.value)) {
+      activeSite.value = sites.value[0]?.name ?? ''
+    }
+  },
+  { immediate: true },
+)
 
 // Live mode state
 const stats = ref(null)

@@ -81,6 +81,17 @@ def test_limit_is_capped_at_the_hard_maximum(tmp_path: Path) -> None:
     assert len(body["data"]) == 500
 
 
+def test_jti_query_param_is_passed_through_to_entries(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    client = _client(bench_root)
+    log = _mock_log([])
+
+    with patch("pilot.core.bench.audit_log.AuditLog", return_value=log):
+        client.get("/api/v1/audit-events", query_string={"jti": "abc"})
+
+    assert log.entries.call_args.kwargs["jti"] == "abc"
+
+
 def test_an_invalid_cursor_is_treated_as_the_start(tmp_path: Path) -> None:
     bench_root = tmp_path / "benches" / "current"
     client = _client(bench_root)

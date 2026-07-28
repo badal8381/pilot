@@ -11,6 +11,7 @@ from admin.backend.api.v1.setup import wizard_marker_path
 from admin.backend.internal.session import Session
 from admin.backend.middleware import (
     allow_unauthenticated,
+    client_ip,
     decode_session_token,
     is_request_authenticated,
     rate_limit,
@@ -124,7 +125,7 @@ def create_session():
 
     if redeemed_jti:
         bench.audit_action("session", {"event": "login_redeemed", "jti": redeemed_jti})
-    token, jti = Session(bench).issue_session_token()
+    token, jti = Session(bench).issue_session_token(ip=client_ip())
     bench.audit_action(
         "session",
         {
@@ -149,30 +150,29 @@ def create_session():
 @core_bp.delete("/session")
 @allow_unauthenticated
 def delete_session():
+    """Sign out: revoke this session's jti so the token itself stops working, not just
+    the cookie in this browser."""
+    token = request.cookies.get("sid")
+    if token:
+        try:
+            bench = Bench(Path(current_app.config["BENCH_ROOT"]))
+        except Exception:
+            bench = None
+        if bench:
+            claims = decode_session_token(token, bench, client_ip())
+            if claims and claims.get("jti"):
+                Session(bench).revoke_jti(claims["jti"])
+                bench.audit_action("session", {"event": "revoked", "jti": claims["jti"], "via": "logout"})
     response = no_content_response()
     response.delete_cookie("sid")
     return response
-
-
-@core_bp.post("/session/revoke")
-def revoke_session():
-    """Revoke an active session by its jti. Requires an authenticated bench session."""
-    data = request.get_json(silent=True)
-    jti = data.get("jti") if isinstance(data, dict) else None
-    if not jti:
-        return error_response("malformed_request", "Expected a jti.", 400)
-    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-    if not Session(bench).revoke_jti(jti):
-        return error_response("unknown_session", "No such active session.", 404)
-    bench.audit_action("session", {"event": "revoked", "jti": jti})
-    return no_content_response()
 
 
 def _validate_login(data: dict, bench):
     """Return (error_response_or_None, redeemed_login_jti_or_None)."""
     sid = data.get("sid")
     if sid is not None:
-        payload = decode_session_token(sid, bench)
+        payload = decode_session_token(sid, bench, client_ip())
         jti = payload.get("jti") if payload else None
         expires = payload.get("exp") if payload else None
         used_logins = current_app.extensions["used_logins"]

@@ -45,7 +45,7 @@ def is_request_authenticated(bench) -> bool:
     token = token or request.cookies.get("sid")
     if not token:
         return False
-    claims = decode_session_token(token, bench)
+    claims = decode_session_token(token, bench, client_ip())
     if claims is None:
         return False
     g.jwt_claims = claims
@@ -63,11 +63,11 @@ def set_session_cookie(response, token: str, secure: bool) -> None:
     )
 
 
-def decode_session_token(token: str, bench) -> dict | None:
+def decode_session_token(token: str, bench, ip: str = "unknown") -> dict | None:
     """Verify a token via Session (local HS256, then the bench's remote JWKS keys)."""
     from admin.backend.internal.session import Session
 
-    return Session(bench).verify_token(token)
+    return Session(bench).verify_token(token, ip)
 
 
 def current_site_scope() -> str | None:

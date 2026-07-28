@@ -42,7 +42,7 @@ _BENCH_TEMPLATE = Template.from_path(_TEMPLATES / "bench.conf.template")
 _SERVER_TEMPLATE = Template.from_path(_TEMPLATES / "server.conf.template")
 _ERROR_PAGE_TEMPLATE = Template.from_path(_TEMPLATES / "error_page.html.template")
 
-_CORS_PATHS = ["/api/v1/health", "/api/v1/bootstrap"]
+_CORS_PATHS = ["/api/v1/health", "/api/v1/bootstrap", "/api/v1/setup/actions/finish"]
 
 
 def _admin_static_dir() -> Path:

@@ -103,9 +103,15 @@ const routes = [
     meta: { title: 'Code editor', group: 'Dev tools' },
   },
   {
-    path: '/settings',
-    name: 'Settings',
+    path: '/mobile/settings',
+    name: 'MobileSettings',
     component: () => import('./pages/settings/Settings.vue'),
+    meta: { title: 'Settings' },
+  },
+  {
+    path: '/settings/:section?/:subSection?',
+    name: 'Settings',
+    component: () => import('./pages/settings/SettingsRoute.vue'),
     meta: { title: 'Settings' },
   },
 ]

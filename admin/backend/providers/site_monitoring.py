@@ -4,13 +4,13 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from admin.backend.internal.timeline import TimelinePoint, build_timeline
+from admin.backend.internal.timeline import TimelinePoint, build_timeline, build_total_timeline
 from admin.backend.providers.site_access_log import SiteAccessLogProvider
 from admin.backend.providers.windowed_log import WindowedLogProvider
 from pilot.core.site.uptime_monitoring import PING_PATH
 from pilot.internal.site_paths import site_config_path
 
-_MAX_BUCKETS = 48
+_MAX_BUCKETS = 30
 _TOP_LIMIT = 5
 
 
@@ -30,17 +30,29 @@ class SiteMonitoringProvider(WindowedLogProvider):
         self._bucket_seconds = max(60, self.window_seconds // _MAX_BUCKETS)
         self._access_log = SiteAccessLogProvider(bench_root, site_name, window)
         self._db_name = self._read_db_name(bench_root, site_name)
+        self._start_ms = self.to_epoch_ms(self.cutoff)
 
     def get_analytics(self) -> dict:
         entries = list(self._entries_in_window())
+        request_points = self._points(entries, "request", self._non_ping_path)
+        job_points = self._points(entries, "job", self._job_method)
+        now_ms = self.now_ms()
         return {
             "window": self.window,
             "window_seconds": self.window_seconds,
-            "now": self.now_ms(),
+            "now": now_ms,
+            "requests_over_time": build_total_timeline(
+                request_points, self._bucket_seconds, "Requests", self._start_ms, now_ms
+            ),
             "top_paths": self._timeline(entries, "request", self._non_ping_path, "count"),
             "slowest_requests": self._timeline(entries, "request", self._request_path, "duration"),
+            "avg_request_duration": self._timeline(entries, "request", self._non_ping_path, "average"),
+            "background_jobs_over_time": build_total_timeline(
+                job_points, self._bucket_seconds, "Jobs", self._start_ms, now_ms
+            ),
             "top_jobs": self._timeline(entries, "job", self._job_method, "count"),
             "slowest_jobs": self._timeline(entries, "job", self._job_method, "duration"),
+            "avg_job_duration": self._timeline(entries, "job", self._job_method, "average"),
             "top_ips": self._top_ips(entries),
             "slowest_reports": self._timeline(entries, "request", self._report_name, "duration"),
             "frequent_slow_queries": self._slow_query_timeline("count"),
@@ -52,16 +64,17 @@ class SiteMonitoringProvider(WindowedLogProvider):
         from pilot.core.database.slow_queries import SlowQueryLog
 
         if not self._db_name:
-            return build_timeline([], _TOP_LIMIT, self._bucket_seconds, by)
-        config = BenchConfig.read(self._bench_root)
-        points = [
-            TimelinePoint(self.to_epoch_ms(when), record["query"], (record.get("query_time") or 0) * 1_000_000)
-            for record in SlowQueryLog(config.monitor.slow_query_log_path).records()
-            if record.get("db") == self._db_name
-            and (when := self.get_time(record.get("time"))) is not None
-            and when >= self.cutoff
-        ]
-        return build_timeline(points, _TOP_LIMIT, self._bucket_seconds, by)
+            points = []
+        else:
+            config = BenchConfig.read(self._bench_root)
+            points = [
+                TimelinePoint(self.to_epoch_ms(when), record["query"], (record.get("query_time") or 0) * 1_000_000)
+                for record in SlowQueryLog(config.monitor.slow_query_log_path).records()
+                if record.get("db") == self._db_name
+                and (when := self.get_time(record.get("time"))) is not None
+                and when >= self.cutoff
+            ]
+        return build_timeline(points, _TOP_LIMIT, self._bucket_seconds, by, self._start_ms, self.now_ms())
 
     @staticmethod
     def _read_db_name(bench_root: Path, site_name: str) -> str | None:
@@ -82,7 +95,7 @@ class SiteMonitoringProvider(WindowedLogProvider):
         self, entries: list[dict], transaction_type: str, category: Callable[[dict], str | None], by: str
     ) -> dict:
         points = self._points(entries, transaction_type, category)
-        return build_timeline(points, _TOP_LIMIT, self._bucket_seconds, by)
+        return build_timeline(points, _TOP_LIMIT, self._bucket_seconds, by, self._start_ms, self.now_ms())
 
     def _points(
         self, entries: list[dict], transaction_type: str, category: Callable[[dict], str | None]

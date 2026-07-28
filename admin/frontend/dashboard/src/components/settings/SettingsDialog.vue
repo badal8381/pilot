@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model="open" bare size="3xl">
+  <Dialog v-model="open" bare size="4xl">
     <template #default="{ close }">
       <div class="relative flex sm:h-[70vh] max-h-[85vh]">
         <div
@@ -42,39 +42,24 @@
           <div class="flex justify-between items-center pb-4">
             <div class="flex items-center gap-2">
               <Button
-                class="sm:hidden -ml-2"
+                v-if="subSection || sessionJti || activeSection"
+                :class="{ 'sm:hidden': !subSection && !sessionJti }"
+                class="-ml-2"
                 variant="subtle"
                 icon="lucide-arrow-left"
-                @click="activeSection = null"
+                @click="goBack"
               />
-              <h3 class="font-semibold text-ink-gray-9 text-lg">{{ activeSectionLabel }}</h3>
+              <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
             </div>
             <div id="settings-header-actions" class="contents"></div>
-            <Button
-              v-if="currentSection === 'workers'"
-              variant="subtle"
-              icon-left="lucide-plus"
-              @click="workersRef?.addGroup()"
-              >Add</Button
-            >
-            <Button
-              v-else-if="currentSection === 'ssh-keys'"
-              variant="subtle"
-              icon-left="lucide-plus"
-              @click="sshKeysRef?.openAdd()"
-              >Add</Button
-            >
           </div>
-          <General v-if="currentSection === 'general'" />
-          <Workers v-else-if="currentSection === 'workers'" ref="workersRef" />
-          <Firewall v-else-if="currentSection === 'firewall'" />
-          <Waf v-else-if="currentSection === 'waf'" />
-          <Git v-else-if="currentSection === 'github'" />
-          <S3Bucket v-else-if="currentSection === 's3-bucket'" />
-          <LLM v-else-if="currentSection === 'llm'" />
-          <SshKeys v-else-if="currentSection === 'ssh-keys'" ref="sshKeysRef" />
-          <AdminPassword v-else-if="currentSection === 'password'" />
-          <Sessions v-else-if="currentSection === 'sessions'" />
+          <General v-if="currentSection === 'general'" v-model:open-section="subSection" />
+          <Security v-else-if="currentSection === 'security'" v-model:open-section="subSection" />
+          <Sessions
+            v-else-if="currentSection === 'sessions'"
+            v-model:nested-view="nestedView"
+            v-model:jti="sessionJti"
+          />
           <SystemInfo v-else-if="currentSection === 'system-info'" />
         </div>
       </div>
@@ -83,43 +68,77 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Button } from 'frappe-ui'
 import General from '@/components/settings/General.vue'
-import Firewall from '@/components/settings/Firewall.vue'
-import Waf from '@/components/settings/Waf.vue'
-import Git from '@/components/settings/Git.vue'
-import S3Bucket from '@/components/settings/S3Bucket.vue'
-import LLM from '@/components/settings/LLM.vue'
-import SshKeys from '@/components/settings/SshKeys.vue'
-import AdminPassword from '@/components/settings/AdminPassword.vue'
+import Security from '@/components/settings/Security.vue'
 import Sessions from '@/components/settings/Sessions.vue'
 import SystemInfo from '@/components/settings/SystemInfo.vue'
-import Workers from '@/components/settings/Workers.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
+import { GENERAL_SECTIONS, SECURITY_SECTIONS } from '@/components/settings/sections'
 
 const open = defineModel()
 
 const isMobile = useIsMobile()
+const route = useRoute()
+const router = useRouter()
 
 const sections = computed(() => [
   { id: 'general', label: 'General', icon: 'lucide-settings' },
-  { id: 'github', label: 'Git', icon: 'lucide-git-branch' },
-  { id: 'workers', label: 'Workers', icon: 'lucide-server-cog' },
-  { id: 's3-bucket', label: 'Object Storage', icon: 'lucide-archive' },
-  { id: 'llm', label: 'AI Assistant', icon: 'lucide-sparkles' },
-  { id: 'firewall', label: 'Firewall', icon: 'lucide-shield' },
-  { id: 'waf', label: 'WAF', icon: 'lucide-shield-alert' },
-  { id: 'ssh-keys', label: 'SSH Keys', icon: 'lucide-key-round' },
-  { id: 'password', label: 'Password', icon: 'lucide-lock' },
+  { id: 'security', label: 'Security', icon: 'lucide-shield' },
   { id: 'sessions', label: 'Sessions', icon: 'lucide-monitor' },
   { id: 'system-info', label: 'System Info', icon: 'lucide-info' },
 ])
-const activeSection = ref(null)
-const workersRef = ref(null)
-const sshKeysRef = ref(null)
+// Both section and sub-section are routed (deep-linkable, back button
+// closes/steps back). Sub-section options come from a shared registry so
+// this dialog can resolve a route id without General/Security exposing one.
+const activeSection = computed({
+  get: () => route.params.section || null,
+  set: (id) => router.push(id ? { name: 'Settings', params: { section: id } } : { name: 'Settings' }),
+})
 const currentSection = computed(() => activeSection.value ?? sections.value[0].id)
 const activeSectionLabel = computed(
   () => sections.value.find((s) => s.id === currentSection.value)?.label,
 )
+
+const subSectionOptions = computed(() => {
+  if (currentSection.value === 'general') return GENERAL_SECTIONS
+  if (currentSection.value === 'security') return SECURITY_SECTIONS
+  return []
+})
+const subSection = computed({
+  get: () => subSectionOptions.value.find((s) => s.id === route.params.subSection) ?? null,
+  set: (section) =>
+    router.push({
+      name: 'Settings',
+      params: { section: currentSection.value, subSection: section?.id },
+    }),
+})
+
+// Sessions doesn't use the sub-section registry (its "sub-pages" are individual,
+// dynamically-fetched sessions, not a fixed list) - the same :subSection route slot
+// carries a jti instead, so a specific session's activity view is a real deep link.
+const sessionJti = computed({
+  get: () => (currentSection.value === 'sessions' ? route.params.subSection || null : null),
+  set: (jti) =>
+    router.push({ name: 'Settings', params: { section: 'sessions', subSection: jti || undefined } }),
+})
+
+// Sessions reports the human title (an IP, once it resolves the jti) since the route
+// only carries the raw id - reset whenever the visible section changes so re-entering
+// the tab later never inherits a stale title.
+const nestedView = ref(null)
+watch(currentSection, () => (nestedView.value = null))
+
+const headerTitle = computed(() => {
+  if (sessionJti.value) return nestedView.value?.title ?? sessionJti.value
+  return subSection.value?.label ?? activeSectionLabel.value
+})
+
+function goBack() {
+  if (sessionJti.value) sessionJti.value = null
+  else if (subSection.value) subSection.value = null
+  else activeSection.value = null
+}
 </script>

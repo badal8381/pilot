@@ -1,7 +1,7 @@
 <template>
   <div>
-    <div v-if="loading" class="flex justify-center h-[40vh]">
-      <LoadingText />
+    <div v-if="loading" class="gap-4 grid grid-cols-1 sm:grid-cols-2">
+      <Skeleton v-for="i in 6" :key="i" class="rounded-lg h-[340px]" />
     </div>
     <ErrorMessage v-else-if="error" :message="error" />
     <div
@@ -36,7 +36,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { AxisChart, ErrorMessage, LoadingText } from 'frappe-ui'
+import { AxisChart, ErrorMessage, Skeleton } from 'frappe-ui'
 import ChartCard from '@/components/common/ChartCard.vue'
 import SlowQueries from '@/components/dashboard/SlowQueries.vue'
 import { apiErrorMessage } from '@/api/client'

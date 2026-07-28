@@ -36,7 +36,7 @@
     >
       <span class="lucide-filter size-4 text-ink-blue-7 shrink-0" />
       <p class="flex-1 min-w-0 text-p-sm text-ink-blue-8 truncate">
-        Jobs linked to <span class="font-semibold">{{ siteFilter }}</span>, plus bench-level jobs
+        Jobs linked to <span class="font-semibold">{{ siteFilter }}</span>
       </p>
       <Button variant="ghost" size="sm" icon="lucide-x" @click="clearSiteFilter" />
     </div>
@@ -115,11 +115,11 @@ const filterOptions = [
   { label: 'Succeeded', value: 'success' },
 ]
 
-// ?site=<name> shows jobs linked to that site plus bench-level (unlinked) jobs.
+// ?site=<name> shows only jobs linked to that site.
 const siteFilter = computed(() => (typeof route.query.site === 'string' ? route.query.site : ''))
 const visibleTasks = computed(() => {
   if (!siteFilter.value) return tasks.value
-  return tasks.value.filter((task) => [siteFilter.value, 'Server-level'].includes(siteLabel(task)))
+  return tasks.value.filter((task) => siteLabel(task) === siteFilter.value)
 })
 
 function clearSiteFilter() {

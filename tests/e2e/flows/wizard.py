@@ -19,10 +19,7 @@ def complete_dev_wizard(
     page: Page,
     *,
     admin_password: str,
-    mariadb_password: str = "",
     db_type: str = "mariadb",
-    postgres_password: str = "",
-    postgres_admin_user: str = "postgres",
     framework_branch: str | None = None,
 ) -> None:
     """Complete the development-only setup wizard."""
@@ -30,20 +27,10 @@ def complete_dev_wizard(
     expect(page.get_by_text("Step 1 of", exact=False)).to_be_visible(timeout=30_000)
     page.get_by_label("Admin password").fill(admin_password)
     page.get_by_role("button", name="Next").click()
-    # MariaDB and PostgreSQL share one set of fields: generic "Root username" /
-    # "Root user password" fields (Setup.vue's showRootUsername).
     _choose_select(page, "Database engine", "PostgreSQL" if db_type == "postgres" else "MariaDB")
-    # Root username only renders when it isn't implied (a fresh install
-    # defaults to root/postgres).
-    if page.get_by_label("Root username").is_visible():
-        page.get_by_label("Root username").fill(postgres_admin_user if db_type == "postgres" else "root")
-    page.get_by_label("Root user password").fill(
-        postgres_password if db_type == "postgres" else mariadb_password
-    )
-    page.get_by_role("button", name="Verify credentials").click()
-    # A wrong password surfaces inline and keeps us on this step.
-    expect(page.get_by_text("Incorrect MariaDB credentials.")).to_be_hidden()
-    expect(page.get_by_text("Incorrect PostgreSQL credentials.")).to_be_hidden()
+    # "Use existing database" / "Create new database" need no input here - only
+    # "Connect to external database" shows host/user/password fields.
+    page.get_by_role("button", name="Next").click()
     # The wizard always provisions a development bench (no production/process-manager
     # choice - that's a separate `bench setup production` step run from the terminal
     # afterwards). We keep the repo default.

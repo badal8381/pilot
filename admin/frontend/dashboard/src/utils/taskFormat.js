@@ -97,10 +97,46 @@ export function siteLabel(task) {
   return (key && task.args?.[key]) || 'Server-level'
 }
 
+export function siteRoute(task) {
+  const site = siteLabel(task)
+  if (site === 'Server-level') return null
+  return { name: 'SiteDetail', params: { name: site } }
+}
+
+const REDIRECT_ON_SUCCESS_COMMANDS = [
+  'new-site',
+  'install-app',
+  'uninstall-app',
+  'get-and-install-app',
+]
+
+const APP_ARG_KEY = {
+  'install-app': 'app',
+  'uninstall-app': 'app',
+  'get-and-install-app': 'marketplace_app',
+}
+
+const APP_ACTION_FOR_COMMAND = {
+  'install-app': 'install-app',
+  'uninstall-app': 'uninstall-app',
+  'get-and-install-app': 'install-app',
+}
+
+export function redirectRouteOnSuccess(task) {
+  if (!REDIRECT_ON_SUCCESS_COMMANDS.includes(task.command)) return null
+  const route = siteRoute(task)
+  if (!route) return null
+  const appKey = APP_ARG_KEY[task.command]
+  const app = appKey && task.args?.[appKey]
+  if (!app) return route
+  return { ...route, query: { app, action: APP_ACTION_FOR_COMMAND[task.command] } }
+}
+
 export function relativeTime(iso) {
   if (!iso) return ''
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
+  if (seconds < 5) return 'just now'
+  if (seconds < 60) return `${seconds} sec ago`
   const minutes = Math.floor(seconds / 60)
   if (minutes < 60) return `${minutes} min ago`
   const hours = Math.floor(minutes / 60)

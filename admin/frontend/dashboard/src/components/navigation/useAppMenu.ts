@@ -1,15 +1,16 @@
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTheme } from 'frappe-ui'
 import { authApi } from '@/api/auth'
 import { useSession } from '@/composables/auth/useSession'
 
 // dialogs
-const showSettings = ref(false)
 const showBenches = ref(false)
 const showNewBench = ref(false)
 
 // shared by mobile settings page & desktop sidebar
 export function useAppMenu() {
+  const router = useRouter()
   const { setTheme } = useTheme()
   const { session } = useSession()
 
@@ -26,7 +27,7 @@ export function useAppMenu() {
     {
       label: 'Settings',
       icon: 'lucide-settings',
-      onClick: () => (showSettings.value = true),
+      onClick: () => router.push({ name: 'Settings' }),
     },
 
     // Managing other benches is gated server-wide by admin.allow_bench_management.
@@ -51,5 +52,5 @@ export function useAppMenu() {
     { label: 'Logout', icon: 'lucide-log-out', onClick: logout },
   ])
 
-  return { menuItems, showSettings, showBenches, showNewBench, logout, session }
+  return { menuItems, showBenches, showNewBench, logout, session }
 }

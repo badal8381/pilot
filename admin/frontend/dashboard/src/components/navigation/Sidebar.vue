@@ -42,7 +42,7 @@ function isActive(to) {
       title="Pilot"
       :menu-items="menuItems"
       :logo="PilotLogo"
-    /> 
+    />
 
     <nav class="flex-1 overflow-y-auto px-2 pt-2">
       <template v-for="section in visibleSections" :key="section.label || 'main'">
