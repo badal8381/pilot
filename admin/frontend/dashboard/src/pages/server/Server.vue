@@ -43,7 +43,7 @@ onMounted(load)
   <!-- storgae -->
   <section class="mx-auto max-w-5xl">
     <!-- header -->
-    <div class="flex justify-between items-center gap-2 mb-4">
+    <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
       <h2 class="flex items-center gap-2 font-medium text-ink-gray-8 text-lg">
         <span class="size-4 lucide-hard-drive" />
         Storage
