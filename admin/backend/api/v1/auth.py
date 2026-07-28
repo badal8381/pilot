@@ -217,15 +217,15 @@ def start_two_factor_enrollment():
     if not isinstance(data, dict):
         return error_response("malformed_request", "Expected a JSON object.", 400)
     try:
-        enrollment = TwoFactorAuthentication(bench).start_enrollment(str(data.get("label", "")))
+        enrollment = TwoFactorAuthentication(bench).start_enrollment(str(data.get("name", "")))
     except TwoFactorError as error:
-        return error_response("invalid_label", str(error), 422)
+        return error_response("invalid_device_name", str(error), 422)
     return jsonify(enrollment)
 
 
-@auth_bp.post("/two-factor/<credential_id>")
+@auth_bp.post("/two-factor/<name>")
 @rate_limit(5, 60, user_ip=True)
-def confirm_two_factor_credential(credential_id: str):
+def confirm_two_factor_credential(name: str):
     """Activate a device once a code proves its setup key was entered correctly."""
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
     data = request.get_json(silent=True)
@@ -233,9 +233,9 @@ def confirm_two_factor_credential(credential_id: str):
         return error_response("malformed_request", "Expected a JSON object.", 400)
     two_factor = TwoFactorAuthentication(bench)
     was_enabled = two_factor.is_enabled
-    if not two_factor.confirm_enrollment(credential_id, str(data.get("otp", ""))):
+    if not two_factor.confirm_enrollment(name, str(data.get("otp", ""))):
         return error_response("invalid_otp", "That code is not valid.", 422)
-    bench.audit_action("session", {"event": "two_factor_device_added", "credential": credential_id})
+    bench.audit_action("session", {"event": "two_factor_device_added", "device": name})
 
     codes = None
     token = None
@@ -257,19 +257,19 @@ def confirm_two_factor_credential(credential_id: str):
     return response
 
 
-@auth_bp.delete("/two-factor/<credential_id>")
+@auth_bp.delete("/two-factor/<name>")
 @rate_limit(5, 60, user_ip=True)
-def remove_two_factor_credential(credential_id: str):
+def remove_two_factor_credential(name: str):
     """Remove a device. Dropping the last confirmed one turns 2FA off."""
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
     two_factor = TwoFactorAuthentication(bench)
-    if not two_factor.remove_credential(credential_id):
+    if not two_factor.remove_credential(name):
         return error_response("unknown_credential", "No such device.", 404)
     bench.audit_action(
         "session",
         {
             "event": "two_factor_device_removed",
-            "credential": credential_id,
+            "device": name,
             "still_enabled": two_factor.is_enabled,
         },
     )
