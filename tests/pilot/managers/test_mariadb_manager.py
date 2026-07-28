@@ -89,7 +89,7 @@ def test_install_unit_uses_defaults_file_only(tmp_path) -> None:
     m = _manager()
     with (
         patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
-        patch.object(m, "_user_unit_dir", return_value=tmp_path),
+        patch.object(type(m), "user_unit_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch(f"{MODULE}.which", return_value="/usr/sbin/mariadbd"),
         patch(f"{MODULE}.run_command"),
     ):

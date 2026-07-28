@@ -498,24 +498,25 @@ def test_toml_writer_monitor_section_omitted_when_production_disabled() -> None:
 
 
 def test_toml_writer_monitor_section_emitted_when_production_enabled() -> None:
+    from pathlib import Path
+
     data = copy.deepcopy(MINIMAL_VALID_DATA)
     data["production"] = {"enabled": True, "process_manager": "systemd"}
     data["admin"] = {"domain": "admin.example.com"}
     config = BenchConfig._from_dict(data)
+    config.monitor.log_path = Path("/var/log/test-bench-stats.log")
     toml = config.dumps()
     assert "[monitor]" in toml
-    assert "system_log_path" in toml
-    assert "authority_file_path" in toml
+    assert "log_path" in toml
 
 
-def test_toml_writer_monitor_log_path_omitted_when_none() -> None:
+def test_toml_writer_monitor_section_omitted_when_log_path_unset() -> None:
     data = copy.deepcopy(MINIMAL_VALID_DATA)
     data["production"] = {"enabled": True, "process_manager": "systemd"}
     data["admin"] = {"domain": "admin.example.com"}
     config = BenchConfig._from_dict(data)
     assert config.monitor.log_path is None
-    monitor_section = config.dumps().split("[monitor]")[1].split("[")[0]
-    assert "\nlog_path =" not in monitor_section
+    assert "[monitor]" not in config.dumps()
 
 
 def test_toml_writer_monitor_log_path_written_when_set() -> None:
@@ -707,10 +708,12 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
     config.llm.api_base = "http://vllm:8000/v1"
 
     config.monitor.system_log_path = Path("/var/log/custom-system.log")
-    config.monitor.authority_file_path = Path("/var/log/.custom-authority")
+    config.monitor.db_log_path = Path("/var/log/custom-db.log")
+    config.monitor.slow_query_log_path = Path("/var/log/custom-slow.json")
     config.monitor.log_path = Path("/var/log/custom-app.log")
 
-    # mariadb/postgres/letsencrypt/admin.jwks_* are host-shared state in
+    # mariadb/postgres/letsencrypt/admin.jwks_*/monitor.system_log_path/
+    # db_log_path/slow_query_log_path are host-shared state in
     # common_config.toml, one level above the bench directory - nest under
     # tmp_path so this test's common config never leaks into another test's.
     bench_dir = tmp_path / "benches" / "roundtrip-bench"

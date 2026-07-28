@@ -295,7 +295,7 @@ def test_install_unit_uses_explicit_config_file(tmp_path) -> None:
     with (
         patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch.object(m, "_server_binary", return_value="/usr/lib/postgresql/17/bin/postgres"),
-        patch.object(m, "_user_unit_dir", return_value=tmp_path),
+        patch.object(type(m), "user_unit_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch(f"{MODULE}.run_command"),
     ):
         m._install_unit()
@@ -405,7 +405,7 @@ def test_install_unit_execstart_uses_resolved_postgres_binary(tmp_path) -> None:
             return_value=tmp_path / "pilot-postgres.service",
         ),
         patch.object(m, "_server_binary", return_value="/usr/lib/postgresql/17/bin/postgres"),
-        patch.object(m, "_user_unit_dir", return_value=tmp_path),
+        patch.object(type(m), "user_unit_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch(f"{MODULE}.run_command"),
     ):
         m._install_unit()
@@ -422,7 +422,7 @@ def test_install_unit_pins_unix_socket_directories_to_owned_dir(tmp_path) -> Non
             new_callable=PropertyMock,
             return_value=tmp_path / "pilot-postgres.service",
         ),
-        patch.object(m, "_user_unit_dir", return_value=tmp_path),
+        patch.object(type(m), "user_unit_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch(f"{MODULE}.which", return_value="/usr/lib/postgresql/bin/postgres"),
         patch(f"{MODULE}.run_command"),
     ):

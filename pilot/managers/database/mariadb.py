@@ -119,7 +119,7 @@ class MariaDBManager(UserOwnedDBManager):
             "[Install]\n"
             "WantedBy=default.target\n"
         )
-        unit_dir = self._user_unit_dir()
+        unit_dir = self.user_unit_dir
         unit_dir.mkdir(parents=True, exist_ok=True)
         self.unit_path.write_text(content)
         run_command(self._systemctl("daemon-reload"), env=self._systemctl_env())
