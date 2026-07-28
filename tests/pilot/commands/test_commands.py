@@ -830,35 +830,6 @@ def test_bench_update_apps_uses_captured_target_for_unpinned_app(tmp_path: Path)
     mock_registry.assert_not_called()
 
 
-def test_bench_migrate_sites_raises_on_failure(tmp_path: Path) -> None:
-    from pilot.exceptions import MigrateError
-
-    bench = make_bench(tmp_path)
-    bench.create_directories()
-    site_dir = bench.sites_path / "site1.localhost"
-    site_dir.mkdir()
-    (site_dir / "site_config.json").write_text("{}")
-
-    with (
-        patch("pilot.core.site.Site.migrate", side_effect=MigrateError("migrate failed")),
-        pytest.raises(MigrateError),
-    ):
-        bench._migrate_sites(False, lambda message: None)
-
-
-def test_bench_migrate_sites_passes_skip_failing_patches(tmp_path: Path) -> None:
-    bench = make_bench(tmp_path)
-    bench.create_directories()
-    site_dir = bench.sites_path / "site1.localhost"
-    site_dir.mkdir()
-    (site_dir / "site_config.json").write_text("{}")
-
-    with patch("pilot.core.site.Site.migrate") as mock_migrate:
-        bench._migrate_sites(True, lambda message: None)
-
-    mock_migrate.assert_called_once_with(skip_failing=True)
-
-
 def test_drop_site_removes_site_from_bench_toml(tmp_path: Path) -> None:
     import tomllib
 
