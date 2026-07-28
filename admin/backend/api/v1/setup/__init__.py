@@ -245,9 +245,9 @@ def _validate_finished_setup_task(bench_root: Path, task_id: str):
         )
     marker = wizard_marker_path(bench_root)
     with exclusive_file_lock(marker):
-        error = _check_marker_claims_this_task(bench_root, marker, task_id)
-        if error is not None:
-            return error
+        conflict = _check_marker_claims_this_task(bench_root, marker, task_id)
+        if conflict is not None:
+            return conflict
         if not (bench_root / "config" / "Procfile").exists():
             return error_response(
                 "setup_not_initialized",
