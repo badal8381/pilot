@@ -25,7 +25,7 @@ admin/backend/
 
 admin/frontend/dashboard/  Vue Admin UI
 admin/frontend/editor/     Vue code editor
-admin/frontend/embed/      Desk-embeddable Cloud Settings (IIFE)
+admin/frontend/embed/      Desk-embeddable Cloud Settings (IIFE → /embed/cloud-settings/)
 ```
 
 ## Install Modes
