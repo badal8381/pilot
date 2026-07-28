@@ -64,9 +64,7 @@ const barParts = computed(() => {
   <dl v-if="legend" class="mt-3">
     <template v-for="part in visibleParts" :key="part.label">
       <slot name="row" :part="part">
-        <div
-          class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
-        >
+        <div class="flex justify-between items-center gap-4 py-2">
           <dt class="flex items-center gap-2 min-w-0">
             <span class="rounded-full size-2 shrink-0" :style="{ backgroundColor: part.color }" />
             <span class="text-ink-gray-7 text-sm truncate">{{ part.label }}</span>
