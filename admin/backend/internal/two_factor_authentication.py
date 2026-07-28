@@ -158,6 +158,7 @@ class TwoFactorAuthentication:
                 "id": credential_id,
                 "label": entry.get("label", ""),
                 "confirmed": bool(entry.get("confirmed_at")),
+                "confirmed_at": entry.get("confirmed_at"),
                 "created_at": entry.get("created_at"),
                 "last_used_at": entry.get("last_used_at"),
             }
