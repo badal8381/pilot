@@ -12,12 +12,7 @@ const props = defineProps({
   size: { type: Object, required: true },
 })
 
-const COLORS = {
-  data: '#ef4444',
-  index: '#06b6d4',
-  claimable: '#f59e0b',
-  free: '#d1d5db',
-}
+const COLORS = { data: 'red-7', index: 'cyan-7', claimable: 'amber-7', free: 'gray-2' }
 
 const parts = computed(() => [
   { label: 'Data Size', bytes: props.size.data_bytes, color: COLORS.data },

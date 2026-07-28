@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem, SidebarCollapseToggle } from 'frappe-ui'
 import { sidebarSections } from './list'
 import { useAppMenu } from './useAppMenu'
-import PilotLogo from '@/components/common/PilotLogo.vue'
+import PilotLogo from '@/components/icons/Pilot.vue'
 
 const props = defineProps({
   isMobile: { type: Boolean, default: false },

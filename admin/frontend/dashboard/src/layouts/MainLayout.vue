@@ -10,7 +10,7 @@ import {
   MobileNavItem,
 } from 'frappe-ui'
 import Sidebar from '@/components/navigation/Sidebar.vue'
-import PilotLogo from '@/components/common/PilotLogo.vue'
+import PilotLogo from '@/components/icons/Pilot.vue'
 import MigrationStatusButton from '@/components/common/MigrationStatusButton.vue'
 import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import BenchSwitcherDialog from '@/components/benches/BenchSwitcherDialog.vue'
