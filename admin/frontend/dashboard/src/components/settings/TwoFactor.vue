@@ -97,8 +97,15 @@
           <div class="flex justify-center bg-surface-white p-4 rounded-lg">
             <QrcodeVue :value="enrollment.provisioning_url" :size="176" level="M" render-as="svg" />
           </div>
-          <details class="text-ink-gray-6 text-p-sm">
-            <summary class="cursor-pointer">Can't scan? Enter the key by hand</summary>
+          <details class="group">
+            <summary
+              class="flex items-center gap-1.5 text-ink-gray-6 text-sm cursor-pointer select-none"
+            >
+              <span
+                class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
+              ></span>
+              Can't scan? Enter the key by hand
+            </summary>
             <div class="bg-surface-gray-2 mt-2 p-3 rounded-lg">
               <p class="font-mono text-ink-gray-8 text-sm break-all">{{ enrollment.secret }}</p>
               <button class="mt-1 text-ink-blue-3 text-xs" @click="copy(enrollment.secret)">
