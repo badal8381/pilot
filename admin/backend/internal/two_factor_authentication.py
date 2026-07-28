@@ -21,10 +21,33 @@ RECOVERY_CODE_COUNT = 10
 # Each device holds its own secret, so this also caps how many people can sign in
 # during the same 30-second window.
 MAX_ENROLLED_DEVICES = 10
+# The name is the key and travels in the URL path.
+MAX_DEVICE_NAME_LENGTH = 40
+
+
+def normalise_device_name(name: str) -> str:
+    """Collapse whitespace so "My  Phone" and "My Phone" cannot both be enrolled."""
+    return " ".join(name.split())
+
+
+def validate_device_name(name: str) -> str:
+    """Return the stored form of a device name, or explain why it cannot be used."""
+    name = normalise_device_name(name)
+    if not name:
+        raise TwoFactorError("A device name is required.")
+    if len(name) > MAX_DEVICE_NAME_LENGTH:
+        raise TwoFactorError(f"Device names are limited to {MAX_DEVICE_NAME_LENGTH} characters.")
+    # Werkzeug decodes the path segment, so any printable character survives the round
+    # trip. A slash does not: proxies decode %2F back into a separator before routing.
+    if "/" in name:
+        raise TwoFactorError("Device names cannot contain a slash.")
+    if not name.isprintable():
+        raise TwoFactorError("Device names cannot contain control characters.")
+    return name
 
 
 class TotpCredentialStore:
-    """A private, lock-guarded ``{id: credential}`` file.
+    """A private, lock-guarded ``{device name: credential}`` file.
 
     Unconfirmed entries past ``PENDING_TTL`` are dropped on every read, and every gunicorn
     worker shares one view through an exclusive lock.
@@ -47,9 +70,8 @@ class TotpCredentialStore:
         """Credentials someone has proved they hold. Only these can authenticate."""
         return {key: entry for key, entry in self.all().items() if entry.get("confirmed_at")}
 
-    def add(self, label: str, secret: str) -> str:
-        """Register a pending credential and return its id."""
-        credential_id = secrets.token_urlsafe(8)
+    def add(self, name: str, secret: str) -> str:
+        """Register a pending credential under its name, which must be free."""
         with exclusive_file_lock(self._path):
             entries = self._prune(self._load_raw())
 
@@ -60,8 +82,10 @@ class TotpCredentialStore:
                     "device's setup key with another authenticator app."
                 )
 
-            entries[credential_id] = {
-                "label": label,
+            if any(existing.casefold() == name.casefold() for existing in entries):
+                raise TwoFactorError(f"A device named {name!r} is already enrolled.")
+
+            entries[name] = {
                 "secret": secret,
                 "created_at": int(time.time()),
                 "confirmed_at": None,
@@ -69,13 +93,13 @@ class TotpCredentialStore:
                 "last_used_at": None,
             }
             self._write(entries)
-        return credential_id
+        return name
 
-    def confirm(self, credential_id: str, timestep: int) -> bool:
+    def confirm(self, name: str, timestep: int) -> bool:
         """Mark a credential usable, burning the time step that proved it."""
         with exclusive_file_lock(self._path):
             entries = self._prune(self._load_raw())
-            entry = entries.get(credential_id)
+            entry = entries.get(name)
             if entry is None or entry.get("confirmed_at"):
                 return False
             now = int(time.time())
@@ -83,7 +107,7 @@ class TotpCredentialStore:
             self._write(entries)
         return True
 
-    def burn_timestep(self, credential_id: str, timestep: int) -> bool:
+    def burn_timestep(self, name: str, timestep: int) -> bool:
         """Spend a time step for one credential, rejecting any step already used.
 
         Checked and written under a single lock: two workers reading the same stale value
@@ -91,17 +115,17 @@ class TotpCredentialStore:
         """
         with exclusive_file_lock(self._path):
             entries = self._prune(self._load_raw())
-            entry = entries.get(credential_id)
+            entry = entries.get(name)
             if entry is None or timestep <= int(entry.get("last_timestep", 0)):
                 return False
             entry.update(last_timestep=timestep, last_used_at=int(time.time()))
             self._write(entries)
         return True
 
-    def remove(self, credential_id: str) -> bool:
+    def remove(self, name: str) -> bool:
         with exclusive_file_lock(self._path):
             entries = self._prune(self._load_raw())
-            if entries.pop(credential_id, None) is None:
+            if entries.pop(name, None) is None:
                 return False
             self._write(entries)
         return True
@@ -141,60 +165,59 @@ class TwoFactorAuthentication:
 
     @property
     def is_enabled(self) -> bool:
-        """Whether a second factor is required to sign in."""
-        has_confirmed_credentials = bool(self.store.confirmed())
-        # If we have no confirmed credentials we can drop the recovery codes as well
-        # Since 2FA is disabled.
-        if not has_confirmed_credentials and self.bench.config.admin.recovery_codes:
-            with BenchConfig.open(self.bench.path, mode="rw") as config:
-                config.admin.recovery_codes = []
-
+        """Whether a second factor is required to sign in. Reads only - every sign-in
+        asks this, so it must not write."""
         return bool(self.store.confirmed())
 
     def get_credentials(self) -> list[dict]:
         """Public rows for the settings UI. Never exposes a secret."""
         rows = [
             {
-                "id": credential_id,
-                "label": entry.get("label", ""),
+                "name": name,
                 "confirmed": bool(entry.get("confirmed_at")),
                 "confirmed_at": entry.get("confirmed_at"),
                 "created_at": entry.get("created_at"),
                 "last_used_at": entry.get("last_used_at"),
             }
-            for credential_id, entry in self.store.all().items()
+            for name, entry in self.store.all().items()
         ]
         return sorted(rows, key=lambda row: row["created_at"] or 0)
 
-    def start_enrollment(self, label: str) -> dict:
+    def start_enrollment(self, name: str) -> dict:
         """Create a pending credential and return what an authenticator app needs.
 
         The secret is returned exactly here. Once confirmed it is never handed back, so a
         stolen session cannot clone an existing device's factor.
         """
-        label = label.strip()
-        if not label:
-            raise TwoFactorError("A device name is required.")
+        name = validate_device_name(name)
         secret = pyotp.random_base32()
-        credential_id = self.store.add(label, secret)
+        self.store.add(name, secret)
         return {
-            "id": credential_id,
+            "name": name,
             "secret": secret,
-            "provisioning_url": self._provisioning_url(label, secret),
+            "provisioning_url": self._provisioning_url(name, secret),
         }
 
-    def confirm_enrollment(self, credential_id: str, otp: str) -> bool:
+    def confirm_enrollment(self, name: str, otp: str) -> bool:
         """Activate a pending credential, but only once a code proves it was set up."""
-        entry = self.store.all().get(credential_id)
+        entry = self.store.all().get(name)
         if entry is None or entry.get("confirmed_at"):
             return False
         timestep = self._matching_timestep(entry["secret"], otp.strip())
         if timestep is None:
             return False
-        return self.store.confirm(credential_id, timestep)
+        return self.store.confirm(name, timestep)
 
-    def remove_credential(self, credential_id: str) -> bool:
-        return self.store.remove(credential_id)
+    def remove_credential(self, name: str) -> bool:
+        """Forget a device, and the recovery codes too once the last one is gone.
+
+        Removal is the only thing that can switch 2FA off, so the cleanup belongs here
+        rather than in whatever happens to ask about it next.
+        """
+        removed = self.store.remove(name)
+        if removed and not self.is_enabled:
+            self._store_recovery_codes([])
+        return removed
 
     @property
     def unused_recovery_code_count(self) -> int:
@@ -246,16 +269,14 @@ class TwoFactorAuthentication:
         # compare_digest raises on non-ASCII, so a pasted smart quote would 500 the login.
         if not otp or not otp.isascii():
             return False
-        for credential_id, entry in self.store.confirmed().items():
+        for name, entry in self.store.confirmed().items():
             timestep = self._matching_timestep(entry["secret"], otp)
             if timestep is not None:
-                return self.store.burn_timestep(credential_id, timestep)
+                return self.store.burn_timestep(name, timestep)
         return False
 
-    def _provisioning_url(self, label: str, secret: str) -> str:
-        return pyotp.TOTP(secret).provisioning_uri(
-            name=label, issuer_name=f"Pilot - {self.bench.config.name}"
-        )
+    def _provisioning_url(self, name: str, secret: str) -> str:
+        return pyotp.TOTP(secret).provisioning_uri(name=name, issuer_name=f"Pilot - {self.bench.config.name}")
 
     @staticmethod
     def _matching_timestep(secret: str, otp: str) -> int | None:

@@ -26,16 +26,16 @@ def _bench(tmp_path: Path) -> Bench:
     return Bench(BenchConfig.from_file(toml_path), tmp_path)
 
 
-def _enroll(two_factor: TwoFactorAuthentication, label: str = "phone") -> tuple[str, str]:
+def _enroll(two_factor: TwoFactorAuthentication, name: str = "phone") -> tuple[str, str]:
     """Enroll and confirm a device, returning its id and secret.
 
     Confirms with the previous step's code so the current one stays unspent: confirmation
     burns the step it used, and re-sending that code would be a replay.
     """
-    enrollment = two_factor.start_enrollment(label)
+    enrollment = two_factor.start_enrollment(name)
     code = _code(enrollment["secret"], at=int(time.time()) - 30)
-    assert two_factor.confirm_enrollment(enrollment["id"], code)
-    return enrollment["id"], enrollment["secret"]
+    assert two_factor.confirm_enrollment(enrollment["name"], code)
+    return enrollment["name"], enrollment["secret"]
 
 
 def _code(secret: str, at: int | None = None) -> str:
@@ -71,10 +71,10 @@ def test_two_factor_is_only_enabled_after_a_valid_code(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
     enrollment = two_factor.start_enrollment("phone")
 
-    assert two_factor.confirm_enrollment(enrollment["id"], "000000") is False
+    assert two_factor.confirm_enrollment(enrollment["name"], "000000") is False
     assert two_factor.is_enabled is False
 
-    assert two_factor.confirm_enrollment(enrollment["id"], _code(enrollment["secret"])) is True
+    assert two_factor.confirm_enrollment(enrollment["name"], _code(enrollment["secret"])) is True
     assert two_factor.is_enabled is True
 
 
@@ -157,7 +157,7 @@ def test_concurrent_use_of_one_code_is_accepted_once(tmp_path: Path) -> None:
 def test_clock_drift_within_one_step_is_accepted(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
     enrollment = two_factor.start_enrollment("phone")
-    two_factor.confirm_enrollment(enrollment["id"], _code(enrollment["secret"], at=int(time.time()) - 30))
+    two_factor.confirm_enrollment(enrollment["name"], _code(enrollment["secret"], at=int(time.time()) - 30))
 
     assert two_factor.is_enabled is True
 
@@ -202,7 +202,7 @@ def test_credentials_never_expose_secrets(tmp_path: Path) -> None:
 
     rows = two_factor.get_credentials()
 
-    assert {row["label"] for row in rows} == {"phone", "pending laptop"}
+    assert {row["name"] for row in rows} == {"phone", "pending laptop"}
     assert {row["confirmed"] for row in rows} == {True, False}
     assert not any("secret" in row for row in rows)
 
@@ -210,7 +210,7 @@ def test_credentials_never_expose_secrets(tmp_path: Path) -> None:
 def test_abandoned_enrollments_are_pruned(tmp_path: Path) -> None:
     bench = _bench(tmp_path)
     two_factor = TwoFactorAuthentication(bench)
-    stale = two_factor.start_enrollment("never confirmed")["id"]
+    stale = two_factor.start_enrollment("never confirmed")["name"]
     confirmed, _ = _enroll(two_factor, "phone")
 
     path = tmp_path / TotpCredentialStore.FILENAME
@@ -363,10 +363,99 @@ def test_enrollment_stops_at_the_device_limit(tmp_path: Path) -> None:
 
 def test_removing_a_device_frees_a_slot(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    first = two_factor.start_enrollment("device 0")["id"]
+    first = two_factor.start_enrollment("device 0")["name"]
     for index in range(1, MAX_ENROLLED_DEVICES):
         two_factor.start_enrollment(f"device {index}")
 
     two_factor.remove_credential(first)
 
-    assert two_factor.start_enrollment("replacement")["id"]
+    assert two_factor.start_enrollment("replacement")["name"]
+
+
+def test_a_duplicate_device_name_is_rejected(tmp_path: Path) -> None:
+    """Overwriting would swap the secret out from under a working device."""
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _, secret = _enroll(two_factor, "phone")
+
+    with pytest.raises(TwoFactorError):
+        two_factor.start_enrollment("phone")
+
+    assert two_factor.verify_otp(_code(secret)) is True
+
+
+def test_duplicate_names_ignore_case_and_spacing(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    two_factor.start_enrollment("My Phone")
+
+    for variant in ("my phone", "MY PHONE", "  My   Phone  "):
+        with pytest.raises(TwoFactorError):
+            two_factor.start_enrollment(variant)
+
+
+def test_device_names_are_normalised(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+
+    assert two_factor.start_enrollment("  My   Phone  ")["name"] == "My Phone"
+
+
+def test_device_names_must_be_addressable(tmp_path: Path) -> None:
+    """The name is the key and travels in the URL path, so it stays to safe characters."""
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+
+    for bad in ("phone/laptop", "null\x00byte", "bell\x07here", "x" * 41):
+        with pytest.raises(TwoFactorError):
+            two_factor.start_enrollment(bad)
+
+    # Everything else survives percent-encoding, so punctuation and unicode are fine.
+    assert two_factor.start_enrollment("new\nline")["name"] == "new line"
+    assert two_factor.start_enrollment("Aradhya's iPhone")["name"] == "Aradhya's iPhone"
+    assert two_factor.start_enrollment("Phone (work)")["name"] == "Phone (work)"
+    assert two_factor.start_enrollment("ラップトップ")["name"] == "ラップトップ"
+
+
+def test_a_freed_name_can_be_reused(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _enroll(two_factor, "phone")
+
+    two_factor.remove_credential("phone")
+
+    assert two_factor.start_enrollment("phone")["name"] == "phone"
+
+
+def test_the_store_is_keyed_by_device_name(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _enroll(two_factor, "Ops laptop")
+
+    stored = json.loads((tmp_path / TotpCredentialStore.FILENAME).read_text())
+
+    assert list(stored) == ["Ops laptop"]
+    assert "label" not in stored["Ops laptop"]
+
+
+def test_removing_the_last_device_discards_recovery_codes(tmp_path: Path) -> None:
+    """Codes that bypass a gate which is now off protect nothing."""
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    phone, _ = _enroll(two_factor, "phone")
+    laptop, _ = _enroll(two_factor, "laptop")
+    codes = two_factor.generate_recovery_codes()
+
+    two_factor.remove_credential(phone)
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT
+
+    two_factor.remove_credential(laptop)
+    assert two_factor.unused_recovery_code_count == 0
+    assert BenchConfig.from_file(tmp_path / "bench.toml").admin.recovery_codes == []
+    assert two_factor.redeem_recovery_code(codes[0]) is False
+
+
+def test_asking_whether_two_factor_is_enabled_never_writes(tmp_path: Path) -> None:
+    """Every sign-in asks this, so it must stay a pure read."""
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    two_factor.generate_recovery_codes()
+    toml_path = tmp_path / "bench.toml"
+    before = toml_path.read_text()
+
+    assert two_factor.is_enabled is False
+
+    assert toml_path.read_text() == before
+    assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT

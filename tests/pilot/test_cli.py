@@ -155,6 +155,7 @@ def test_command_discovery_matches_baseline() -> None:
         "build",
         "enroll",
         "issue-site-token",
+        "revoke-totp",
         "run-patches",
         "set-central-config",
         "upgrade",
