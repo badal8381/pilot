@@ -135,8 +135,7 @@ class BenchConfig:
     def from_file(cls, path: Path) -> "BenchConfig":
         with path.open("rb") as fh:
             data = tomllib.load(fh)
-        common = CommonConfig.read(path.parent.parent)
-        config = cls._from_dict(data, common=common)
+        config = cls._from_dict(data, common=cls._read_common(path))
         config.validate()
         return config
 
@@ -329,6 +328,12 @@ class BenchConfig:
         return bench_dir.parent
 
     @classmethod
+    def _read_common(cls, bench_root: Path | None) -> CommonConfig | None:
+        """The host-shared config this bench merges with, or None if bench_root
+        is unknown (only _validate_serialized calls it without one)."""
+        return CommonConfig.read(cls._benches_root(bench_root)) if bench_root else None
+
+    @classmethod
     def exists(cls, bench_root: Path) -> bool:
         return cls.toml_path(bench_root).exists()
 
@@ -336,8 +341,8 @@ class BenchConfig:
     def read(cls, bench_root: Path, *, validate: bool = True, strict: bool = False) -> "BenchConfig":
         """Typed config. ``validate=False`` parses a half-configured file."""
         path = cls.toml_path(bench_root)
-        common = CommonConfig.read(cls._benches_root(bench_root))
-        config = cls._from_dict(Toml.loads(path.read_text(encoding="utf-8")), common=common, strict=strict)
+        data = Toml.loads(path.read_text(encoding="utf-8"))
+        config = cls._from_dict(data, common=cls._read_common(bench_root), strict=strict)
         if validate:
             config.validate()
         return config
@@ -352,8 +357,7 @@ class BenchConfig:
         """Wizard's flat-key settings dict (parse-only)."""
         with open(cls.toml_path(bench_root), "rb") as fh:
             data = tomllib.load(fh)
-        common = CommonConfig.read(cls._benches_root(bench_root))
-        return cls._from_dict(data, common=common)._to_flat_dict()
+        return cls._from_dict(data, common=cls._read_common(bench_root))._to_flat_dict()
 
     def write(self, bench_root: Path) -> None:
         atomic_write_private_text(self.toml_path(bench_root), self._validated_dumps(bench_root))
@@ -392,8 +396,7 @@ class BenchConfig:
         with exclusive_file_lock(path):
             if path.exists():
                 original = Toml.loads(path.read_text(encoding="utf-8"))
-                common = CommonConfig.read(cls._benches_root(bench_root))
-                config = cls._from_dict(original, common=common)
+                config = cls._from_dict(original, common=cls._read_common(bench_root))
                 config._apply_flat_settings(settings)
                 if name:
                     config.name = name
@@ -432,8 +435,7 @@ class BenchConfig:
 
     @classmethod
     def _validate_serialized(cls, content: str, bench_root: Path | None = None) -> None:
-        common = CommonConfig.read(cls._benches_root(bench_root)) if bench_root else None
-        config = cls._from_dict(Toml.loads(content), common=common)
+        config = cls._from_dict(Toml.loads(content), common=cls._read_common(bench_root))
         config.validate()
 
     def _validated_dumps(self, bench_root: Path | None = None) -> str:

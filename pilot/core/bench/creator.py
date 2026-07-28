@@ -82,34 +82,20 @@ class BenchCreator:
         """Pick a fresh port/password only the first time this host
         provisions the server; later benches inherit them automatically
         through BenchConfig's merge with common_config.toml."""
-        from pilot.config import BenchConfig
+        from pilot.config import BenchConfig, MariaDBConfig, PostgresConfig
 
         defaults = BenchConfig.default(benches_root=self.target_directory.parent)
         if self.db_type == "mariadb" and not defaults.mariadb.root_password:
-            settings["mariadb_port"] = self._pick_mariadb_port()
+            settings["mariadb_port"] = self._pick_free_port(MariaDBConfig().port)
             settings["mariadb_password"] = secrets.token_hex(nbytes=8)
         if self.db_type == "postgres" and not defaults.postgres.root_password:
-            settings["postgres_port"] = self._pick_postgres_port()
+            settings["postgres_port"] = self._pick_free_port(PostgresConfig().port)
             settings["postgres_password"] = secrets.token_hex(nbytes=8)
 
-    def _pick_mariadb_port(self) -> int:
-        """Pick the first free MariaDB port for the first bench on this host."""
-        from pilot.config import MariaDBConfig
+    def _pick_free_port(self, port: int) -> int:
+        """Pick the first free port at or after `port`, for the first bench on this host."""
         from pilot.managers.platform import is_macos
 
-        port = MariaDBConfig().port
-        if is_macos():
-            return port
-        while self._port_is_live(port):
-            port += 1
-        return port
-
-    def _pick_postgres_port(self) -> int:
-        """Pick the first free PostgreSQL port for the first bench on this host."""
-        from pilot.config import PostgresConfig
-        from pilot.managers.platform import is_macos
-
-        port = PostgresConfig().port
         if is_macos():
             return port
         while self._port_is_live(port):
