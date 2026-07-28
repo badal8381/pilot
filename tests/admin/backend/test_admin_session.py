@@ -1183,3 +1183,85 @@ def test_enrolling_past_the_limit_is_rejected(tmp_path: Path) -> None:
 
     assert response.status_code == 422
     assert str(MAX_ENROLLED_DEVICES) in response.get_json()["error"]["message"]
+
+
+def test_stores_read_files_written_before_the_record_shape(tmp_path: Path) -> None:
+    """A dropped revocation would silently make a revoked token valid again."""
+    import json
+
+    from admin.backend.internal.session import ActiveTokens, RevokedTokens
+
+    _client(tmp_path)  # lays down the bench this reads through
+    bench_root = tmp_path / "benches" / "current"
+    expires = int(time.time()) + 3600
+    # The old on-disk shape: a bare exp int rather than a record.
+    (bench_root / RevokedTokens.FILENAME).write_text(json.dumps({"old-jti": expires}))
+    (bench_root / ActiveTokens.FILENAME).write_text(json.dumps({"old-active": expires}))
+
+    bench = Bench(bench_root)
+    assert "old-jti" in RevokedTokens(bench)
+    assert ActiveTokens(bench).all()["old-active"]["exp"] == expires
+
+
+def test_a_legacy_revoked_token_is_still_rejected(tmp_path: Path) -> None:
+    import json
+
+    from admin.backend.internal.session import RevokedTokens, Session
+
+    client = _client(tmp_path)
+    bench_root = tmp_path / "benches" / "current"
+    token, jti = Session(Bench(bench_root)).issue_session_token()
+    path = bench_root / RevokedTokens.FILENAME
+    path.write_text(json.dumps({jti: int(time.time()) + 3600}))
+
+    client.set_cookie("sid", token)
+
+    assert client.get("/api/v1/auth/two-factor").status_code == 401
+
+
+def test_revoking_removes_the_jti_from_active(tmp_path: Path) -> None:
+    """It used to linger in .active-jtis.json, hidden only by a read-time filter."""
+    from admin.backend.internal.session import ActiveTokens, RevokedTokens, Session
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    _, jti = Session(bench).issue_session_token()
+    client.set_cookie("sid", _session_token())
+
+    assert client.post(f"/api/v1/auth/sessions/revoke/{jti}").status_code == 204
+
+    assert jti in RevokedTokens(bench)
+    assert jti not in ActiveTokens(bench).all()
+
+
+def test_revoking_all_clears_active(tmp_path: Path) -> None:
+    from admin.backend.internal.session import ActiveTokens, RevokedTokens, Session
+
+    bench_root = tmp_path / "benches" / "current"
+    client = _client(tmp_path)
+    bench = Bench(bench_root)
+    token, caller_jti = Session(bench).issue_session_token()
+    _, other_jti = Session(bench).issue_session_token()
+    client.set_cookie("sid", token)
+
+    assert client.post("/api/v1/auth/sessions/revoke/all").status_code == 200
+
+    revoked = RevokedTokens(bench)
+    assert other_jti in revoked and caller_jti in revoked
+    # Only the freshly issued replacement for the caller survives.
+    assert other_jti not in ActiveTokens(bench).all()
+    assert caller_jti not in ActiveTokens(bench).all()
+
+
+def test_discarding_an_unknown_jti_does_not_rewrite(tmp_path: Path) -> None:
+    from admin.backend.internal.session import ActiveTokens, Session
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    Session(bench).issue_session_token()
+    path = tmp_path / "benches" / "current" / ActiveTokens.FILENAME
+    before = path.stat().st_mtime_ns
+
+    ActiveTokens(bench).discard("never-existed")
+
+    assert path.stat().st_mtime_ns == before
