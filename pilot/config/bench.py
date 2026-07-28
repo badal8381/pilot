@@ -133,6 +133,10 @@ class BenchConfig:
 
     @classmethod
     def from_file(cls, path: Path) -> "BenchConfig":
+        """Read a bench.toml at an arbitrary path. Host-shared fields only
+        merge in correctly when `path` sits at the real `<benches_root>/
+        <bench>/bench.toml` depth (see `_benches_root`) - a standalone file
+        elsewhere merges with an empty CommonConfig instead."""
         with path.open("rb") as fh:
             data = tomllib.load(fh)
         config = cls._from_dict(data, common=cls._read_common(path))
