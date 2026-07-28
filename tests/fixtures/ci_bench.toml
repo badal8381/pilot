@@ -14,11 +14,6 @@ name = "blog"
 repo = "https://github.com/frappe/blog"
 branch = "develop"
 
-[mariadb]
-host = "localhost"
-port = 3306
-root_password = "admin"
-
 [redis]
 cache_port = 13000
 queue_port = 11000

@@ -46,6 +46,7 @@ jobs:
         run: |
           mkdir -p benches/ci-bench
           cp tests/fixtures/ci_bench.toml benches/ci-bench/bench.toml
+          cp tests/fixtures/ci_common_config.toml benches/common_config.toml
 
       - name: bench init
         run: bench init -b ci-bench
