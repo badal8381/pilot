@@ -1,0 +1,13 @@
+/* The embed's whole stylesheet, adopted into the shadow root.
+ * Not frappe-ui/style.css: that is these same directives plus an Inter @font-face
+ * that adopted sheets ignore and Desk already serves. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Frappe UI's conic-gradient spinner repaints the shadow host every frame in
+ * Safari, which makes the dialog flash. App actions use the local transform
+ * spinner instead; other busy controls retain a stable disabled indicator. */
+.fui-spinner {
+  animation: none !important;
+}
