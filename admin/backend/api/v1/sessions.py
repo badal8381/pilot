@@ -6,10 +6,10 @@ from flask import Blueprint, current_app, g, jsonify
 
 from admin.backend.api.responses import error_response, no_content_response
 from admin.backend.internal.session import Session
-from admin.backend.middleware import rate_limit, set_session_cookie
+from admin.backend.middleware import client_ip, rate_limit, set_session_cookie
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
-from pilot.core.bench.settings import active_tokens_payload, revoked_tokens_payload
+from pilot.core.bench.settings import active_tokens_payload
 
 sessions_bp = Blueprint("sessions", __name__)
 
@@ -24,7 +24,6 @@ def list_sessions():
     return jsonify(
         {
             "active_tokens": active_tokens_payload(config, bench_root),
-            "revoked_tokens": revoked_tokens_payload(config, bench_root),
             "current_jti": (getattr(g, "jwt_claims", None) or {}).get("jti"),
         }
     )
@@ -37,7 +36,7 @@ def revoke_all_sessions():
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
     session = Session(bench)
     revoked = session.revoke_all()
-    token, jti = session.issue_session_token()
+    token, jti = session.issue_session_token(ip=client_ip())
     bench.audit_action(
         "session",
         {"event": "other_sessions_revoked", "jti": jti, "revoked_sessions": revoked},

@@ -17,7 +17,7 @@ from admin.backend.api.v1.setup.state import (
     setup_handoff_task,
     wizard_marker_path,
 )
-from admin.backend.middleware import allow_during_setup, set_session_cookie
+from admin.backend.middleware import allow_during_setup, client_ip, set_session_cookie
 from pilot.config import BenchConfig
 from pilot.config.bench import FRAMEWORK_BRANCHES
 from pilot.core.bench import Bench
@@ -118,7 +118,7 @@ def _issue_setup_session(resp, toml_path: Path) -> None:
     from admin.backend.internal.session import Session
 
     bench = Bench(toml_path.parent)
-    token, jti = Session(bench).issue_session_token()
+    token, jti = Session(bench).issue_session_token(ip=client_ip())
     set_session_cookie(resp, token, current_app.config["SESSION_COOKIE_SECURE"])
     bench.audit_action("session", {"event": "issued", "jti": jti, "scope": "bench", "via": "setup"})
 

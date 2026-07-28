@@ -117,6 +117,28 @@ def test_delete_session_clears_cookie(tmp_path: Path) -> None:
     assert client.get("/api/v1/session").get_json() == {"authenticated": False}
 
 
+def test_delete_session_revokes_the_token(tmp_path: Path) -> None:
+    from admin.backend.internal.session import RevokedTokens, Session
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    token, jti = Session(bench).issue_session_token()
+    client.set_cookie("sid", token)
+
+    response = client.delete("/api/v1/session")
+
+    assert response.status_code == 204
+    assert jti in RevokedTokens(bench)
+
+
+def test_delete_session_without_a_cookie_still_clears_it(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    response = client.delete("/api/v1/session")
+
+    assert response.status_code == 204
+
+
 def test_bootstrap_reports_bench_db_type(tmp_path: Path) -> None:
     # The engine is a bench-wide property; the admin reads it from bootstrap to
     # show one bench-level badge instead of a per-site one.
