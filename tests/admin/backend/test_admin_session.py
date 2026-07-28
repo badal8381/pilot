@@ -793,3 +793,98 @@ def test_change_admin_password_checks_scope_independently_of_middleware(
 
     assert response.status_code == 403
     assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.password == "secret"
+
+
+def _two_factor(bench_root: Path):
+    from admin.backend.internal.two_factor_authentication import TwoFactorAuthentication
+
+    return TwoFactorAuthentication(Bench(bench_root))
+
+
+def _current_code(bench_root: Path) -> str:
+    import pyotp
+
+    return pyotp.TOTP(_two_factor(bench_root).admin_config.totp_secret).now()
+
+
+def test_two_factor_status_starts_disabled(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    body = client.get("/api/v1/settings/two-factor").get_json()
+
+    assert body == {"enabled": False, "enrollment_started": False}
+
+
+def test_two_factor_enrollment_returns_secret_and_provisioning_url(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    body = client.post("/api/v1/settings/two-factor/enrollment").get_json()
+
+    assert body["secret"]
+    assert body["provisioning_url"].startswith("otpauth://totp/")
+    assert body["secret"] in body["provisioning_url"]
+
+
+def test_two_factor_is_enabled_only_with_a_valid_code(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    bench_root = tmp_path / "benches" / "current"
+    client.post("/api/v1/settings/two-factor/enrollment")
+
+    rejected = client.post("/api/v1/settings/two-factor", json={"otp": "000000"})
+    assert rejected.status_code == 422
+    assert rejected.get_json()["error"]["code"] == "invalid_otp"
+
+    accepted = client.post("/api/v1/settings/two-factor", json={"otp": _current_code(bench_root)})
+    assert accepted.status_code == 200
+    assert accepted.get_json() == {"enabled": True, "enrollment_started": True}
+
+
+def test_two_factor_enrollment_is_refused_once_enabled(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    bench_root = tmp_path / "benches" / "current"
+    client.post("/api/v1/settings/two-factor/enrollment")
+    client.post("/api/v1/settings/two-factor", json={"otp": _current_code(bench_root)})
+
+    refused = client.post("/api/v1/settings/two-factor/enrollment")
+
+    assert refused.status_code == 409
+    assert refused.get_json()["error"]["code"] == "two_factor_already_enabled"
+
+
+def test_disabling_two_factor_requires_the_password(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    bench_root = tmp_path / "benches" / "current"
+    client.post("/api/v1/settings/two-factor/enrollment")
+    client.post("/api/v1/settings/two-factor", json={"otp": _current_code(bench_root)})
+
+    assert client.delete("/api/v1/settings/two-factor", json={"password": "wrong"}).status_code == 401
+    assert _two_factor(bench_root).is_enabled is True
+
+    assert client.delete("/api/v1/settings/two-factor", json={"password": "secret"}).status_code == 204
+    assert _two_factor(bench_root).is_enabled is False
+
+
+def test_two_factor_routes_require_authentication(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+
+    assert client.get("/api/v1/settings/two-factor").status_code == 401
+    assert client.post("/api/v1/settings/two-factor/enrollment").status_code == 401
+    assert client.post("/api/v1/settings/two-factor", json={"otp": "000000"}).status_code == 401
+
+
+def test_two_factor_enable_is_audited(tmp_path: Path) -> None:
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    bench_root = tmp_path / "benches" / "current"
+    client.post("/api/v1/settings/two-factor/enrollment")
+    client.post("/api/v1/settings/two-factor", json={"otp": _current_code(bench_root)})
+
+    events = [e["event"] for e in AuditLog(Bench(bench_root)).entries(entry_type="session")]
+    assert "two_factor_enabled" in events

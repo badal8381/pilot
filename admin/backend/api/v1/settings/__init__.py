@@ -5,9 +5,13 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, g, jsonify, request
 
-from admin.backend.api.responses import error_response
+from admin.backend.api.responses import error_response, no_content_response
 from admin.backend.api.v1.settings.config import ConfigPatcher
 from admin.backend.internal.session import Session
+from admin.backend.internal.two_factor_authentication import (
+    TwoFactorAlreadyEnabled,
+    TwoFactorAuthentication,
+)
 from admin.backend.middleware import client_ip, rate_limit, set_session_cookie
 from pilot.config import (
     WAF_MODES,
@@ -245,6 +249,56 @@ def change_admin_password():
     response = jsonify({"revoked_sessions": revoked})
     set_session_cookie(response, token, current_app.config["SESSION_COOKIE_SECURE"])
     return response
+
+
+def two_factor_payload(bench: Bench) -> dict:
+    two_factor = TwoFactorAuthentication(bench)
+    return {"enabled": two_factor.is_enabled, "enrollment_started": two_factor.has_secret}
+
+
+@settings_bp.get("/two-factor")
+def get_two_factor():
+    return jsonify(two_factor_payload(Bench(Path(current_app.config["BENCH_ROOT"]))))
+
+
+@settings_bp.post("/two-factor/enrollment")
+@rate_limit(10, 60, user_ip=True)
+def start_two_factor_enrollment():
+    """Hand back the setup key so an authenticator app can be set up."""
+    two_factor = TwoFactorAuthentication(Bench(Path(current_app.config["BENCH_ROOT"])))
+    try:
+        provisioning_url = two_factor.start_enrollment()
+    except TwoFactorAlreadyEnabled as error:
+        return error_response("two_factor_already_enabled", str(error), 409)
+    return jsonify({"provisioning_url": provisioning_url, "secret": two_factor.ensure_totp_secret()})
+
+
+@settings_bp.post("/two-factor")
+@rate_limit(5, 60, user_ip=True)
+def enable_two_factor():
+    """Turn 2FA on once a code proves the secret reached an authenticator."""
+    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return error_response("malformed_request", "Expected a JSON object.", 400)
+    if not TwoFactorAuthentication(bench).confirm_enrollment(str(data.get("otp", ""))):
+        return error_response("invalid_otp", "That code is not valid. Try the next one.", 422)
+    bench.audit_action("session", {"event": "two_factor_enabled"})
+    return jsonify(two_factor_payload(bench))
+
+
+@settings_bp.delete("/two-factor")
+@rate_limit(5, 60, user_ip=True)
+def disable_two_factor():
+    """Turn 2FA off. The password is re-checked so a stolen session cannot drop the factor."""
+    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
+    data = request.get_json(silent=True)
+    password = str(data.get("password", "")) if isinstance(data, dict) else ""
+    if not hmac.compare_digest(password, bench.config.admin.password):
+        return error_response("invalid_credentials", "Incorrect password.", 401)
+    TwoFactorAuthentication(bench).disable()
+    bench.audit_action("session", {"event": "two_factor_disabled"})
+    return no_content_response()
 
 
 @settings_bp.patch("")
