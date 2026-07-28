@@ -5,12 +5,12 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, g, jsonify, request
 
-from admin.backend.api.responses import error_response, no_content_response
+from admin.backend.api.responses import error_response
 from admin.backend.api.v1.settings.config import ConfigPatcher
 from admin.backend.internal.session import Session
 from admin.backend.internal.two_factor_authentication import (
-    TwoFactorAlreadyEnabled,
     TwoFactorAuthentication,
+    TwoFactorError,
 )
 from admin.backend.middleware import client_ip, rate_limit, set_session_cookie
 from pilot.config import (
@@ -253,7 +253,13 @@ def change_admin_password():
 
 def two_factor_payload(bench: Bench) -> dict:
     two_factor = TwoFactorAuthentication(bench)
-    return {"enabled": two_factor.is_enabled, "enrollment_started": two_factor.has_secret}
+    return {"enabled": two_factor.is_enabled, "credentials": two_factor.get_credentials()}
+
+
+def _password_matches(bench: Bench, data: dict | None) -> bool:
+    """Re-check the password, so a stolen session alone cannot change the second factor."""
+    password = str(data.get("password", "")) if isinstance(data, dict) else ""
+    return hmac.compare_digest(password, bench.config.admin.password)
 
 
 @settings_bp.get("/two-factor")
@@ -264,41 +270,58 @@ def get_two_factor():
 @settings_bp.post("/two-factor/enrollment")
 @rate_limit(10, 60, user_ip=True)
 def start_two_factor_enrollment():
-    """Hand back the setup key so an authenticator app can be set up."""
-    two_factor = TwoFactorAuthentication(Bench(Path(current_app.config["BENCH_ROOT"])))
-    try:
-        provisioning_url = two_factor.start_enrollment()
-    except TwoFactorAlreadyEnabled as error:
-        return error_response("two_factor_already_enabled", str(error), 409)
-    return jsonify({"provisioning_url": provisioning_url, "secret": two_factor.ensure_totp_secret()})
-
-
-@settings_bp.post("/two-factor")
-@rate_limit(5, 60, user_ip=True)
-def enable_two_factor():
-    """Turn 2FA on once a code proves the secret reached an authenticator."""
+    """Register a device and hand back its setup key, shown only here."""
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("malformed_request", "Expected a JSON object.", 400)
-    if not TwoFactorAuthentication(bench).confirm_enrollment(str(data.get("otp", ""))):
+    if not _password_matches(bench, data):
+        return error_response("invalid_credentials", "Incorrect password.", 401)
+    try:
+        enrollment = TwoFactorAuthentication(bench).start_enrollment(str(data.get("label", "")))
+    except TwoFactorError as error:
+        return error_response("invalid_label", str(error), 422)
+    return jsonify(enrollment)
+
+
+@settings_bp.post("/two-factor/<credential_id>")
+@rate_limit(5, 60, user_ip=True)
+def confirm_two_factor_credential(credential_id: str):
+    """Activate a device once a code proves its setup key was entered correctly."""
+    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return error_response("malformed_request", "Expected a JSON object.", 400)
+    two_factor = TwoFactorAuthentication(bench)
+    was_enabled = two_factor.is_enabled
+    if not two_factor.confirm_enrollment(credential_id, str(data.get("otp", ""))):
         return error_response("invalid_otp", "That code is not valid. Try the next one.", 422)
-    bench.audit_action("session", {"event": "two_factor_enabled"})
+    bench.audit_action("session", {"event": "two_factor_device_added", "credential": credential_id})
+    if not was_enabled:
+        # Tokens issued before 2FA existed would otherwise skip it until they expired.
+        Session(bench).revoke_all()
     return jsonify(two_factor_payload(bench))
 
 
-@settings_bp.delete("/two-factor")
+@settings_bp.delete("/two-factor/<credential_id>")
 @rate_limit(5, 60, user_ip=True)
-def disable_two_factor():
-    """Turn 2FA off. The password is re-checked so a stolen session cannot drop the factor."""
+def remove_two_factor_credential(credential_id: str):
+    """Remove a device. Dropping the last confirmed one turns 2FA off."""
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-    data = request.get_json(silent=True)
-    password = str(data.get("password", "")) if isinstance(data, dict) else ""
-    if not hmac.compare_digest(password, bench.config.admin.password):
+    if not _password_matches(bench, request.get_json(silent=True)):
         return error_response("invalid_credentials", "Incorrect password.", 401)
-    TwoFactorAuthentication(bench).disable()
-    bench.audit_action("session", {"event": "two_factor_disabled"})
-    return no_content_response()
+    two_factor = TwoFactorAuthentication(bench)
+    if not two_factor.remove_credential(credential_id):
+        return error_response("unknown_credential", "No such device.", 404)
+    bench.audit_action(
+        "session",
+        {
+            "event": "two_factor_device_removed",
+            "credential": credential_id,
+            "still_enabled": two_factor.is_enabled,
+        },
+    )
+    return jsonify(two_factor_payload(bench))
 
 
 @settings_bp.patch("")

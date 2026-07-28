@@ -21,9 +21,6 @@ class AdminConfig:
     domain: str = ""
     tls: bool = False
     allow_bench_management: bool = True
-    totp_secret: str = ""
-    # Set only once a code proves the secret reached an authenticator app.
-    totp_enabled: bool = False
 
     @classmethod
     def from_dict(cls, data: dict) -> "AdminConfig":
@@ -33,8 +30,6 @@ class AdminConfig:
             enabled=data.get("enabled", False),
             password=data.get("password", ""),
             jwt_secret=data.get("jwt_secret", ""),
-            totp_secret=data.get("totp_secret", ""),
-            totp_enabled=data.get("totp_enabled", False),
             jwks_url=data.get("jwks_url", ""),
             jwks_audience=data.get("jwks_audience", ""),
             domain=data.get("domain", ""),

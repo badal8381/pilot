@@ -496,8 +496,6 @@ class BenchConfig:
         }
         optional_admin = {
             "jwt_secret": self.admin.jwt_secret,
-            "totp_secret": self.admin.totp_secret,
-            "totp_enabled": self.admin.totp_enabled,
             "jwks_url": self.admin.jwks_url,
             "jwks_audience": self.admin.jwks_audience,
         }

@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import json
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pyotp
 import pytest
 
 from admin.backend.internal.two_factor_authentication import (
-    TwoFactorAlreadyEnabled,
+    PENDING_TTL,
+    TotpCredentialStore,
     TwoFactorAuthentication,
+    TwoFactorError,
 )
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
@@ -20,70 +24,96 @@ def _bench(tmp_path: Path) -> Bench:
     return Bench(BenchConfig.from_file(toml_path), tmp_path)
 
 
-def _code(two_factor: TwoFactorAuthentication, at: int | None = None) -> str:
-    totp = pyotp.TOTP(two_factor.admin_config.totp_secret)
+def _enroll(two_factor: TwoFactorAuthentication, label: str = "phone") -> tuple[str, str]:
+    """Enroll and confirm a device, returning its id and secret.
+
+    Confirms with the previous step's code so the current one stays unspent: confirmation
+    burns the step it used, and re-sending that code would be a replay.
+    """
+    enrollment = two_factor.start_enrollment(label)
+    code = _code(enrollment["secret"], at=int(time.time()) - 30)
+    assert two_factor.confirm_enrollment(enrollment["id"], code)
+    return enrollment["id"], enrollment["secret"]
+
+
+def _code(secret: str, at: int | None = None) -> str:
+    totp = pyotp.TOTP(secret)
     return totp.at(at) if at else totp.now()
 
 
 def test_secret_is_valid_base32_and_usable(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    secret = two_factor.ensure_totp_secret()
+
+    enrollment = two_factor.start_enrollment("phone")
 
     # pyotp only rejects a non-base32 secret when a code is generated, not at construction.
-    assert pyotp.TOTP(secret).now()
-    assert two_factor.verify_otp(_code(two_factor))
+    assert pyotp.TOTP(enrollment["secret"]).now()
 
 
-def test_secret_is_generated_once_and_persisted(tmp_path: Path) -> None:
-    bench_root = tmp_path
-    first = TwoFactorAuthentication(_bench(bench_root)).ensure_totp_secret()
-
-    reread = BenchConfig.from_file(bench_root / "bench.toml")
-    assert reread.admin.totp_secret == first
-    # A second object must not mint a new secret; an enrolled phone would stop working.
-    assert TwoFactorAuthentication(Bench(reread, bench_root)).ensure_totp_secret() == first
-
-
-def test_constructing_does_not_write_a_secret(tmp_path: Path) -> None:
+def test_nothing_is_written_until_enrollment_starts(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
 
-    assert two_factor.has_secret is False
     assert two_factor.is_enabled is False
-    assert BenchConfig.from_file(tmp_path / "bench.toml").admin.totp_secret == ""
+    assert two_factor.get_credentials() == []
+    assert not (tmp_path / TotpCredentialStore.FILENAME).exists()
 
 
-def test_enrollment_is_idempotent(tmp_path: Path) -> None:
+def test_enrollment_requires_a_label(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
 
-    assert two_factor.start_enrollment() == two_factor.start_enrollment()
+    with pytest.raises(TwoFactorError):
+        two_factor.start_enrollment("   ")
 
 
 def test_two_factor_is_only_enabled_after_a_valid_code(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    two_factor.start_enrollment()
+    enrollment = two_factor.start_enrollment("phone")
 
-    assert two_factor.confirm_enrollment("000000") is False
+    assert two_factor.confirm_enrollment(enrollment["id"], "000000") is False
     assert two_factor.is_enabled is False
 
-    assert two_factor.confirm_enrollment(_code(two_factor)) is True
+    assert two_factor.confirm_enrollment(enrollment["id"], _code(enrollment["secret"])) is True
     assert two_factor.is_enabled is True
-    assert BenchConfig.from_file(tmp_path / "bench.toml").admin.totp_enabled is True
 
 
-def test_enrollment_cannot_be_restarted_once_enabled(tmp_path: Path) -> None:
-    """Re-issuing the secret would let a stolen session clone the second factor."""
+def test_a_pending_credential_cannot_authenticate(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    two_factor.start_enrollment()
-    two_factor.confirm_enrollment(_code(two_factor))
+    enrollment = two_factor.start_enrollment("phone")
 
-    with pytest.raises(TwoFactorAlreadyEnabled):
-        two_factor.start_enrollment()
+    assert two_factor.verify_otp(_code(enrollment["secret"])) is False
+
+
+def test_a_credential_cannot_be_confirmed_twice(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    credential_id, secret = _enroll(two_factor)
+
+    assert two_factor.confirm_enrollment(credential_id, _code(secret)) is False
+
+
+def test_each_device_has_its_own_secret(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+
+    _, first = _enroll(two_factor, "phone")
+    _, second = _enroll(two_factor, "laptop")
+
+    assert first != second
+
+
+def test_two_devices_can_sign_in_within_the_same_window(tmp_path: Path) -> None:
+    """The reason for per-device secrets: one shared secret would serialise logins."""
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _, first = _enroll(two_factor, "phone")
+    _, second = _enroll(two_factor, "laptop")
+    moment = int(time.time())
+
+    assert two_factor.verify_otp(_code(first, at=moment)) is True
+    assert two_factor.verify_otp(_code(second, at=moment)) is True
 
 
 def test_a_code_cannot_be_used_twice(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    two_factor.start_enrollment()
-    code = _code(two_factor)
+    _, secret = _enroll(two_factor)
+    code = _code(secret)
 
     assert two_factor.verify_otp(code) is True
     assert two_factor.verify_otp(code) is False
@@ -92,65 +122,135 @@ def test_a_code_cannot_be_used_twice(tmp_path: Path) -> None:
 def test_an_earlier_code_is_rejected_after_a_later_one(tmp_path: Path) -> None:
     """Replay protection burns the time step, not just the code string."""
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    two_factor.start_enrollment()
+    _, secret = _enroll(two_factor)
     now = int(time.time())
-    previous = _code(two_factor, at=now - 30)
 
-    assert two_factor.verify_otp(_code(two_factor, at=now)) is True
-    assert two_factor.verify_otp(previous) is False
+    # A later in-window code first, then an earlier one that is still inside the window.
+    assert two_factor.verify_otp(_code(secret, at=now + 30)) is True
+    assert two_factor.verify_otp(_code(secret, at=now)) is False
+
+
+def test_burning_one_device_does_not_block_another(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _, first = _enroll(two_factor, "phone")
+    _, second = _enroll(two_factor, "laptop")
+    now = int(time.time())
+
+    assert two_factor.verify_otp(_code(first, at=now)) is True
+    assert two_factor.verify_otp(_code(first, at=now)) is False
+    assert two_factor.verify_otp(_code(second, at=now)) is True
+
+
+def test_concurrent_use_of_one_code_is_accepted_once(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _, secret = _enroll(two_factor)
+    code = _code(secret)
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(lambda _: two_factor.verify_otp(code), range(8)))
+
+    assert sum(results) == 1
 
 
 def test_clock_drift_within_one_step_is_accepted(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    two_factor.start_enrollment()
+    enrollment = two_factor.start_enrollment("phone")
+    two_factor.confirm_enrollment(enrollment["id"], _code(enrollment["secret"], at=int(time.time()) - 30))
 
-    assert two_factor.verify_otp(_code(two_factor, at=int(time.time()) - 30)) is True
+    assert two_factor.is_enabled is True
 
 
 def test_codes_beyond_the_drift_window_are_rejected(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    two_factor.start_enrollment()
+    _, secret = _enroll(two_factor)
 
-    assert two_factor.verify_otp(_code(two_factor, at=int(time.time()) - 120)) is False
+    assert two_factor.verify_otp(_code(secret, at=int(time.time()) - 120)) is False
 
 
-def test_verification_without_a_secret_fails_closed(tmp_path: Path) -> None:
+def test_verification_without_any_device_fails_closed(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
 
     assert two_factor.verify_otp("000000") is False
     assert two_factor.verify_otp("") is False
 
 
-def test_disable_clears_the_secret_and_replay_state(tmp_path: Path) -> None:
+def test_removing_the_last_device_turns_two_factor_off(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    two_factor.start_enrollment()
-    two_factor.confirm_enrollment(_code(two_factor))
+    phone, _ = _enroll(two_factor, "phone")
+    laptop, laptop_secret = _enroll(two_factor, "laptop")
 
-    two_factor.disable()
+    assert two_factor.remove_credential(phone) is True
+    assert two_factor.is_enabled is True
 
+    assert two_factor.remove_credential(laptop) is True
     assert two_factor.is_enabled is False
-    assert two_factor.has_secret is False
-    assert not (tmp_path / TwoFactorAuthentication.TIMESTEP_FILENAME).exists()
-    stored = BenchConfig.from_file(tmp_path / "bench.toml").admin
-    assert stored.totp_secret == ""
-    assert stored.totp_enabled is False
+    assert two_factor.verify_otp(_code(laptop_secret)) is False
 
 
-def test_re_enrolling_after_disable_issues_a_new_secret(tmp_path: Path) -> None:
-    two_factor = TwoFactorAuthentication(_bench(tmp_path))
-    original = two_factor.ensure_totp_secret()
-    two_factor.confirm_enrollment(_code(two_factor))
-
-    two_factor.disable()
-
-    assert two_factor.ensure_totp_secret() != original
-
-
-def test_provisioning_url_names_the_bench(tmp_path: Path) -> None:
+def test_removing_an_unknown_device_reports_failure(tmp_path: Path) -> None:
     two_factor = TwoFactorAuthentication(_bench(tmp_path))
 
-    url = two_factor.start_enrollment()
+    assert two_factor.remove_credential("nope") is False
 
-    assert url.startswith("otpauth://totp/")
-    assert f"issuer=Pilot%20-%20{tmp_path.name}" in url
-    assert two_factor.admin_config.totp_secret in url
+
+def test_credentials_never_expose_secrets(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    _enroll(two_factor, "phone")
+    two_factor.start_enrollment("pending laptop")
+
+    rows = two_factor.get_credentials()
+
+    assert {row["label"] for row in rows} == {"phone", "pending laptop"}
+    assert {row["confirmed"] for row in rows} == {True, False}
+    assert not any("secret" in row for row in rows)
+
+
+def test_abandoned_enrollments_are_pruned(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    two_factor = TwoFactorAuthentication(bench)
+    stale = two_factor.start_enrollment("never confirmed")["id"]
+    confirmed, _ = _enroll(two_factor, "phone")
+
+    path = tmp_path / TotpCredentialStore.FILENAME
+    entries = json.loads(path.read_text())
+    entries[stale]["created_at"] = int(time.time()) - PENDING_TTL - 1
+    path.write_text(json.dumps(entries))
+
+    # Filtered out of every read, without the read path rewriting the file.
+    assert set(two_factor.store.all()) == {confirmed}
+    assert set(json.loads(path.read_text())) == {stale, confirmed}
+
+    # The next write is what actually drops it from disk.
+    two_factor.start_enrollment("laptop")
+    assert stale not in json.loads(path.read_text())
+
+
+def test_a_confirmed_credential_is_never_pruned(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    two_factor = TwoFactorAuthentication(bench)
+    confirmed, _ = _enroll(two_factor, "phone")
+
+    path = tmp_path / TotpCredentialStore.FILENAME
+    entries = json.loads(path.read_text())
+    entries[confirmed]["created_at"] = int(time.time()) - PENDING_TTL * 10
+    path.write_text(json.dumps(entries))
+
+    assert set(two_factor.store.all()) == {confirmed}
+
+
+def test_provisioning_url_names_the_bench_and_device(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+
+    enrollment = two_factor.start_enrollment("Ops laptop")
+
+    assert enrollment["provisioning_url"].startswith("otpauth://totp/")
+    assert f"issuer=Pilot%20-%20{tmp_path.name}" in enrollment["provisioning_url"]
+    assert enrollment["secret"] in enrollment["provisioning_url"]
+    assert "Ops%20laptop" in enrollment["provisioning_url"]
+
+
+def test_state_survives_a_fresh_object(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    _enroll(TwoFactorAuthentication(bench), "phone")
+
+    assert TwoFactorAuthentication(_bench(tmp_path)).is_enabled is True

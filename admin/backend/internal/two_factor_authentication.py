@@ -1,135 +1,213 @@
-"""Bench-wide TOTP second factor: enrollment, verification, and replay protection.
+"""Bench-wide TOTP second factor.
 
-One shared secret per bench, matching the single shared admin password. Every enrolled
-device produces the same codes, so a code is treated as single-use across the bench.
+Credentials are per-device rather than per-bench: the admin password is shared, so the
+only way two people can sign in during the same 30-second window is to hold different
+secrets. Each credential burns its own time step, which keeps replay protection intact
+without serialising logins.
 """
 
 from __future__ import annotations
 
 import hmac
+import json
+import secrets
 import time
 
 import pyotp
 
-from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
 
 # One step either side of now, so a phone whose clock drifts slightly still works.
 DRIFT_STEPS = 1
+# An enrollment nobody completes is dropped, so an abandoned secret cannot linger.
+PENDING_TTL = 24 * 3600
 
 
-class TwoFactorAlreadyEnabled(Exception):
-    """Raised when enrollment is restarted while 2FA is already on."""
+class TwoFactorError(Exception):
+    """Raised when an enrollment request cannot be honoured."""
+
+
+class TotpCredentialStore:
+    """A private, lock-guarded ``{id: credential}`` file.
+
+    Unconfirmed entries past ``PENDING_TTL`` are dropped on every read, and every gunicorn
+    worker shares one view through an exclusive lock.
+    """
+
+    FILENAME = ".totp-credentials.json"
+
+    def __init__(self, bench: Bench) -> None:
+        self._path = bench.path / self.FILENAME
+
+    def all(self) -> dict[str, dict]:
+        """Live credentials. Abandoned enrollments are filtered out, not rewritten.
+
+        Verification reads this on every sign-in, so it must never write: the writers
+        below already drop expired entries when they rewrite the file anyway.
+        """
+        return self._prune(self._load_raw())
+
+    def confirmed(self) -> dict[str, dict]:
+        """Credentials someone has proved they hold. Only these can authenticate."""
+        return {key: entry for key, entry in self.all().items() if entry.get("confirmed_at")}
+
+    def add(self, label: str, secret: str) -> str:
+        """Register a pending credential and return its id."""
+        credential_id = secrets.token_urlsafe(8)
+        with exclusive_file_lock(self._path):
+            entries = self._prune(self._load_raw())
+            entries[credential_id] = {
+                "label": label,
+                "secret": secret,
+                "created_at": int(time.time()),
+                "confirmed_at": None,
+                "last_timestep": 0,
+                "last_used_at": None,
+            }
+            self._write(entries)
+        return credential_id
+
+    def confirm(self, credential_id: str, timestep: int) -> bool:
+        """Mark a credential usable, burning the time step that proved it."""
+        with exclusive_file_lock(self._path):
+            entries = self._prune(self._load_raw())
+            entry = entries.get(credential_id)
+            if entry is None or entry.get("confirmed_at"):
+                return False
+            now = int(time.time())
+            entry.update(confirmed_at=now, last_timestep=timestep, last_used_at=now)
+            self._write(entries)
+        return True
+
+    def burn_timestep(self, credential_id: str, timestep: int) -> bool:
+        """Spend a time step for one credential, rejecting any step already used.
+
+        Checked and written under a single lock: two workers reading the same stale value
+        would otherwise both accept the same code.
+        """
+        with exclusive_file_lock(self._path):
+            entries = self._prune(self._load_raw())
+            entry = entries.get(credential_id)
+            if entry is None or timestep <= int(entry.get("last_timestep", 0)):
+                return False
+            entry.update(last_timestep=timestep, last_used_at=int(time.time()))
+            self._write(entries)
+        return True
+
+    def remove(self, credential_id: str) -> bool:
+        with exclusive_file_lock(self._path):
+            entries = self._prune(self._load_raw())
+            if entries.pop(credential_id, None) is None:
+                return False
+            self._write(entries)
+        return True
+
+    def _write(self, entries: dict[str, dict]) -> None:
+        replace_private_text_locked(self._path, json.dumps(entries))
+
+    def _load_raw(self) -> dict[str, dict]:
+        """Raw ``{id: credential}`` from disk; empty if missing or unreadable."""
+        try:
+            data = json.loads(self._path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, ValueError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    @staticmethod
+    def _prune(entries: dict[str, dict]) -> dict[str, dict]:
+        cutoff = int(time.time()) - PENDING_TTL
+        return {
+            key: entry
+            for key, entry in entries.items()
+            if isinstance(entry, dict)
+            and (entry.get("confirmed_at") or int(entry.get("created_at", 0)) > cutoff)
+        }
 
 
 class TwoFactorAuthentication:
-    """Issues and verifies this bench's TOTP codes.
+    """Enrolls devices and verifies their codes for one bench.
 
-    The secret is written once and never rotated implicitly: it lives on enrolled phones,
-    so regenerating it silently would lock every one of them out.
+    A secret is written once per device and never rotated implicitly: it lives on that
+    phone, so regenerating it silently would lock the device out.
     """
-
-    TIMESTEP_FILENAME = ".totp-timestep"
 
     def __init__(self, bench: Bench) -> None:
         self.bench = bench
-        self.admin_config = bench.config.admin
-        self._timestep_path = bench.path / self.TIMESTEP_FILENAME
+        self.store = TotpCredentialStore(bench)
 
     @property
     def is_enabled(self) -> bool:
-        """Whether a confirmed second factor is required to sign in."""
-        return bool(self.admin_config.totp_enabled and self.admin_config.totp_secret)
+        """Whether a second factor is required to sign in."""
+        return bool(self.store.confirmed())
 
-    @property
-    def has_secret(self) -> bool:
-        """A secret exists, but nobody has proved they can produce a code from it yet."""
-        return bool(self.admin_config.totp_secret)
+    def get_credentials(self) -> list[dict]:
+        """Public rows for the settings UI. Never exposes a secret."""
+        rows = [
+            {
+                "id": credential_id,
+                "label": entry.get("label", ""),
+                "confirmed": bool(entry.get("confirmed_at")),
+                "created_at": entry.get("created_at"),
+                "last_used_at": entry.get("last_used_at"),
+            }
+            for credential_id, entry in self.store.all().items()
+        ]
+        return sorted(rows, key=lambda row: row["created_at"] or 0)
 
-    @property
-    def provisioning_url(self) -> str:
-        """The ``otpauth://`` URI an authenticator app consumes."""
-        return self._totp.provisioning_uri(
-            name="admin",
-            issuer_name=f"Pilot - {self.bench.config.name}",
-        )
+    def start_enrollment(self, label: str) -> dict:
+        """Create a pending credential and return what an authenticator app needs.
 
-    def start_enrollment(self) -> str:
-        """Create the secret if absent and return its provisioning URI.
-
-        Refuses once 2FA is on: handing the secret back to an already-authenticated
-        session would let a stolen session clone the second factor onto another device.
+        The secret is returned exactly here. Once confirmed it is never handed back, so a
+        stolen session cannot clone an existing device's factor.
         """
-        if self.is_enabled:
-            raise TwoFactorAlreadyEnabled("Two-factor authentication is already enabled.")
-        self.ensure_totp_secret()
-        return self.provisioning_url
+        label = label.strip()
+        if not label:
+            raise TwoFactorError("A device name is required.")
+        secret = pyotp.random_base32()
+        credential_id = self.store.add(label, secret)
+        return {
+            "id": credential_id,
+            "secret": secret,
+            "provisioning_url": self._provisioning_url(label, secret),
+        }
 
-    def confirm_enrollment(self, otp: str) -> bool:
-        """Turn 2FA on, but only once a code proves the secret reached an authenticator."""
-        if not self.has_secret or not self.verify_otp(otp):
+    def confirm_enrollment(self, credential_id: str, otp: str) -> bool:
+        """Activate a pending credential, but only once a code proves it was set up."""
+        entry = self.store.all().get(credential_id)
+        if entry is None or entry.get("confirmed_at"):
             return False
-        with BenchConfig.open(self.bench.path, mode="rw") as config:
-            config.admin.totp_enabled = True
-        self.admin_config.totp_enabled = True
-        return True
-
-    def disable(self) -> None:
-        """Turn 2FA off and forget the secret, so re-enrolling starts clean."""
-        with BenchConfig.open(self.bench.path, mode="rw") as config:
-            config.admin.totp_enabled = False
-            config.admin.totp_secret = ""
-        self.admin_config.totp_enabled = False
-        self.admin_config.totp_secret = ""
-        self._timestep_path.unlink(missing_ok=True)
-
-    def ensure_totp_secret(self) -> str:
-        """This bench's base32 TOTP secret, generating and persisting one if absent.
-
-        Re-checked under the config lock: gunicorn workers race here, and a loser that
-        overwrote the winner's secret would break an already-scanned phone.
-        """
-        if not self.admin_config.totp_secret:
-            with BenchConfig.open(self.bench.path, mode="rw") as config:
-                if not config.admin.totp_secret:
-                    config.admin.totp_secret = pyotp.random_base32()
-                self.admin_config.totp_secret = config.admin.totp_secret
-        return self.admin_config.totp_secret
-
-    def verify_otp(self, otp: str) -> bool:
-        """Check a code and burn its time step, so the same code cannot be used twice."""
-        if not self.has_secret or not otp:
-            return False
-        timestep = self._matching_timestep(otp.strip())
+        timestep = self._matching_timestep(entry["secret"], otp.strip())
         if timestep is None:
             return False
-        return self._consume_timestep(timestep)
+        return self.store.confirm(credential_id, timestep)
 
-    @property
-    def _totp(self) -> pyotp.TOTP:
-        return pyotp.TOTP(self.ensure_totp_secret())
+    def remove_credential(self, credential_id: str) -> bool:
+        return self.store.remove(credential_id)
 
-    def _matching_timestep(self, otp: str) -> int | None:
+    def verify_otp(self, otp: str) -> bool:
+        """Accept a code from any enrolled device, burning that device's time step."""
+        if not otp:
+            return False
+        otp = otp.strip()
+        for credential_id, entry in self.store.confirmed().items():
+            timestep = self._matching_timestep(entry["secret"], otp)
+            if timestep is not None:
+                return self.store.burn_timestep(credential_id, timestep)
+        return False
+
+    def _provisioning_url(self, label: str, secret: str) -> str:
+        return pyotp.TOTP(secret).provisioning_uri(
+            name=label, issuer_name=f"Pilot - {self.bench.config.name}"
+        )
+
+    @staticmethod
+    def _matching_timestep(secret: str, otp: str) -> int | None:
         """The time step whose code equals ``otp``, or None. Compared in constant time."""
-        totp = self._totp
+        totp = pyotp.TOTP(secret)
         now = int(time.time())
         for offset in range(-DRIFT_STEPS, DRIFT_STEPS + 1):
             moment = now + offset * totp.interval
             if hmac.compare_digest(totp.at(moment), otp):
                 return moment // totp.interval
         return None
-
-    def _consume_timestep(self, timestep: int) -> bool:
-        """Record ``timestep`` as spent, rejecting any step already used."""
-        with exclusive_file_lock(self._timestep_path):
-            if timestep <= self._last_timestep():
-                return False
-            replace_private_text_locked(self._timestep_path, str(timestep))
-        return True
-
-    def _last_timestep(self) -> int:
-        try:
-            return int(self._timestep_path.read_text(encoding="utf-8").strip())
-        except (FileNotFoundError, ValueError):
-            return 0
