@@ -59,16 +59,28 @@
     <!-- Sections -->
     <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
     <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
-    <SiteMonitoring v-else-if="activeTab === 'analytics'" :site-name="siteName" />
     <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />
     <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
   </div>
 
+  <AppActionDialog
+    v-if="appAction"
+    v-model:open="showAppAction"
+    :app-name="appAction.app"
+    :action="appAction.action"
+    :site-name="siteName"
+  />
+
   <Teleport defer to="#header-actions">
-    <Button variant="subtle" size="sm" @click="openSite">
+    <Button
+      :variant="site?.setup_complete ? 'subtle' : 'solid'"
+      size="sm"
+      :loading="settingUpSite"
+      @click="site?.setup_complete ? openSite() : setupSite()"
+    >
       <template #prefix><span class="size-4 lucide-external-link" /></template>
-      <span class="hidden sm:inline">Open site</span>
-      <span class="sm:hidden">Open</span>
+      <span class="hidden sm:inline">{{ site?.setup_complete ? 'Open site' : 'Setup site' }}</span>
+      <span class="sm:hidden">{{ site?.setup_complete ? 'Open' : 'Setup' }}</span>
     </Button>
   </Teleport>
 </template>
@@ -79,9 +91,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, ErrorMessage, LoadingText, TabButtons, toast } from 'frappe-ui'
 import SiteApps from '@/components/sites/Apps.vue'
 import SiteBackups from '@/components/sites/Backups.vue'
-import SiteMonitoring from '@/components/sites/Monitoring.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
+import AppActionDialog from '@/components/sites/AppActionDialog.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
@@ -113,7 +125,6 @@ const statusBadgeTheme = computed(() => STATUS_THEMES[status.value] ?? 'gray')
 const tabs = [
   { value: 'apps', label: 'Apps' },
   { value: 'backups', label: 'Backups' },
-  { value: 'analytics', label: 'Analytics' },
   { value: 'config', label: 'Config' },
   { value: 'settings', label: 'Settings' },
 ]
@@ -137,10 +148,42 @@ watchEffect(() => {
   if (site.value) document.title = `${site.value.name} | ${tabLabel.value}`
 })
 
+const APP_ACTIONS = ['install-app', 'uninstall-app']
+const appAction = computed(() => {
+  const app = route.query.app
+  const action = route.query.action
+  if (typeof app !== 'string' || !APP_ACTIONS.includes(action)) return null
+  return { app, action }
+})
+const showAppAction = ref(false)
+watch(
+  appAction,
+  (value) => {
+    showAppAction.value = Boolean(value)
+  },
+  { immediate: true },
+)
+watch(showAppAction, (open) => {
+  if (open) return
+  router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
+})
+
 const isMobile = useIsMobile()
 
 function openSite() {
   window.open(`https://${site.value.name}`, '_blank')
+}
+
+const settingUpSite = ref(false)
+async function setupSite() {
+  settingUpSite.value = true
+  try {
+    await login()
+  } catch (caught) {
+    toast.error(caught.message || 'Could not open the setup wizard')
+  } finally {
+    settingUpSite.value = false
+  }
 }
 
 function goToMarketplace() {
@@ -171,6 +214,17 @@ const menuOptions = computed(() => [
     : []),
   { label: 'Login as admin', icon: 'lucide-log-in', onClick: loginAsAdmin },
   { label: 'Back up now', icon: 'lucide-archive', onClick: backupNow },
+  {
+    label: 'View analytics',
+    icon: 'lucide-chart-line',
+    onClick: () =>
+      router.push({ name: 'Analytics', query: { view: 'site', window: '24h', site: siteName } }),
+  },
+  {
+    label: 'View jobs',
+    icon: 'lucide-list-checks',
+    onClick: () => router.push({ name: 'Tasks', query: { site: site.value.name } }),
+  },
 ])
 
 // Provisioning is a transient state (a new-site/reinstall task still running);

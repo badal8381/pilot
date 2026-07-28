@@ -2,7 +2,7 @@
   <div v-if="loading" class="flex justify-center items-center h-40">
     <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
   </div>
-  <div v-else class="space-y-4">
+  <div v-else class="space-y-6">
     <div v-for="(group, index) in groups" :key="index" class="flex items-end gap-3">
       <div class="space-y-1.5 w-28">
         <p v-if="index === 0" class="font-medium text-ink-gray-7 text-sm">No of Workers</p>
@@ -23,6 +23,7 @@
     <ErrorMessage v-if="error" :message="error" />
 
     <div class="flex justify-end gap-2">
+      <Button variant="subtle" icon-left="lucide-plus" @click="addGroup">Add</Button>
       <Button variant="solid" :loading="saving" @click="save">Save Changes</Button>
     </div>
   </div>
@@ -50,8 +51,6 @@ function addGroup() {
 function removeGroup(index) {
   groups.value.splice(index, 1)
 }
-
-defineExpose({ addGroup })
 
 function queueList(value) {
   return String(value || '')

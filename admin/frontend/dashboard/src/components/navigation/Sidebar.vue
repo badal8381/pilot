@@ -39,7 +39,7 @@ function isActive(to) {
   >
     <SidebarHeader v-if="!isMobile" title="Pilot" :menu-items="menuItems">
       <template #logo>
-        <PilotLogo class="size-8" />
+        <PilotLogo class="size-7" />
       </template>
     </SidebarHeader>
 

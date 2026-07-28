@@ -1,5 +1,7 @@
-import { request } from './client'
+import { request, unwrap } from './client'
 
 export const sessionApi = {
-  revoke: (jti) => request.post('session/revoke', { json: { jti } }),
+  list: () => unwrap(request.get('sessions').json()),
+  revoke: (jti) => request.post(`sessions/revoke/${jti}`),
+  revokeAll: () => unwrap(request.post('sessions/revoke/all').json()),
 }

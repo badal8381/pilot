@@ -5,7 +5,9 @@ management. Session is the single entry point -- construct it with a bench and c
 from __future__ import annotations
 
 import json
+import logging
 import secrets
+import threading
 import time
 from typing import TYPE_CHECKING, ClassVar
 
@@ -13,58 +15,78 @@ import jwt
 from jwt import PyJWKClient
 
 from pilot.config import BenchConfig
-from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
+from pilot.internal.atomic_file import replace_private_text_locked
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pilot.core.bench import Bench
 
 
 class _JtiStore:
-    """A private, lock-guarded ``{jti: exp}`` file. Expired entries are dropped from disk
-    on every read, and every gunicorn worker shares one view through an exclusive lock.
-
-    Subclasses set ``FILENAME``.
+    """A private ``{jti: record}`` file, cached in-process by mtime: a cheap ``stat()``
+    decides whether the cached dict still matches disk, so a single gunicorn worker
+    handling many threads avoids re-reading and re-parsing on every request while still
+    picking up a change written by anyone else (another worker, a restart). Subclasses
+    set FILENAME and may override ``_prune`` for a richer record shape than a plain
+    ``exp`` int.
     """
 
     FILENAME: ClassVar[str]
+    _cache: ClassVar[dict[Path, tuple[float | None, dict]]] = {}
+    _lock: ClassVar[threading.Lock] = threading.Lock()
 
     def __init__(self, bench: Bench) -> None:
         self._path = bench.path / self.FILENAME
 
     def add(self, jti: str, exp: int) -> None:
-        with exclusive_file_lock(self._path):
-            entries = self._prune(self._load_raw())
-            entries[jti] = int(exp)
-            replace_private_text_locked(self._path, json.dumps(entries))
+        self._update(lambda entries: entries.__setitem__(jti, int(exp)))
 
     def extend(self, entries: dict[str, int]) -> None:
-        """Add many ``{jti: exp}`` entries under a single lock."""
+        """Add many ``{jti: exp}`` entries in one update."""
         if not entries:
             return
-        with exclusive_file_lock(self._path):
-            merged = self._prune(self._load_raw())
-            merged.update({jti: int(exp) for jti, exp in entries.items()})
-            replace_private_text_locked(self._path, json.dumps(merged))
+        self._update(lambda live: live.update({jti: int(exp) for jti, exp in entries.items()}))
 
-    def all(self) -> dict[str, int]:
-        return self._read()
+    def all(self) -> dict:
+        with self._lock:
+            return dict(self._entries())
 
     def __contains__(self, jti: str) -> bool:
-        return jti in self._read()
+        with self._lock:
+            return jti in self._entries()
 
-    def _read(self) -> dict[str, int]:
-        """Live entries, purging any expired ones from disk when found."""
-        entries = self._load_raw()
-        live = self._prune(entries)
-        if len(live) != len(entries):
-            # Re-read under the lock so a concurrent add of a still-valid jti survives.
-            with exclusive_file_lock(self._path):
-                live = self._prune(self._load_raw())
-                replace_private_text_locked(self._path, json.dumps(live))
-        return live
+    def _update(self, mutate) -> None:
+        with self._lock:
+            entries = self._entries()
+            mutate(entries)
+            entries = self._prune(entries)
+            replace_private_text_locked(self._path, json.dumps(entries))
+            self._cache[self._path] = (self._mtime(), entries)
 
-    def _load_raw(self) -> dict[str, int]:
-        """Raw ``{jti: exp}`` from disk; empty if missing or unreadable."""
+    def _entries(self) -> dict:
+        """This file's entries, from cache if the file hasn't changed since, else disk.
+
+        Re-pruned against the current time either way, so entries that expired since the
+        last write still disappear even without a fresh disk read (pruning is a cheap
+        dict filter - it's the read/parse that the cache is skipping)."""
+        mtime = self._mtime()
+        cached = self._cache.get(self._path)
+        raw = cached[1] if cached is not None and cached[0] == mtime else self._load_raw()
+        entries = self._prune(raw)
+        if len(entries) != len(raw):  # garbage-collect expired entries from disk too
+            replace_private_text_locked(self._path, json.dumps(entries))
+            mtime = self._mtime()
+        self._cache[self._path] = (mtime, entries)
+        return entries
+
+    def _mtime(self) -> float | None:
+        try:
+            return self._path.stat().st_mtime
+        except FileNotFoundError:
+            return None
+
+    def _load_raw(self) -> dict:
         try:
             data = json.loads(self._path.read_text(encoding="utf-8"))
         except (FileNotFoundError, ValueError):
@@ -72,15 +94,29 @@ class _JtiStore:
         return data if isinstance(data, dict) else {}
 
     @staticmethod
-    def _prune(entries: dict[str, int]) -> dict[str, int]:
+    def _prune(entries: dict) -> dict:
         now = int(time.time())
         return {jti: exp for jti, exp in entries.items() if isinstance(exp, int) and exp > now}
 
 
 class ActiveTokens(_JtiStore):
-    """Live token jtis this bench has issued or verified (a registry for listing/management)."""
+    """Live sessions this bench has issued or verified, each with its most recent IP and
+    last-seen time - refreshed on every request."""
 
     FILENAME = ".active-jtis.json"
+
+    def touch(self, jti: str, exp: int, ip: str) -> None:
+        record = {"exp": int(exp), "ip": ip, "last_seen": int(time.time())}
+        self._update(lambda entries: entries.__setitem__(jti, record))
+
+    @staticmethod
+    def _prune(entries: dict) -> dict:
+        now = int(time.time())
+        return {
+            jti: record
+            for jti, record in entries.items()
+            if isinstance(record, dict) and isinstance(record.get("exp"), int) and record["exp"] > now
+        }
 
 
 class RevokedTokens(_JtiStore):
@@ -131,16 +167,12 @@ class Session:
         return self.admin_config.jwt_secret
 
     def issue_session_token(
-        self, scope: str = "bench", site: str | None = None, ttl: int = DEFAULT_TTL
+        self, scope: str = "bench", site: str | None = None, ttl: int = DEFAULT_TTL, ip: str = "unknown"
     ) -> tuple[str, str]:
-        """Mint an admin session token (with a jti) and register it as active.
-
-        Auditing the issuance is the caller's job -- it happens in the request handler so
-        the entry carries the actor's IP.
-        """
+        """Mint an admin session token (with a jti) and register it as active."""
         jti = secrets.token_urlsafe(16)
         token = self._encode(ttl=ttl, scope=scope, jti=jti, site=site)
-        ActiveTokens(self.bench).add(jti, int(time.time()) + ttl)
+        ActiveTokens(self.bench).touch(jti, int(time.time()) + ttl, ip)
         return token, jti
 
     def issue_login_token(self) -> str:
@@ -153,22 +185,22 @@ class Session:
             raise ValueError("Site name is required.")
         return self._encode(ttl=ttl, scope="site", site=site)
 
-    def verify_token(self, token: str) -> dict | None:
+    def verify_token(self, token: str, ip: str = "unknown") -> dict | None:
         """Verify a token: local HS256 first, then the bench's JWKS keys if configured.
 
-        A token whose jti has been revoked is rejected. A valid, previously unseen jti is
-        recorded in the active tracker.
+        A token whose jti has been revoked is rejected. Otherwise its entry in the active
+        tracker is refreshed with this request's IP and time.
         """
         claims = self._decode(token)
         if claims is None:
+            logging.warning("Rejected unknown or invalid session token from %s", ip)
             return None
         jti, exp = claims.get("jti"), claims.get("exp")
         if jti:
             if jti in RevokedTokens(self.bench):
                 return None
-            active = ActiveTokens(self.bench)
-            if exp and jti not in active:
-                active.add(jti, exp)
+            if exp:
+                ActiveTokens(self.bench).touch(jti, exp, ip)
         return claims
 
     @staticmethod
@@ -185,10 +217,10 @@ class Session:
 
         Returns False when the jti is not a known active session (nothing to revoke).
         """
-        exp = ActiveTokens(self.bench).all().get(jti)
-        if exp is None:
+        record = ActiveTokens(self.bench).all().get(jti)
+        if record is None:
             return False
-        RevokedTokens(self.bench).add(jti, exp)
+        RevokedTokens(self.bench).add(jti, record["exp"])
         return True
 
     def revoke_all(self) -> int:
@@ -198,9 +230,16 @@ class Session:
         return len(live)
 
     def active_jtis(self) -> dict[str, int]:
-        """Issued session jtis that are still live: unexpired and not revoked."""
+        """Issued session jtis that are still live: unexpired and not revoked. Maps jti to exp."""
         revoked = RevokedTokens(self.bench)
-        return {jti: exp for jti, exp in ActiveTokens(self.bench).all().items() if jti not in revoked}
+        return {
+            jti: record["exp"] for jti, record in ActiveTokens(self.bench).all().items() if jti not in revoked
+        }
+
+    def active_sessions(self) -> dict[str, dict]:
+        """Issued sessions still live: unexpired and not revoked. Maps jti to its exp/ip/last_seen."""
+        revoked = RevokedTokens(self.bench)
+        return {jti: record for jti, record in ActiveTokens(self.bench).all().items() if jti not in revoked}
 
     def _decode(self, token: str) -> dict | None:
         """Signature/expiry-checked claims: local HS256, then JWKS if configured."""

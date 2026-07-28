@@ -38,11 +38,11 @@ class AuditLog:
         with open_private(self._current_file(), "a") as handle:
             handle.write(json.dumps(record) + "\n")
 
-    def entries(self, entry_type=None, site=None, status=None, limit=None) -> list[dict]:
+    def entries(self, entry_type=None, site=None, status=None, jti=None, limit=None) -> list[dict]:
         """Return matching records newest first across weekly files."""
         matched = []
         for record in self._read_newest_first():
-            if self._matches(record, entry_type, site, status):
+            if self._matches(record, entry_type, site, status, jti):
                 matched.append(record)
                 if limit is not None and len(matched) >= limit:
                     break
@@ -86,11 +86,12 @@ class AuditLog:
                 yield tail.decode()
 
     @staticmethod
-    def _matches(record: dict, entry_type, site, status) -> bool:
+    def _matches(record: dict, entry_type, site, status, jti=None) -> bool:
         return (
             (entry_type is None or record.get("type") == entry_type)
             and (site is None or record.get("site") == site)
             and (status is None or record.get("status") == status)
+            and (jti is None or jti in (record.get("jti"), record.get("actor_jti")))
         )
 
     @staticmethod

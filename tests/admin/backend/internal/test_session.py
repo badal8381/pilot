@@ -131,7 +131,25 @@ def test_verify_registers_unseen_valid_jti(tmp_path: Path) -> None:
 def test_expired_jtis_are_purged_from_disk_on_read(tmp_path: Path) -> None:
     bench = _bench(tmp_path)
     path = bench.path / ActiveTokens.FILENAME
-    path.write_text(json.dumps({"dead": int(time.time()) - 5, "live": int(time.time()) + 300}))
+    path.write_text(
+        json.dumps(
+            {
+                "dead": {"exp": int(time.time()) - 5, "ip": "1.1.1.1", "last_seen": 0},
+                "live": {"exp": int(time.time()) + 300, "ip": "1.1.1.1", "last_seen": 0},
+            }
+        )
+    )
 
     assert set(ActiveTokens(bench).all()) == {"live"}  # read drops the expired entry
     assert set(json.loads(path.read_text(encoding="utf-8"))) == {"live"}  # ...from disk too
+
+
+def test_revoked_jti_is_pruned_once_its_own_expiry_passes(tmp_path: Path) -> None:
+    from admin.backend.internal.session import RevokedTokens
+
+    bench = _bench(tmp_path)
+    path = bench.path / RevokedTokens.FILENAME
+    path.write_text(json.dumps({"gone": int(time.time()) - 5, "still-revoked": int(time.time()) + 300}))
+
+    assert set(RevokedTokens(bench).all()) == {"still-revoked"}
+    assert set(json.loads(path.read_text(encoding="utf-8"))) == {"still-revoked"}

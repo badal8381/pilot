@@ -3,11 +3,13 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from admin.backend.api.v1.setup.database import local_database_credentials
 from admin.backend.api.v1.setup.state import setup_handoff_task
 from pilot.config import BenchConfig
 from pilot.internal.validators import validate_branch_name, validate_repo_url
 
 _PASSWORD_KEYS = ("admin_password", "mariadb_password", "postgres_password")
+_DB_ENGINES = ("mariadb", "postgres")
 
 
 def validate_configuration(data: dict) -> str | None:
@@ -79,6 +81,26 @@ def _validate_app_source(data: dict) -> str | None:
     return None
 
 
+def apply_existing_local_database(bench_root: Path, data: dict) -> dict:
+    """When the wizard picked 'use existing local database', copy that
+    server's credentials from a sibling bench instead of asking the user."""
+    mode = data.pop("db_mode", None)
+    if mode != "existing_local":
+        return data
+    engine = data.get("db_type", "mariadb")
+    credentials = local_database_credentials(bench_root, engine)
+    if not credentials:
+        return data
+    return {
+        **data,
+        f"{engine}_existing": False,
+        f"{engine}_host": credentials["host"],
+        f"{engine}_port": credentials["port"],
+        f"{engine}_admin_user": credentials["admin_user"],
+        f"{engine}_password": credentials["password"],
+    }
+
+
 def read_defaults(bench_root: Path) -> dict:
     from pilot.managers.platform import is_linux, native_process_manager
 
@@ -107,6 +129,9 @@ def read_defaults(bench_root: Path) -> dict:
 
     for key in _PASSWORD_KEYS:
         result.setdefault(f"{key}_configured", False)
+
+    for engine in _DB_ENGINES:
+        result[f"{engine}_local_available"] = local_database_credentials(bench_root, engine) is not None
 
     try:
         task = setup_handoff_task(bench_root)

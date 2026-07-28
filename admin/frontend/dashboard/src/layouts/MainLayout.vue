@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Breadcrumbs,
   BottomSheet,
@@ -21,10 +21,30 @@ import { useSession } from '@/composables/auth/useSession'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 
 const route = useRoute()
+const router = useRouter()
 const { items, resetBreadcrumbs } = useBreadcrumbs()
 const isMobile = useIsMobile()
 const { session } = useSession()
-const { showSettings, showBenches, showNewBench } = useAppMenu()
+const { showBenches, showNewBench } = useAppMenu()
+
+// Remembers the last non-Settings route so dismissing the dialog (backdrop
+// click, Escape, close button) exits to it directly instead of stepping back
+// through every section/subsection push made while the dialog was open.
+const lastNonSettingsRoute = ref(null)
+watch(
+  () => route.fullPath,
+  () => {
+    if (route.name !== 'Settings') lastNonSettingsRoute.value = route.fullPath
+  },
+  { immediate: true },
+)
+
+const showSettings = computed({
+  get: () => route.name === 'Settings',
+  set: (value) => {
+    if (!value) router.push(lastNonSettingsRoute.value || { name: 'Sites' })
+  },
+})
 
 const mobileNavDrawer = ref(false)
 
@@ -53,18 +73,24 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
     >
       <div class="flex items-center justify-between">
         <template v-if="route.name == 'Home'">
-          <PilotLogo class="size-6 rounded-sm" />
-          <span class="flex-1 text-center text-ink-gray-9">Home</span>
+          <div class="flex items-center gap-2">
+            <PilotLogo class="size-6 rounded-sm" />
+            <span class="text-ink-gray-9">Home</span>
+          </div>
         </template>
 
-        <button v-else class="flex items-center gap-1" @click="mobileNavDrawer = true">
-          <Breadcrumbs :items="breadcrumbs" />
-          <lucide-chevron-down class="size-4 text-ink-gray-5" />
+        <button
+          v-else
+          class="flex items-center gap-1 max-w-[50%] min-w-0"
+          @click="mobileNavDrawer = true"
+        >
+          <Breadcrumbs :items="breadcrumbs" class="min-w-0" />
+          <lucide-chevron-down class="size-4 text-ink-gray-5 shrink-0" />
         </button>
 
         <div id="header-badge" class="flex items-center" />
         <div id="header-actions" class="flex items-center gap-2 ml-auto">
-          <MigrationStatusButton />
+          <MigrationStatusButton v-if="route.name !== 'SiteDetail'" />
         </div>
       </div>
     </header>
@@ -81,8 +107,8 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
         <MobileNavItem
           label="Settings"
           icon="lucide-settings"
-          to="/settings"
-          :active="route.name == 'Settings'"
+          to="/mobile/settings"
+          :active="route.name == 'MobileSettings'"
         />
       </MobileNav>
     </template>

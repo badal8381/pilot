@@ -2,7 +2,10 @@
   <div v-if="loading" class="flex justify-center items-center h-40">
     <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
   </div>
-  <template v-else>
+  <div v-else class="space-y-6">
+    <div class="flex justify-end">
+      <Button variant="subtle" icon-left="lucide-plus" @click="openAdd">Add</Button>
+    </div>
     <div
       v-if="loadError"
       class="py-12 border border-dashed rounded-xl border-outline-red-2 text-ink-red-3 text-p-sm text-center"
@@ -23,15 +26,7 @@
       :options="{ selectable: false, showTooltip: false }"
     >
       <template #cell="{ column, row, item }">
-        <button
-          v-if="column.key === 'fingerprint'"
-          class="block w-full font-mono text-ink-gray-6 text-xs text-left truncate"
-          title="Click to copy"
-          @click="copy(row.fingerprint)"
-        >
-          {{ row.fingerprint }}
-        </button>
-        <div v-else-if="column.key === 'actions'" class="flex justify-end">
+        <div v-if="column.key === 'actions'" class="flex justify-end">
           <Button
             variant="ghost"
             size="sm"
@@ -43,7 +38,7 @@
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
     </ListView>
-  </template>
+  </div>
 
   <Dialog v-model="showAdd" :options="{ title: 'Add SSH key', size: 'md' }">
     <template #body-content>
@@ -88,10 +83,11 @@ import { Button, Dialog, ErrorMessage, FormControl, ListView, ListRowItem, toast
 import { apiErrorMessage } from '@/api/client'
 import { sshKeysApi } from '@/api/sshKeys'
 
-// Fixed widths keep the long fingerprint from forcing horizontal scroll.
+// Numeric widths are fr units (ListView convention) so Name/Fingerprint stretch to
+// fill the row instead of leaving dead space; actions stays a fixed icon-sized column.
 const columns = [
-  { label: 'Name', key: 'label', align: 'left', width: '9rem' },
-  { label: 'Fingerprint', key: 'fingerprint', align: 'left', width: '17rem' },
+  { label: 'Name', key: 'label', align: 'left', width: 1 },
+  { label: 'Fingerprint', key: 'fingerprint', align: 'left', width: 2 },
   { label: '', key: 'actions', align: 'right', width: '3rem' },
 ]
 
@@ -110,15 +106,6 @@ const rows = computed(() =>
   keys.value.map((k) => ({ fingerprint: k.fingerprint, label: k.comment || 'Unnamed key' })),
 )
 const isLastKey = computed(() => rows.value.length <= 1)
-
-async function copy(fingerprint) {
-  try {
-    await navigator.clipboard.writeText(fingerprint)
-    toast.success('Fingerprint copied')
-  } catch {
-    toast.error('Could not copy')
-  }
-}
 
 async function load() {
   loading.value = true
@@ -183,8 +170,6 @@ async function confirmRemove() {
     removingBusy.value = false
   }
 }
-
-defineExpose({ openAdd })
 
 onMounted(load)
 </script>

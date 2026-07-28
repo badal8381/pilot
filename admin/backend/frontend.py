@@ -29,17 +29,32 @@ def ensure_admin_frontend(on_progress: Callable[[str], None] = lambda message: N
     )
 
 
-def build_admin_frontend(on_progress: Callable[[str], None] = lambda message: None) -> None:
-    """Build the admin frontend and editor from source. Requires Node.js."""
+def build_admin_frontend(
+    on_progress: Callable[[str], None] = lambda message: None, *, force: bool = False
+) -> None:
+    """Build the admin frontend and editor from source, skipping either whose dist
+    already exists unless force is set."""
+    from pilot.utils import cli_root
+
     _check_node_version()
-    _build_frontend(_find_frontend(), "dashboard", on_progress)
-    _build_frontend(_find_editor(), "editor", on_progress)
-    on_progress("\nAdmin frontend built successfully.")
+    root = cli_root()
+    _build_frontend(
+        _find_frontend(), root / "admin" / "backend" / "static" / "dashboard", "dashboard", on_progress, force=force
+    )
+    _build_frontend(
+        _find_editor(), root / "admin" / "backend" / "static" / "editor", "editor", on_progress, force=force
+    )
+    on_progress("\nAdmin frontend up to date.")
 
 
-def _build_frontend(frontend: Path, label: str, on_progress: Callable[[str], None]) -> None:
+def _build_frontend(
+    frontend: Path, dist: Path, label: str, on_progress: Callable[[str], None], *, force: bool = False
+) -> None:
     from pilot.utils import run_command
 
+    if not force and (dist / "assets").exists():
+        on_progress(f"{label} frontend is already built, skipping.")
+        return
     on_progress(f"Building {label} frontend at {frontend}...")
     if _is_npm_install_stale(frontend):
         on_progress(f"Running npm install for {label}...")

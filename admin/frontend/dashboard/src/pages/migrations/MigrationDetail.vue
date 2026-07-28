@@ -30,7 +30,7 @@
 
       <!-- Metadata -->
       <div
-        class="gap-4 grid grid-cols-2 bg-surface-elevation-1 mt-4 px-0 py-4 rounded-xl sm:grid-cols-5"
+        class="gap-4 grid grid-cols-2 mt-4 px-0 py-4 rounded-xl sm:grid-cols-5"
       >
         <div v-for="item in metadata" :key="item.label">
           <p class="text-xs text-ink-gray-4">{{ item.label }}</p>
