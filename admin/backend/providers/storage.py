@@ -102,7 +102,7 @@ def _site_backup_files(site_path: Path) -> list[StorageItem]:
 
 
 def _site_other_entries(site_path: Path) -> list[StorageItem]:
-    entries = []
+    entries: list[StorageItem] = []
     for child in site_path.iterdir():
         if child.name == "public":
             continue
