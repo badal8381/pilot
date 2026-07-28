@@ -516,7 +516,7 @@ class BenchConfig:
             "threads": self.gunicorn.threads,
             "timeout": self.gunicorn.timeout,
             "worker_class": self.gunicorn.worker_class,
-            "malloc_arena_max": self.gunicorn.malloc_arena_max or 2,
+            "malloc_arena_max": self.gunicorn.malloc_arena_max,
             "max_requests": self.gunicorn.max_requests,
             "max_requests_jitter": self.gunicorn.max_requests_jitter,
         }
@@ -540,10 +540,13 @@ class BenchConfig:
         return admin
 
     def _central_section(self) -> ConfigDict:
-        return {
+        data: ConfigDict = {
             "endpoint": self.central.endpoint,
             "auth_token": self.central.auth_token,
         }
+        if self.central.bootstrap_token:
+            data["bootstrap_token"] = self.central.bootstrap_token
+        return data
 
     def _firewall_section(self) -> ConfigDict:
         return {

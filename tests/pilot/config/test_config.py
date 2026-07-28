@@ -531,6 +531,19 @@ def test_toml_writer_monitor_log_path_written_when_set() -> None:
     assert 'log_path = "/var/log/test-bench-stats.log"' in toml
 
 
+def test_toml_writer_preserves_malloc_arena_max_zero() -> None:
+    """0 is a real, meaningful value (disables the cap) - `or 2` would silently
+    coerce it back to the default on every write."""
+    import tomllib
+
+    config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
+    config.gunicorn.malloc_arena_max = 0
+    toml = config.dumps()
+    assert "malloc_arena_max = 0" in toml
+    reloaded = BenchConfig._from_dict(tomllib.loads(toml))
+    assert reloaded.gunicorn.malloc_arena_max == 0
+
+
 def test_firewall_defaults_to_off_and_open() -> None:
     config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.firewall.enabled is False
@@ -609,8 +622,6 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
     wired into both _from_dict and to_toml_dict should fail here immediately.
 
     nginx is deliberately excluded - it is fixed and never read from bench.toml.
-    central.bootstrap_token is deliberately excluded - it is a one-time seed
-    that is never serialized back out once consumed.
     """
     config = BenchConfig.default("roundtrip-bench")
 
@@ -672,6 +683,7 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
 
     config.central.endpoint = "https://central.example.com"
     config.central.auth_token = "central-token"
+    config.central.bootstrap_token = "central-bootstrap"
 
     config.firewall.enabled = True
     config.firewall.default = "deny"
