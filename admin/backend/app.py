@@ -38,6 +38,7 @@ def create_app(bench_root: Path) -> Flask:
     install_auth_guard(app, bench_root)
     register_blueprints(app)
     register_editor_frontend(app)
+    register_embed_frontend(app)
     register_frontend(app)
     install_api_error_handlers(app)
 
@@ -110,6 +111,31 @@ def register_editor_frontend(app: Flask) -> None:
             return _immutable(send_from_directory(editor_dist, path))
         except NotFound:
             return error_response("not_found", "Asset not found.", 404)
+
+
+def register_embed_frontend(app: Flask) -> None:
+    """Serve Desk's Cloud Settings IIFE at the URL Frappe boots into desk.
+
+    Desk loads `{pilot_endpoint}/embed/cloud-settings/cloud-settings.js` cross-origin.
+    This must be registered before the dashboard SPA catch-all, which would otherwise
+    answer with index.html and break script load.
+    """
+    embed_dist = STATIC_DIR / "embed" / "cloud-settings"
+
+    @app.route("/embed/cloud-settings/<path:path>")
+    @allow_unauthenticated
+    def serve_cloud_settings_embed(path):
+        if not embed_dist.exists():
+            return (
+                "Cloud Settings embed not built. "
+                "Run: cd admin/frontend/embed && npm install && npm run build",
+                503,
+            )
+        try:
+            # Fixed filename; Desk busts cache with ?v= from cloud_settings_embed_version.
+            return _immutable(send_from_directory(embed_dist, path))
+        except NotFound:
+            return error_response("not_found", "Embed asset not found.", 404)
 
 
 def register_frontend(app: Flask) -> None:
