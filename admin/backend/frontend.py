@@ -46,7 +46,7 @@ def build_admin_frontend(
     )
     _build_frontend(
         _find_embed(),
-        root / "admin" / "backend" / "static" / "dist" / "embed" / "cloud-settings",
+        root / "admin" / "backend" / "static" / "embed" / "cloud-settings",
         "embed",
         on_progress,
         force=force,
