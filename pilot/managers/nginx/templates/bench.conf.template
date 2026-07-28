@@ -234,9 +234,16 @@ server {
     }
 
     {% endfor %}
-    {# editor + dashboard static assets served straight from disk, off the admin worker #}
+    {# editor + dashboard + embed static assets served straight from disk, off the admin worker #}
     location /editor-assets/ {
         alias {{ admin_static }}/editor/;
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    location /embed/cloud-settings/ {
+        alias {{ admin_static }}/embed/cloud-settings/;
         try_files $uri =404;
         expires 1y;
         add_header Cache-Control "public, immutable";
