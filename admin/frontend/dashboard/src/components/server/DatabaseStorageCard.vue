@@ -25,11 +25,6 @@ const GROUP_SHOWN_COUNT = 3
 
 const groupParts = computed(() => {
   const schemaBytes = props.data.databases.reduce((sum, row) => sum + row.bytes, 0)
-  const systemNames = props.data.databases.filter((row) => row.system).map((row) => row.schema)
-
-  const databasesLabel = systemNames.length
-    ? `${props.data.databases.length} databases (including ${systemNames.join(', ')})`
-    : `${props.data.databases.length} databases`
 
   return [
     {
@@ -37,7 +32,11 @@ const groupParts = computed(() => {
       bytes: props.data.binlog_bytes,
       color: COLORS.binlog,
     },
-    { label: databasesLabel, bytes: schemaBytes, color: COLORS.databases },
+    {
+      label: `${props.data.databases.length} databases`,
+      bytes: schemaBytes,
+      color: COLORS.databases,
+    },
     { label: `${props.data.engine} core files`, bytes: props.data.core_bytes, color: COLORS.core },
     {
       label: `${props.data.engine} error log`,
@@ -106,7 +105,7 @@ const hiddenCount = computed(() =>
         <Badge :label="String(data.databases.length)" />
       </div>
 
-      <div class="max-h-72 overflow-y-auto">
+      <div class="max-h-40 overflow-y-auto">
         <dl
           v-for="row in visibleDatabases"
           :key="row.schema"

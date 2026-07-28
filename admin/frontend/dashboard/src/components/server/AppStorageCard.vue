@@ -29,6 +29,8 @@ onMounted(async () => {
 
 const COLORS = { apps: 'blue-7', sites: 'violet-7', logs: 'amber-7' }
 
+const bySize = (items: { bytes: number }[]) => [...items].sort((a, b) => b.bytes - a.bytes)
+
 const groups = computed(() => [
   {
     label: 'Apps',
@@ -36,7 +38,7 @@ const groups = computed(() => [
     badge: true,
     color: COLORS.apps,
     bytes: props.data.apps_bytes,
-    items: props.data.apps,
+    items: bySize(props.data.apps),
   },
   {
     label: 'Site files',
@@ -44,7 +46,7 @@ const groups = computed(() => [
     badge: false,
     color: COLORS.sites,
     bytes: props.data.sites_bytes,
-    items: props.data.sites,
+    items: bySize(props.data.sites),
   },
   {
     label: 'Logs',
@@ -77,8 +79,12 @@ const groups = computed(() => [
           <summary class="flex items-center gap-2 py-2 list-none cursor-pointer">
             <span class="rounded-full size-2 shrink-0" :style="{ backgroundColor: part.color }" />
             <span class="text-ink-gray-7 text-sm truncate">{{ part.label }}</span>
-            <lucide-chevron-up class="transition-all size-3.5 text-ink-gray-5 rotate-180 group-open:rotate-0" />
-            <span class="ml-auto text-ink-gray-8 text-sm tabular-nums shrink-0">{{ part.text }}</span>
+            <lucide-chevron-up
+              class="transition-all size-3.5 text-ink-gray-5 rotate-180 group-open:rotate-0"
+            />
+            <span class="ml-auto text-ink-gray-8 text-sm tabular-nums shrink-0">
+              {{ part.text }}
+            </span>
           </summary>
 
           <div
