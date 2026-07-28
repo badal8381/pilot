@@ -14,7 +14,7 @@ from pilot.core.server.monitoring_processes import ProcessResolver
 from pilot.utils import cli_root, iter_sibling_benches
 
 if typing.TYPE_CHECKING:
-    from pilot.core.bench import Bench, BenchConfig
+    from pilot.core.bench import Bench
 
 # Gap between the two /proc samples used to turn cumulative counters into a rate.
 CPU_SAMPLE_INTERVAL = 1.0
@@ -277,12 +277,6 @@ def _to_int(value: object) -> int:
         return int(value)  # type: ignore[call-overload]
     except (TypeError, ValueError):
         return 0
-
-
-def resolve_monitor_log_path(bench_config: "BenchConfig"):
-    from pilot.config import MonitorConfig
-
-    return MonitorConfig.default_log_path(bench_config.name)
 
 
 def _production_monitors() -> list[Monitor]:

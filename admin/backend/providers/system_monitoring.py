@@ -18,11 +18,11 @@ class SystemMonitoringProvider(WindowedLogProvider):
         self._bench_root = bench_root
 
     def get_history(self) -> dict:
-        from pilot.config import BenchConfig, MonitorConfig
-        from pilot.config.monitor import system_log_path
+        from pilot.config import BenchConfig
+        from pilot.config.monitor import bench_log_path, system_log_path
 
         config = BenchConfig.read(self._bench_root)
-        app_log = config.monitor.log_path or MonitorConfig.default_log_path(config.name)
+        app_log = bench_log_path(config.name)
         return {
             "window": self.window,
             "window_seconds": self.window_seconds,

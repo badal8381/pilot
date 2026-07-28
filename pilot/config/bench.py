@@ -18,7 +18,6 @@ from pilot.config.gunicorn import GunicornConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
 from pilot.config.llm import LLMConfig
 from pilot.config.mariadb import MariaDBConfig
-from pilot.config.monitor import MonitorConfig
 from pilot.config.nginx import NginxConfig
 from pilot.config.postgres import PostgresConfig
 from pilot.config.production import ProductionConfig
@@ -118,7 +117,6 @@ class BenchConfig:
     # Gates whether developer mode can be toggled per site; sets nothing itself.
     allow_developer_mode: bool = False
     production: ProductionConfig = field(default_factory=ProductionConfig)
-    monitor: MonitorConfig = field(default_factory=MonitorConfig)
     nginx: NginxConfig = field(default_factory=NginxConfig)
     gunicorn: GunicornConfig = field(default_factory=GunicornConfig)
     letsencrypt: LetsEncryptConfig = field(default_factory=LetsEncryptConfig)
@@ -609,15 +607,6 @@ class BenchConfig:
             "api_base": self.llm.api_base,
         }
 
-    def _monitor_section(self) -> ConfigDict:
-        # system_log_path/db_log_path/slow_query_log_path are host-shared
-        # (common_config.toml), not written here.
-        monitor = self.monitor
-        data: ConfigDict = {}
-        if monitor.log_path:
-            data["log_path"] = str(monitor.log_path)
-        return data
-
     # -- wizard flat-key interface --
 
     def _apply_flat_settings(self, settings: dict) -> None:
@@ -764,11 +753,6 @@ _SECTIONS: tuple[_Section, ...] = (
         ),
     ),
     _Section(
-        "monitor",
-        lambda data: MonitorConfig.from_dict(data.get("monitor", {})),
-        lambda config: config._monitor_section() if config.monitor.log_path else None,
-    ),
-    _Section(
         "llm",
         lambda data: LLMConfig(**BenchConfig._known_fields(LLMConfig, data.get("llm", {}))),
         lambda config: config._llm_section() if (config.llm.api_key or config.llm.provider) else None,
@@ -854,7 +838,6 @@ def _bench_schema() -> _Table:
             "bench": _Table(keys=set(_BENCH_KEYS)),
             "redis": _Table(keys=_keys(RedisConfig)),
             "production": _Table(keys=_keys(ProductionConfig) | _PRODUCTION_LEGACY),
-            "monitor": _Table(keys=_keys(MonitorConfig)),
             "gunicorn": _Table(keys=_keys(GunicornConfig)),
             "admin": _Table(keys=_keys(AdminConfig)),
             "central": _Table(keys=_keys(CentralConfig)),

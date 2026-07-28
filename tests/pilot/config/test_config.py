@@ -469,67 +469,6 @@ def test_invalid_db_type_rejected() -> None:
     assert "bench.db_type" in str(exc_info.value)
 
 
-def test_monitor_defaults_when_section_absent() -> None:
-    config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
-    assert config.monitor.log_path is None
-
-
-def test_monitor_log_path_parsed_as_path() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["monitor"] = {"log_path": "/var/log/my-bench-stats.log"}
-    config = BenchConfig._from_dict(data)
-    from pathlib import Path
-
-    assert config.monitor.log_path == Path("/var/log/my-bench-stats.log")
-
-
-def test_monitor_log_path_absent_gives_none() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["monitor"] = {"system_log_path": "/var/log/custom-stats.log"}
-    config = BenchConfig._from_dict(data)
-    assert config.monitor.log_path is None
-
-
-def test_toml_writer_monitor_section_omitted_when_production_disabled() -> None:
-    config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
-    assert not config.production.enabled
-    assert "[monitor]" not in config.dumps()
-
-
-def test_toml_writer_monitor_section_emitted_when_production_enabled() -> None:
-    from pathlib import Path
-
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["production"] = {"enabled": True, "process_manager": "systemd"}
-    data["admin"] = {"domain": "admin.example.com"}
-    config = BenchConfig._from_dict(data)
-    config.monitor.log_path = Path("/var/log/test-bench-stats.log")
-    toml = config.dumps()
-    assert "[monitor]" in toml
-    assert "log_path" in toml
-
-
-def test_toml_writer_monitor_section_omitted_when_log_path_unset() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["production"] = {"enabled": True, "process_manager": "systemd"}
-    data["admin"] = {"domain": "admin.example.com"}
-    config = BenchConfig._from_dict(data)
-    assert config.monitor.log_path is None
-    assert "[monitor]" not in config.dumps()
-
-
-def test_toml_writer_monitor_log_path_written_when_set() -> None:
-    from pathlib import Path
-
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["production"] = {"enabled": True, "process_manager": "systemd"}
-    data["admin"] = {"domain": "admin.example.com"}
-    config = BenchConfig._from_dict(data)
-    config.monitor.log_path = Path("/var/log/test-bench-stats.log")
-    toml = config.dumps()
-    assert 'log_path = "/var/log/test-bench-stats.log"' in toml
-
-
 def test_toml_writer_preserves_malloc_arena_max_zero() -> None:
     """0 is a real, meaningful value (disables the cap) - `or 2` would silently
     coerce it back to the default on every write."""
@@ -620,7 +559,8 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
     """Regression guard: a field or section added to BenchConfig without being
     wired into both _from_dict and to_toml_dict should fail here immediately.
 
-    nginx is deliberately excluded - it is fixed and never read from bench.toml.
+    nginx and monitor are deliberately excluded - both are fixed and never
+    read from bench.toml.
     """
     config = BenchConfig.default("roundtrip-bench")
 
@@ -717,8 +657,6 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
     config.llm.model = "my-served-model"
     config.llm.max_tokens = 2048
     config.llm.api_base = "http://vllm:8000/v1"
-
-    config.monitor.log_path = Path("/var/log/custom-app.log")
 
     # mariadb/postgres/letsencrypt/admin.jwks_* are host-shared state in
     # common_config.toml, one level above the bench directory - nest under

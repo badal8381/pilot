@@ -2,9 +2,19 @@ import json
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
+import pytest
+
 from pilot.config import BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig
 from pilot.core.bench import Bench
 from pilot.core.server.monitoring import Monitor, MonitorConfigurator
+
+
+@pytest.fixture(autouse=True)
+def _confine_monitor_logs_to_tmp_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """log_path/system_log_path/etc. are computed from cli_root() with no
+    override left - pin it to tmp_path so tests never touch the real host's
+    system/logs/ directory."""
+    monkeypatch.setattr("pilot.utils.cli_root", lambda: tmp_path)
 
 
 def _make_bench(path: Path, name: str = "my-bench") -> Bench:
@@ -20,9 +30,7 @@ def _make_bench(path: Path, name: str = "my-bench") -> Bench:
 
 def _make_monitor(bench: Bench) -> Monitor:
     with patch.object(MonitorConfigurator, "setup"):
-        monitor = Monitor(bench)
-    monitor.bench.config.monitor.log_path = bench.path / f"{bench.config.name}-stats.log"
-    return monitor
+        return Monitor(bench)
 
 
 def _fake_proc_reads(monitor: Monitor) -> None:

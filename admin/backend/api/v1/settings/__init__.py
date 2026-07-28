@@ -15,7 +15,7 @@ from pilot.config import (
     WAF_RULE_OPERATORS,
     BenchConfig,
 )
-from pilot.config.monitor import system_log_path
+from pilot.config.monitor import bench_log_path, system_log_path
 from pilot.core.bench import Bench
 from pilot.core.bench.settings import (
     SettingsApplyFailed,
@@ -114,7 +114,7 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
         "llm_providers": llm_provider_options(),
         "monitor": {
             "system_log_path": str(system_log_path()),
-            "log_path": str(config.monitor.log_path) if config.monitor.log_path else "",
+            "log_path": str(bench_log_path(config.name)),
         },
     }
 

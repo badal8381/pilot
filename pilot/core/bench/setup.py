@@ -141,13 +141,11 @@ class ProductionSetup:
             SystemdProcessManager(self.bench).remove_units()
 
     def _setup_monitoring(self):
-        from pilot.core.server.monitoring import MonitorConfigurator, resolve_monitor_log_path
+        from pilot.core.server.monitoring import MonitorConfigurator
         from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
         monitor = MonitorConfigurator(self.bench)
         monitor.install()
-        self.bench.config.monitor.log_path = resolve_monitor_log_path(self.bench.config)
-        self.bench.config.write(self.bench.path)
         monitor.setup()
 
         uptime = UptimeMonitorConfigurator(self.bench)

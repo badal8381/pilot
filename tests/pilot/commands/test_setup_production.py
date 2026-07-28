@@ -178,55 +178,6 @@ def test_require_production_inputs_passes_with_domain_and_email(tmp_path: Path) 
     cmd._require_production_inputs()  # no raise
 
 
-def test_resolve_monitor_log_path_default(tmp_path: Path) -> None:
-    from pilot.core.server.monitoring import resolve_monitor_log_path
-
-    bench = _make_bench(tmp_path)
-    result = resolve_monitor_log_path(bench.config)
-    assert result.name == f"{bench.config.name}-stats.log"
-
-
-def test_setup_monitoring_persists_log_path_to_toml(tmp_path: Path, monkeypatch) -> None:
-    import tomllib
-
-    from pilot.core.server.monitoring import MonitorConfigurator
-    from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
-
-    bench = _make_bench(tmp_path, process_manager="systemd")
-    bench.config.production.enabled = True
-    cmd = ProductionSetup(bench)
-
-    monkeypatch.setattr(MonitorConfigurator, "install", lambda self: None)
-    monkeypatch.setattr(UptimeMonitorConfigurator, "install", lambda self: None)
-    monkeypatch.setattr(MonitorConfigurator, "setup", lambda self: None)
-    monkeypatch.setattr(UptimeMonitorConfigurator, "setup", lambda self: None)
-
-    cmd._setup_monitoring()
-
-    data = tomllib.loads((bench.path / "bench.toml").read_text())
-    assert "monitor" in data
-    assert data["monitor"]["log_path"].endswith(f"{bench.config.name}-stats.log")
-
-
-def test_setup_monitoring_log_path_is_path_on_config(tmp_path: Path, monkeypatch) -> None:
-    from pilot.core.server.monitoring import MonitorConfigurator
-    from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
-
-    bench = _make_bench(tmp_path, process_manager="systemd")
-    bench.config.production.enabled = True
-    cmd = ProductionSetup(bench)
-
-    monkeypatch.setattr(MonitorConfigurator, "install", lambda self: None)
-    monkeypatch.setattr(UptimeMonitorConfigurator, "install", lambda self: None)
-    monkeypatch.setattr(MonitorConfigurator, "setup", lambda self: None)
-    monkeypatch.setattr(UptimeMonitorConfigurator, "setup", lambda self: None)
-
-    cmd._setup_monitoring()
-
-    assert isinstance(bench.config.monitor.log_path, Path)
-    assert bench.config.monitor.log_path.name == f"{bench.config.name}-stats.log"
-
-
 def test_setup_monitoring_runs_privileged_setup_at_provision_time(tmp_path: Path, monkeypatch) -> None:
     """Privileged log-dir/logrotate setup must run here, not in the user-service daemons."""
     from pilot.core.server.monitoring import MonitorConfigurator

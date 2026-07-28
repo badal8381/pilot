@@ -3,7 +3,13 @@ from __future__ import annotations
 import typing
 from pathlib import Path
 
-from pilot.config.monitor import db_log_path, monitor_log_dir, slow_query_log_path, system_log_path
+from pilot.config.monitor import (
+    bench_log_path,
+    db_log_path,
+    monitor_log_dir,
+    slow_query_log_path,
+    system_log_path,
+)
 from pilot.exceptions import BenchError
 from pilot.managers.platform import is_linux
 from pilot.managers.systemd_user import SystemdUserMixin, install_user_timer, user_timer_installed
@@ -68,10 +74,7 @@ class MonitorConfigurator(SystemdUserMixin):
 
     @property
     def log_path(self) -> Path:
-        from pilot.config import MonitorConfig
-
-        bench = self._require_bench()
-        return bench.config.monitor.log_path or MonitorConfig.default_log_path(bench.config.name)
+        return bench_log_path(self._require_bench().config.name)
 
     @property
     def system_log_path(self) -> Path:
