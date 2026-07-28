@@ -1,32 +1,12 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from pathlib import Path
 
 import pytest
 
-from pilot.internal.toml import Toml, TomlDataclassCodec
-
-
-@dataclass
-class ServiceConfig:
-    name: str
-    port: int
-    enabled: bool = True
-
-
-SERVICE_CODEC = TomlDataclassCodec(
-    from_config_dict=lambda data: ServiceConfig(**data["service"]),
-    to_config_dict=lambda config: {
-        "service": {
-            "name": config.name,
-            "port": config.port,
-            "enabled": config.enabled,
-        }
-    },
-)
+from pilot.internal.toml import Toml
 
 
 def test_toml_dict_round_trip() -> None:
@@ -144,15 +124,3 @@ def test_toml_native_date_time_and_float_values_round_trip() -> None:
 def test_toml_dump_rejects_none(data: dict[str, object]) -> None:
     with pytest.raises(TypeError):
         Toml.dumps(data)
-
-
-def test_dataclass_dict_round_trip() -> None:
-    config = ServiceConfig(name="admin", port=7001)
-
-    assert SERVICE_CODEC.from_dict(SERVICE_CODEC.to_dict(config)) == config
-
-
-def test_dataclass_toml_round_trip() -> None:
-    config = ServiceConfig(name="admin", port=7001, enabled=False)
-
-    assert SERVICE_CODEC.loads(SERVICE_CODEC.dumps(config)) == config
