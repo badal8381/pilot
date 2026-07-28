@@ -473,8 +473,6 @@ def test_monitor_defaults_when_section_absent() -> None:
     config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.monitor.log_path is None
     assert config.monitor.system_log_path.name == "bench-system-stats.log"
-    assert config.monitor.system_log_max_size == "500M"
-    assert config.monitor.application_log_max_size == "500M"
 
 
 def test_monitor_log_path_parsed_as_path() -> None:
@@ -488,22 +486,9 @@ def test_monitor_log_path_parsed_as_path() -> None:
 
 def test_monitor_log_path_absent_gives_none() -> None:
     data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["monitor"] = {"system_log_max_size": "200M"}
+    data["monitor"] = {"system_log_path": "/var/log/custom-stats.log"}
     config = BenchConfig._from_dict(data)
     assert config.monitor.log_path is None
-
-
-def test_monitor_custom_sizes_roundtrip() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["production"] = {"enabled": True, "process_manager": "systemd"}
-    data["admin"] = {"domain": "admin.example.com"}
-    data["monitor"] = {"system_log_max_size": "200M", "application_log_max_size": "100M"}
-    config = BenchConfig._from_dict(data)
-    assert config.monitor.system_log_max_size == "200M"
-    assert config.monitor.application_log_max_size == "100M"
-    toml = config.dumps()
-    assert 'system_log_max_size = "200M"' in toml
-    assert 'application_log_max_size = "100M"' in toml
 
 
 def test_toml_writer_monitor_section_omitted_when_production_disabled() -> None:
@@ -723,8 +708,6 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
 
     config.monitor.system_log_path = Path("/var/log/custom-system.log")
     config.monitor.authority_file_path = Path("/var/log/.custom-authority")
-    config.monitor.system_log_max_size = "600M"
-    config.monitor.application_log_max_size = "700M"
     config.monitor.log_path = Path("/var/log/custom-app.log")
 
     # mariadb/postgres/letsencrypt/admin.jwks_* are host-shared state in
