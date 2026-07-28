@@ -49,6 +49,42 @@ def test_bench_breakdown_sums_apps_sites_and_logs(tmp_path: Path) -> None:
     assert breakdown.used_bytes == (breakdown.apps_bytes + breakdown.sites_bytes + breakdown.logs_bytes)
 
 
+def test_site_storage_splits_private_public_and_backups(tmp_path: Path) -> None:
+    from admin.backend.providers.storage import StorageProvider
+
+    _write_bench(tmp_path)
+    site_dir = tmp_path / "sites" / "site1.local"
+    (site_dir / "private" / "files").mkdir(parents=True)
+    (site_dir / "private" / "files" / "a.pdf").write_bytes(b"x" * 1000)
+    (site_dir / "private" / "backups").mkdir(parents=True)
+    (site_dir / "private" / "backups" / "b.sql.gz").write_bytes(b"x" * 2000)
+    (site_dir / "public" / "files").mkdir(parents=True)
+    (site_dir / "public" / "files" / "c.jpg").write_bytes(b"x" * 500)
+    (site_dir / "logs").mkdir()
+    (site_dir / "logs" / "d.log").write_bytes(b"x" * 250)
+    (site_dir / "site_config.json").write_text('{"db_name": "site1_db"}')
+
+    site = StorageProvider(tmp_path)._bench.site("site1.local")
+    storage = StorageProvider(tmp_path)._site_storage(site)
+
+    assert storage.name == "site1.local"
+    assert storage.private_files_bytes >= 1000
+    assert storage.backups_bytes >= 2000
+    assert storage.public_files_bytes >= 500
+    assert storage.other_bytes >= 250
+    assert storage.bytes == (
+        storage.private_files_bytes
+        + storage.public_files_bytes
+        + storage.backups_bytes
+        + storage.other_bytes
+    )
+    assert {entry.name: entry.bytes for entry in storage.backup_files} == {"b.sql.gz": 2000}
+    other_names = {entry.name for entry in storage.other_entries}
+    assert other_names == {"logs", "site_config.json"}
+    assert "files" not in other_names
+    assert "backups" not in other_names
+
+
 def test_mariadb_variable_file_size_reads_relative_path(tmp_path: Path) -> None:
     from admin.backend.providers.storage import _mariadb_variable_file_size
 

@@ -48,11 +48,23 @@ class StorageItem:
 
 
 @dataclass
+class SiteStorage:
+    name: str
+    bytes: int
+    private_files_bytes: int
+    public_files_bytes: int
+    backups_bytes: int
+    other_bytes: int
+    backup_files: list[StorageItem] = field(default_factory=list)
+    other_entries: list[StorageItem] = field(default_factory=list)
+
+
+@dataclass
 class BenchBreakdown:
     used_bytes: int
     apps: list[StorageItem]
     apps_bytes: int
-    sites: list[StorageItem]
+    sites: list[SiteStorage]
     sites_bytes: int
     logs_bytes: int
 
@@ -72,6 +84,37 @@ def directory_size_bytes(path: str) -> int:
         return int(result.stdout.split()[0]) if result.returncode == 0 else 0
     except Exception:
         return 0
+
+
+_PRIVATE_SUBDIRS_EXCLUDED_FROM_OTHER = {"files", "backups"}
+
+
+def _storage_entry(path: Path) -> StorageItem:
+    size = path.stat().st_size if path.is_file() else directory_size_bytes(str(path))
+    return StorageItem(name=path.name, bytes=size)
+
+
+def _site_backup_files(site_path: Path) -> list[StorageItem]:
+    backups_dir = site_path / "private" / "backups"
+    if not backups_dir.is_dir():
+        return []
+    return [_storage_entry(child) for child in backups_dir.iterdir()]
+
+
+def _site_other_entries(site_path: Path) -> list[StorageItem]:
+    entries = []
+    for child in site_path.iterdir():
+        if child.name == "public":
+            continue
+        if child.name == "private":
+            entries.extend(
+                _storage_entry(grandchild)
+                for grandchild in child.iterdir()
+                if grandchild.name not in _PRIVATE_SUBDIRS_EXCLUDED_FROM_OTHER
+            )
+            continue
+        entries.append(_storage_entry(child))
+    return entries
 
 
 def _mariadb_variable_file_size(database, variable: str, data_dir: Path) -> int:
@@ -190,10 +233,7 @@ class StorageProvider:
             StorageItem(name=app.config.name, bytes=directory_size_bytes(str(app.path)))
             for app in self._bench.apps()
         ]
-        sites = [
-            StorageItem(name=site.config.name, bytes=directory_size_bytes(str(site.path)))
-            for site in self._bench.sites()
-        ]
+        sites = [self._site_storage(site) for site in self._bench.sites()]
         logs_bytes = directory_size_bytes(str(self._bench.logs_path))
         apps_bytes = sum(item.bytes for item in apps)
         sites_bytes = sum(item.bytes for item in sites)
@@ -204,4 +244,23 @@ class StorageProvider:
             sites=sites,
             sites_bytes=sites_bytes,
             logs_bytes=logs_bytes,
+        )
+
+    def _site_storage(self, site) -> SiteStorage:
+        total_bytes = directory_size_bytes(str(site.path))
+        private_files_bytes = directory_size_bytes(str(site.path / "private" / "files"))
+        public_files_bytes = directory_size_bytes(str(site.path / "public"))
+        backups_bytes = directory_size_bytes(str(site.path / "private" / "backups"))
+        other_bytes = max(
+            total_bytes - private_files_bytes - public_files_bytes - backups_bytes, 0
+        )
+        return SiteStorage(
+            name=site.config.name,
+            bytes=total_bytes,
+            private_files_bytes=private_files_bytes,
+            public_files_bytes=public_files_bytes,
+            backups_bytes=backups_bytes,
+            other_bytes=other_bytes,
+            backup_files=_site_backup_files(site.path),
+            other_entries=_site_other_entries(site.path),
         )
