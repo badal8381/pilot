@@ -1,6 +1,6 @@
 # Configuration
 
-`bench.toml` is the source of truth for a bench. Read and write it through the config model and TOML store.
+`bench.toml` is the source of truth for a bench. Read and write it through the config model and TOML store. `BenchConfig` is also the sole reader/writer of `common_config.toml`, the host-shared file described in [Common Config](#common-config).
 
 ## Minimal Example
 
@@ -17,21 +17,6 @@ db_type = "mariadb"
 name = "frappe"
 repo = "https://github.com/frappe/frappe"
 branch = "version-15"
-
-[mariadb]
-host = "localhost"
-port = 3306
-admin_user = "root"
-root_password = ""
-socket_path = ""
-existing = false
-
-[postgres]
-host = "localhost"
-port = 5432
-admin_user = "postgres"
-root_password = ""
-existing = false
 
 [redis]
 cache_port = 13000
@@ -70,7 +55,7 @@ The first app is treated as the framework app when code needs that distinction.
 
 ## Databases
 
-`[mariadb]` and `[postgres]` describe how the bench connects to the chosen engine. `existing = true` means the user supplied the service and Pilot should not infer or manage it as owned state.
+`config.mariadb` and `config.postgres` describe how a bench connects to the chosen engine. `existing = true` means the user supplied the service and Pilot should not infer or manage it as owned state. Both live in `common_config.toml`, not `bench.toml` - see [Common Config](#common-config).
 
 One bench uses one database engine for its sites. Pick it with `bench.db_type`.
 
@@ -110,21 +95,49 @@ allow_bench_management = true
 
 `admin.internal_port` is derived as `port + 1` for the localhost Gunicorn service behind nginx.
 
-JWT fields are:
-
-- `jwt_secret`: local token signing secret.
-- `jwks_url`: remote issuer key set.
-- `jwks_audience`: required when `jwks_url` is used.
+`jwt_secret` is this bench's own local token signing secret, kept in `bench.toml`. `jwks_url` and `jwks_audience` trust a remote issuer instead and are host-shared - see [Common Config](#common-config).
 
 ## Other Groups
 
 - `[monitor]`: monitoring settings.
 - `[nginx]`: nginx rendering settings.
 - `[gunicorn]`: Gunicorn process settings.
-- `[letsencrypt]`: certificate settings.
 - `[central]`: Central endpoint and Pilot auth token.
 - `[firewall]`: firewall behavior.
 - `[waf]`: WAF behavior.
 - `[s3]`: S3 backup credentials and bucket settings.
 
 Unknown fields are ignored by normal loads for compatibility. Strict validation can report unknown config paths.
+
+## Common Config
+
+Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
+
+```toml
+[mariadb]
+host = "localhost"
+port = 3306
+admin_user = "root"
+root_password = ""
+socket_path = ""
+existing = false
+
+[postgres]
+host = "localhost"
+port = 5432
+admin_user = "postgres"
+root_password = ""
+existing = false
+
+[letsencrypt]
+email = "ops@example.com"
+webroot_path = "/var/www/letsencrypt"
+
+[admin]
+jwks_url = "https://issuer.example.com/jwks.json"
+jwks_audience = "bench-fleet"
+```
+
+`BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
+
+A pre-upgrade bench whose `bench.toml` still carries these fields directly is migrated by the `merge_common_config` patch - see [pilot/patches](../pilot/patches) and `bench admin run-patches`.

@@ -6,7 +6,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pilot.config.common import CommonConfig
 from pilot.exceptions import BenchAlreadyExistsError
 from pilot.utils import iter_sibling_benches
 
@@ -83,11 +82,13 @@ class BenchCreator:
         """Pick a fresh port/password only the first time this host
         provisions the server; later benches inherit them automatically
         through BenchConfig's merge with common_config.toml."""
-        common = CommonConfig.read(self.target_directory.parent)
-        if self.db_type == "mariadb" and not common.mariadb.root_password:
+        from pilot.config import BenchConfig
+
+        defaults = BenchConfig.default(benches_root=self.target_directory.parent)
+        if self.db_type == "mariadb" and not defaults.mariadb.root_password:
             settings["mariadb_port"] = self._pick_mariadb_port()
             settings["mariadb_password"] = secrets.token_hex(nbytes=8)
-        if self.db_type == "postgres" and not common.postgres.root_password:
+        if self.db_type == "postgres" and not defaults.postgres.root_password:
             settings["postgres_port"] = self._pick_postgres_port()
             settings["postgres_password"] = secrets.token_hex(nbytes=8)
 

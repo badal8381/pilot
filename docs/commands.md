@@ -69,6 +69,7 @@ These commands control the task worker, not individual Frappe workers.
 - `bench admin enroll`: exchange the bootstrap token for this bench's Central credential.
 - `bench admin set-central-config`: store Central endpoint and Pilot auth token.
 - `bench admin issue-site-token`: issue a scoped site-to-bench API token.
+- `bench admin run-patches [--phase pre_update|post_update|all]`: run pending bench-cli upgrade patches (see [Configuration](configuration.md#common-config)).
 
 Admin commands live in `pilot/commands/admin`. Backend route behavior lives under `admin/backend/api/v1`.
 
