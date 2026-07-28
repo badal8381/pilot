@@ -472,7 +472,6 @@ def test_invalid_db_type_rejected() -> None:
 def test_monitor_defaults_when_section_absent() -> None:
     config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.monitor.log_path is None
-    assert config.monitor.system_log_path.name == "bench-system-stats.log"
 
 
 def test_monitor_log_path_parsed_as_path() -> None:
@@ -719,13 +718,9 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
     config.llm.max_tokens = 2048
     config.llm.api_base = "http://vllm:8000/v1"
 
-    config.monitor.system_log_path = Path("/var/log/custom-system.log")
-    config.monitor.db_log_path = Path("/var/log/custom-db.log")
-    config.monitor.slow_query_log_path = Path("/var/log/custom-slow.json")
     config.monitor.log_path = Path("/var/log/custom-app.log")
 
-    # mariadb/postgres/letsencrypt/admin.jwks_*/monitor.system_log_path/
-    # db_log_path/slow_query_log_path are host-shared state in
+    # mariadb/postgres/letsencrypt/admin.jwks_* are host-shared state in
     # common_config.toml, one level above the bench directory - nest under
     # tmp_path so this test's common config never leaks into another test's.
     bench_dir = tmp_path / "benches" / "roundtrip-bench"

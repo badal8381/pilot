@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 
 from pilot.config import BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig
 from pilot.core.bench import Bench
@@ -43,10 +43,10 @@ def _fake_proc_reads(monitor: Monitor) -> None:
 def test_collect_system_metrics_writes_to_system_log_file(tmp_path: Path) -> None:
     system_log_file = tmp_path / "bench-system-stats.log"
     monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
-    monitor.bench.config.monitor.system_log_path = system_log_file
     _fake_proc_reads(monitor)
 
-    monitor.collect_system_metrics()
+    with patch.object(type(monitor), "system_log_path", new_callable=PropertyMock, return_value=system_log_file):
+        monitor.collect_system_metrics()
 
     assert system_log_file.exists()
     entry = json.loads(system_log_file.read_text().splitlines()[-1])
@@ -59,10 +59,10 @@ def test_collect_system_metrics_does_not_write_app_log(tmp_path: Path) -> None:
     """System metrics must never bleed into the per-bench application log."""
     system_log_file = tmp_path / "bench-system-stats.log"
     monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
-    monitor.bench.config.monitor.system_log_path = system_log_file
     _fake_proc_reads(monitor)
 
-    monitor.collect_system_metrics()
+    with patch.object(type(monitor), "system_log_path", new_callable=PropertyMock, return_value=system_log_file):
+        monitor.collect_system_metrics()
 
     assert not monitor.log_path.exists()
 
@@ -70,10 +70,10 @@ def test_collect_system_metrics_does_not_write_app_log(tmp_path: Path) -> None:
 def test_collect_system_metrics_includes_storage(tmp_path: Path) -> None:
     system_log_file = tmp_path / "bench-system-stats.log"
     monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
-    monitor.bench.config.monitor.system_log_path = system_log_file
     _fake_proc_reads(monitor)
 
-    monitor.collect_system_metrics()
+    with patch.object(type(monitor), "system_log_path", new_callable=PropertyMock, return_value=system_log_file):
+        monitor.collect_system_metrics()
 
     entry = json.loads(system_log_file.read_text().splitlines()[-1])
     assert "storage" in entry

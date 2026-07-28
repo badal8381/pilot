@@ -72,15 +72,21 @@ class MonitorConfigurator(SystemdUserMixin):
 
     @property
     def system_log_path(self) -> Path:
-        return self._require_bench().config.monitor.system_log_path
+        from pilot.config.monitor import system_log_path
+
+        return system_log_path()
 
     @property
     def db_log_path(self) -> Path:
-        return self._require_bench().config.monitor.db_log_path
+        from pilot.config.monitor import db_log_path
+
+        return db_log_path()
 
     @property
     def slow_query_log_path(self) -> Path:
-        return self._require_bench().config.monitor.slow_query_log_path
+        from pilot.config.monitor import slow_query_log_path
+
+        return slow_query_log_path()
 
     def setup(self) -> None:
         if not is_linux():

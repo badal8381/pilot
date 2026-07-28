@@ -130,7 +130,7 @@ class Monitor:
 
     @property
     def slow_query_log_path(self) -> Path:
-        return self.bench.config.monitor.slow_query_log_path
+        return self._configurator.slow_query_log_path
 
     def collect_system_metrics(self) -> None:
         self._append(
