@@ -853,9 +853,7 @@ def _enroll_device(client, label: str = "phone") -> dict:
     """Register and confirm a device through the API, returning the enrollment payload."""
     import pyotp
 
-    response = client.post(
-        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": label}
-    )
+    response = client.post("/api/v1/auth/two-factor/enrollment", json={"label": label})
     assert response.status_code == 200
     enrollment = response.get_json()
     # Confirm with the previous step so the current code stays unspent for the test body.
@@ -870,24 +868,10 @@ def test_two_factor_starts_disabled_with_no_devices(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
 
-    assert client.get("/api/v1/auth/two-factor").get_json() == {
-        "enabled": False,
-        "credentials": [],
-        "recovery_codes_remaining": 0,
-    }
-
-
-def test_two_factor_enrollment_needs_the_password(tmp_path: Path) -> None:
-    """A stolen session alone must not be able to add a second factor."""
-    client = _client(tmp_path)
-    client.set_cookie("sid", _session_token())
-
-    response = client.post(
-        "/api/v1/auth/two-factor/enrollment", json={"password": "wrong", "label": "phone"}
-    )
-
-    assert response.status_code == 401
-    assert client.get("/api/v1/auth/two-factor").get_json()["credentials"] == []
+    body = client.get("/api/v1/auth/two-factor").get_json()
+    assert body["enabled"] is False
+    assert body["credentials"] == []
+    assert body["recovery_codes_remaining"] == 0
 
 
 def test_two_factor_enrollment_returns_a_secret_and_url(tmp_path: Path) -> None:
@@ -895,7 +879,7 @@ def test_two_factor_enrollment_returns_a_secret_and_url(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token())
 
     body = client.post(
-        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": "Ops laptop"}
+        "/api/v1/auth/two-factor/enrollment", json={"label": "Ops laptop"}
     ).get_json()
 
     assert body["secret"] in body["provisioning_url"]
@@ -908,7 +892,7 @@ def test_two_factor_enrollment_requires_a_label(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token())
 
     response = client.post(
-        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": " "}
+        "/api/v1/auth/two-factor/enrollment", json={"label": " "}
     )
 
     assert response.status_code == 422
@@ -921,7 +905,7 @@ def test_a_device_is_only_confirmed_with_a_valid_code(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
     enrollment = client.post(
-        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": "phone"}
+        "/api/v1/auth/two-factor/enrollment", json={"label": "phone"}
     ).get_json()
 
     rejected = client.post(f"/api/v1/auth/two-factor/{enrollment['id']}", json={"otp": "000000"})
@@ -974,16 +958,13 @@ def test_devices_are_listed_without_secrets(tmp_path: Path) -> None:
     assert enrollment["secret"] not in str(body)
 
 
-def test_removing_a_device_requires_the_password(tmp_path: Path) -> None:
+def test_removing_a_device_turns_two_factor_off(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
     enrollment = _enroll_device(client)
     path = f"/api/v1/auth/two-factor/{enrollment['id']}"
 
-    assert client.delete(path, json={"password": "wrong"}).status_code == 401
-    assert client.get("/api/v1/auth/two-factor").get_json()["enabled"] is True
-
-    response = client.delete(path, json={"password": "secret"})
+    response = client.delete(path)
     assert response.status_code == 200
     body = response.get_json()
     assert body["enabled"] is False
@@ -994,7 +975,7 @@ def test_removing_an_unknown_device_is_404(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
 
-    response = client.delete("/api/v1/auth/two-factor/nope", json={"password": "secret"})
+    response = client.delete("/api/v1/auth/two-factor/nope")
 
     assert response.status_code == 404
 
@@ -1014,7 +995,7 @@ def test_two_factor_changes_are_audited(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
     enrollment = _enroll_device(client)
-    client.delete(f"/api/v1/auth/two-factor/{enrollment['id']}", json={"password": "secret"})
+    client.delete(f"/api/v1/auth/two-factor/{enrollment['id']}")
 
     bench = Bench(tmp_path / "benches" / "current")
     events = [e["event"] for e in AuditLog(bench).entries(entry_type="session")]
@@ -1037,16 +1018,168 @@ def test_first_device_returns_recovery_codes_once(tmp_path: Path) -> None:
 
 
 
-def test_regenerating_recovery_codes_requires_the_password(tmp_path: Path) -> None:
+def test_regenerating_replaces_the_recovery_codes(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
     original = _enroll_device(client)["confirmation"]["recovery_codes"]
 
-    rejected = client.post("/api/v1/auth/two-factor/recovery-codes", json={"password": "wrong"})
-    assert rejected.status_code == 401
-
-    accepted = client.post("/api/v1/auth/two-factor/recovery-codes", json={"password": "secret"})
+    accepted = client.post("/api/v1/auth/two-factor/recovery-codes")
     assert accepted.status_code == 200
     assert set(accepted.get_json()["recovery_codes"]).isdisjoint(original)
 
 
+
+
+def test_enabling_two_factor_keeps_the_enroller_signed_in(tmp_path: Path) -> None:
+    """Revoking every session would sign out the admin who just enabled it."""
+    from admin.backend.internal.session import Session
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    token, _ = Session(bench).issue_session_token()
+    client.set_cookie("sid", token)
+
+    _enroll_device(client)
+
+    assert client.get("/api/v1/auth/two-factor").status_code == 200
+
+
+def _current_code(bench_root: Path, secret_index: int = -1) -> str:
+    """A live code for one enrolled device, read straight from the store."""
+    import json
+
+    import pyotp
+
+    data = json.loads((bench_root / ".totp-credentials.json").read_text())
+    confirmed = [entry for entry in data.values() if entry.get("confirmed_at")]
+    return pyotp.TOTP(confirmed[secret_index]["secret"]).now()
+
+
+def test_login_asks_for_a_code_once_two_factor_is_on(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    _enroll_device(client)
+    client.delete("/api/v1/auth/session")
+
+    response = client.post("/api/v1/auth/session", json={"password": "secret"})
+
+    assert response.status_code == 200
+    assert response.get_json() == {"authenticated": False, "two_factor_required": True}
+    assert client.get("/api/v1/auth/two-factor").status_code == 401
+
+
+def test_login_succeeds_with_a_valid_code(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    _enroll_device(client)
+    bench_root = tmp_path / "benches" / "current"
+    client.delete("/api/v1/auth/session")
+
+    response = client.post(
+        "/api/v1/auth/session", json={"password": "secret", "otp": _current_code(bench_root)}
+    )
+
+    assert response.status_code == 201
+    assert response.get_json()["authenticated"] is True
+    assert client.get("/api/v1/auth/two-factor").status_code == 200
+
+
+def test_login_rejects_a_wrong_code(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    _enroll_device(client)
+    client.delete("/api/v1/auth/session")
+
+    response = client.post("/api/v1/auth/session", json={"password": "secret", "otp": "000000"})
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "invalid_otp"
+    assert client.get("/api/v1/auth/two-factor").status_code == 401
+
+
+def test_login_accepts_a_recovery_code(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    codes = _enroll_device(client)["confirmation"]["recovery_codes"]
+    client.delete("/api/v1/auth/session")
+
+    response = client.post("/api/v1/auth/session", json={"password": "secret", "otp": codes[0]})
+
+    assert response.status_code == 201
+    # Spent on use, so the same code cannot sign in twice.
+    client.delete("/api/v1/auth/session")
+    assert client.post("/api/v1/auth/session", json={"password": "secret", "otp": codes[0]}).status_code == 401
+
+
+def test_a_wrong_password_is_rejected_before_the_code_is_considered(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    _enroll_device(client)
+    bench_root = tmp_path / "benches" / "current"
+    client.delete("/api/v1/auth/session")
+
+    response = client.post(
+        "/api/v1/auth/session", json={"password": "wrong", "otp": _current_code(bench_root)}
+    )
+
+    assert response.status_code == 401
+    assert response.get_json()["error"]["code"] == "invalid_credentials"
+
+
+def test_login_link_bypasses_the_second_factor(tmp_path: Path) -> None:
+    """`pilot generate-session` runs on the server, so its holder already had shell access."""
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    _enroll_device(client)
+    client.delete("/api/v1/auth/session")
+
+    assert client.post("/api/v1/auth/session", json={"sid": _login_token()}).status_code == 201
+
+
+def test_a_recovery_sign_in_is_indistinguishable_from_a_device_one(tmp_path: Path) -> None:
+    """Nothing in the response or the log says which kind of code was used."""
+    from pilot.core.bench.audit_log import AuditLog
+
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    codes = _enroll_device(client)["confirmation"]["recovery_codes"]
+    client.delete("/api/v1/auth/session")
+
+    body = client.post("/api/v1/auth/session", json={"password": "secret", "otp": codes[0]}).get_json()
+
+    assert body == {"authenticated": True, "scope": "bench"}
+
+    issued = [
+        entry
+        for entry in AuditLog(Bench(tmp_path / "benches" / "current")).entries(entry_type="session")
+        if entry.get("event") == "issued"
+    ]
+    assert issued[0]["via"] == "password"
+
+
+def test_two_factor_status_reports_the_device_limit(tmp_path: Path) -> None:
+    from admin.backend.internal.two_factor_authentication import MAX_ENROLLED_DEVICES
+
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+
+    assert client.get("/api/v1/auth/two-factor").get_json()["max_devices"] == MAX_ENROLLED_DEVICES
+
+
+def test_enrolling_past_the_limit_is_rejected(tmp_path: Path) -> None:
+    from admin.backend.internal.two_factor_authentication import (
+        MAX_ENROLLED_DEVICES,
+        TwoFactorAuthentication,
+    )
+
+    client = _client(tmp_path)
+    client.set_cookie("sid", _session_token())
+    # Seeded directly: enrolling all of them over HTTP would trip the rate limiter first.
+    two_factor = TwoFactorAuthentication(Bench(tmp_path / "benches" / "current"))
+    for index in range(MAX_ENROLLED_DEVICES):
+        two_factor.start_enrollment(f"device {index}")
+
+    response = client.post("/api/v1/auth/two-factor/enrollment", json={"label": "one too many"})
+
+    assert response.status_code == 422
+    assert str(MAX_ENROLLED_DEVICES) in response.get_json()["error"]["message"]

@@ -9,6 +9,7 @@ import pyotp
 import pytest
 
 from admin.backend.internal.two_factor_authentication import (
+    MAX_ENROLLED_DEVICES,
     PENDING_TTL,
     RECOVERY_CODE_COUNT,
     TotpCredentialStore,
@@ -347,3 +348,25 @@ def test_non_ascii_codes_are_rejected_not_raised(tmp_path: Path) -> None:
     assert two_factor.verify_otp("café12") is False
     assert two_factor.verify_second_factor("café-code-xyz") is False
     assert two_factor.unused_recovery_code_count == RECOVERY_CODE_COUNT
+
+
+def test_enrollment_stops_at_the_device_limit(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    for index in range(MAX_ENROLLED_DEVICES):
+        two_factor.start_enrollment(f"device {index}")
+
+    with pytest.raises(TwoFactorError) as error:
+        two_factor.start_enrollment("one too many")
+
+    assert str(MAX_ENROLLED_DEVICES) in str(error.value)
+
+
+def test_removing_a_device_frees_a_slot(tmp_path: Path) -> None:
+    two_factor = TwoFactorAuthentication(_bench(tmp_path))
+    first = two_factor.start_enrollment("device 0")["id"]
+    for index in range(1, MAX_ENROLLED_DEVICES):
+        two_factor.start_enrollment(f"device {index}")
+
+    two_factor.remove_credential(first)
+
+    assert two_factor.start_enrollment("replacement")["id"]

@@ -8,6 +8,7 @@ from flask import Blueprint, current_app, g, jsonify, request, url_for
 from admin.backend.api.responses import created_response, error_response, no_content_response
 from admin.backend.internal.session import Session
 from admin.backend.internal.two_factor_authentication import (
+    MAX_ENROLLED_DEVICES,
     TwoFactorAuthentication,
     TwoFactorError,
 )
@@ -32,6 +33,19 @@ def _validate_new_password(new_password: str, current_password: str) -> str | No
     if hmac.compare_digest(new_password, current_password):
         return "New password must differ from the current password."
     return validate_admin_password(new_password)
+
+
+def _second_factor_error(bench: Bench, otp: str):
+    """Block the sign-in until an authenticator or recovery code is supplied."""
+    two_factor = TwoFactorAuthentication(bench)
+    if not two_factor.is_enabled:
+        return None
+    if not otp:
+        # The password was right; the form now needs a code. Not an error the user can fix.
+        return jsonify({"authenticated": False, "two_factor_required": True})
+    if not two_factor.verify_second_factor(otp):
+        return error_response("invalid_otp", "That code is not valid. Try the next one.", 401)
+    return None
 
 
 @auth_bp.get("/session")
@@ -80,6 +94,11 @@ def create_session():
     error, redeemed_jti = _validate_login(data, bench)
     if error is not None:
         return error
+
+    # A sign-in link is minted on the server by `pilot generate-session`, so whoever holds
+    # one already had shell access. Requiring a device there would only lock out recovery.
+    if not redeemed_jti and (blocked := _second_factor_error(bench, str(data.get("otp", "")))):
+        return blocked
 
     if redeemed_jti:
         bench.audit_action("session", {"event": "login_redeemed", "jti": redeemed_jti})
@@ -180,13 +199,8 @@ def two_factor_payload(bench: Bench) -> dict:
         "enabled": two_factor.is_enabled,
         "credentials": two_factor.get_credentials(),
         "recovery_codes_remaining": two_factor.unused_recovery_code_count,
+        "max_devices": MAX_ENROLLED_DEVICES,
     }
-
-
-def _password_matches(bench: Bench, data: dict | None) -> bool:
-    """Re-check the password, so a stolen session alone cannot change the second factor."""
-    password = str(data.get("password", "")) if isinstance(data, dict) else ""
-    return hmac.compare_digest(password, bench.config.admin.password)
 
 
 @auth_bp.get("/two-factor")
@@ -202,8 +216,6 @@ def start_two_factor_enrollment():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("malformed_request", "Expected a JSON object.", 400)
-    if not _password_matches(bench, data):
-        return error_response("invalid_credentials", "Incorrect password.", 401)
     try:
         enrollment = TwoFactorAuthentication(bench).start_enrollment(str(data.get("label", "")))
     except TwoFactorError as error:
@@ -226,16 +238,23 @@ def confirm_two_factor_credential(credential_id: str):
     bench.audit_action("session", {"event": "two_factor_device_added", "credential": credential_id})
 
     codes = None
+    token = None
     if not was_enabled:
         # First device: mint the break-glass codes now, while someone is here to save them.
         codes = two_factor.generate_recovery_codes()
-        # Tokens issued before 2FA existed would otherwise skip it until they expired.
-        Session(bench).revoke_all()
+        # Tokens issued before 2FA existed would otherwise skip it until they expired. The
+        # caller keeps a session: they just proved possession of the device seconds ago.
+        session = Session(bench)
+        session.revoke_all()
+        token, _ = session.issue_session_token(ip=client_ip())
 
     payload = two_factor_payload(bench)
     if codes is not None:
         payload["recovery_codes"] = codes
-    return jsonify(payload)
+    response = jsonify(payload)
+    if token is not None:
+        set_session_cookie(response, token, current_app.config["SESSION_COOKIE_SECURE"])
+    return response
 
 
 @auth_bp.delete("/two-factor/<credential_id>")
@@ -243,8 +262,6 @@ def confirm_two_factor_credential(credential_id: str):
 def remove_two_factor_credential(credential_id: str):
     """Remove a device. Dropping the last confirmed one turns 2FA off."""
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-    if not _password_matches(bench, request.get_json(silent=True)):
-        return error_response("invalid_credentials", "Incorrect password.", 401)
     two_factor = TwoFactorAuthentication(bench)
     if not two_factor.remove_credential(credential_id):
         return error_response("unknown_credential", "No such device.", 404)
@@ -307,8 +324,6 @@ def revoke_session(jti: str):
 def regenerate_recovery_codes():
     """Replace the whole set. Any code saved from the previous set stops working."""
     bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-    if not _password_matches(bench, request.get_json(silent=True)):
-        return error_response("invalid_credentials", "Incorrect password.", 401)
     codes = TwoFactorAuthentication(bench).generate_recovery_codes()
     bench.audit_action("session", {"event": "recovery_codes_regenerated"})
     return jsonify({"recovery_codes": codes})

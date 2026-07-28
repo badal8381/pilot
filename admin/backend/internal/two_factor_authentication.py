@@ -18,6 +18,9 @@ DRIFT_STEPS = 1
 PENDING_TTL = 24 * 3600
 # Let's give 10 recovery codes to bypass the second factor, if exhausted users will have to regenerate them.
 RECOVERY_CODE_COUNT = 10
+# Each device holds its own secret, so this also caps how many people can sign in
+# during the same 30-second window.
+MAX_ENROLLED_DEVICES = 10
 
 
 class TotpCredentialStore:
@@ -50,9 +53,12 @@ class TotpCredentialStore:
         with exclusive_file_lock(self._path):
             entries = self._prune(self._load_raw())
 
-            if len(entries) >= 10:
-                # This effectively means we don't allow for more than 10 concurrent logins in a 30s window.
-                raise TwoFactorError("Too many enrolled devices.")
+            if len(entries) >= MAX_ENROLLED_DEVICES:
+                raise TwoFactorError(
+                    f"This bench allows {MAX_ENROLLED_DEVICES} devices. "
+                    "Remove one before adding another, or share an existing "
+                    "device's setup key with another authenticator app."
+                )
 
             entries[credential_id] = {
                 "label": label,
@@ -136,6 +142,13 @@ class TwoFactorAuthentication:
     @property
     def is_enabled(self) -> bool:
         """Whether a second factor is required to sign in."""
+        has_confirmed_credentials = bool(self.store.confirmed())
+        # If we have no confirmed credentials we can drop the recovery codes as well
+        # Since 2FA is disabled.
+        if not has_confirmed_credentials and self.bench.config.admin.recovery_codes:
+            with BenchConfig.open(self.bench.path, mode="rw") as config:
+                config.admin.recovery_codes = []
+
         return bool(self.store.confirmed())
 
     def get_credentials(self) -> list[dict]:
