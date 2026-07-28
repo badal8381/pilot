@@ -46,8 +46,8 @@ def create_app(bench_root: Path) -> Flask:
 
 def register_blueprints(app: Flask) -> None:
     from admin.backend.api.v1.apps import apps_bp, marketplace_bp
-    from admin.backend.api.v1.benches import bench_readiness_bp, benches_bp
     from admin.backend.api.v1.auth import auth_bp
+    from admin.backend.api.v1.benches import bench_readiness_bp, benches_bp
     from admin.backend.api.v1.core import core_bp
     from admin.backend.api.v1.databases import database_bp
     from admin.backend.api.v1.editor import editor_bp
