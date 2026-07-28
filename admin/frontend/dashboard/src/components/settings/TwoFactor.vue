@@ -83,10 +83,10 @@
     <template #body-content>
       <div class="space-y-3">
         <FormControl
+          v-if="!enrollment"
           v-model="label"
           label="Device name"
           placeholder="My Phone"
-          :disabled="Boolean(enrollment)"
           @keydown.enter="startEnrollment"
         />
 
@@ -94,9 +94,7 @@
           <p class="text-ink-gray-6 text-p-sm">
             Scan with Authy, Bitwarden, Microsoft Authenticator or any TOTP app.
           </p>
-          <div
-            class="flex justify-center bg-surface-white p-4 border border-outline-gray-2 rounded-lg"
-          >
+          <div class="flex justify-center bg-surface-white p-4 rounded-lg">
             <QrcodeVue :value="enrollment.provisioning_url" :size="176" level="M" render-as="svg" />
           </div>
           <details class="text-ink-gray-6 text-p-sm">
