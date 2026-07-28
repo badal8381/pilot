@@ -13,6 +13,7 @@ def _task(tmp_path, filenames):
         config=SimpleNamespace(s3=SimpleNamespace(is_configured=False)),
     )
     bench.site = lambda name: Site(SiteConfig(name=name, apps=[]), bench)
+    bench.audit_action = lambda category, fields: AuditLog(bench).append(category, fields)
     return DeleteBackupTask(bench=bench, bench_root=tmp_path, site="site1", filenames=filenames), bench
 
 

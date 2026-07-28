@@ -1290,11 +1290,11 @@ def _admin_source_checkout(tmp_path: Path, src_mtime: int, built_mtime: int) -> 
     import os
 
     cli_root = tmp_path / "repo"
-    frontend = cli_root / "admin" / "frontend"
+    frontend = cli_root / "admin" / "frontend" / "dashboard"
     (frontend / "src").mkdir(parents=True)
     package_json = frontend / "package.json"
     package_json.write_text("{}")
-    dist = cli_root / "admin" / "backend" / "static" / "dist"
+    dist = cli_root / "admin" / "backend" / "static" / "dashboard"
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("built")
     src_file = frontend / "src" / "App.vue"
@@ -1306,21 +1306,9 @@ def _admin_source_checkout(tmp_path: Path, src_mtime: int, built_mtime: int) -> 
     return cli_root
 
 
-def test_admin_source_is_newer_detects_edits(tmp_path: Path) -> None:
-    from pilot.core.bench.runtime import BenchRuntime
-
-    cli_root = _admin_source_checkout(tmp_path, src_mtime=100, built_mtime=1)
-    frontend = cli_root / "admin" / "frontend"
-    dist = cli_root / "admin" / "backend" / "static" / "dist"
-    assert BenchRuntime._admin_source_is_newer(frontend, dist) is True
-
-    import os
-
-    os.utime(dist / "index.html", (200, 200))  # built after the edit
-    assert BenchRuntime._admin_source_is_newer(frontend, dist) is False
-
-
-def test_start_rebuilds_admin_when_source_changed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_rebuilds_admin_in_a_dev_checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Staleness is decided inside build_admin_frontend (see test_frontend.py); this only
+    checks _ensure_admin_dist delegates to it whenever a dev checkout can build."""
     from pilot.core.bench.runtime import BenchRuntime
 
     cli_root = _admin_source_checkout(tmp_path, src_mtime=100, built_mtime=1)
@@ -1331,16 +1319,3 @@ def test_start_rebuilds_admin_when_source_changed(tmp_path: Path, monkeypatch: p
     BenchRuntime(make_bench(tmp_path))._ensure_admin_dist(lambda _message: None)
 
     build.assert_called_once_with(on_progress=ANY)
-
-
-def test_start_skips_admin_rebuild_when_fresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from pilot.core.bench.runtime import BenchRuntime
-
-    cli_root = _admin_source_checkout(tmp_path, src_mtime=1, built_mtime=100)
-    build = MagicMock()
-    monkeypatch.setattr("pilot.utils.cli_root", lambda: cli_root)
-    monkeypatch.setattr("admin.backend.frontend.build_admin_frontend", build)
-
-    BenchRuntime(make_bench(tmp_path))._ensure_admin_dist(lambda _message: None)
-
-    build.assert_not_called()

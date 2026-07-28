@@ -154,6 +154,18 @@ def waf_payload(config: BenchConfig) -> dict:
     }
 
 
+def active_tokens_payload(config: BenchConfig, bench_root: Path | None = None) -> list[dict]:
+    if bench_root is None:
+        return []
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
+
+    sessions = Session(Bench(config, bench_root)).active_sessions()
+    return [
+        {"jti": jti, **record} for jti, record in sorted(sessions.items(), key=lambda item: item[1]["exp"])
+    ]
+
+
 def s3_payload(config: BenchConfig) -> dict:
     return {
         "access_key": config.s3.access_key,

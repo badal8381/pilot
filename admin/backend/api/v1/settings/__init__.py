@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hmac
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import error_response
 from admin.backend.api.v1.settings.config import ConfigPatcher
-from admin.backend.middleware import client_ip
+from admin.backend.middleware import client_ip, rate_limit
 from pilot.config import (
     WAF_MODES,
     WAF_RULE_ACTIONS,
@@ -99,7 +100,10 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
             "process_manager": config.production.process_manager or "none",
             "enabled": config.production.enabled,
         },
-        "admin": {"domain": config.admin.domain, "tls": config.admin.tls},
+        "admin": {
+            "domain": config.admin.domain,
+            "tls": config.admin.tls,
+        },
         "letsencrypt": {"email": config.letsencrypt.email},
         "s3": s3_payload(config),
         "s3_providers": s3_provider_options(),
@@ -130,6 +134,14 @@ def llm_provider_options() -> list[dict]:
     from pilot.integrations.llm.registry import provider_options
 
     return provider_options()
+
+
+def _validate_new_password(new_password: str, current_password: str) -> str | None:
+    from pilot.internal.validators import validate_admin_password
+
+    if hmac.compare_digest(new_password, current_password):
+        return "New password must differ from the current password."
+    return validate_admin_password(new_password)
 
 
 @settings_bp.get("/llm/models")
@@ -173,6 +185,7 @@ def audit_log():
                 entry_type=request.args.get("type") or None,
                 site=request.args.get("site") or None,
                 status=request.args.get("status") or None,
+                jti=request.args.get("jti") or None,
                 limit=count,
             )
 
@@ -185,6 +198,28 @@ def audit_log():
 def my_ip():
     """Return the client IP the firewall should allow-list."""
     return jsonify({"ip": client_ip(default="")})
+
+
+@settings_bp.post("/admin-password")
+@rate_limit(5, 60, user_ip=True)
+def change_admin_password():
+    """Change the admin password. Leaves existing sessions alone - revoking them is a
+    separate, caller-confirmed step."""
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    bench = Bench(bench_root)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return error_response("malformed_request", "Expected a JSON object.", 400)
+
+    new_password = str(data.get("new_password", ""))
+    if error := _validate_new_password(new_password, bench.config.admin.password):
+        return error_response("invalid_password", error, 422)
+
+    with BenchConfig.open(bench_root) as config:
+        config.admin.password = new_password
+
+    bench.audit_action("session", {"event": "admin_password_changed"})
+    return jsonify({})
 
 
 @settings_bp.patch("")

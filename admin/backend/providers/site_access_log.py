@@ -8,7 +8,7 @@ from admin.backend.internal.timeline import TimelinePoint, build_timeline
 from admin.backend.providers.windowed_log import WindowedLogProvider
 from pilot.core.site.uptime_monitoring import PING_PATH
 
-_MAX_BUCKETS = 48
+_MAX_BUCKETS = 30
 _TOP_LIMIT = 5
 
 _LINE_RE = re.compile(
@@ -33,7 +33,9 @@ class SiteAccessLogProvider(WindowedLogProvider):
         return self._log_path.exists()
 
     def get_top_ips(self) -> dict:
-        return build_timeline(self._points(), _TOP_LIMIT, self._bucket_seconds, "count")
+        return build_timeline(
+            self._points(), _TOP_LIMIT, self._bucket_seconds, "count", self.to_epoch_ms(self.cutoff), self.now_ms()
+        )
 
     def _points(self) -> list[TimelinePoint]:
         points = []

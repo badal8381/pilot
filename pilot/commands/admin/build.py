@@ -16,4 +16,4 @@ class BuildAdminCommand(Command):
     def run(self) -> None:
         from admin.backend.frontend import build_admin_frontend
 
-        build_admin_frontend(on_progress=self.report)
+        build_admin_frontend(on_progress=self.report, force=True)

@@ -31,6 +31,17 @@ def test_filter_by_type_status_and_site(tmp_path) -> None:
     assert log.entries(limit=1)[0]["type"] == "activity"
 
 
+def test_filter_by_jti_matches_subject_or_actor(tmp_path) -> None:
+    log = AuditLog(_bench(tmp_path))
+    log.append("session", {"event": "issued", "jti": "a"})
+    log.append("session", {"event": "revoked", "jti": "a", "actor_jti": "b"})
+    log.append("session", {"event": "issued", "jti": "c"})
+
+    assert {e["event"] for e in log.entries(jti="a")} == {"issued", "revoked"}
+    assert [e["event"] for e in log.entries(jti="b")] == ["revoked"]
+    assert log.entries(jti="unknown") == []
+
+
 def test_entries_survive_site_removal(tmp_path) -> None:
     """The log is bench-wide, so an entry stays readable after its site is gone."""
     log = AuditLog(_bench(tmp_path))
@@ -90,3 +101,19 @@ def test_missing_and_corrupt_lines_are_tolerated(tmp_path) -> None:
     log.append("backup", {"site": "b"})
 
     assert [e["site"] for e in log.entries()] == ["b", "a"]
+
+
+def test_audit_action_swallows_append_failure(tmp_path, caplog) -> None:
+    """bench.audit_action is best-effort: a write failure is logged, never raised."""
+    import logging
+    from unittest.mock import patch
+
+    from pilot.config import BenchConfig
+    from pilot.core.bench import Bench
+
+    bench = Bench(BenchConfig.from_flat("t", {}), tmp_path)
+    caplog.set_level(logging.WARNING)
+    with patch("pilot.core.bench.audit_log.AuditLog.append", side_effect=OSError("disk full")):
+        bench.audit_action("session", {"event": "issued"})
+
+    assert "Audit log update skipped" in caplog.text

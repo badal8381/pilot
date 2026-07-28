@@ -89,13 +89,17 @@ def _backup_set_resource(s) -> dict:
 @require_scope(site_name)
 def download_backup_file(name: str, timestamp: str, file_id: str):
     bench_root = Path(current_app.config["BENCH_ROOT"])
+    bench = Bench(bench_root)
     try:
-        target = Bench(bench_root).site(name).backups.download_file_path(timestamp, file_id)
+        target = bench.site(name).backups.download_file_path(timestamp, file_id)
     except BenchError:
         return error_response("invalid_filename", "Backup filename is invalid.", 422)
     except Exception:
         return error_response("backup_not_found", "Backup file not found.", 404)
 
+    bench.audit_action(
+        "backup", {"site": name, "event": "download", "timestamp": timestamp, "file": file_id}
+    )
     return send_file(target, as_attachment=True, download_name=file_id)
 
 
@@ -109,13 +113,15 @@ def backup_download_links(name: str, timestamp: str):
     """Pre-signed S3 URLs for a backup run's files - the user downloads
     straight from the bucket, so this server never proxies the transfer."""
     bench_root = Path(current_app.config["BENCH_ROOT"])
+    bench = Bench(bench_root)
     try:
-        links = Bench(bench_root).site(name).backups.download_links(timestamp)
+        links = bench.site(name).backups.download_links(timestamp)
     except FileNotFoundError:
         return error_response("backup_not_found", "Offsite backup not found.", 404)
     except Exception:
         return internal_error("Could not create offsite backup URLs.")
 
+    bench.audit_action("backup", {"site": name, "event": "download", "timestamp": timestamp, "via": "s3"})
     return jsonify(links)
 
 

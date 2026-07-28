@@ -2,11 +2,30 @@
 
 import json
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from pilot.utils import open_private
 
 _FILE_RE = re.compile(r"^audit_\d{4}_\d{2}\.jsonl$")
+
+# Extra fields merged into every audit entry. The admin backend registers a provider that
+# reads the current request (IP + actor); the CLI/worker leave the empty default.
+def _context_provider() -> dict:
+    return {}
+
+
+def set_audit_context_provider(provider: Callable[[], dict]) -> None:
+    global _context_provider
+    _context_provider = provider
+
+
+def audit_context() -> dict:
+    """Registered context fields, or empty if none/failing. Never raises."""
+    try:
+        return _context_provider() or {}
+    except Exception:
+        return {}
 
 
 class AuditLog:
@@ -19,11 +38,11 @@ class AuditLog:
         with open_private(self._current_file(), "a") as handle:
             handle.write(json.dumps(record) + "\n")
 
-    def entries(self, entry_type=None, site=None, status=None, limit=None) -> list[dict]:
+    def entries(self, entry_type=None, site=None, status=None, jti=None, limit=None) -> list[dict]:
         """Return matching records newest first across weekly files."""
         matched = []
         for record in self._read_newest_first():
-            if self._matches(record, entry_type, site, status):
+            if self._matches(record, entry_type, site, status, jti):
                 matched.append(record)
                 if limit is not None and len(matched) >= limit:
                     break
@@ -67,11 +86,12 @@ class AuditLog:
                 yield tail.decode()
 
     @staticmethod
-    def _matches(record: dict, entry_type, site, status) -> bool:
+    def _matches(record: dict, entry_type, site, status, jti=None) -> bool:
         return (
             (entry_type is None or record.get("type") == entry_type)
             and (site is None or record.get("site") == site)
             and (status is None or record.get("status") == status)
+            and (jti is None or jti in (record.get("jti"), record.get("actor_jti")))
         )
 
     @staticmethod

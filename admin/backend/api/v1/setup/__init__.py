@@ -5,7 +5,11 @@ from pathlib import Path
 from flask import Blueprint, current_app, g, jsonify, request
 
 from admin.backend.api.responses import accepted_task_response, error_response, no_content_response
-from admin.backend.api.v1.setup.config import read_defaults, validate_configuration
+from admin.backend.api.v1.setup.config import (
+    apply_existing_local_database,
+    read_defaults,
+    validate_configuration,
+)
 from admin.backend.api.v1.setup.database import database_validation, database_validation_state
 from admin.backend.api.v1.setup.state import (
     clear_wizard_marker_if_idle,
@@ -13,7 +17,7 @@ from admin.backend.api.v1.setup.state import (
     setup_handoff_task,
     wizard_marker_path,
 )
-from admin.backend.middleware import allow_during_setup, set_session_cookie
+from admin.backend.middleware import allow_during_setup, client_ip, set_session_cookie
 from pilot.config import BenchConfig
 from pilot.config.bench import FRAMEWORK_BRANCHES
 from pilot.core.bench import Bench
@@ -77,6 +81,7 @@ def _update_configuration(bench_root: Path, data: dict):
             401,
         )
 
+    data = apply_existing_local_database(bench_root, data)
     settings = {**current, **data, "admin_enabled": True}
     error = validate_configuration(settings)
     if error:
@@ -110,13 +115,12 @@ def _update_configuration(bench_root: Path, data: dict):
 
 
 def _issue_setup_session(resp, toml_path: Path) -> None:
-    from admin.backend.auth import ensure_jwt_secret, issue_token
+    from admin.backend.internal.session import Session
 
-    set_session_cookie(
-        resp,
-        issue_token(ensure_jwt_secret(toml_path)),
-        current_app.config["SESSION_COOKIE_SECURE"],
-    )
+    bench = Bench(toml_path.parent)
+    token, jti = Session(bench).issue_session_token(ip=client_ip())
+    set_session_cookie(resp, token, current_app.config["SESSION_COOKIE_SECURE"])
+    bench.audit_action("session", {"event": "issued", "jti": jti, "scope": "bench", "via": "setup"})
 
 
 @setup_bp.post("/database-validations")
@@ -241,19 +245,9 @@ def _validate_finished_setup_task(bench_root: Path, task_id: str):
         )
     marker = wizard_marker_path(bench_root)
     with exclusive_file_lock(marker):
-        handoff = setup_handoff_task(bench_root)
-        if handoff is None or handoff.task_id != task_id:
-            return error_response(
-                "setup_task_mismatch",
-                "Task is not the current setup attempt.",
-                409,
-            )
-        if running_setup_task(bench_root):
-            return error_response(
-                "setup_active",
-                "Another setup task is still active.",
-                409,
-            )
+        conflict = _check_marker_claims_this_task(bench_root, marker, task_id)
+        if conflict is not None:
+            return conflict
         if not (bench_root / "config" / "Procfile").exists():
             return error_response(
                 "setup_not_initialized",
@@ -261,4 +255,21 @@ def _validate_finished_setup_task(bench_root: Path, task_id: str):
                 409,
             )
         marker.unlink(missing_ok=True)
+    return None
+
+
+def _check_marker_claims_this_task(bench_root: Path, marker: Path, task_id: str):
+    """Caller must already hold the marker's exclusive lock."""
+    if running_setup_task(bench_root):
+        return error_response("setup_active", "Another setup task is still active.", 409)
+
+    if not marker.exists():
+        return None
+    handoff = setup_handoff_task(bench_root)
+    if handoff is None or handoff.task_id != task_id:
+        return error_response(
+            "setup_task_mismatch",
+            "Task is not the current setup attempt.",
+            409,
+        )
     return None

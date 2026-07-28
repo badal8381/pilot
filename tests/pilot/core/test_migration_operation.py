@@ -618,7 +618,7 @@ def test_snapshot_creation_rejects_another_unresolved_owner(tmp_path: Path) -> N
         SiteMigrationBackup(site).create("current-operation")
 
 
-def test_bypass_patch_audit_failure_is_not_hidden(tmp_path: Path) -> None:
+def test_bypass_patch_records_audit(tmp_path: Path) -> None:
     mock_bench = MagicMock()
     mock_bench.path = tmp_path
     mock_bench.frappe_call = ["bench"]
@@ -631,11 +631,13 @@ def test_bypass_patch_audit_failure_is_not_hidden(tmp_path: Path) -> None:
     operation.failed_site = "site1.localhost"
     operation.diagnosis = {"patch": "frappe.patches.expected"}
 
-    with (
-        patch("pilot.utils.run_command", return_value=MagicMock(returncode=0)),
-        patch("pilot.core.bench.audit_log.AuditLog.append", side_effect=OSError("disk full")),
-        pytest.raises(OSError, match="disk full"),
-    ):
+    mock_bench.audit_action.reset_mock()
+    with patch("pilot.utils.run_command", return_value=MagicMock(returncode=0)):
         operation.bypass_patch("frappe.patches.expected")
 
+    mock_bench.audit_action.assert_called_once()
+    category, fields = mock_bench.audit_action.call_args.args
+    assert category == "bypass_patch"
+    assert fields["operation"] == operation.id
+    assert fields["patch"] == "frappe.patches.expected"
     assert operation.decisions[-1]["patch"] == "frappe.patches.expected"

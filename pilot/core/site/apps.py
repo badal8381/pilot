@@ -18,11 +18,15 @@ class SiteApps:
         self.site = site
 
     def install_app(self, app: "App") -> None:
-        run_command(
-            self.site._frappe_call("frappe", "--site", self.site.config.name, "install-app", app.config.name),
-            cwd=self.site.bench.sites_path,
-            stream_output=True,
-        )
+        self._clear_cache()
+        try:
+            run_command(
+                self.site._frappe_call("frappe", "--site", self.site.config.name, "install-app", app.config.name),
+                cwd=self.site.bench.sites_path,
+                stream_output=True,
+            )
+        finally:
+            self._clear_cache()
         self.site.bench.reload_workers(raises=True)
 
     def install_app_with_dependencies(self, app: "App") -> list["App"]:
@@ -50,8 +54,17 @@ class SiteApps:
         )
         if force:
             cmd.append("--force")
-        run_command(cmd, cwd=self.site.bench.sites_path, stream_output=True)
+        try:
+            run_command(cmd, cwd=self.site.bench.sites_path, stream_output=True)
+        finally:
+            self._clear_cache()
         self.site.bench.reload_workers(raises=True)
+
+    def _clear_cache(self) -> None:
+        run_command(
+            self.site._frappe_call("frappe", "--site", self.site.config.name, "clear-cache"),
+            cwd=self.site.bench.sites_path,
+        )
 
     def list_apps(self) -> list[str]:
         result = subprocess.run(

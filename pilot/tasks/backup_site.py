@@ -74,7 +74,7 @@ class BackupSiteTask(Task):
             return []
 
     def record(self, status: str, timestamp: str, files: dict, offsite: bool, pruned: list[str]) -> None:
-        self.record_audit(
+        self.bench.audit_action(
             "backup",
             {
                 "site": self.site,

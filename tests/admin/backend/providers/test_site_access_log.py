@@ -45,7 +45,8 @@ def test_filters_by_host(tmp_path: Path) -> None:
     site_b = SiteAccessLogProvider(root, "site-b.local", "1h").get_top_ips()
 
     assert site_a["categories"] == ["1.1.1.1"]
-    assert site_a["points"][0]["1.1.1.1"] == 2
+    point = next(p for p in site_a["points"] if "1.1.1.1" in p)
+    assert point["1.1.1.1"] == 2
     assert site_b["categories"] == ["2.2.2.2"]
 
 

@@ -178,6 +178,87 @@ def test_only_one_unauthenticated_request_can_claim_setup(
     assert BenchConfig.read(tmp_path).admin.password == "first-admin-secret"
 
 
+def _write_sibling_local_database(benches: Path, name: str, password: str) -> None:
+    sibling = benches / name
+    sibling.mkdir()
+    BenchConfig.write_flat(
+        sibling,
+        name,
+        {
+            "mariadb_password": password,
+            "mariadb_admin_user": "root",
+            "mariadb_host": "localhost",
+            "mariadb_port": 3306,
+        },
+    )
+
+
+def test_local_database_available_reflects_a_sibling_benchs_local_server(
+    tmp_path: Path,
+) -> None:
+    benches = tmp_path / "benches"
+    benches.mkdir()
+    _write_sibling_local_database(benches, "existing-bench", "sibling-secret")
+    client = setup_client(benches / "new-bench")
+
+    configuration = client.get("/api/v1/setup/configuration").get_json()
+
+    assert configuration["mariadb_local_available"] is True
+    assert configuration["postgres_local_available"] is False
+
+
+def test_local_database_unavailable_without_a_configured_sibling(tmp_path: Path) -> None:
+    benches = tmp_path / "benches"
+    benches.mkdir()
+    solo_bench = benches / "solo-bench"
+    solo_bench.mkdir()
+    client = setup_client(solo_bench)
+
+    configuration = client.get("/api/v1/setup/configuration").get_json()
+
+    assert configuration["mariadb_local_available"] is False
+    assert configuration["postgres_local_available"] is False
+
+
+def test_existing_local_database_mode_copies_sibling_credentials(tmp_path: Path) -> None:
+    benches = tmp_path / "benches"
+    benches.mkdir()
+    _write_sibling_local_database(benches, "existing-bench", "sibling-secret")
+    bench_root = benches / "new-bench"
+    bench_root.mkdir()
+    client = setup_client(bench_root)
+
+    response = client.put(
+        "/api/v1/setup/configuration",
+        json={"admin_password": "admin-secret", "db_type": "mariadb", "db_mode": "existing_local"},
+    )
+
+    assert response.status_code == 200
+    assert "mariadb_password" not in response.get_json()
+    config = BenchConfig.read(bench_root)
+    assert config.mariadb.root_password == "sibling-secret"
+    assert config.mariadb.existing is False
+    assert config.mariadb.host == "localhost"
+
+
+def test_existing_local_database_mode_without_a_sibling_still_requires_a_password(
+    tmp_path: Path,
+) -> None:
+    benches = tmp_path / "benches"
+    benches.mkdir()
+    solo_bench = benches / "solo-bench"
+    solo_bench.mkdir()
+    client = setup_client(solo_bench)
+
+    response = client.put(
+        "/api/v1/setup/configuration",
+        json={"admin_password": "admin-secret", "db_type": "mariadb", "db_mode": "existing_local"},
+    )
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == "invalid_setup_configuration"
+
+
 def test_database_validation_uses_one_engine_neutral_resource(tmp_path: Path) -> None:
     client = setup_client(tmp_path)
     with patch("pilot.managers.database.MariaDBManager") as manager_class:
@@ -381,3 +462,24 @@ def test_finish_requires_the_marker_bound_task(tmp_path: Path) -> None:
     assert response.status_code == 409
     assert response.get_json()["error"]["code"] == "setup_task_mismatch"
     assert (tmp_path / ".wizard-active").exists()
+
+
+def test_finish_is_retryable_after_the_marker_was_already_cleared(tmp_path: Path) -> None:
+    """A client can lose the response to a successful finish() and retry -
+    that retry must still succeed rather than 409 just because the marker
+    is already gone."""
+    client = setup_client(tmp_path)
+    assert save_configuration(client).status_code == 200
+    task_id = start_setup(client).get_json()["task_id"]
+    complete_task(tmp_path, task_id)
+    procfile = tmp_path / "config" / "Procfile"
+    procfile.parent.mkdir()
+    procfile.touch()
+    first = client.post("/api/v1/setup/actions/finish", json={"task_id": task_id})
+    assert first.status_code == 204
+    assert not (tmp_path / ".wizard-active").exists()
+
+    retry = client.post("/api/v1/setup/actions/finish", json={"task_id": task_id})
+
+    assert retry.status_code == 204
+    assert not (tmp_path / ".wizard-active").exists()

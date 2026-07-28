@@ -57,7 +57,7 @@ class DeleteBackupTask(Task):
         self.record(deleted, offsite)
 
     def record(self, deleted: list[str], offsite: bool) -> None:
-        self.record_audit(
+        self.bench.audit_action(
             "backup",
             {
                 "site": self.site,

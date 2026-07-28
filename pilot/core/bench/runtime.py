@@ -143,33 +143,26 @@ class BenchRuntime:
         self.bench.write_common_site_config()
 
     def _ensure_admin_dist(self, on_progress: Callable[[str], None]) -> None:
-        from admin.backend.frontend import build_admin_frontend
         from pilot import is_dev_build
         from pilot.utils import cli_root
 
         root = cli_root()
-        dist = root / "admin" / "backend" / "static" / "dist"
-        frontend = root / "admin" / "frontend"
+        dist = root / "admin" / "backend" / "static" / "dashboard"
+        frontend = root / "admin" / "frontend" / "dashboard"
         # Releases ship the source too; only dev builds may (re)compile it.
         can_build = is_dev_build and (frontend / "package.json").exists()
 
-        if not (dist / "assets").exists():
-            if not can_build:
-                raise BenchError(
-                    "Admin UI is missing from this release. Reinstall bench-cli, "
-                    "or run it from a source checkout."
-                )
-            on_progress("Admin UI not built yet; building it now...")
-            build_admin_frontend(on_progress=on_progress)
-            return
-
-        if can_build and self._admin_source_is_newer(frontend, dist):
+        if not (dist / "assets").exists() and not can_build:
+            raise BenchError(
+                "Admin UI is missing from this release. Reinstall bench-cli, "
+                "or run it from a source checkout."
+            )
+        if can_build:
             self._rebuild_admin(on_progress)
 
     def _rebuild_admin(self, on_progress: Callable[[str], None]) -> None:
         from admin.backend.frontend import build_admin_frontend
 
-        on_progress("Admin UI source changed since last build; rebuilding...")
         try:
             build_admin_frontend(on_progress=on_progress)
         except BenchError as error:
@@ -184,7 +177,7 @@ class BenchRuntime:
         admin_mgr = AdminEnvManager(root)
         admin_mgr.ensure()
 
-        assets = root / "admin" / "backend" / "static" / "dist" / "assets"
+        assets = root / "admin" / "backend" / "static" / "dashboard" / "assets"
         if not assets.exists():
             ensure_admin_frontend(on_progress)
 
@@ -224,18 +217,6 @@ class BenchRuntime:
 
     def _is_initialized(self) -> bool:
         return self.bench.python.exists()
-
-    @staticmethod
-    def _admin_source_is_newer(frontend, dist) -> bool:
-        built_at = (dist / "index.html").stat().st_mtime
-        for name in ("src", "index.html", "package.json", "vite.config.js"):
-            path = frontend / name
-            if path.is_dir():
-                if any(f.stat().st_mtime > built_at for f in path.rglob("*") if f.is_file()):
-                    return True
-            elif path.exists() and path.stat().st_mtime > built_at:
-                return True
-        return False
 
     def _install_python_requirements(self, on_progress: Callable[[str], None]) -> None:
         from pilot.managers.environment import PythonEnvManager

@@ -22,6 +22,16 @@ def _request(site: str, when: datetime, path: str, duration: int = 1_000_000) ->
     }
 
 
+def _job(site: str, when: datetime, method: str, duration: int = 1_000_000) -> dict:
+    return {
+        "timestamp": when.isoformat(),
+        "site": site,
+        "transaction_type": "job",
+        "duration": duration,
+        "job": {"method": method},
+    }
+
+
 def _write_log(tmp_path: Path, records: list[dict]) -> Path:
     logs = tmp_path / "logs"
     logs.mkdir(exist_ok=True)
@@ -49,6 +59,76 @@ def test_slowest_requests_still_includes_ping(tmp_path: Path) -> None:
     assert result["slowest_requests"]["categories"] == ["/api/method/ping"]
 
 
+def test_requests_over_time_counts_all_non_ping_requests(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+    records = [_request("site-a.local", now, "/api/method/ping")]
+    records += [_request("site-a.local", now, "/app/todo") for _ in range(3)]
+    records.append(_request("site-a.local", now, "/app/other"))
+    root = _write_log(tmp_path, records)
+
+    result = SiteMonitoringProvider(root, "site-a.local", "1h").get_analytics()
+
+    assert result["requests_over_time"]["categories"] == ["Requests"]
+    assert sum(p["Requests"] for p in result["requests_over_time"]["points"]) == 4
+
+
+def test_requests_over_time_zero_fills_empty_buckets(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+    root = _write_log(tmp_path, [_request("site-a.local", now, "/app/todo")])
+
+    result = SiteMonitoringProvider(root, "site-a.local", "30m").get_analytics()
+
+    points = result["requests_over_time"]["points"]
+    assert len(points) > 1
+    assert sum(p["Requests"] for p in points) == 1
+    assert any(p["Requests"] == 0 for p in points)
+
+
+def test_avg_request_duration_does_not_zero_fill(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+    root = _write_log(tmp_path, [_request("site-a.local", now, "/app/todo", duration=2_000_000)])
+
+    result = SiteMonitoringProvider(root, "site-a.local", "30m").get_analytics()
+
+    points = result["avg_request_duration"]["points"]
+    populated = [p for p in points if "/app/todo" in p]
+    assert len(points) > 1
+    assert populated == [{"time": populated[0]["time"], "/app/todo": 2.0}]
+
+
+def test_avg_request_duration_breaks_down_by_path(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+    records = [
+        _request("site-a.local", now, "/app/a", duration=1_000_000),
+        _request("site-a.local", now, "/app/a", duration=3_000_000),
+        _request("site-a.local", now, "/app/b", duration=6_000_000),
+    ]
+    root = _write_log(tmp_path, records)
+
+    result = SiteMonitoringProvider(root, "site-a.local", "1h").get_analytics()
+
+    point = next(p for p in result["avg_request_duration"]["points"] if "/app/a" in p)
+    assert point["/app/a"] == 2.0
+    assert point["/app/b"] == 6.0
+
+
+def test_background_jobs_over_time_and_avg_duration(tmp_path: Path) -> None:
+    now = datetime.now(UTC)
+    records = [
+        _job("site-a.local", now, "app.tasks.a", duration=2_000_000),
+        _job("site-a.local", now, "app.tasks.a", duration=4_000_000),
+        _job("site-a.local", now, "app.tasks.b", duration=8_000_000),
+    ]
+    root = _write_log(tmp_path, records)
+
+    result = SiteMonitoringProvider(root, "site-a.local", "1h").get_analytics()
+
+    assert sum(p["Jobs"] for p in result["background_jobs_over_time"]["points"]) == 3
+    point = next(p for p in result["avg_job_duration"]["points"] if "app.tasks.a" in p)
+    assert point["app.tasks.a"] == 3.0
+    assert point["app.tasks.b"] == 8.0
+
+
 def _site_root(tmp_path: Path, site: str, db_name: str) -> Path:
     site_dir = tmp_path / "sites" / site
     site_dir.mkdir(parents=True)
@@ -72,7 +152,8 @@ def test_slow_query_timelines_scoped_to_site_db(tmp_path: Path) -> None:
 
     assert result["frequent_slow_queries"]["categories"] == ["SELECT ?"]
     assert result["slowest_queries"]["categories"] == ["SELECT ?"]
-    assert result["slowest_queries"]["points"][0]["SELECT ?"] == 1.5
+    point = next(p for p in result["slowest_queries"]["points"] if "SELECT ?" in p)
+    assert point["SELECT ?"] == 1.5
 
 
 def test_slow_query_timeline_empty_for_unknown_site(tmp_path: Path) -> None:

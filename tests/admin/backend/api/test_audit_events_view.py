@@ -10,17 +10,17 @@ from pilot.config import BenchConfig
 
 def _client(bench_root: Path, password: str = "secret"):
     from admin.backend.app import create_app
-    from admin.backend.auth import ensure_jwt_secret, issue_token
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
 
     bench_root.mkdir(parents=True, exist_ok=True)
     (bench_root / "bench.toml").write_text(
         BenchConfig.from_flat(bench_root.name, {"admin_enabled": True, "admin_password": password}).dumps()
     )
-    secret = ensure_jwt_secret(bench_root / "bench.toml")
     app = create_app(bench_root)
     app.config["TESTING"] = True
     client = app.test_client()
-    client.set_cookie("sid", issue_token(secret))
+    client.set_cookie("sid", Session(Bench(bench_root)).issue_session_token()[0])
     return client
 
 
@@ -79,6 +79,17 @@ def test_limit_is_capped_at_the_hard_maximum(tmp_path: Path) -> None:
     body = response.get_json()
     assert body["meta"]["limit"] == 500
     assert len(body["data"]) == 500
+
+
+def test_jti_query_param_is_passed_through_to_entries(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    client = _client(bench_root)
+    log = _mock_log([])
+
+    with patch("pilot.core.bench.audit_log.AuditLog", return_value=log):
+        client.get("/api/v1/audit-events", query_string={"jti": "abc"})
+
+    assert log.entries.call_args.kwargs["jti"] == "abc"
 
 
 def test_an_invalid_cursor_is_treated_as_the_start(tmp_path: Path) -> None:

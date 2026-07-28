@@ -17,14 +17,14 @@ def _write_bench_toml(bench_dir: Path, name: str, **settings) -> None:
 
 def _client(bench_root: Path, password: str = "secret"):
     from admin.backend.app import create_app
-    from admin.backend.auth import ensure_jwt_secret, issue_token
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
 
     _write_bench_toml(bench_root, bench_root.name, admin_enabled=True, admin_password=password)
-    secret = ensure_jwt_secret(bench_root / "bench.toml")
     app = create_app(bench_root)
     app.config["TESTING"] = True
     client = app.test_client()
-    client.set_cookie("sid", issue_token(secret))
+    client.set_cookie("sid", Session(Bench(bench_root)).issue_session_token()[0])
     return client
 
 

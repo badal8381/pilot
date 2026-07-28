@@ -26,7 +26,8 @@ def _client(
     db_type: str = "mariadb",
 ):
     from admin.backend.app import create_app
-    from admin.backend.auth import ensure_jwt_secret, issue_token
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
 
     bench_root.mkdir(parents=True, exist_ok=True)
     flat = {
@@ -36,11 +37,10 @@ def _client(
         "db_type": db_type,
     }
     (bench_root / "bench.toml").write_text(BenchConfig.from_flat(bench_root.name, flat).dumps())
-    secret = ensure_jwt_secret(bench_root / "bench.toml")
     app = create_app(bench_root)
     app.config["TESTING"] = True
     client = app.test_client()
-    client.set_cookie("sid", issue_token(secret))
+    client.set_cookie("sid", Session(Bench(bench_root)).issue_session_token()[0])
     return client
 
 
