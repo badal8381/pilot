@@ -62,17 +62,19 @@ const barParts = computed(() => {
   </div>
 
   <dl v-if="legend" class="mt-3">
-    <div
-      v-for="part in visibleParts"
-      :key="part.label"
-      class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
-    >
-      <dt class="flex items-center gap-2 min-w-0">
-        <span class="rounded-full size-2 shrink-0" :style="{ backgroundColor: part.color }" />
-        <span class="text-ink-gray-7 text-sm truncate">{{ part.label }}</span>
-      </dt>
-      <dd class="text-ink-gray-8 text-sm tabular-nums shrink-0">{{ part.text }}</dd>
-    </div>
+    <template v-for="part in visibleParts" :key="part.label">
+      <slot name="row" :part="part">
+        <div
+          class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0"
+        >
+          <dt class="flex items-center gap-2 min-w-0">
+            <span class="rounded-full size-2 shrink-0" :style="{ backgroundColor: part.color }" />
+            <span class="text-ink-gray-7 text-sm truncate">{{ part.label }}</span>
+          </dt>
+          <dd class="text-ink-gray-8 text-sm tabular-nums shrink-0">{{ part.text }}</dd>
+        </div>
+      </slot>
+    </template>
   </dl>
 
   <button
