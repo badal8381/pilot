@@ -8,16 +8,13 @@ import time
 import pyotp
 
 from pilot.core.bench import Bench
+from pilot.exceptions import TwoFactorError
 from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
 
 # One step either side of now, so a phone whose clock drifts slightly still works.
 DRIFT_STEPS = 1
 # An enrollment nobody completes is dropped, so an abandoned secret cannot linger.
 PENDING_TTL = 24 * 3600
-
-
-class TwoFactorError(Exception):
-    """Raised when an enrollment request cannot be honoured."""
 
 
 class TotpCredentialStore:
@@ -49,6 +46,11 @@ class TotpCredentialStore:
         credential_id = secrets.token_urlsafe(8)
         with exclusive_file_lock(self._path):
             entries = self._prune(self._load_raw())
+
+            if len(entries) >= 10:
+                # This effectively means we don't allow for more than 10 concurrent logins in a 30s window.
+                raise TwoFactorError("Too many enrolled devices.")
+
             entries[credential_id] = {
                 "label": label,
                 "secret": secret,
