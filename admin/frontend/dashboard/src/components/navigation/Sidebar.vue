@@ -37,11 +37,12 @@ function isActive(to) {
     class="border-r dark:border-outline-gray-2"
     :class="isMobile ? '!w-full !border-r-0 mobile-sidebar bg-transparent' : ''"
   >
-    <SidebarHeader v-if="!isMobile" title="Pilot" :menu-items="menuItems">
-      <template #logo>
-        <PilotLogo class="size-8" />
-      </template>
-    </SidebarHeader>
+    <SidebarHeader
+      v-if="!isMobile"
+      title="Pilot"
+      :menu-items="menuItems"
+      :logo="PilotLogo"
+    /> 
 
     <nav class="flex-1 overflow-y-auto px-2 pt-2">
       <template v-for="section in visibleSections" :key="section.label || 'main'">
