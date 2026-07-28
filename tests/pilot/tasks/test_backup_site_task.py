@@ -17,6 +17,7 @@ def _task(tmp_path):
         config=SimpleNamespace(s3=SimpleNamespace(is_configured=False)),
     )
     bench.site = lambda name: Site(SiteConfig(name=name, apps=[]), bench)
+    bench.audit_action = lambda category, fields: AuditLog(bench).append(category, fields)
     (bench.sites_path / "site1" / "private" / "backups").mkdir(parents=True)
     return BackupSiteTask(bench=bench, bench_root=tmp_path, site="site1", with_files=False), bench
 

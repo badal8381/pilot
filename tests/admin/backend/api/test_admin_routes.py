@@ -69,18 +69,18 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         if rule.rule.startswith(f"{API_ROOT_PREFIX}/") and not rule.rule.startswith(f"{API_V1_PREFIX}/")
     ]
 
-    assert len(routes) == 148
+    assert len(routes) == 150
     assert unversioned == []
-    assert len({(method, path) for method, path, _, _ in routes}) == 148
+    assert len({(method, path) for method, path, _, _ in routes}) == 150
     assert Counter(method for method, _, _, _ in routes) == {
         "DELETE": 11,
         "GET": 79,
         "PATCH": 4,
-        "POST": 49,
+        "POST": 51,
         "PUT": 5,
     }
     assert Counter(policy for _, _, _, policy in routes) == {
-        "authenticated": 98,
+        "authenticated": 100,
         "authenticated+bench-management": 9,
         "authenticated+site-scope": 30,
         "open": 5,
@@ -107,12 +107,12 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         "network": 1,
         "updates": 1,
         "runtime": 4,
-        "settings": 3,
+        "settings": 4,
         "setup": 6,
         "sites": 33,
         "ssh-keys": 3,
         "metrics": 1,
-        "session": 3,
+        "session": 4,
         "storage": 1,
         "system": 1,
         "task-worker": 3,
@@ -208,6 +208,7 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         ("GET", "/api/v1/settings"),
         ("PATCH", "/api/v1/settings"),
         ("GET", "/api/v1/settings/llm/models"),
+        ("POST", "/api/v1/settings/admin-password"),
         ("GET", "/api/v1/audit-events"),
         ("GET", "/api/v1/network/client"),
         ("GET", "/api/v1/ssh-keys"),

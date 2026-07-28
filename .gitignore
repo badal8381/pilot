@@ -62,6 +62,8 @@ admin/frontend/dashboard/node_modules/
 admin/frontend/editor/node_modules/
 admin/backend/static/dashboard/
 admin/backend/static/editor/
+admin/frontend/node_modules
+admin/frontend/components.d.ts
 admin/frontend/dashboard/components.d.ts
 admin/frontend/editor/components.d.ts
 admin/frontend/dashboard/src/types/
