@@ -53,7 +53,7 @@ def test_build_frontend_skips_when_dist_already_exists(tmp_path: Path) -> None:
     run_command.assert_not_called()
 
 
-def test_build_frontend_skips_when_embed_iife_exists(tmp_path: Path) -> None:
+def test_build_frontend_skips_when_in_app_embed_iife_exists(tmp_path: Path) -> None:
     frontend_dir = tmp_path / "frontend"
     dist_dir = tmp_path / "dist"
     frontend_dir.mkdir(parents=True)
@@ -61,7 +61,7 @@ def test_build_frontend_skips_when_embed_iife_exists(tmp_path: Path) -> None:
     (dist_dir / "cloud-settings.js").write_text("// iife")
 
     with patch("pilot.utils.run_command") as run_command:
-        frontend._build_frontend(frontend_dir, dist_dir, "embed", lambda message: None)
+        frontend._build_frontend(frontend_dir, dist_dir, "in-app-embed", lambda message: None)
     run_command.assert_not_called()
 
 

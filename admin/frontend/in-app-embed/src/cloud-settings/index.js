@@ -1,4 +1,4 @@
-/* Cloud Settings embed entry.
+/* Cloud Settings in-app embed entry.
  *
  * Pilot owns the whole dialog, registered as a shadow-DOM custom element so
  * Tailwind's reset and frappe-ui's styles cannot reach Desk (and vice versa).

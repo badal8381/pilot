@@ -1,4 +1,4 @@
-// Cloud Settings embed build.
+// Cloud Settings in-app embed build.
 //
 // Ships a classic-script IIFE so Desk can `<script src>` it cross-origin with no
 // CORS and no Pilot credentials. The dialog renders inside a shadow root, so all
@@ -27,7 +27,7 @@ export default defineConfig({
     {
       name: "cloud-settings-drop-css-assets",
       closeBundle() {
-        const dir = path.resolve(__dirname, "../../backend/static/embed/cloud-settings/assets");
+        const dir = path.resolve(__dirname, "../../backend/static/in-app-embed/cloud-settings/assets");
         if (!fs.existsSync(dir)) return;
         for (const file of fs.readdirSync(dir)) {
           if (file.endsWith(".css")) fs.rmSync(path.join(dir, file));
@@ -47,7 +47,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../../backend/static/embed/cloud-settings",
+    outDir: "../../backend/static/in-app-embed/cloud-settings",
     emptyOutDir: true,
     cssCodeSplit: false,
     sourcemap: false,
