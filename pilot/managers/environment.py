@@ -225,33 +225,6 @@ class PythonEnvManager:
     def build_assets_for_app(self, app: "App") -> None:
         self._assets.build_assets_for_app(app)
 
-    def _ensure_yarn_install(self, path: Path) -> None:
-        self._assets.ensure_yarn_install(path)
-
-    def _try_download_prebuilt_assets(self, app: "App", app_public_dir: Path, dist_dir: Path) -> bool:
-        return self._assets.try_download_prebuilt_assets(app, app_public_dir, dist_dir)
-
-    @staticmethod
-    def _release_asset_url(app: "App", branch: str) -> str | None:
-        return PythonAssetBuilder.release_asset_url(app, branch)
-
-    @staticmethod
-    def _download_and_extract(url: str, dest_dir: Path) -> bool:
-        return PythonAssetBuilder.download_and_extract(url, dest_dir)
-
-    def _has_prebuilt_assets(self, dist_dir: Path) -> bool:
-        return PythonAssetBuilder.has_prebuilt_assets(dist_dir)
-
-    def _setup_prebuilt_assets(self, app_name: str, app_public_dir: Path, dist_dir: Path) -> None:
-        self._assets.setup_prebuilt_assets(app_name, app_public_dir, dist_dir)
-
-    def _write_assets_json(self, app_name: str, dist_dir: Path, assets_dir: Path) -> None:
-        self._assets.write_assets_json(app_name, dist_dir, assets_dir)
-
-    @staticmethod
-    def _merge_json(path: Path, new_entries: dict) -> None:
-        PythonAssetBuilder.merge_json(path, new_entries)
-
     def _ensure_uv(self) -> str:
         uv = shutil.which("uv")
         if uv:
