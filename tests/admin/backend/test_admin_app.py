@@ -312,10 +312,9 @@ def test_api_benches_create_routes_wizard_at_domain_when_production(tmp_path: Pa
     mock_apply.assert_not_called()
     assert data["scheme"] == "http"
     fresh_toml = (benches_dir / "fresh" / "bench.toml").read_text()
-    # The sibling production bench serves TLS, so the new one inherits that choice
-    # (applied once WizardSetupTask brings it up for real) instead of being
-    # forced onto plain HTTP.
-    assert "tls = true" in fresh_toml
+    # admin.tls is a per-bench choice, not inherited from a production sibling -
+    # the new bench starts on plain HTTP until its own wizard/setup requests TLS.
+    assert "tls = false" in fresh_toml
     # production.enabled stays false until the wizard's init + SetupProductionCommand
     # actually finish - a half-built deployment must never look "done" to the switcher.
     assert "enabled = false" in fresh_toml.split("[production]")[1].split("[")[0]

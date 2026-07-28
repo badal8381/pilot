@@ -14,7 +14,10 @@ if TYPE_CHECKING:
 
 
 class BenchCreator:
-    """Creates a bench and inherits server-wide settings from siblings."""
+    """Creates a bench. Host-shared settings (MariaDB/Postgres server, ACME
+    email, admin JWKS trust) live in common_config.toml and are merged in
+    automatically by BenchConfig - only a first-ever database needs seeding
+    here."""
 
     def __init__(
         self,
@@ -29,7 +32,6 @@ class BenchCreator:
         self.name = name
         self.process_manager = process_manager
         self.admin_domain = admin_domain
-        # None → inherit the server-wide value from a sibling bench (default False).
         self.admin_tls = admin_tls
         self.db_type = db_type
 
@@ -67,114 +69,38 @@ class BenchCreator:
         settings = {
             "admin_enabled": True,
             "admin_domain": self.admin_domain,
-            "admin_tls": self._admin_tls_setting(),
+            # admin.tls is a per-bench choice, not inherited from siblings.
+            "admin_tls": bool(self.admin_tls),
             "db_type": self.db_type,
         }
         self._add_database_settings(settings)
-        self._add_production_settings(settings)
-        self._add_shared_admin_settings(settings)
-        return settings
-
-    def _admin_tls_setting(self) -> bool:
-        if self.admin_tls is not None:
-            return self.admin_tls
-        return self._sibling_admin_tls()
-
-    def _add_database_settings(self, settings: dict) -> None:
-        if self.db_type == "mariadb":
-            settings["mariadb_port"] = self._sibling_mariadb_port() or self._pick_mariadb_port()
-            settings["mariadb_password"] = self._sibling_mariadb_password() or secrets.token_hex(nbytes=8)
-        if self.db_type == "postgres":
-            settings["postgres_port"] = self._sibling_postgres_port() or self._pick_postgres_port()
-            settings["postgres_password"] = self._sibling_postgres_password() or secrets.token_hex(nbytes=8)
-
-    def _add_production_settings(self, settings: dict) -> None:
         if self.process_manager:
             settings["production_process_manager"] = self.process_manager
+        return settings
 
-    def _add_shared_admin_settings(self, settings: dict) -> None:
-        sibling_email = self._sibling_letsencrypt_email()
-        if sibling_email:
-            settings["letsencrypt_email"] = sibling_email
+    def _add_database_settings(self, settings: dict) -> None:
+        """Pick a fresh port/password only the first time this host
+        provisions the server; later benches inherit them automatically
+        through BenchConfig's merge with common_config.toml."""
+        from pilot.config import BenchConfig, MariaDBConfig, PostgresConfig
 
-        sibling_admin = self._sibling_jwks_admin()
-        if sibling_admin:
-            settings["admin_jwks_url"] = sibling_admin.jwks_url
-            if sibling_admin.jwks_audience:
-                settings["admin_jwks_audience"] = sibling_admin.jwks_audience
+        defaults = BenchConfig.default(benches_root=self.target_directory.parent)
+        if self.db_type == "mariadb" and not defaults.mariadb.root_password:
+            settings["mariadb_port"] = self._pick_free_port(MariaDBConfig().port)
+            settings["mariadb_password"] = secrets.token_hex(nbytes=8)
+        if self.db_type == "postgres" and not defaults.postgres.root_password:
+            settings["postgres_port"] = self._pick_free_port(PostgresConfig().port)
+            settings["postgres_password"] = secrets.token_hex(nbytes=8)
 
-    def _sibling_letsencrypt_email(self) -> str:
-        """Return the shared Let's Encrypt email from a sibling bench."""
-        for _, config in iter_sibling_benches(self.target_directory):
-            email = getattr(config.letsencrypt, "email", "")
-            if email:
-                return email
-        return ""
-
-    def _sibling_mariadb_port(self) -> int:
-        """Return the shared MariaDB port from a sibling bench."""
-        for _, config in iter_sibling_benches(self.target_directory):
-            if config.db_type == "mariadb" and config.mariadb.port:
-                return config.mariadb.port
-        return 0
-
-    def _pick_mariadb_port(self) -> int:
-        """Pick the first free MariaDB port for the first bench on this host."""
-        from pilot.config import MariaDBConfig
+    def _pick_free_port(self, port: int) -> int:
+        """Pick the first free port at or after `port`, for the first bench on this host."""
         from pilot.managers.platform import is_macos
 
-        port = MariaDBConfig().port
         if is_macos():
             return port
         while self._port_is_live(port):
             port += 1
         return port
-
-    def _sibling_mariadb_password(self) -> str:
-        """Return the shared MariaDB root password from a sibling bench."""
-        for _, config in iter_sibling_benches(self.target_directory):
-            if config.db_type == "mariadb" and config.mariadb.root_password:
-                return config.mariadb.root_password
-        return ""
-
-    def _sibling_postgres_port(self) -> int:
-        """Return the shared PostgreSQL port from a sibling bench."""
-        for _, config in iter_sibling_benches(self.target_directory):
-            if config.db_type == "postgres" and config.postgres.port:
-                return config.postgres.port
-        return 0
-
-    def _pick_postgres_port(self) -> int:
-        """Pick the first free PostgreSQL port for the first bench on this host."""
-        from pilot.config import PostgresConfig
-        from pilot.managers.platform import is_macos
-
-        port = PostgresConfig().port
-        if is_macos():
-            return port
-        while self._port_is_live(port):
-            port += 1
-        return port
-
-    def _sibling_postgres_password(self) -> str:
-        """Return the shared PostgreSQL password from a sibling bench."""
-        for _, config in iter_sibling_benches(self.target_directory):
-            if config.db_type == "postgres" and config.postgres.root_password:
-                return config.postgres.root_password
-        return ""
-
-    def _sibling_jwks_admin(self):
-        """Return sibling admin config that trusts a remote JWKS issuer."""
-        for _, config in iter_sibling_benches(self.target_directory):
-            if getattr(config.admin, "jwks_url", ""):
-                return config.admin
-        return None
-
-    def _sibling_admin_tls(self) -> bool:
-        """Return the server-wide admin TLS choice from a sibling bench."""
-        for _, config in iter_sibling_benches(self.target_directory):
-            return bool(getattr(config.admin, "tls", False))
-        return False
 
     def _pick_port_offset(self, bench_path: Path) -> int:
         """Pick the first base-port offset unused by configs or live processes."""

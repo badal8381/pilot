@@ -56,8 +56,11 @@ def test_enroll_exchanges_seed_and_persists_credential_and_jwks(tmp_path: Path) 
     saved = BenchConfig.read_raw(bench.path)
     assert saved["central"]["auth_token"] == "pilot-token-abc"
     assert "bootstrap_token" not in saved["central"]
-    assert saved["admin"]["jwks_url"] == _ENROLL_RESULT["jwks_url"]
-    assert saved["admin"]["jwks_audience"] == "vm-boot-1"
+
+    # admin.jwks_* is host-shared (common_config.toml), not a bench.toml field.
+    reloaded = BenchConfig.read(bench.path)
+    assert reloaded.admin.jwks_url == _ENROLL_RESULT["jwks_url"]
+    assert reloaded.admin.jwks_audience == "vm-boot-1"
 
     assert bench.config.central.auth_token == "pilot-token-abc"
     assert bench.config.central.bootstrap_token == ""

@@ -61,21 +61,21 @@ def database_validation(bench_root: Path, data: dict):
 
 
 def local_database_credentials(bench_root: Path, engine: str) -> dict | None:
-    """Credentials for the shared local <engine> server, copied from a sibling
-    bench that already configured it (never an external/'existing' server)."""
-    from pilot.utils import iter_sibling_benches
+    """Credentials for the shared local <engine> server, already recorded in
+    common_config.toml once any bench on this host has set it up (never an
+    external/'existing' server)."""
+    from pilot.config.common import CommonConfig
 
-    for _, config in iter_sibling_benches(bench_root):
-        section = config.mariadb if engine == "mariadb" else config.postgres
-        if section.existing or not section.root_password:
-            continue
-        return {
-            "host": section.host,
-            "port": section.port,
-            "admin_user": section.admin_user,
-            "password": section.root_password,
-        }
-    return None
+    common = CommonConfig.read(bench_root.parent)
+    section = common.mariadb if engine == "mariadb" else common.postgres
+    if section.existing or not section.root_password:
+        return None
+    return {
+        "host": section.host,
+        "port": section.port,
+        "admin_user": section.admin_user,
+        "password": section.root_password,
+    }
 
 
 def database_validation_state(manager, password: str, existing: bool) -> str:

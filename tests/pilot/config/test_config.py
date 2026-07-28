@@ -10,14 +10,15 @@ from pilot.config import (
     WafCondition,
     WafRule,
 )
+from pilot.config.common import CommonConfig
 from pilot.config.worker import WorkerGroup
 from pilot.exceptions import ConfigError
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 
 
-def load_from_dict(data: dict) -> BenchConfig:
-    config = BenchConfig._from_dict(data)
+def load_from_dict(data: dict, common: CommonConfig | None = None) -> BenchConfig:
+    config = BenchConfig._from_dict(data, common=common)
     config.validate()
     return config
 
@@ -25,7 +26,6 @@ def load_from_dict(data: dict) -> BenchConfig:
 MINIMAL_VALID_DATA: dict = {
     "bench": {"name": "test-bench", "python": "3.14"},
     "apps": [{"name": "frappe", "repo": "https://github.com/frappe/frappe", "branch": "version-16"}],
-    "mariadb": {"root_password": "root"},
     "redis": {"cache_port": 13000, "queue_port": 11000},
     "admin": {"domain": "admin.test.localhost"},
 }
@@ -41,10 +41,6 @@ def test_load_minimal_config() -> None:
     assert config.apps[0].name == "frappe"
     assert config.apps[0].repo == "https://github.com/frappe/frappe"
     assert config.apps[0].branch == "version-16"
-
-    assert config.mariadb.root_password == "root"
-    assert config.mariadb.host == "localhost"
-    assert config.mariadb.port == 3306
 
     assert config.redis.cache_port == 13000
     assert config.redis.queue_port == 11000
@@ -208,30 +204,12 @@ def test_rule_9_worker_counts_must_be_positive() -> None:
 
 
 def test_rule_11_invalid_letsencrypt_email() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["letsencrypt"] = {"email": "not-an-email"}
+    from pilot.config.letsencrypt import LetsEncryptConfig
+
+    common = CommonConfig(letsencrypt=LetsEncryptConfig(email="not-an-email"))
     with pytest.raises(ConfigError) as exc_info:
-        load_from_dict(data)
+        load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA), common=common)
     assert "letsencrypt.email" in str(exc_info.value)
-
-
-def test_stale_mariadb_instance_key_is_ignored_not_a_hard_error() -> None:
-    """Legacy MariaDB instance keys are ignored, not rejected."""
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["mariadb"]["instance"] = "old-bench"
-    data["mariadb"]["version"] = "10.6"
-    data["mariadb"]["data_dir"] = "/var/lib/mysql-old-bench"
-    config = load_from_dict(data)
-    assert not hasattr(config.mariadb, "instance")
-    assert config.mariadb.root_password == "root"
-
-
-def test_stale_postgres_instance_key_is_ignored_not_a_hard_error() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["postgres"] = {"instance": "old-bench", "version": "15", "root_password": "secret"}
-    config = load_from_dict(data)
-    assert not hasattr(config.postgres, "instance")
-    assert config.postgres.root_password == "secret"
 
 
 def test_redis_version_accepted() -> None:
@@ -266,29 +244,24 @@ def test_postgres_defaults_when_section_absent() -> None:
 
 
 def test_postgres_section_roundtrip() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["postgres"] = {
-        "host": "db.internal",
-        "port": 5433,
-        "admin_user": "pgroot",
-        "root_password": "secret",
-    }
-    config = load_from_dict(data)
+    from pilot.config.postgres import PostgresConfig
+
+    common = CommonConfig(
+        postgres=PostgresConfig(host="db.internal", port=5433, admin_user="pgroot", root_password="secret")
+    )
+    config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA), common=common)
     assert config.postgres.host == "db.internal"
     assert config.postgres.port == 5433
-    toml = config.dumps()
-    assert "[postgres]" in toml
-    assert 'host = "db.internal"' in toml
-    assert "port = 5433" in toml
-    assert 'admin_user = "pgroot"' in toml
-    assert 'root_password = "secret"' in toml
+    # postgres now lives in common_config.toml, not bench.toml.
+    assert "[postgres]" not in config.dumps()
 
 
 def test_invalid_postgres_port_rejected() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["postgres"] = {"port": 0}
+    from pilot.config.postgres import PostgresConfig
+
+    common = CommonConfig(postgres=PostgresConfig(port=0))
     with pytest.raises(ConfigError) as exc_info:
-        load_from_dict(data)
+        load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA), common=common)
     assert "postgres.port" in str(exc_info.value)
 
 
@@ -754,8 +727,12 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
     config.monitor.application_log_max_size = "700M"
     config.monitor.log_path = Path("/var/log/custom-app.log")
 
-    path = tmp_path / "bench.toml"
-    config.write(path)
-    reloaded = BenchConfig.read(path)
+    # mariadb/postgres/letsencrypt/admin.jwks_* are host-shared state in
+    # common_config.toml, one level above the bench directory - nest under
+    # tmp_path so this test's common config never leaks into another test's.
+    bench_dir = tmp_path / "benches" / "roundtrip-bench"
+    bench_dir.mkdir(parents=True)
+    config.write(bench_dir)
+    reloaded = BenchConfig.read(bench_dir)
 
     assert reloaded == config

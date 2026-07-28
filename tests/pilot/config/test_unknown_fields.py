@@ -13,7 +13,6 @@ from pilot.exceptions import ConfigError
 MINIMAL: dict = {
     "bench": {"name": "test-bench", "python": "3.14"},
     "apps": [{"name": "frappe", "repo": "https://github.com/frappe/frappe", "branch": "version-16"}],
-    "mariadb": {"root_password": "root"},
     "redis": {"cache_port": 13000, "queue_port": 11000},
     "admin": {"domain": "admin.test.localhost"},
 }
@@ -21,8 +20,20 @@ MINIMAL: dict = {
 
 def test_unknown_nested_key_reported_with_full_path() -> None:
     data = copy.deepcopy(MINIMAL)
-    data["mariadb"]["unknown_key"] = "x"
-    assert "mariadb.unknown_key" in BenchConfig._unknown_config_paths(data)
+    data["admin"]["unknown_key"] = "x"
+    assert "admin.unknown_key" in BenchConfig._unknown_config_paths(data)
+
+
+def test_mariadb_postgres_letsencrypt_are_now_unknown_tables() -> None:
+    """mariadb/postgres/letsencrypt moved to common_config.toml; a bench.toml
+    still carrying them (pre-migration) reports them as unrecognized tables
+    rather than parsing their contents."""
+    data = copy.deepcopy(MINIMAL)
+    data["mariadb"] = {"root_password": "root"}
+    data["postgres"] = {"root_password": "secret"}
+    data["letsencrypt"] = {"email": "ops@example.com"}
+    paths = BenchConfig._unknown_config_paths(data)
+    assert set(paths) == {"mariadb", "postgres", "letsencrypt"}
 
 
 def test_unknown_bench_key_reported() -> None:
@@ -62,8 +73,9 @@ def test_default_decode_silently_ignores_unknown_and_still_loads(
     capsys: pytest.CaptureFixture,
 ) -> None:
     data = copy.deepcopy(MINIMAL)
-    data["mariadb"]["unknown_key"] = "x"
+    data["admin"]["unknown_key"] = "x"
     data["bench"]["typo"] = 1
+    data["mariadb"] = {"root_password": "root"}
 
     config = BenchConfig._from_dict(data)
 
@@ -73,23 +85,23 @@ def test_default_decode_silently_ignores_unknown_and_still_loads(
 
 def test_strict_decode_raises_with_offending_path() -> None:
     data = copy.deepcopy(MINIMAL)
-    data["mariadb"]["unknown_key"] = "x"
+    data["admin"]["unknown_key"] = "x"
     with pytest.raises(ConfigError) as exc_info:
         BenchConfig._from_dict(data, strict=True)
-    assert "mariadb.unknown_key" in str(exc_info.value)
+    assert "admin.unknown_key" in str(exc_info.value)
 
 
 def test_load_config_strict_raises_default_loads(tmp_path: Path) -> None:
     path = tmp_path / "bench.toml"
     path.write_text(
         '[bench]\nname = "b"\npython = "3.14"\n\n'
-        '[mariadb]\nroot_password = "r"\nbogus = 1\n\n'
+        '[admin]\ndomain = "admin.test.localhost"\nbogus = 1\n\n'
         "[redis]\ncache_port = 13000\nqueue_port = 11000\n"
     )
 
     with pytest.raises(ConfigError) as exc_info:
         BenchConfig.read(path, validate=False, strict=True)
-    assert "mariadb.bogus" in str(exc_info.value)
+    assert "admin.bogus" in str(exc_info.value)
 
     # Default read path tolerates the stale key and still decodes.
-    assert BenchConfig.read(path, validate=False).mariadb.root_password == "r"
+    assert BenchConfig.read(path, validate=False).admin.domain == "admin.test.localhost"

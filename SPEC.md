@@ -39,20 +39,19 @@ The stable top-level config groups are:
 
 - `[bench]`
 - `[[apps]]`
-- `[mariadb]`
-- `[postgres]`
 - `[redis]`
 - `[[workers]]`
 - `[production]`
 - `[monitor]`
 - `[nginx]`
 - `[gunicorn]`
-- `[letsencrypt]`
 - `[admin]`
 - `[central]`
 - `[firewall]`
 - `[waf]`
 - `[s3]`
+
+Settings shared by every bench under one benches directory - `[mariadb]`, `[postgres]`, `[letsencrypt]`, and `admin.jwks_url`/`jwks_audience` - live in `common_config.toml` instead, merged in by `BenchConfig` alone. See [Configuration](docs/configuration.md#common-config).
 
 Sites are represented by site directories and bench config records where needed.
 
