@@ -1,17 +1,11 @@
 from __future__ import annotations
 
-import hmac
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import error_response
 from admin.backend.api.v1.settings.config import ConfigPatcher
-from admin.backend.internal.session import Session
-from admin.backend.internal.two_factor_authentication import (
-    TwoFactorAuthentication,
-    TwoFactorError,
-)
 from admin.backend.middleware import client_ip, rate_limit
 from pilot.config import (
     WAF_MODES,
@@ -141,14 +135,6 @@ def llm_provider_options() -> list[dict]:
     return provider_options()
 
 
-def _validate_new_password(new_password: str, current_password: str) -> str | None:
-    from pilot.internal.validators import validate_admin_password
-
-    if hmac.compare_digest(new_password, current_password):
-        return "New password must differ from the current password."
-    return validate_admin_password(new_password)
-
-
 @settings_bp.get("/llm/models")
 def llm_models():
     """Models litellm knows for a provider — powers the model combobox."""
@@ -203,101 +189,6 @@ def audit_log():
 def my_ip():
     """Return the client IP the firewall should allow-list."""
     return jsonify({"ip": client_ip(default="")})
-
-
-@settings_bp.post("/admin-password")
-@rate_limit(5, 60, user_ip=True)
-def change_admin_password():
-    """Change the admin password. Leaves existing sessions alone - revoking them is a
-    separate, caller-confirmed step."""
-    bench_root = Path(current_app.config["BENCH_ROOT"])
-    bench = Bench(bench_root)
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("malformed_request", "Expected a JSON object.", 400)
-
-    new_password = str(data.get("new_password", ""))
-    if error := _validate_new_password(new_password, bench.config.admin.password):
-        return error_response("invalid_password", error, 422)
-
-    with BenchConfig.open(bench_root) as config:
-        config.admin.password = new_password
-
-    bench.audit_action("session", {"event": "admin_password_changed"})
-    return jsonify({})
-
-
-def two_factor_payload(bench: Bench) -> dict:
-    two_factor = TwoFactorAuthentication(bench)
-    return {"enabled": two_factor.is_enabled, "credentials": two_factor.get_credentials()}
-
-
-def _password_matches(bench: Bench, data: dict | None) -> bool:
-    """Re-check the password, so a stolen session alone cannot change the second factor."""
-    password = str(data.get("password", "")) if isinstance(data, dict) else ""
-    return hmac.compare_digest(password, bench.config.admin.password)
-
-
-@settings_bp.get("/two-factor")
-def get_two_factor():
-    return jsonify(two_factor_payload(Bench(Path(current_app.config["BENCH_ROOT"]))))
-
-
-@settings_bp.post("/two-factor/enrollment")
-@rate_limit(10, 60, user_ip=True)
-def start_two_factor_enrollment():
-    """Register a device and hand back its setup key, shown only here."""
-    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("malformed_request", "Expected a JSON object.", 400)
-    if not _password_matches(bench, data):
-        return error_response("invalid_credentials", "Incorrect password.", 401)
-    try:
-        enrollment = TwoFactorAuthentication(bench).start_enrollment(str(data.get("label", "")))
-    except TwoFactorError as error:
-        return error_response("invalid_label", str(error), 422)
-    return jsonify(enrollment)
-
-
-@settings_bp.post("/two-factor/<credential_id>")
-@rate_limit(5, 60, user_ip=True)
-def confirm_two_factor_credential(credential_id: str):
-    """Activate a device once a code proves its setup key was entered correctly."""
-    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("malformed_request", "Expected a JSON object.", 400)
-    two_factor = TwoFactorAuthentication(bench)
-    was_enabled = two_factor.is_enabled
-    if not two_factor.confirm_enrollment(credential_id, str(data.get("otp", ""))):
-        return error_response("invalid_otp", "That code is not valid. Try the next one.", 422)
-    bench.audit_action("session", {"event": "two_factor_device_added", "credential": credential_id})
-    if not was_enabled:
-        # Tokens issued before 2FA existed would otherwise skip it until they expired.
-        Session(bench).revoke_all()
-    return jsonify(two_factor_payload(bench))
-
-
-@settings_bp.delete("/two-factor/<credential_id>")
-@rate_limit(5, 60, user_ip=True)
-def remove_two_factor_credential(credential_id: str):
-    """Remove a device. Dropping the last confirmed one turns 2FA off."""
-    bench = Bench(Path(current_app.config["BENCH_ROOT"]))
-    if not _password_matches(bench, request.get_json(silent=True)):
-        return error_response("invalid_credentials", "Incorrect password.", 401)
-    two_factor = TwoFactorAuthentication(bench)
-    if not two_factor.remove_credential(credential_id):
-        return error_response("unknown_credential", "No such device.", 404)
-    bench.audit_action(
-        "session",
-        {
-            "event": "two_factor_device_removed",
-            "credential": credential_id,
-            "still_enabled": two_factor.is_enabled,
-        },
-    )
-    return jsonify(two_factor_payload(bench))
 
 
 @settings_bp.patch("")

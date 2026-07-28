@@ -1,11 +1,3 @@
-"""Bench-wide TOTP second factor.
-
-Credentials are per-device rather than per-bench: the admin password is shared, so the
-only way two people can sign in during the same 30-second window is to hold different
-secrets. Each credential burns its own time step, which keeps replay protection intact
-without serialising logins.
-"""
-
 from __future__ import annotations
 
 import hmac

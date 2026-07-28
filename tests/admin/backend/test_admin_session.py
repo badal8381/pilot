@@ -69,7 +69,7 @@ def _client(tmp_path: Path, jwt_secret: str = "k3y"):
 def test_valid_jwt_cookie_authenticates(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
-    assert client.get("/api/v1/session").get_json() == {
+    assert client.get("/api/v1/auth/session").get_json() == {
         "authenticated": True,
         "scope": "bench",
     }
@@ -79,7 +79,7 @@ def test_valid_jwt_cookie_authenticates(tmp_path: Path) -> None:
 def test_invalid_jwt_cookie_stays_unauthenticated(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token("wrong-secret"))
-    assert client.get("/api/v1/session").get_json() == {"authenticated": False}
+    assert client.get("/api/v1/auth/session").get_json() == {"authenticated": False}
     assert client.get("/api/v1/benches").status_code == 401
 
 
@@ -103,18 +103,18 @@ def test_fresh_bench_bootstrap_and_session_are_explicit(tmp_path: Path) -> None:
         "mode": "setup",
         "name": tmp_path.name,
     }
-    assert client.get("/api/v1/session").get_json() == {"authenticated": False}
+    assert client.get("/api/v1/auth/session").get_json() == {"authenticated": False}
 
 
 def test_delete_session_clears_cookie(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
 
-    response = client.delete("/api/v1/session")
+    response = client.delete("/api/v1/auth/session")
 
     assert response.status_code == 204
     assert response.data == b""
-    assert client.get("/api/v1/session").get_json() == {"authenticated": False}
+    assert client.get("/api/v1/auth/session").get_json() == {"authenticated": False}
 
 
 def test_delete_session_revokes_the_token(tmp_path: Path) -> None:
@@ -125,7 +125,7 @@ def test_delete_session_revokes_the_token(tmp_path: Path) -> None:
     token, jti = Session(bench).issue_session_token()
     client.set_cookie("sid", token)
 
-    response = client.delete("/api/v1/session")
+    response = client.delete("/api/v1/auth/session")
 
     assert response.status_code == 204
     assert jti in RevokedTokens(bench)
@@ -134,7 +134,7 @@ def test_delete_session_revokes_the_token(tmp_path: Path) -> None:
 def test_delete_session_without_a_cookie_still_clears_it(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
-    response = client.delete("/api/v1/session")
+    response = client.delete("/api/v1/auth/session")
 
     assert response.status_code == 204
 
@@ -193,9 +193,9 @@ def test_bootstrap_reports_allow_bench_management_when_disabled(tmp_path: Path) 
 
 def test_login_with_sid_sets_httponly_cookie(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    resp = client.post("/api/v1/session", json={"sid": _login_token()})
+    resp = client.post("/api/v1/auth/session", json={"sid": _login_token()})
     assert resp.status_code == 201
-    assert resp.headers["Location"] == "/api/v1/session"
+    assert resp.headers["Location"] == "/api/v1/auth/session"
     assert resp.get_json() == {"authenticated": True, "scope": "bench"}
     cookie = next(h for k, h in resp.headers if k == "Set-Cookie" and h.startswith("sid="))
     assert "HttpOnly" in cookie
@@ -207,7 +207,7 @@ def test_password_login_records_session_issued(tmp_path: Path) -> None:
     from pilot.core.bench.audit_log import AuditLog
 
     client = _client(tmp_path)
-    assert client.post("/api/v1/session", json={"password": "secret"}).status_code == 201
+    assert client.post("/api/v1/auth/session", json={"password": "secret"}).status_code == 201
 
     issued = AuditLog(Bench(tmp_path / "benches" / "current")).entries(entry_type="session")
     assert len(issued) == 1
@@ -220,7 +220,7 @@ def test_sid_login_records_redeemed_and_issued(tmp_path: Path) -> None:
     from pilot.core.bench.audit_log import AuditLog
 
     client = _client(tmp_path)
-    assert client.post("/api/v1/session", json={"sid": _login_token()}).status_code == 201
+    assert client.post("/api/v1/auth/session", json={"sid": _login_token()}).status_code == 201
 
     entries = AuditLog(Bench(tmp_path / "benches" / "current")).entries(entry_type="session")
     assert {e["event"] for e in entries} == {"issued", "login_redeemed"}
@@ -232,7 +232,7 @@ def test_login_cookie_uses_explicit_is_secure_cookie(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.application.config["SESSION_COOKIE_SECURE"] = True
 
-    response = client.post("/api/v1/session", json={"sid": _login_token()})
+    response = client.post("/api/v1/auth/session", json={"sid": _login_token()})
 
     cookie = next(
         value for key, value in response.headers if key == "Set-Cookie" and value.startswith("sid=")
@@ -286,14 +286,14 @@ def test_is_secure_cookie_requires_tls_or_configured_proxy(monkeypatch) -> None:
 
 def test_login_with_invalid_sid_rejected(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    resp = client.post("/api/v1/session", json={"sid": _login_token("wrong-secret")})
+    resp = client.post("/api/v1/auth/session", json={"sid": _login_token("wrong-secret")})
     assert resp.status_code == 401
     assert resp.get_json()["error"]["code"] == "invalid_login_token"
     assert client.get("/api/v1/benches").status_code == 401
 
 
 def test_session_creation_requires_a_json_object(tmp_path: Path) -> None:
-    response = _client(tmp_path).post("/api/v1/session", json=["secret"])
+    response = _client(tmp_path).post("/api/v1/auth/session", json=["secret"])
 
     assert response.status_code == 400
     assert response.get_json() == {
@@ -308,15 +308,15 @@ def test_session_creation_requires_a_json_object(tmp_path: Path) -> None:
 def test_sid_is_single_use(tmp_path: Path) -> None:
     client = _client(tmp_path)
     sid = _login_token()
-    assert client.post("/api/v1/session", json={"sid": sid}).status_code == 201
-    assert client.post("/api/v1/session", json={"sid": sid}).status_code == 401
+    assert client.post("/api/v1/auth/session", json={"sid": sid}).status_code == 201
+    assert client.post("/api/v1/auth/session", json={"sid": sid}).status_code == 401
 
 
 def test_login_rate_limited_after_limit(tmp_path: Path) -> None:
     client = _client(tmp_path)
     for _ in range(5):
-        assert client.post("/api/v1/session", json={"password": "wrong"}).status_code == 401
-    response = client.post("/api/v1/session", json={"password": "wrong"})
+        assert client.post("/api/v1/auth/session", json={"password": "wrong"}).status_code == 401
+    response = client.post("/api/v1/auth/session", json={"password": "wrong"})
 
     assert response.status_code == 429
     assert response.get_json() == {
@@ -331,11 +331,11 @@ def test_login_rate_limited_after_limit(tmp_path: Path) -> None:
 def test_login_rate_limit_is_scoped_to_each_app(tmp_path: Path) -> None:
     first_client = _client(tmp_path / "first")
     for _ in range(5):
-        first_client.post("/api/v1/session", json={"password": "wrong"})
+        first_client.post("/api/v1/auth/session", json={"password": "wrong"})
 
     second_client = _client(tmp_path / "second")
 
-    response = second_client.post("/api/v1/session", json={"password": "wrong"})
+    response = second_client.post("/api/v1/auth/session", json={"password": "wrong"})
     assert response.status_code == 401
 
 
@@ -343,14 +343,14 @@ def test_login_rate_limit_ignores_spoofed_forwarded_ips(tmp_path: Path) -> None:
     client = _client(tmp_path)
     for index in range(5):
         response = client.post(
-            "/api/v1/session",
+            "/api/v1/auth/session",
             json={"password": "wrong"},
             headers={"X-Real-IP": f"203.0.113.{index + 1}"},
         )
         assert response.status_code == 401
 
     response = client.post(
-        "/api/v1/session",
+        "/api/v1/auth/session",
         json={"password": "wrong"},
         headers={"X-Real-IP": "203.0.113.99"},
     )
@@ -629,19 +629,19 @@ def test_revoke_session_endpoint_revokes_active_jti(tmp_path: Path) -> None:
     _, jti = Session(bench).issue_session_token()
     assert jti in ActiveTokens(bench)
 
-    assert client.post(f"/api/v1/sessions/revoke/{jti}").status_code == 204
+    assert client.post(f"/api/v1/auth/sessions/revoke/{jti}").status_code == 204
     assert jti in RevokedTokens(bench)
 
 
 def test_revoke_session_unknown_jti_is_404(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
-    assert client.post("/api/v1/sessions/revoke/nope").status_code == 404
+    assert client.post("/api/v1/auth/sessions/revoke/nope").status_code == 404
 
 
 def test_revoke_session_requires_authentication(tmp_path: Path) -> None:
     client = _client(tmp_path)
-    assert client.post("/api/v1/sessions/revoke/x").status_code == 401
+    assert client.post("/api/v1/auth/sessions/revoke/x").status_code == 401
 
 
 def test_revoke_session_is_audited_with_request_context(tmp_path: Path) -> None:
@@ -654,7 +654,7 @@ def test_revoke_session_is_audited_with_request_context(tmp_path: Path) -> None:
     client.set_cookie("sid", actor_token)
     _, target_jti = Session(bench).issue_session_token()
 
-    assert client.post(f"/api/v1/sessions/revoke/{target_jti}").status_code == 204
+    assert client.post(f"/api/v1/auth/sessions/revoke/{target_jti}").status_code == 204
 
     revoked = [e for e in AuditLog(bench).entries(entry_type="session") if e.get("event") == "revoked"]
     assert len(revoked) == 1
@@ -672,7 +672,7 @@ def test_sessions_reports_current_session_jti(tmp_path: Path) -> None:
     token, jti = Session(Bench(tmp_path / "benches" / "current")).issue_session_token()
     client.set_cookie("sid", token)
 
-    data = client.get("/api/v1/sessions").get_json()
+    data = client.get("/api/v1/auth/sessions").get_json()
     assert data["current_jti"] == jti
 
 
@@ -680,7 +680,7 @@ _NEW_PASSWORD = "N3wSecret!"
 
 
 def _change_password(client, **payload):
-    return client.post("/api/v1/settings/admin-password", json=payload)
+    return client.post("/api/v1/auth/password", json=payload)
 
 
 def test_change_admin_password_writes_config_without_revoking_sessions(tmp_path: Path) -> None:
@@ -711,7 +711,7 @@ def test_change_admin_password_keeps_caller_signed_in(tmp_path: Path) -> None:
 
     # Password change alone never touches sessions - no new cookie is issued.
     assert not any(key == "Set-Cookie" for key, _ in response.headers)
-    assert client.get("/api/v1/session").get_json()["authenticated"] is True
+    assert client.get("/api/v1/auth/session").get_json()["authenticated"] is True
 
 
 @pytest.mark.parametrize(
@@ -774,7 +774,7 @@ def test_change_admin_password_is_audited(tmp_path: Path) -> None:
 
 
 def _revoke_all_sessions(client):
-    return client.post("/api/v1/sessions/revoke/all")
+    return client.post("/api/v1/auth/sessions/revoke/all")
 
 
 def test_revoke_all_sessions_revokes_and_reissues(tmp_path: Path) -> None:
@@ -806,7 +806,7 @@ def test_revoke_all_sessions_keeps_caller_signed_in(tmp_path: Path) -> None:
     )
     assert "HttpOnly" in cookie
     # The replacement cookie is live; the revoked original is not.
-    assert client.get("/api/v1/session").get_json()["authenticated"] is True
+    assert client.get("/api/v1/auth/session").get_json()["authenticated"] is True
 
 
 def test_revoke_all_sessions_requires_authentication(tmp_path: Path) -> None:
@@ -854,13 +854,13 @@ def _enroll_device(client, label: str = "phone") -> dict:
     import pyotp
 
     response = client.post(
-        "/api/v1/settings/two-factor/enrollment", json={"password": "secret", "label": label}
+        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": label}
     )
     assert response.status_code == 200
     enrollment = response.get_json()
     # Confirm with the previous step so the current code stays unspent for the test body.
     code = pyotp.TOTP(enrollment["secret"]).at(int(time.time()) - 30)
-    confirmed = client.post(f"/api/v1/settings/two-factor/{enrollment['id']}", json={"otp": code})
+    confirmed = client.post(f"/api/v1/auth/two-factor/{enrollment['id']}", json={"otp": code})
     assert confirmed.status_code == 200
     return enrollment
 
@@ -869,7 +869,7 @@ def test_two_factor_starts_disabled_with_no_devices(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
 
-    assert client.get("/api/v1/settings/two-factor").get_json() == {
+    assert client.get("/api/v1/auth/two-factor").get_json() == {
         "enabled": False,
         "credentials": [],
     }
@@ -881,11 +881,11 @@ def test_two_factor_enrollment_needs_the_password(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token())
 
     response = client.post(
-        "/api/v1/settings/two-factor/enrollment", json={"password": "wrong", "label": "phone"}
+        "/api/v1/auth/two-factor/enrollment", json={"password": "wrong", "label": "phone"}
     )
 
     assert response.status_code == 401
-    assert client.get("/api/v1/settings/two-factor").get_json()["credentials"] == []
+    assert client.get("/api/v1/auth/two-factor").get_json()["credentials"] == []
 
 
 def test_two_factor_enrollment_returns_a_secret_and_url(tmp_path: Path) -> None:
@@ -893,7 +893,7 @@ def test_two_factor_enrollment_returns_a_secret_and_url(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token())
 
     body = client.post(
-        "/api/v1/settings/two-factor/enrollment", json={"password": "secret", "label": "Ops laptop"}
+        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": "Ops laptop"}
     ).get_json()
 
     assert body["secret"] in body["provisioning_url"]
@@ -906,7 +906,7 @@ def test_two_factor_enrollment_requires_a_label(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token())
 
     response = client.post(
-        "/api/v1/settings/two-factor/enrollment", json={"password": "secret", "label": " "}
+        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": " "}
     )
 
     assert response.status_code == 422
@@ -919,15 +919,15 @@ def test_a_device_is_only_confirmed_with_a_valid_code(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
     enrollment = client.post(
-        "/api/v1/settings/two-factor/enrollment", json={"password": "secret", "label": "phone"}
+        "/api/v1/auth/two-factor/enrollment", json={"password": "secret", "label": "phone"}
     ).get_json()
 
-    rejected = client.post(f"/api/v1/settings/two-factor/{enrollment['id']}", json={"otp": "000000"})
+    rejected = client.post(f"/api/v1/auth/two-factor/{enrollment['id']}", json={"otp": "000000"})
     assert rejected.status_code == 422
-    assert client.get("/api/v1/settings/two-factor").get_json()["enabled"] is False
+    assert client.get("/api/v1/auth/two-factor").get_json()["enabled"] is False
 
     code = pyotp.TOTP(enrollment["secret"]).now()
-    accepted = client.post(f"/api/v1/settings/two-factor/{enrollment['id']}", json={"otp": code})
+    accepted = client.post(f"/api/v1/auth/two-factor/{enrollment['id']}", json={"otp": code})
     assert accepted.status_code == 200
     assert accepted.get_json()["enabled"] is True
 
@@ -966,7 +966,7 @@ def test_devices_are_listed_without_secrets(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token())
     enrollment = _enroll_device(client, "Ops laptop")
 
-    body = client.get("/api/v1/settings/two-factor").get_json()
+    body = client.get("/api/v1/auth/two-factor").get_json()
 
     assert [row["label"] for row in body["credentials"]] == ["Ops laptop"]
     assert enrollment["secret"] not in str(body)
@@ -976,10 +976,10 @@ def test_removing_a_device_requires_the_password(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
     enrollment = _enroll_device(client)
-    path = f"/api/v1/settings/two-factor/{enrollment['id']}"
+    path = f"/api/v1/auth/two-factor/{enrollment['id']}"
 
     assert client.delete(path, json={"password": "wrong"}).status_code == 401
-    assert client.get("/api/v1/settings/two-factor").get_json()["enabled"] is True
+    assert client.get("/api/v1/auth/two-factor").get_json()["enabled"] is True
 
     response = client.delete(path, json={"password": "secret"})
     assert response.status_code == 200
@@ -990,7 +990,7 @@ def test_removing_an_unknown_device_is_404(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
 
-    response = client.delete("/api/v1/settings/two-factor/nope", json={"password": "secret"})
+    response = client.delete("/api/v1/auth/two-factor/nope", json={"password": "secret"})
 
     assert response.status_code == 404
 
@@ -998,10 +998,10 @@ def test_removing_an_unknown_device_is_404(tmp_path: Path) -> None:
 def test_two_factor_routes_require_authentication(tmp_path: Path) -> None:
     client = _client(tmp_path)
 
-    assert client.get("/api/v1/settings/two-factor").status_code == 401
-    assert client.post("/api/v1/settings/two-factor/enrollment", json={}).status_code == 401
-    assert client.post("/api/v1/settings/two-factor/x", json={}).status_code == 401
-    assert client.delete("/api/v1/settings/two-factor/x", json={}).status_code == 401
+    assert client.get("/api/v1/auth/two-factor").status_code == 401
+    assert client.post("/api/v1/auth/two-factor/enrollment", json={}).status_code == 401
+    assert client.post("/api/v1/auth/two-factor/x", json={}).status_code == 401
+    assert client.delete("/api/v1/auth/two-factor/x", json={}).status_code == 401
 
 
 def test_two_factor_changes_are_audited(tmp_path: Path) -> None:
@@ -1010,7 +1010,7 @@ def test_two_factor_changes_are_audited(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
     enrollment = _enroll_device(client)
-    client.delete(f"/api/v1/settings/two-factor/{enrollment['id']}", json={"password": "secret"})
+    client.delete(f"/api/v1/auth/two-factor/{enrollment['id']}", json={"password": "secret"})
 
     bench = Bench(tmp_path / "benches" / "current")
     events = [e["event"] for e in AuditLog(bench).entries(entry_type="session")]
