@@ -260,10 +260,11 @@ def test_is_unsecured_true_when_role_does_not_exist_yet() -> None:
 def test_provision_user_owned_initialises_and_installs_unit_when_fresh(tmp_path) -> None:
     m = _mgr(port=5440)
     with (
-        patch.object(type(m), "data_dir", new_callable=PropertyMock, return_value=tmp_path / "data"),
+        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch.object(m, "is_provisioned", return_value=False),
         patch.object(m, "_ensure_port_available"),
         patch.object(m, "is_running", return_value=False),
+        patch.object(m, "_move_generated_config_into_config_dir"),
         patch.object(m, "_install_unit") as install_unit,
         patch.object(m, "_server_binary", side_effect=lambda name: name),
         patch(f"{MODULE}.run_command") as rc,
@@ -275,6 +276,31 @@ def test_provision_user_owned_initialises_and_installs_unit_when_fresh(tmp_path)
     initdb_call = next(argv for argv in argv_calls if "initdb" in argv)
     assert "-D" in initdb_call
     assert "--username" not in initdb_call  # bootstrap superuser = current OS user
+
+
+def test_move_generated_config_into_config_dir_relocates_all_three(tmp_path) -> None:
+    m = _mgr()
+    with patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path):
+        m.data_dir.mkdir(parents=True)
+        for name in ("postgresql.conf", "pg_hba.conf", "pg_ident.conf"):
+            (m.data_dir / name).write_text(f"# {name}")
+        m._move_generated_config_into_config_dir()
+        for name in ("postgresql.conf", "pg_hba.conf", "pg_ident.conf"):
+            assert not (m.data_dir / name).exists()
+            assert (m.config_dir / name).read_text() == f"# {name}"
+
+
+def test_install_unit_uses_explicit_config_file(tmp_path) -> None:
+    m = _mgr(port=5440)
+    with (
+        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch.object(m, "_server_binary", return_value="/usr/lib/postgresql/17/bin/postgres"),
+        patch.object(m, "_user_unit_dir", return_value=tmp_path),
+        patch(f"{MODULE}.run_command"),
+    ):
+        m._install_unit()
+        content = m.unit_path.read_text()
+        assert f"--config-file={m.config_dir / 'postgresql.conf'}" in content
 
 
 def test_ensure_port_available_raises_when_port_taken() -> None:
@@ -413,6 +439,7 @@ def test_provision_user_owned_creates_socket_dir(tmp_path) -> None:
         patch.object(m, "is_provisioned", return_value=False),
         patch.object(m, "_ensure_port_available"),
         patch.object(m, "is_running", return_value=False),
+        patch.object(m, "_move_generated_config_into_config_dir"),
         patch.object(m, "_install_unit"),
         patch(f"{MODULE}.run_command"),
     ):
