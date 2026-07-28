@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from pathlib import Path
 
+from pilot.config.monitor import monitor_log_dir
 from pilot.exceptions import BenchError
 from pilot.managers.platform import is_linux
 from pilot.managers.systemd_user import SystemdUserMixin, install_user_timer, user_timer_installed
@@ -33,8 +34,8 @@ Type=oneshot
 WorkingDirectory={cli_root}
 Environment=PYTHONPATH={cli_root}
 ExecStart={python} -m pilot.core.site.uptime_monitoring
-StandardOutput=append:{cli_root}/system/uptime/site-uptime.log
-StandardError=append:{cli_root}/system/uptime/site-uptime.error.log
+StandardOutput=append:{cli_root}/system/logs/uptime.log
+StandardError=append:{cli_root}/system/logs/uptime.error.log
 
 [Install]
 WantedBy=default.target
@@ -57,6 +58,8 @@ class UptimeMonitorConfigurator(SystemdUserMixin):
     def install(self) -> None:
         if user_timer_installed(self.timer_unit_name):
             return
+        # systemd cannot open the unit's append: targets if this is missing.
+        monitor_log_dir().mkdir(parents=True, exist_ok=True)
         install_user_timer(
             unit_dir=self.uptime_dir,
             unit_name=self.unit_name,

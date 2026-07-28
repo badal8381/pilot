@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 from pathlib import Path
 
+from pilot.config.monitor import db_log_path, monitor_log_dir, slow_query_log_path, system_log_path
 from pilot.exceptions import BenchError
 from pilot.managers.platform import is_linux
 from pilot.managers.systemd_user import SystemdUserMixin, install_user_timer, user_timer_installed
@@ -33,8 +34,8 @@ Type=oneshot
 WorkingDirectory={cli_root}
 Environment=PYTHONPATH={cli_root}
 ExecStart={python} -m pilot.core.server.monitoring
-StandardOutput=append:{cli_root}/system/monitor/bench-monitor.log
-StandardError=append:{cli_root}/system/monitor/bench-monitor.error.log
+StandardOutput=append:{cli_root}/system/logs/monitor.log
+StandardError=append:{cli_root}/system/logs/monitor.error.log
 
 [Install]
 WantedBy=default.target
@@ -55,6 +56,8 @@ class MonitorConfigurator(SystemdUserMixin):
     def install(self) -> None:
         if user_timer_installed(self.timer_unit_name):
             return
+        # systemd cannot open the unit's append: targets if this is missing.
+        monitor_log_dir().mkdir(parents=True, exist_ok=True)
         install_user_timer(
             unit_dir=self.monitor_dir,
             unit_name=self.unit_name,
@@ -72,20 +75,14 @@ class MonitorConfigurator(SystemdUserMixin):
 
     @property
     def system_log_path(self) -> Path:
-        from pilot.config.monitor import system_log_path
-
         return system_log_path()
 
     @property
     def db_log_path(self) -> Path:
-        from pilot.config.monitor import db_log_path
-
         return db_log_path()
 
     @property
     def slow_query_log_path(self) -> Path:
-        from pilot.config.monitor import slow_query_log_path
-
         return slow_query_log_path()
 
     def setup(self) -> None:

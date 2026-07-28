@@ -6,19 +6,19 @@ def monitor_log_dir() -> Path:
     """Monitor logs live beside the install, not in root-owned /var/log."""
     from pilot.utils import cli_root
 
-    return cli_root() / "system" / "monitor"
+    return cli_root() / "system" / "logs"
 
 
 def system_log_path() -> Path:
-    return monitor_log_dir() / "bench-system-stats.log"
+    return monitor_log_dir() / "system-stats.log"
 
 
 def db_log_path() -> Path:
-    return monitor_log_dir() / "bench-db-stats.log"
+    return monitor_log_dir() / "db-stats.log"
 
 
 def slow_query_log_path() -> Path:
-    return monitor_log_dir() / "bench-slow-queries.json"
+    return monitor_log_dir() / "slow-queries.json"
 
 
 @dataclass

@@ -41,7 +41,7 @@ def _fake_proc_reads(monitor: Monitor) -> None:
 
 
 def test_collect_system_metrics_writes_to_system_log_file(tmp_path: Path) -> None:
-    system_log_file = tmp_path / "bench-system-stats.log"
+    system_log_file = tmp_path / "system-stats.log"
     monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
     _fake_proc_reads(monitor)
 
@@ -57,7 +57,7 @@ def test_collect_system_metrics_writes_to_system_log_file(tmp_path: Path) -> Non
 
 def test_collect_system_metrics_does_not_write_app_log(tmp_path: Path) -> None:
     """System metrics must never bleed into the per-bench application log."""
-    system_log_file = tmp_path / "bench-system-stats.log"
+    system_log_file = tmp_path / "system-stats.log"
     monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
     _fake_proc_reads(monitor)
 
@@ -68,7 +68,7 @@ def test_collect_system_metrics_does_not_write_app_log(tmp_path: Path) -> None:
 
 
 def test_collect_system_metrics_includes_storage(tmp_path: Path) -> None:
-    system_log_file = tmp_path / "bench-system-stats.log"
+    system_log_file = tmp_path / "system-stats.log"
     monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
     _fake_proc_reads(monitor)
 
