@@ -43,13 +43,13 @@ The stable top-level config groups are:
 - `[[workers]]`
 - `[production]`
 - `[monitor]`
-- `[nginx]`
 - `[gunicorn]`
 - `[admin]`
 - `[central]`
 - `[firewall]`
 - `[waf]`
 - `[s3]`
+- `[llm]`
 
 Settings shared by every bench under one benches directory - `[mariadb]`, `[postgres]`, `[letsencrypt]`, `admin.jwks_url`/`jwks_audience`, and `monitor.system_log_path`/`db_log_path`/`slow_query_log_path` - live in `common_config.toml` instead, merged in by `BenchConfig` alone. See [Configuration](docs/configuration.md#common-config).
 

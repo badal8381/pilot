@@ -857,7 +857,6 @@ def _bench_schema() -> _Table:
             "redis": _Table(keys=_keys(RedisConfig)),
             "production": _Table(keys=_keys(ProductionConfig) | _PRODUCTION_LEGACY),
             "monitor": _Table(keys=_keys(MonitorConfig)),
-            "nginx": _Table(keys=_keys(NginxConfig)),
             "gunicorn": _Table(keys=_keys(GunicornConfig)),
             "admin": _Table(keys=_keys(AdminConfig)),
             "central": _Table(keys=_keys(CentralConfig)),

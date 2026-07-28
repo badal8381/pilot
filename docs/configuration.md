@@ -100,12 +100,14 @@ allow_bench_management = true
 ## Other Groups
 
 - `[monitor]`: per-bench `log_path` for this bench's own application metrics. `system_log_path`/`db_log_path`/`slow_query_log_path` are host-shared - see [Common Config](#common-config).
-- `[nginx]`: nginx rendering settings.
 - `[gunicorn]`: Gunicorn process settings.
 - `[central]`: Central endpoint and Pilot auth token.
 - `[firewall]`: firewall behavior.
 - `[waf]`: WAF behavior.
 - `[s3]`: S3 backup credentials and bucket settings.
+- `[llm]`: LLM provider settings used by the admin assistant.
+
+Nginx has no per-bench `bench.toml` section - `config.nginx` always holds its compiled-in defaults (ports 80/443, platform-default `config_dir`, etc.); nothing in `bench.toml` can override it.
 
 Unknown fields are ignored by normal loads for compatibility. Strict validation can report unknown config paths.
 
