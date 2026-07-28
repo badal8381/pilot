@@ -35,6 +35,9 @@ class DatabaseBreakdown:
     used_bytes: int
     binlog_bytes: int
     core_bytes: int
+    error_log_bytes: int = 0
+    slow_log_bytes: int = 0
+    binlog_index_bytes: int = 0
     databases: list[DatabaseRow] = field(default_factory=list)
 
 
@@ -68,6 +71,20 @@ def directory_size_bytes(path: str) -> int:
         result = subprocess.run(["du", "-sb", path], capture_output=True, timeout=10)
         return int(result.stdout.split()[0]) if result.returncode == 0 else 0
     except Exception:
+        return 0
+
+
+def _mariadb_variable_file_size(database, variable: str, data_dir: Path) -> int:
+    """Size of the file a MariaDB system variable (e.g. @@log_error) points at."""
+    value = str(database.get_scalar(f"SELECT {variable}") or "")
+    if not value:
+        return 0
+    path = Path(value)
+    if not path.is_absolute():
+        path = data_dir / path
+    try:
+        return path.stat().st_size
+    except OSError:
         return 0
 
 
@@ -105,14 +122,28 @@ class StorageProvider:
         database = make_database(self._config)
         databases = self._schema_sizes(database, _SCHEMA_SIZE_QUERY)
         binlog_bytes = database.get_binlog_status().size_bytes
+        error_log_bytes = _mariadb_variable_file_size(database, "@@log_error", data_dir)
+        slow_log_bytes = _mariadb_variable_file_size(database, "@@slow_query_log_file", data_dir)
+        binlog_index_bytes = _mariadb_variable_file_size(database, "@@log_bin_index", data_dir)
         schema_bytes = sum(row.bytes for row in databases)
-        core_bytes = max(total_bytes - binlog_bytes - schema_bytes, 0)
+        core_bytes = max(
+            total_bytes
+            - binlog_bytes
+            - schema_bytes
+            - error_log_bytes
+            - slow_log_bytes
+            - binlog_index_bytes,
+            0,
+        )
         return DatabaseBreakdown(
             engine="mariadb",
             supported=True,
             used_bytes=total_bytes,
             binlog_bytes=binlog_bytes,
             core_bytes=core_bytes,
+            error_log_bytes=error_log_bytes,
+            slow_log_bytes=slow_log_bytes,
+            binlog_index_bytes=binlog_index_bytes,
             databases=databases,
         )
 

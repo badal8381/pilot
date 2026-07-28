@@ -49,6 +49,41 @@ def test_bench_breakdown_sums_apps_sites_and_logs(tmp_path: Path) -> None:
     assert breakdown.used_bytes == (breakdown.apps_bytes + breakdown.sites_bytes + breakdown.logs_bytes)
 
 
+def test_mariadb_variable_file_size_reads_relative_path(tmp_path: Path) -> None:
+    from admin.backend.providers.storage import _mariadb_variable_file_size
+
+    (tmp_path / "mariadb.err").write_bytes(b"x" * 777)
+    db = Mock()
+    db.get_scalar.return_value = "mariadb.err"
+
+    size = _mariadb_variable_file_size(db, "@@log_error", tmp_path)
+
+    assert size == 777
+    db.get_scalar.assert_called_once_with("SELECT @@log_error")
+
+
+def test_mariadb_variable_file_size_reads_absolute_path(tmp_path: Path) -> None:
+    from admin.backend.providers.storage import _mariadb_variable_file_size
+
+    log_file = tmp_path / "elsewhere.log"
+    log_file.write_bytes(b"x" * 42)
+    db = Mock()
+    db.get_scalar.return_value = str(log_file)
+
+    assert _mariadb_variable_file_size(db, "@@slow_query_log_file", tmp_path) == 42
+
+
+def test_mariadb_variable_file_size_is_zero_when_unset_or_missing(tmp_path: Path) -> None:
+    from admin.backend.providers.storage import _mariadb_variable_file_size
+
+    db = Mock()
+    db.get_scalar.return_value = ""
+    assert _mariadb_variable_file_size(db, "@@slow_query_log_file", tmp_path) == 0
+
+    db.get_scalar.return_value = "does-not-exist.log"
+    assert _mariadb_variable_file_size(db, "@@log_bin_index", tmp_path) == 0
+
+
 def test_mariadb_breakdown_shapes_schemas_and_reconciles_core(tmp_path: Path) -> None:
     from admin.backend.providers.storage import DatabaseBreakdown, DatabaseRow, StorageProvider
 
@@ -62,6 +97,7 @@ def test_mariadb_breakdown_shapes_schemas_and_reconciles_core(tmp_path: Path) ->
         duration_ms=1.0,
     )
     db.get_binlog_status.return_value = BinlogStatus(enabled=True, file_count=1, size_bytes=50)
+    db.get_scalar.return_value = ""
 
     with (
         patch("admin.backend.providers.storage.make_database", return_value=db),
@@ -75,6 +111,9 @@ def test_mariadb_breakdown_shapes_schemas_and_reconciles_core(tmp_path: Path) ->
         used_bytes=1000,
         binlog_bytes=50,
         core_bytes=350,  # 1000 - 50 - (500 + 100)
+        error_log_bytes=0,
+        slow_log_bytes=0,
+        binlog_index_bytes=0,
         databases=[
             DatabaseRow(schema="site1_db", site="site1.local", system=False, bytes=500),
             DatabaseRow(schema="mysql", site=None, system=True, bytes=100),
