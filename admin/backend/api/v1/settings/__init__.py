@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hmac
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
@@ -136,14 +135,6 @@ def llm_provider_options() -> list[dict]:
     return provider_options()
 
 
-def _validate_new_password(new_password: str, current_password: str) -> str | None:
-    from pilot.internal.validators import validate_admin_password
-
-    if hmac.compare_digest(new_password, current_password):
-        return "New password must differ from the current password."
-    return validate_admin_password(new_password)
-
-
 @settings_bp.get("/llm/models")
 def llm_models():
     """Models litellm knows for a provider — powers the model combobox."""
@@ -198,28 +189,6 @@ def audit_log():
 def my_ip():
     """Return the client IP the firewall should allow-list."""
     return jsonify({"ip": client_ip(default="")})
-
-
-@settings_bp.post("/admin-password")
-@rate_limit(5, 60, user_ip=True)
-def change_admin_password():
-    """Change the admin password. Leaves existing sessions alone - revoking them is a
-    separate, caller-confirmed step."""
-    bench_root = Path(current_app.config["BENCH_ROOT"])
-    bench = Bench(bench_root)
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return error_response("malformed_request", "Expected a JSON object.", 400)
-
-    new_password = str(data.get("new_password", ""))
-    if error := _validate_new_password(new_password, bench.config.admin.password):
-        return error_response("invalid_password", error, 422)
-
-    with BenchConfig.open(bench_root) as config:
-        config.admin.password = new_password
-
-    bench.audit_action("session", {"event": "admin_password_changed"})
-    return jsonify({})
 
 
 @settings_bp.patch("")

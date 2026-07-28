@@ -2,8 +2,8 @@ import { request } from './client'
 
 export const authApi = {
   bootstrap: () => request.get('bootstrap').json(),
-  session: () => request.get('session').json(),
-  login: (password) => request.post('session', { json: { password } }).json(),
-  loginWithSid: (sid) => request.post('session', { json: { sid } }).json(),
-  logout: () => request.delete('session'),
+  session: () => request.get('auth/session').json(),
+  login: (password, otp) => request.post('auth/session', { json: { password, otp } }).json(),
+  loginWithSid: (sid) => request.post('auth/session', { json: { sid } }).json(),
+  logout: () => request.delete('auth/session'),
 }

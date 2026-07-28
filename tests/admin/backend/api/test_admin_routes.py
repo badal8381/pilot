@@ -73,18 +73,18 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         if rule.rule.startswith(f"{API_ROOT_PREFIX}/") and not rule.rule.startswith(f"{API_V1_PREFIX}/")
     ]
 
-    assert len(routes) == 156
+    assert len(routes) == 161
     assert unversioned == []
-    assert len({(method, path) for method, path, _, _ in routes}) == 156
+    assert len({(method, path) for method, path, _, _ in routes}) == 161
     assert Counter(method for method, _, _, _ in routes) == {
-        "DELETE": 11,
-        "GET": 83,
+        "DELETE": 12,
+        "GET": 84,
         "PATCH": 4,
-        "POST": 53,
+        "POST": 56,
         "PUT": 5,
     }
     assert Counter(policy for _, _, _, policy in routes) == {
-        "authenticated": 102,
+        "authenticated": 107,
         "authenticated+bench-management": 9,
         "authenticated+site-scope": 34,
         "open": 5,
@@ -111,13 +111,12 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         "network": 1,
         "updates": 1,
         "runtime": 4,
-        "settings": 4,
+        "auth": 12,
+        "settings": 3,
         "setup": 6,
         "sites": 37,
         "ssh-keys": 3,
         "metrics": 1,
-        "session": 3,
-        "sessions": 3,
         "storage": 1,
         "system": 1,
         "task-worker": 3,
@@ -217,7 +216,12 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
         ("GET", "/api/v1/settings"),
         ("PATCH", "/api/v1/settings"),
         ("GET", "/api/v1/settings/llm/models"),
-        ("POST", "/api/v1/settings/admin-password"),
+        ("POST", "/api/v1/auth/password"),
+        ("GET", "/api/v1/auth/two-factor"),
+        ("POST", "/api/v1/auth/two-factor/enrollment"),
+        ("POST", "/api/v1/auth/two-factor/<credential_id>"),
+        ("DELETE", "/api/v1/auth/two-factor/<credential_id>"),
+        ("POST", "/api/v1/auth/two-factor/recovery-codes"),
         ("GET", "/api/v1/audit-events"),
         ("GET", "/api/v1/network/client"),
         ("GET", "/api/v1/ssh-keys"),
