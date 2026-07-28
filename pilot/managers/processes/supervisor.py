@@ -84,7 +84,7 @@ class SupervisorProcessManager(ManagedProcessManager):
 
     @property
     def supervisor_dir(self) -> Path:
-        return self.bench.config_path / "supervisor"
+        return self.bench.config_path / "services"
 
     @property
     def supervisor_conf_path(self) -> Path:
