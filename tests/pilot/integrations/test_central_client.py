@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import io
 import json
+import urllib.error
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -200,3 +203,126 @@ def test_proxy_rejects_non_allowlisted_method(tmp_path: Path) -> None:
 
     assert response.status_code == 403
     forward.assert_not_called()
+
+
+def test_account_url_returns_the_configured_central_endpoint(tmp_path: Path) -> None:
+    client = _app_client(tmp_path / "bench")
+    central = SimpleNamespace(
+        bench=SimpleNamespace(config=SimpleNamespace(central=SimpleNamespace(endpoint="https://central.test/")))
+    )
+
+    with patch("admin.backend.api.v1.sites.central._central", return_value=central):
+        response = client.get("/api/v1/sites/s1.localhost/account-url")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"url": "https://central.test"}
+
+
+def test_account_url_requires_central_configuration(tmp_path: Path) -> None:
+    client = _app_client(tmp_path / "bench")
+    central = SimpleNamespace(
+        bench=SimpleNamespace(config=SimpleNamespace(central=SimpleNamespace(endpoint="")))
+    )
+
+    with patch("admin.backend.api.v1.sites.central._central", return_value=central):
+        response = client.get("/api/v1/sites/s1.localhost/account-url")
+
+    assert response.status_code == 503
+    assert response.get_json()["error"]["code"] == "central_not_configured"
+
+
+def _http_error(code: int, body: bytes) -> urllib.error.HTTPError:
+    return urllib.error.HTTPError("https://central.test/x", code, "err", {}, io.BytesIO(body))
+
+
+def test_rejection_surfaces_centrals_own_message(tmp_path: Path) -> None:
+    """Central validates billing input; reporting only the status code would strand
+    the user with an unactionable "HTTP 417"."""
+    bench = _bench(tmp_path)
+    _write_central(bench, "https://central.test", "tok")
+    body = json.dumps(
+        {
+            "exception": "frappe.exceptions.ValidationError: 'MH' is not a recognised Indian state.",
+            "_server_messages": json.dumps(
+                [json.dumps({"message": "'MH' is not a recognised Indian state."})]
+            ),
+        }
+    ).encode()
+
+    with (
+        patch(
+            "pilot.integrations.central.client.urllib.request.urlopen",
+            side_effect=_http_error(417, body),
+        ),
+        pytest.raises(CentralClientError) as excinfo,
+    ):
+        CentralClient(bench).forward("central.billing.api.billing_api.save_billing_profile", "POST", {})
+
+    assert str(excinfo.value) == "'MH' is not a recognised Indian state."
+    assert excinfo.value.status_code == 417
+
+
+def test_rejection_without_a_message_falls_back_to_the_status(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    _write_central(bench, "https://central.test", "tok")
+
+    with (
+        patch(
+            "pilot.integrations.central.client.urllib.request.urlopen",
+            side_effect=_http_error(403, b"<html>nope</html>"),
+        ),
+        pytest.raises(CentralClientError) as excinfo,
+    ):
+        CentralClient(bench).forward("central.billing.api.billing_api.save_billing_profile", "POST", {})
+
+    assert "HTTP 403" in str(excinfo.value)
+    assert excinfo.value.status_code == 403
+
+
+def test_unreachable_central_has_no_status_code(tmp_path: Path) -> None:
+    bench = _bench(tmp_path)
+    _write_central(bench, "https://central.test", "tok")
+
+    with (
+        patch(
+            "pilot.integrations.central.client.urllib.request.urlopen",
+            side_effect=urllib.error.URLError("connection refused"),
+        ),
+        pytest.raises(CentralClientError) as excinfo,
+    ):
+        CentralClient(bench).heartbeat()
+
+    assert excinfo.value.status_code is None
+
+
+def test_proxy_relays_a_central_rejection_instead_of_a_502(tmp_path: Path) -> None:
+    """A rejection is the caller's problem to show; only an outage is a 502."""
+    client = _app_client(tmp_path / "bench")
+    with patch(
+        "admin.backend.api.v1.sites.central.CentralClient.forward",
+        side_effect=CentralClientError("Pick a state from the list.", status_code=417),
+    ):
+        response = client.post(
+            "/api/v1/sites/s1.localhost/central/central.billing.api.billing_api.save_billing_profile",
+            json={"state": "MH"},
+        )
+
+    assert response.status_code == 417
+    body = response.get_json()["error"]
+    assert body["code"] == "central_rejected"
+    assert body["message"] == "Pick a state from the list."
+
+
+def test_proxy_still_reports_an_outage_as_unreachable(tmp_path: Path) -> None:
+    client = _app_client(tmp_path / "bench")
+    with patch(
+        "admin.backend.api.v1.sites.central.CentralClient.forward",
+        side_effect=CentralClientError("Cannot reach Central"),
+    ):
+        response = client.post(
+            "/api/v1/sites/s1.localhost/central/central.billing.api.billing_api.save_billing_profile",
+            json={},
+        )
+
+    assert response.status_code == 502
+    assert response.get_json()["error"]["code"] == "central_unreachable"
