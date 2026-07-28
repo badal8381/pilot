@@ -154,7 +154,6 @@ const needsBilling = computed(() =>
               :is="item.component"
               :store="store"
               :active="tab === item.value"
-              @open-billing="tab = 'billing'"
             />
           </SettingsPanel>
         </SettingsContent>

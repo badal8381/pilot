@@ -7,20 +7,20 @@ import ErrorMessage from "frappe-ui/src/components/ErrorMessage/ErrorMessage.vue
 import PanelState from "../components/PanelState.vue";
 import BillingProfileCard from "../components/BillingProfileCard.vue";
 import AddPaymentCard from "../components/AddPaymentCard.vue";
-import PlanDialog from "../components/PlanDialog.vue";
+import { openExternal } from "../external";
 
 const props = defineProps({
   store: { type: Object, required: true },
   active: { type: Boolean, default: false },
 });
 const store = props.store;
-const emit = defineEmits(["open-billing"]);
 
 // One inline flow at a time: "" | "profile" | "payment".
 const flow = ref("");
 const removing = ref(false);
 const removeError = ref("");
-const showPlans = ref(false);
+const openingChangePlan = ref(false);
+const changePlanError = ref("");
 
 watch(
   () => props.active,
@@ -99,6 +99,24 @@ async function removeCard() {
     removing.value = false;
   }
 }
+
+// Temporary: in-embed change plan is not ready; send users to Central.
+async function openChangePlan() {
+  if (openingChangePlan.value) return;
+  openingChangePlan.value = true;
+  changePlanError.value = "";
+  try {
+    const response = store.state.context?.account_url
+      ? { url: store.state.context.account_url }
+      : await store.api.getAccountUrl();
+    if (!response?.url) throw new Error(__("Central is not configured."));
+    openExternal(response.url);
+  } catch (exception) {
+    changePlanError.value = store.api.getErrorMessage(exception);
+  } finally {
+    openingChangePlan.value = false;
+  }
+}
 </script>
 
 <template>
@@ -134,9 +152,15 @@ async function removeCard() {
               )
             }}
           </p>
-          <Button class="mt-3" @click="showPlans = true">
-            {{ __("View plans") }}
+          <Button
+            class="mt-3"
+            icon-right="arrow-up-right"
+            :disabled="openingChangePlan"
+            @click="openChangePlan"
+          >
+            {{ openingChangePlan ? __("Opening…") : __("View plans") }}
           </Button>
+          <ErrorMessage :message="changePlanError" class="mt-2" />
         </div>
       </div>
 
@@ -151,10 +175,15 @@ async function removeCard() {
               </p>
               <p class="text-p-sm text-ink-gray-6">{{ planSubtitle }}</p>
             </div>
-            <Button @click="showPlans = true">
-              {{ __("Change plan") }}
+            <Button
+              icon-right="arrow-up-right"
+              :disabled="openingChangePlan"
+              @click="openChangePlan"
+            >
+              {{ openingChangePlan ? __("Opening…") : __("Change plan") }}
             </Button>
           </div>
+          <ErrorMessage :message="changePlanError" class="mt-2" />
 
           <div class="mt-3 grid grid-cols-3 gap-5">
             <div v-for="meter in meters" :key="meter.name">
@@ -281,10 +310,4 @@ async function removeCard() {
       </div>
     </PanelState>
   </SettingsBody>
-
-  <PlanDialog
-    v-model="showPlans"
-    :store="store"
-    @open-billing="emit('open-billing')"
-  />
 </template>
