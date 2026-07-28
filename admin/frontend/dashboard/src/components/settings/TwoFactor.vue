@@ -7,8 +7,7 @@
       <template #description>
         <p class="text-ink-gray-6 text-p-sm">
           Requires a code from any enrolled device at every sign-in. Up to
-          {{ status.max_devices }} devices can be enrolled — each gets its own setup key, so
-          several people can sign in during the same 30-second window. To set up more than one
+          {{ status.max_devices }} devices can be enrolled. To set up more than one
           authenticator app for the same person, share that device's setup key instead of
           enrolling again.
         </p>
