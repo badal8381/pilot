@@ -220,10 +220,17 @@ def debug_task(task_id: str):
         return error_response("ai_not_configured", "Connect an AI assistant in Settings first.", 409)
 
     output = "".join(reader.iter_output(task_id)) if task.output_path.exists() else ""
+    refresh = request.args.get("refresh") == "1"
 
     def generate():
         try:
-            for text in stream_task_debug(config.llm, task, output, bench_root=bench_root):
+            for text in stream_task_debug(
+                config.llm,
+                task,
+                output,
+                bench_root=bench_root,
+                refresh=refresh,
+            ):
                 yield sse_message({"type": "delta", "text": text})
             yield sse_message({"type": "done"})
         except LLMError as error:

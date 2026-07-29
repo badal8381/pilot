@@ -84,14 +84,21 @@ class LLMIntegration:
             self._cached_responses.pop(next(iter(self._cached_responses)))
 
     def prompt(
-        self, prompt: str, *, bench_root: Path, max_tokens: int = 4096, **kwargs
+        self,
+        prompt: str,
+        *,
+        bench_root: Path,
+        max_tokens: int = 4096,
+        refresh: bool = False,
+        **kwargs,
     ) -> str | Iterator[str]:
         """The answer to a single-turn prompt: text, or text deltas when streaming.
-        Repeating a prompt replays the cached answer instead of calling the provider."""
+        Repeating a prompt replays the cached answer; `refresh` asks the provider
+        again and replaces what was cached."""
         system_prompt = read_system_prompt(bench_root)
         cache_key = self._cache_key(system_prompt, prompt)
 
-        cached = self.get_cached_response(cache_key)
+        cached = None if refresh else self.get_cached_response(cache_key)
         if cached is not None:
             return iter([cached]) if self.stream else cached
 

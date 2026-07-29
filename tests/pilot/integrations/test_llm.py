@@ -371,3 +371,18 @@ def test_cache_does_not_grow_without_bound(fake_litellm, empty_response_cache) -
         list(integration.prompt(f"q{index}", bench_root=_BENCH))
 
     assert len(empty_response_cache) == base._CACHE_LIMIT
+
+
+def test_refresh_replaces_the_cached_answer(fake_litellm, empty_response_cache) -> None:
+    """The Regenerate button must reach the provider, and what it gets back becomes
+    the new cached answer - otherwise the next open would show the stale one."""
+    first = _streaming_integration(fake_litellm, ["first"])
+    assert "".join(first.prompt("why?", bench_root=_BENCH)) == "first"
+
+    regenerated = _streaming_integration(fake_litellm, ["second"])
+    assert "".join(regenerated.prompt("why?", bench_root=_BENCH, refresh=True)) == "second"
+    assert fake_litellm.completion.called
+
+    reopened = _streaming_integration(fake_litellm, ["should not be used"])
+    assert "".join(reopened.prompt("why?", bench_root=_BENCH)) == "second"
+    assert not fake_litellm.completion.called

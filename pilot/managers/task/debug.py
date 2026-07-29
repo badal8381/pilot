@@ -29,15 +29,22 @@ def build_debug_prompt(task: TaskInfo, output: str) -> str:
 
 
 def stream_task_debug(
-    llm_config: LLMConfig, task: TaskInfo, output: str, *, bench_root: Path
+    llm_config: LLMConfig,
+    task: TaskInfo,
+    output: str,
+    *,
+    bench_root: Path,
+    refresh: bool = False,
 ) -> Iterator[str]:
-    """Yield text deltas of the model's explanation; raises LLMError on failure."""
+    """Yield text deltas of the model's explanation; raises LLMError on failure.
+    `refresh` re-asks the model instead of replaying the cached explanation."""
     integration = build_integration(llm_config, stream=True)
     try:
         yield from integration.prompt(
             build_debug_prompt(task, output),
             bench_root=bench_root,
             max_tokens=llm_config.max_tokens,
+            refresh=refresh,
         )
     except LLMError:
         raise
