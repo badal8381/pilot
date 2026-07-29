@@ -28,10 +28,6 @@ class SystemPackageManager(ABC):
     def is_installed(self, package: str) -> bool:
         """Return True if the package is already installed."""
 
-    @abstractmethod
-    def update(self) -> None:
-        """Refresh the package index."""
-
 
 class AptPackageManager(SystemPackageManager):
     package_aliases: ClassVar[dict[str, str | tuple[str, ...]]] = {
@@ -51,9 +47,6 @@ class AptPackageManager(SystemPackageManager):
             capture_output=True,
         )
         return result.returncode == 0
-
-    def update(self):
-        subprocess.run(_privileged(["apt-get", "-y", "update"]))
 
 
 class DnfPackageManager(SystemPackageManager):
@@ -85,9 +78,6 @@ class DnfPackageManager(SystemPackageManager):
             capture_output=True,
         )
         return result.returncode == 0
-
-    def update(self):
-        subprocess.run(_privileged(["dnf", "-y", "makecache"]))
 
 
 class PacmanPackageManager(SystemPackageManager):
@@ -121,9 +111,6 @@ class PacmanPackageManager(SystemPackageManager):
         )
         return result.returncode == 0
 
-    def update(self):
-        subprocess.run(_privileged(["pacman", "-Sy", "--noconfirm"]))
-
 
 class BrewPackageManager(SystemPackageManager):
     def install(self, *packages: str) -> None:
@@ -138,9 +125,6 @@ class BrewPackageManager(SystemPackageManager):
             capture_output=True,
         )
         return bool(result.stdout.strip())
-
-    def update(self):
-        return super().update()
 
 
 _LINUX_PACKAGE_MANAGERS: dict[Distro, type[SystemPackageManager]] = {

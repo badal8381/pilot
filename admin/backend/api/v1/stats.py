@@ -98,17 +98,15 @@ def _log_file_info(description: str, path: Path) -> dict:
 
 @stats_bp.get("/monitor/status")
 def get_monitor_status():
-    from pilot.config import MonitorConfig
+    from pilot.config.monitor import bench_log_path, system_log_path
 
     bench_root = Path(current_app.config["BENCH_ROOT"])
     try:
         config = BenchConfig.read(bench_root)
-        mon = config.monitor
-        log_path = mon.log_path or MonitorConfig.default_log_path(config.name)
         return jsonify(
             [
-                _log_file_info("System Log", mon.system_log_path),
-                _log_file_info("Application Log", log_path),
+                _log_file_info("System Log", system_log_path()),
+                _log_file_info("Application Log", bench_log_path(config.name)),
             ]
         )
     except Exception:

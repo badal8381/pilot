@@ -70,11 +70,6 @@ class BenchUpdater:
             on_progress(f"Updating assets for {app.config.name}...")
             python_env.build_assets_for_app(app)
 
-    def migrate_sites(self, skip_failing_patches: bool, on_progress: Callable[[str], None]) -> None:
-        for site in self.bench.sites():
-            on_progress(f"Migrating {site.config.name}...")
-            site.migrate(skip_failing=skip_failing_patches)
-
 
 def marketplace_pin(app: "App", marketplace_by_name: dict) -> "RevisionPin | None":
     entry = marketplace_by_name.get(app.config.name)

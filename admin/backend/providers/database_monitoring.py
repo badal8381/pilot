@@ -20,10 +20,9 @@ class DatabaseMonitoringProvider(WindowedLogProvider):
 
     def get_history(self) -> dict:
         from admin.backend.providers.slow_queries import SlowQueryProvider
-        from pilot.config import BenchConfig
+        from pilot.config.monitor import db_log_path
 
-        config = BenchConfig.read(self._bench_root)
-        path = config.monitor.db_log_path
+        path = db_log_path()
         rows = self._rows(path)
         return {
             "window": self.window,

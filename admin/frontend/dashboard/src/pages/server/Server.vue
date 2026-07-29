@@ -72,7 +72,11 @@ onMounted(load)
       <div
         class="divide-y lg:divide-x lg:divide-y-0 grid grid-cols-1 divide-outline-gray-2 lg:grid-cols-2"
       >
-        <DBStorageCard :data="storageData.database" :disk-total="storageData.disk_total" />
+        <DBStorageCard
+          :data="storageData.database"
+          :disk-total="storageData.disk_total"
+          @purged="load"
+        />
         <AppStorageCard :data="storageData.bench" :disk-total="storageData.disk_total" />
       </div>
     </div>

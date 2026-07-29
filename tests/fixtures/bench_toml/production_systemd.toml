@@ -100,6 +100,4 @@ region = "us-east-1"
 [monitor]
 system_log_path = "/var/log/bench-system-stats.log"
 authority_file_path = "/var/log/.bench-authority"
-system_log_max_size = "750M"
-application_log_max_size = "1G"
 log_path = "/var/log/systemd-prod-stats.log"

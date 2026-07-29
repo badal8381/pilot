@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 def shared_modsec_dir() -> Path:
     from pilot.utils import cli_root
 
-    return cli_root() / "modsecurity-crs"
+    return cli_root() / "system" / "waf" / "modsecurity-crs"
 
 MODSEC_MODULE_NAME = "ngx_http_modsecurity_module.so"
 _MODULE_DIRS = ("/usr/lib/nginx/modules", "/usr/lib64/nginx/modules")

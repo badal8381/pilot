@@ -9,12 +9,11 @@ from pilot.config import PostgresConfig
 from pilot.exceptions import DatabaseError
 from pilot.managers.database.base import UserOwnedDBManager
 from pilot.managers.platform import is_macos, which
-from pilot.utils import run_command
+from pilot.utils import cli_root, run_command
 
-# One rootless PostgreSQL server per OS user, shared by all their benches.
-_STATE_DIR = Path.home() / ".local" / "share" / "pilot" / "postgres"
 _CLIENT_TIMEOUT = 5
 _DEBIAN_POSTGRES_ROOT = Path("/usr/lib/postgresql")
+_GENERATED_CONFIG_FILES = ("postgresql.conf", "pg_hba.conf", "pg_ident.conf")
 
 
 class PostgresManager(UserOwnedDBManager):
@@ -30,15 +29,24 @@ class PostgresManager(UserOwnedDBManager):
         self.config = config
 
     @property
+    def state_dir(self) -> Path:
+        """One rootless PostgreSQL server per host, shared by all its benches."""
+        return cli_root() / "databases" / "postgres"
+
+    @property
+    def config_dir(self) -> Path:
+        return self.state_dir / "config"
+
+    @property
     def data_dir(self) -> Path:
-        return _STATE_DIR / "data"
+        return self.state_dir / "data"
 
     @property
     def socket_dir(self) -> Path:
         # Postgres' compiled-in default (often /var/run/postgresql) is owned by
         # the 'postgres' OS user/group, not the bench user - pin a directory
         # we actually own so both the server and psql can use it.
-        return _STATE_DIR / "run"
+        return self.state_dir / "run"
 
     def is_installed(self) -> bool:
         return bool(which("psql") or which("postgres") or which("initdb"))
@@ -95,10 +103,26 @@ class PostgresManager(UserOwnedDBManager):
             self.socket_dir.mkdir(parents=True, exist_ok=True)
             # No --username: the bootstrap superuser is the bench OS user.
             run_command([self._server_binary("initdb"), "-D", str(self.data_dir)])
+            self._move_generated_config_into_config_dir()
             self._install_unit()
             run_command(self._systemctl("enable", "--now", self._UNIT_NAME), env=self._systemctl_env())
         elif not self.is_running():
             run_command(self._systemctl("start", self._UNIT_NAME), env=self._systemctl_env())
+
+    def _move_generated_config_into_config_dir(self) -> None:
+        """initdb writes postgresql.conf/pg_hba.conf/pg_ident.conf into the data
+        dir; move them into our own config/ dir. hba_file/ident_file default to
+        the -D data directory regardless of --config-file, so point them at
+        their new location explicitly from within postgresql.conf."""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        for name in _GENERATED_CONFIG_FILES:
+            (self.data_dir / name).replace(self.config_dir / name)
+        postgresql_conf = self.config_dir / "postgresql.conf"
+        postgresql_conf.write_text(
+            postgresql_conf.read_text()
+            + f"\nhba_file = '{self.config_dir / 'pg_hba.conf'}'\n"
+            + f"ident_file = '{self.config_dir / 'pg_ident.conf'}'\n"
+        )
 
     def _ensure_port_available(self) -> None:
         """Fail if an unowned process is already listening on the configured port."""
@@ -120,13 +144,14 @@ class PostgresManager(UserOwnedDBManager):
             "Description=PostgreSQL (pilot, user-owned)\n\n"
             "[Service]\n"
             "Type=simple\n"
-            f"ExecStart={postgres} -D {self.data_dir} -p {self.config.port} "
+            f"ExecStart={postgres} -D {self.data_dir} "
+            f"--config-file={self.config_dir / 'postgresql.conf'} -p {self.config.port} "
             f"-c listen_addresses=127.0.0.1 -c unix_socket_directories={self.socket_dir}\n"
             "Restart=on-failure\n\n"
             "[Install]\n"
             "WantedBy=default.target\n"
         )
-        unit_dir = self._user_unit_dir()
+        unit_dir = self.user_unit_dir
         unit_dir.mkdir(parents=True, exist_ok=True)
         self.unit_path.write_text(content)
         run_command(self._systemctl("daemon-reload"), env=self._systemctl_env())

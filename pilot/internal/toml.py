@@ -3,12 +3,10 @@ from __future__ import annotations
 import math
 import re
 import tomllib
-from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from collections.abc import Mapping
 from datetime import date, datetime, time
-from typing import Any, Generic, TypeVar
+from typing import Any
 
-ConfigT = TypeVar("ConfigT")
 ConfigDict = dict[str, Any]
 
 _BARE_KEY = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -144,21 +142,3 @@ class Toml:
     def _validate_key(value: Any) -> None:
         if not isinstance(value, str):
             raise TypeError(f"TOML keys must be strings, got {type(value).__name__}")
-
-
-@dataclass(frozen=True)
-class TomlDataclassCodec(Generic[ConfigT]):
-    from_config_dict: Callable[[ConfigDict], ConfigT]
-    to_config_dict: Callable[[ConfigT], ConfigDict]
-
-    def from_dict(self, data: ConfigDict) -> ConfigT:
-        return self.from_config_dict(data)
-
-    def to_dict(self, config: ConfigT) -> ConfigDict:
-        return self.to_config_dict(config)
-
-    def loads(self, value: str) -> ConfigT:
-        return self.from_dict(Toml.loads(value))
-
-    def dumps(self, config: ConfigT) -> str:
-        return Toml.dumps(self.to_dict(config))

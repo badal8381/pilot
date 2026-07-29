@@ -23,6 +23,7 @@ class SlowQueryProvider(WindowedLogProvider):
 
     def get_overview(self) -> dict:
         from pilot.config import BenchConfig
+        from pilot.config.monitor import slow_query_log_path
         from pilot.core.database import make_database
         from pilot.core.database.engines import MariaDB
         from pilot.core.database.slow_queries import SlowQueryLog
@@ -41,7 +42,7 @@ class SlowQueryProvider(WindowedLogProvider):
                 "site": site_by_db.get(str(record.get("db") or ""), str(record.get("db") or "unknown")),
                 "query": self._label(record.get("query") or ""),
             }
-            for record in SlowQueryLog(config.monitor.slow_query_log_path).records()
+            for record in SlowQueryLog(slow_query_log_path()).records()
             if (when := self.get_time(record.get("time"))) and when >= self.cutoff
         ]
         sites = sorted({r["site"] for r in records})

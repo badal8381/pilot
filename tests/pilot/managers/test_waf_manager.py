@@ -43,7 +43,7 @@ def fake_download(monkeypatch, tmp_path):
             Path(dest).write_bytes(payload)
 
         monkeypatch.setattr(waf.urllib.request, "urlretrieve", _urlretrieve)
-        return tmp_path / "modsecurity-crs"
+        return tmp_path / "system" / "waf" / "modsecurity-crs"
 
     return _install
 

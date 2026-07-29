@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -8,10 +7,11 @@ from pathlib import Path
 from pilot.exceptions import DatabaseError
 from pilot.managers.packages import get_package_manager
 from pilot.managers.platform import is_macos
+from pilot.managers.systemd_user import SystemdUserMixin
 from pilot.utils import run_command
 
 
-class UserOwnedDBManager:
+class UserOwnedDBManager(SystemdUserMixin):
     """Shared service-control for per-user database servers."""
 
     _UNIT_NAME: str = ""
@@ -47,7 +47,7 @@ class UserOwnedDBManager:
 
     @property
     def unit_path(self) -> Path:
-        return self._user_unit_dir() / self._UNIT_NAME
+        return self.user_unit_dir / self._UNIT_NAME
 
     def is_provisioned(self) -> bool:
         """A user unit means this per-user server has already been set up."""
@@ -78,19 +78,6 @@ class UserOwnedDBManager:
             run_command(["brew", "services", action, self._brew_package()])
         else:
             run_command(self._systemctl(action, self._UNIT_NAME), env=self._systemctl_env())
-
-    def _systemctl(self, *args: str) -> list[str]:
-        return ["systemctl", "--user", *args]
-
-    def _systemctl_env(self) -> dict:
-        # CI and su -c often miss this; systemctl --user needs it.
-        env = dict(os.environ)
-        if not env.get("XDG_RUNTIME_DIR"):
-            env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
-        return env
-
-    def _user_unit_dir(self) -> Path:
-        return Path.home() / ".config" / "systemd" / "user"
 
     def _brew_package(self) -> str:
         return self._installed_brew_formula() or f"{self._BREW_FORMULA_BASE}@{self._DEFAULT_VERSION}"

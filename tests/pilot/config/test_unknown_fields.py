@@ -36,6 +36,22 @@ def test_mariadb_postgres_letsencrypt_are_now_unknown_tables() -> None:
     assert set(paths) == {"mariadb", "postgres", "letsencrypt"}
 
 
+def test_nginx_is_now_an_unknown_table() -> None:
+    """nginx config is fixed at its compiled-in defaults; a bench.toml carrying
+    a [nginx] table reports it as unrecognized rather than parsing it."""
+    data = copy.deepcopy(MINIMAL)
+    data["nginx"] = {"http_port": 8080}
+    assert BenchConfig._unknown_config_paths(data) == ["nginx"]
+
+
+def test_monitor_is_now_an_unknown_table() -> None:
+    """monitor log paths are fixed under system/logs/; a bench.toml carrying
+    a [monitor] table reports it as unrecognized rather than parsing it."""
+    data = copy.deepcopy(MINIMAL)
+    data["monitor"] = {"log_path": "/var/log/custom.log"}
+    assert BenchConfig._unknown_config_paths(data) == ["monitor"]
+
+
 def test_unknown_bench_key_reported() -> None:
     data = copy.deepcopy(MINIMAL)
     data["bench"]["typo"] = 1

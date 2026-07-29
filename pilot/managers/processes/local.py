@@ -255,39 +255,3 @@ class ProcessManager:
 
     def _process_definitions(self) -> list[ProcessDefinition]:
         return self._definitions.process_definitions()
-
-    def _to_dev(self, pd: ProcessDefinition) -> ProcessDefinition:
-        return self._definitions.to_dev(pd)
-
-    def _py_memory_env(self) -> dict:
-        return self._definitions.py_memory_env()
-
-    def _web_definition(self, dev: bool = False) -> ProcessDefinition:
-        return self._definitions.web_definition(dev)
-
-    def _socketio_definition(self) -> ProcessDefinition:
-        return self._definitions.socketio_definition()
-
-    def _watch_definition(self) -> ProcessDefinition:
-        return self._definitions.watch_definition()
-
-    def _worker_pool_definition(self, queues: str, num_workers: int) -> ProcessDefinition:
-        return self._definitions.worker_pool_definition(queues, num_workers)
-
-    def _worker_definitions(self, queue: str, count: int) -> list[ProcessDefinition]:
-        return self._definitions.worker_definitions(queue, count)
-
-    def _redis_definition(self, name: str, config_filename: str) -> ProcessDefinition:
-        return self._definitions.redis_definition(name, config_filename)
-
-    def _admin_definition(self) -> ProcessDefinition:
-        return self._definitions.admin_definition()
-
-    def _watch_admin_definition(self) -> ProcessDefinition:
-        return self._definitions.watch_admin_definition()
-
-    def _build_admin_definition(self, mode_flag: str) -> ProcessDefinition:
-        return self._definitions.build_admin_definition(mode_flag)
-
-    def _admin_frontend_dev_definition(self) -> ProcessDefinition:
-        return self._definitions.admin_frontend_dev_definition()

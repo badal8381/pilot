@@ -2,7 +2,7 @@ name: Install Script Smoke Tests
 
 on:
   pull_request:
-    branches: [main]
+    branches: [develop]
     paths:
       - install.sh
       - scripts/smoke_install.sh

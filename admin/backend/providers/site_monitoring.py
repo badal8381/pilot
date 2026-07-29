@@ -60,16 +60,15 @@ class SiteMonitoringProvider(WindowedLogProvider):
         }
 
     def _slow_query_timeline(self, by: str) -> dict:
-        from pilot.config import BenchConfig
+        from pilot.config.monitor import slow_query_log_path
         from pilot.core.database.slow_queries import SlowQueryLog
 
         if not self._db_name:
             points = []
         else:
-            config = BenchConfig.read(self._bench_root)
             points = [
                 TimelinePoint(self.to_epoch_ms(when), record["query"], (record.get("query_time") or 0) * 1_000_000)
-                for record in SlowQueryLog(config.monitor.slow_query_log_path).records()
+                for record in SlowQueryLog(slow_query_log_path()).records()
                 if record.get("db") == self._db_name
                 and (when := self.get_time(record.get("time"))) is not None
                 and when >= self.cutoff

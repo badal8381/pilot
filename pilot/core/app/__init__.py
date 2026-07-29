@@ -16,7 +16,6 @@ from pilot.utils import installed_app_version, run_command
 
 if TYPE_CHECKING:
     from pilot.core.bench import Bench
-    from pilot.internal.git import GitRepo
 
 
 @dataclass
@@ -126,10 +125,6 @@ class App:
         return installed_app_version(self.bench.env_path, self.config.name)
 
     @property
-    def _repo(self) -> "GitRepo":
-        return self._repository.repo
-
-    @property
     def _repository(self) -> AppRepository:
         return AppRepository(self)
 
@@ -164,29 +159,11 @@ class App:
         module_path = self.bench.apps_path / self.module_name
         return module_path != self.path and (module_path / ".git").exists()
 
-    @property
-    def _remote_url(self) -> str:
-        return self._repository.remote_url
-
-    def _detect_default_branch(self) -> str:
-        return self._repository.get_default_branch()
-
     def is_commit_hash(self, ref: str) -> bool:
         return AppRepository.is_commit_hash(ref)
 
-    def _clone_rev(self, commit: str) -> None:
-        self._repository.clone_rev(commit)
-
     def clone(self) -> None:
         self._repository.clone()
-
-    @property
-    def _is_shallow(self) -> bool:
-        return self._repository.is_shallow
-
-    @staticmethod
-    def _pack_threads() -> int:
-        return AppRepository.pack_threads()
 
     def update(self, pin: RevisionPin | None = None) -> None:
         self._repository.update(pin)
@@ -196,12 +173,6 @@ class App:
 
     def checkout_commit(self, sha: str) -> None:
         """Check out a specific commit SHA, refetching it from origin if needed."""
-        self._repository.checkout_pinned_commit(sha)
-
-    def _checkout_pinned_target(self, pin: RevisionPin) -> None:
-        self._repository.checkout_pinned_target(pin)
-
-    def _checkout_pinned_commit(self, sha: str) -> None:
         self._repository.checkout_pinned_commit(sha)
 
     @property
