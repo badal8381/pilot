@@ -18,6 +18,7 @@ from pilot.core.bench import Bench
 from pilot.core.server import Server
 from pilot.core.site import Site
 from pilot.exceptions import BenchError
+from pilot.internal.git import GitRepo
 from pilot.managers.processes.local import ProcessDefinition, ProcessManager
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
@@ -296,6 +297,33 @@ def test_app_update_with_commit_target_checks_out_advertised_commit(tmp_path: Pa
     ).stdout.strip()
 
     app.update(pin=RevisionPin(kind="commit", ref=target_sha))
+
+    assert app.installed_hash == target_sha
+
+
+def test_app_update_with_commit_target_stays_on_configured_branch(tmp_path: Path) -> None:
+    """A pinned-commit update should land at that commit without detaching HEAD."""
+    remote = tmp_path / "remote"
+    remote.mkdir()
+    _init_git_repo(remote)
+    _commit(remote, "c1")
+    _commit(remote, "c2")
+
+    import subprocess
+
+    target_sha = subprocess.run(
+        ["git", "-C", str(remote), "rev-parse", "HEAD^"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    bench = make_bench(tmp_path)
+    app = App(AppConfig(name="myapp", repo="r", branch="develop"), bench)
+    subprocess.run(["git", "clone", "-q", str(remote), str(app.path)], check=True)
+    subprocess.run(["git", "-C", str(app.path), "checkout", "-q", "-B", "develop"], check=True)
+
+    app.update(pin=RevisionPin(kind="commit", ref=target_sha))
+
+    assert app.installed_hash == target_sha
+    assert GitRepo(app.path).branch == "develop"
 
     assert app.installed_hash == target_sha
 
