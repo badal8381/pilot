@@ -79,22 +79,20 @@ def test_workload_reload_skips_admin_and_redis(tmp_path: Path, monkeypatch) -> N
     assert restarted == ["web", "socketio", "worker_default_1"]
 
 
-def test_app_tasks_declare_a_single_reload_callback() -> None:
+def test_tasks_that_change_bench_apps_declare_a_single_reload_callback() -> None:
     """One reload per task, not one per app - installing an app plus its
     dependencies must not restart the workload several times."""
     from unittest.mock import MagicMock
 
     from pilot.tasks.callbacks import task_callbacks_for
     from pilot.tasks.get_app import GetAppTask
-    from pilot.tasks.install_app import InstallAppTask
     from pilot.tasks.remove_app import RemoveAppTask
-    from pilot.tasks.uninstall_app import UninstallAppTask
+    from pilot.tasks.switch_branch import SwitchBranchTask
 
     tasks = [
         GetAppTask(bench=MagicMock(), bench_root=Path("/tmp/bench"), repo="lms"),
-        InstallAppTask(bench=MagicMock(), bench_root=Path("/tmp/bench"), site="a.local", app="lms"),
-        UninstallAppTask(bench=MagicMock(), bench_root=Path("/tmp/bench"), site="a.local", app="lms"),
         RemoveAppTask(bench=MagicMock(), bench_root=Path("/tmp/bench"), name="lms"),
+        SwitchBranchTask(bench=MagicMock(), bench_root=Path("/tmp/bench"), name="lms", branch="main"),
     ]
 
     for task in tasks:
@@ -102,6 +100,21 @@ def test_app_tasks_declare_a_single_reload_callback() -> None:
             "operation": "reload-workers",
             "args": {"web_only": False},
         }
+
+
+def test_site_app_tasks_clear_the_site_cache_instead_of_reloading() -> None:
+    """The app is already importable, so a restart buys nothing over a cache clear."""
+    from unittest.mock import MagicMock
+
+    from pilot.tasks.callbacks import task_callbacks_for
+    from pilot.tasks.install_app import InstallAppTask
+    from pilot.tasks.uninstall_app import UninstallAppTask
+
+    for task in (
+        InstallAppTask(bench=MagicMock(), bench_root=Path("/tmp/bench"), site="a.local", app="lms"),
+        UninstallAppTask(bench=MagicMock(), bench_root=Path("/tmp/bench"), site="a.local", app="lms"),
+    ):
+        assert "on_success" not in task_callbacks_for(task)
 
 
 def test_reload_workers_callback_is_registered() -> None:

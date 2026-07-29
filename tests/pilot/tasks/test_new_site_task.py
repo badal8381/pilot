@@ -104,3 +104,40 @@ def test_fetch_missing_apps_raises_when_not_in_marketplace(tmp_path: Path) -> No
             assert "not found in marketplace" in str(error)
         else:
             raise AssertionError("expected BenchError")
+
+
+def test_run_reloads_workers_after_fetching_apps_and_before_provisioning(tmp_path: Path) -> None:
+    """Provisioning runs install-app, which enqueues jobs importing the site's
+    apps - workers must restart in between or those jobs fail to import."""
+    from unittest.mock import MagicMock, call
+
+    task = make_task(tmp_path, ["helpdesk"])
+    order = MagicMock()
+    task.bench.reload_workers = order.reload
+
+    with (
+        patch.object(task, "require_production_privileges"),
+        patch.object(task, "fetch_missing_apps", order.fetch),
+        patch.object(task, "create", order.create),
+    ):
+        task.run()
+
+    assert order.mock_calls == [call.fetch(), call.reload(), call.create()]
+
+
+def test_run_reloads_workers_even_when_no_app_was_fetched(tmp_path: Path) -> None:
+    """An app already on the bench can still postdate the running workers - it
+    may have arrived through `bench get-app` after they started."""
+    from unittest.mock import MagicMock
+
+    task = make_task(tmp_path, ["frappe"])
+    (task.bench.sites_path / "apps.txt").write_text("frappe\n")
+    task.bench.reload_workers = MagicMock()
+
+    with (
+        patch.object(task, "require_production_privileges"),
+        patch.object(task, "create"),
+    ):
+        task.run()
+
+    task.bench.reload_workers.assert_called_once()

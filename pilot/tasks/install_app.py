@@ -2,7 +2,7 @@ import sys
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
-from pilot.tasks import Task, on_success, step
+from pilot.tasks import Task, step
 
 if TYPE_CHECKING:
     from pilot.core.app import App
@@ -21,13 +21,8 @@ class InstallAppTask(Task):
         site = self.bench.site(self.site)
         dependencies = self.install(site, app)
         self.build_assets([app, *dependencies])
+        site.clear_cache()
         self.bench.audit_action("app", {"event": "installed", "app": self.app, "site": self.site})
-
-    @on_success
-    def reload_workers(self) -> dict:
-        """Long-lived web and background workers hold the old app list and
-        import map, so they need a restart once this task lands."""
-        return {"web_only": False}
 
     @step("install", lambda self: f"Install {self.app} into {self.site}")
     def install(self, site: "Site", app: "App") -> list["App"]:
