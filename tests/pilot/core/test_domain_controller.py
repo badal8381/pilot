@@ -9,7 +9,7 @@ import pytest
 from pilot.config import BenchConfig, SiteConfig
 from pilot.core.adapters.domain_provider import DomainRouteProvider
 from pilot.core.bench import Bench
-from pilot.exceptions import BenchError
+from pilot.exceptions import BenchError, DomainConflictError, DomainProviderError
 from pilot.managers.nginx import NginxConfigRenderer
 
 _BENCH_DATA: dict = {
@@ -142,6 +142,32 @@ def test_provider_failure_raises_with_stderr(tmp_path: Path, monkeypatch) -> Non
 
     with pytest.raises(BenchError, match="proxy-servers declined"):
         DomainRouteProvider.proxy_servers()
+
+
+_TRANSPORT_FAILURE_PROVIDER = """#!/usr/bin/env python3
+import sys
+sys.stderr.write("provider config missing")
+sys.exit(1)
+"""
+
+
+def test_register_declined_raises_domain_conflict(tmp_path: Path, monkeypatch) -> None:
+    _install_provider(tmp_path, monkeypatch)
+    monkeypatch.setenv("PROVIDER_FAIL", "register")
+    bench = _make_bench(tmp_path)
+    _write_site(bench, "mysite")
+
+    with pytest.raises(DomainConflictError, match="register declined"):
+        DomainRouteProvider(bench).register("mysite", "app.example.com")
+
+
+def test_register_transport_failure_raises_domain_provider_error(tmp_path: Path, monkeypatch) -> None:
+    _install_provider(tmp_path, monkeypatch, body=_TRANSPORT_FAILURE_PROVIDER)
+    bench = _make_bench(tmp_path)
+    _write_site(bench, "mysite")
+
+    with pytest.raises(DomainProviderError, match="provider config missing"):
+        DomainRouteProvider(bench).register("mysite", "app.example.com")
 
 
 def test_host_queries_empty_without_provider(tmp_path: Path, monkeypatch) -> None:
