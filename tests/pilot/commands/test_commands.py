@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -953,6 +953,36 @@ def test_ls_lists_benches_with_mode_and_address(tmp_path: Path, capsys: pytest.C
     out = capsys.readouterr().out
     assert "alpha" in out and "production" in out and "alpha-admin.example.com" in out
     assert "beta" in out and "development" in out and "http://localhost:7005" in out
+
+
+def test_ls_shows_manager_and_domain_before_wizard_finishes(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    from pilot.commands.bench.list import ListCommand
+
+    benches = tmp_path / "benches"
+    (benches / "pending").mkdir(parents=True)
+    (benches / "pending" / "bench.toml").write_text(
+        '[bench]\nname = "pending"\n\n[production]\nenabled = false\nprocess_manager = "systemd"\n\n'
+        '[admin]\ndomain = "pending-admin.example.com"\n'
+    )
+
+    with (
+        patch("pilot.utils.cli_root", return_value=tmp_path),
+        patch("pilot.commands.bench.list.ListCommand._state", return_value="stopped"),
+        patch(
+            "pilot.managers.nginx.NginxManager.has_admin_cert",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+    ):
+        ListCommand().run()
+
+    out = capsys.readouterr().out
+    assert "development" in out
+    assert "systemd" in out
+    assert "http://pending-admin.example.com" in out
+    assert "foreground" not in out
 
 
 def test_ls_state_admin_active_when_workload_down_but_admin_up(tmp_path: Path) -> None:

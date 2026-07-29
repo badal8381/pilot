@@ -62,7 +62,7 @@ def bench_resource(bench_dir: Path) -> dict:
         "production": production,
         "process_manager": process_manager or None,
         "reachable": bench.is_port_open(port) or bench.is_port_open(port + 1),
-        "admin_url": f"{scheme}://{domain}" if production and domain else "",
+        "admin_url": f"{scheme}://{domain}" if domain else "",
         "workload_running": bench.is_workload_running if production else None,
         "admin_running": bench.is_admin_running if production else None,
         "site_count": bench.site_count,
