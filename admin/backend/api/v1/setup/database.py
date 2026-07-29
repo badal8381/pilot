@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pilot.config import BenchConfig, MariaDBConfig
+from pilot.config import BenchConfig, MariaDBConfig, PostgresConfig
 
 if TYPE_CHECKING:
     from pilot.managers.database import MariaDBManager, PostgresManager
@@ -21,7 +21,7 @@ def database_validation(bench_root: Path, data: dict):
     if "existing" in data and not isinstance(data["existing"], bool):
         raise ValueError("existing must be a boolean.")
 
-    default_port = MariaDBConfig().port if engine == "mariadb" else 5432
+    default_port = MariaDBConfig().port if engine == "mariadb" else PostgresConfig().port
     port = data.get("port", default_port)
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
         raise ValueError("port must be an integer between 1 and 65535.")
@@ -47,7 +47,6 @@ def database_validation(bench_root: Path, data: dict):
         )
         return engine, MariaDBManager(config), password, existing
 
-    from pilot.config import PostgresConfig
     from pilot.managers.database import PostgresManager
 
     config = PostgresConfig(

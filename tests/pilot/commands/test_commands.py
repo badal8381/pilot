@@ -8,7 +8,15 @@ from unittest.mock import ANY, MagicMock, PropertyMock, patch
 
 import pytest
 
-from pilot.config import AppConfig, BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig, WorkerGroup
+from pilot.config import (
+    AppConfig,
+    BenchConfig,
+    MariaDBConfig,
+    PostgresConfig,
+    RedisConfig,
+    WorkerConfig,
+    WorkerGroup,
+)
 from pilot.config.common import CommonConfig
 from pilot.core.bench import Bench
 from pilot.exceptions import BenchAlreadyExistsError, BenchError
@@ -199,7 +207,7 @@ def test_new_command_postgres_port_is_not_offset_between_benches(
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert CommonConfig.read(benches_dir).postgres.port == 5432
+    assert CommonConfig.read(benches_dir).postgres.port == PostgresConfig().port
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -210,14 +218,15 @@ def test_new_command_postgres_port_ignores_live_scan_on_macos(
     from pilot.commands.bench.create import NewCommand
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    # 5432 reads as live, which would normally push the picker to 5433+.
-    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == 5432)
+    default_port = PostgresConfig().port
+    # The default port reads as live, which would normally push the picker up.
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == default_port)
     target = tmp_path / "benches" / "pg"
     with patch("pilot.managers.platform.is_macos", return_value=True):
         NewCommand(target_directory=target, bench_name="pg", database="postgres").run()
         _ensure_database_credentials(target)
 
-    assert CommonConfig.read(tmp_path / "benches").postgres.port == 5432
+    assert CommonConfig.read(tmp_path / "benches").postgres.port == default_port
 
 
 def test_new_command_mariadb_bench_has_no_password_yet(
