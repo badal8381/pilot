@@ -6,6 +6,7 @@ import pytest
 from pilot.config import (
     BenchConfig,
     FirewallRule,
+    PostgresConfig,
     ProductionConfig,
     WafCondition,
     WafRule,
@@ -238,7 +239,7 @@ def test_central_config_round_trips_through_typed_writer() -> None:
 def test_postgres_defaults_when_section_absent() -> None:
     config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.postgres.host == "localhost"
-    assert config.postgres.port == 5432
+    assert config.postgres.port == PostgresConfig().port
     assert config.postgres.admin_user == "postgres"
     assert config.postgres.root_password == ""
 
