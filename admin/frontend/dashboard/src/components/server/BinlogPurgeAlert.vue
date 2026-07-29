@@ -1,0 +1,126 @@
+<script setup lang="ts">
+import { Alert, Button, Dialog, ErrorMessage, toast } from 'frappe-ui'
+import { computed, ref } from 'vue'
+import { apiErrorMessage } from '@/api/client'
+import { databaseApi } from '@/api/database'
+import { formatBytes } from '@/utils/format'
+
+interface BinlogFile {
+  name: string
+  size_bytes: number
+}
+
+interface Props {
+  bytes: number
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<{ purged: [] }>()
+
+const SHOW_THRESHOLD_BYTES = 1024 ** 3
+
+const show = computed(() => props.bytes > SHOW_THRESHOLD_BYTES)
+
+const dialogOpen = ref(false)
+const loading = ref(false)
+const purging = ref(false)
+const loadError = ref('')
+const purgeError = ref('')
+const binlogs = ref<BinlogFile[]>([])
+
+// Files come oldest-first; the last one is the active file PURGE always keeps.
+const keepFile = computed(() => binlogs.value.at(-1) ?? null)
+const freedBytes = computed(() =>
+  binlogs.value.slice(0, -1).reduce((total, file) => total + file.size_bytes, 0),
+)
+const canPurge = computed(() => binlogs.value.length > 1)
+
+const openDialog = async () => {
+  dialogOpen.value = true
+  loadError.value = ''
+  purgeError.value = ''
+  loading.value = true
+
+  try {
+    const result = await databaseApi.binlogs.list()
+    if (result?.error) throw new Error(apiErrorMessage(result, 'Could not load binary logs.'))
+
+    binlogs.value = Array.isArray(result) ? result : []
+  } catch (e) {
+    loadError.value = e instanceof Error ? e.message : 'Could not load binary logs.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const purge = async () => {
+  if (!keepFile.value) return
+
+  purging.value = true
+  purgeError.value = ''
+
+  try {
+    const result = await databaseApi.binlogs.purge(keepFile.value.name)
+    if (result?.error) throw new Error(apiErrorMessage(result, 'Could not purge binary logs.'))
+
+    dialogOpen.value = false
+    toast.success('Binary logs purged')
+    emit('purged')
+  } catch (e) {
+    purgeError.value = e instanceof Error ? e.message : 'Could not purge binary logs.'
+  } finally {
+    purging.value = false
+  }
+}
+</script>
+
+<template>
+  <Alert title="Binary logs are taking up space" :dismissible="false" class="mt-4 !bg-surface-blue-1">
+    <template #description>
+      <p class="text-ink-gray-6 prose-sm">
+        Binary logs are using {{ formatBytes(bytes) }}. Purge older logs to free up space.
+      </p>
+    </template>
+
+    <template #footer>
+      <div class="flex col-span-2 items-center gap-3">
+        <Button  theme='blue' class="ml-auto" @click="openDialog"
+          >Purge binary logs</Button
+        >
+      </div>
+    </template>
+  </Alert>
+
+  <Dialog v-model="dialogOpen" :options="{ title: 'Purge binary logs?', size: 'sm' }">
+    <template #body-content>
+      <p v-if="loading" class="text-ink-gray-6 text-sm">Loading binary logs…</p>
+
+      <template v-else-if="!loadError">
+        <p v-if="!canPurge" class="text-ink-gray-7 text-sm">
+          There's only one binary log file right now, so there's nothing to purge yet.
+        </p>
+        <p v-else class="text-ink-gray-7 text-sm">
+          All binary logs except the most recent are deleted, freeing about
+          {{ formatBytes(freedBytes) }}. The most recent log is kept so replication and
+          point-in-time recovery keep working.
+        </p>
+      </template>
+
+      <ErrorMessage v-if="loadError" :message="loadError" />
+      <ErrorMessage v-if="purgeError" :message="purgeError" class="mt-3" />
+
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="ghost" @click="dialogOpen = false">Cancel</Button>
+        <Button
+          v-if="!loading && !loadError"
+          variant="solid"
+          :loading="purging"
+          :disabled="!canPurge"
+          @click="purge"
+        >
+          Purge
+        </Button>
+      </div>
+    </template>
+  </Dialog>
+</template>
