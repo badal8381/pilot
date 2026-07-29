@@ -32,6 +32,15 @@ def make_bench(tmp_path: Path) -> Bench:
     return Bench(config, tmp_path)
 
 
+def _ensure_database_credentials(bench_dir: Path) -> None:
+    """The DB-credential step of `bench init` (see BenchInitializer) - database
+    ports/passwords are generated there, not by `bench new`."""
+    from pilot.core.bench import Bench
+    from pilot.core.bench.initializer import BenchInitializer
+
+    BenchInitializer(Bench(bench_dir))._ensure_database_credentials()
+
+
 def test_new_command_creates_directory_and_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from pilot.commands.bench.create import NewCommand
 
@@ -136,20 +145,21 @@ def test_new_command_first_bench_has_no_jwks_url(tmp_path: Path, monkeypatch: py
     assert BenchConfig.read(target).admin.jwks_url == ""
 
 
-def test_new_command_postgres_bench(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Postgres benches record db_type and a provisioning password."""
+def test_new_command_postgres_bench_has_no_password_yet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`bench new` alone must not provision the shared DB server - only `bench
+    init` does (BenchInitializer._ensure_database_credentials)."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "pg", bench_name="pg", database="postgres").run()
 
     with open(benches_dir / "pg" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "postgres"
-    assert CommonConfig.read(benches_dir).postgres.root_password  # generated for provisioning
+    assert not CommonConfig.read(benches_dir).postgres.root_password
 
 
 def test_new_command_second_postgres_bench_inherits_password(
@@ -157,14 +167,16 @@ def test_new_command_second_postgres_bench_inherits_password(
 ) -> None:
     """Second Postgres bench reuses the shared server password."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "pg1", bench_name="pg1", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "pg1")
     password = CommonConfig.read(benches_dir).postgres.root_password
+    assert password
     NewCommand(target_directory=benches_dir / "pg2", bench_name="pg2", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "pg2")
 
     assert CommonConfig.read(benches_dir).postgres.root_password == password
     assert BenchConfig.read(benches_dir / "pg2").postgres.root_password == password
@@ -179,8 +191,10 @@ def test_new_command_postgres_port_is_not_offset_between_benches(
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "first", bench_name="first", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "first")
     NewCommand(target_directory=benches_dir / "second", bench_name="second", database="postgres").run()
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
@@ -194,32 +208,30 @@ def test_new_command_postgres_port_ignores_live_scan_on_macos(
 ) -> None:
     """macOS Postgres uses Homebrew's default service port."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     # 5432 reads as live, which would normally push the picker to 5433+.
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: port == 5432))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == 5432)
+    target = tmp_path / "benches" / "pg"
     with patch("pilot.managers.platform.is_macos", return_value=True):
-        NewCommand(target_directory=tmp_path / "benches" / "pg", bench_name="pg", database="postgres").run()
+        NewCommand(target_directory=target, bench_name="pg", database="postgres").run()
+        _ensure_database_credentials(target)
 
     assert CommonConfig.read(tmp_path / "benches").postgres.port == 5432
 
 
-def test_new_command_mariadb_bench_has_no_postgres_password(
+def test_new_command_mariadb_bench_has_no_password_yet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     NewCommand(target_directory=tmp_path / "benches" / "m", bench_name="m").run()
 
     with open(tmp_path / "benches" / "m" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "mariadb"
-    # not provisioned for mariadb benches
-    assert not CommonConfig.read(tmp_path / "benches").postgres.root_password
+    assert not CommonConfig.read(tmp_path / "benches").mariadb.root_password
 
 
 def test_new_command_mariadb_port_is_not_offset_between_benches(
@@ -231,8 +243,10 @@ def test_new_command_mariadb_port_is_not_offset_between_benches(
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "first", bench_name="first").run()
+    _ensure_database_credentials(benches_dir / "first")
     NewCommand(target_directory=benches_dir / "second", bench_name="second").run()
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
@@ -246,13 +260,14 @@ def test_new_command_mariadb_port_ignores_live_scan_on_macos(
 ) -> None:
     """macOS MariaDB uses Homebrew's default service port."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     # 3306 reads as live, which would normally push the picker to 3307+.
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: port == 3306))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == 3306)
+    target = tmp_path / "benches" / "m"
     with patch("pilot.managers.platform.is_macos", return_value=True):
-        NewCommand(target_directory=tmp_path / "benches" / "m", bench_name="m").run()
+        NewCommand(target_directory=target, bench_name="m").run()
+        _ensure_database_credentials(target)
 
     assert CommonConfig.read(tmp_path / "benches").mariadb.port == 3306
 
@@ -262,18 +277,19 @@ def test_new_command_second_mariadb_bench_inherits_password(
 ) -> None:
     """Second MariaDB bench reuses the shared server password."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "m1", bench_name="m1").run()
+    _ensure_database_credentials(benches_dir / "m1")
     password = CommonConfig.read(benches_dir).mariadb.root_password
     # Random, not the old guessable hardcoded default.
     assert password != "root"
     assert len(password) == 16  # secrets.token_hex(nbytes=8)
 
     NewCommand(target_directory=benches_dir / "m2", bench_name="m2").run()
+    _ensure_database_credentials(benches_dir / "m2")
     assert CommonConfig.read(benches_dir).mariadb.root_password == password
     assert BenchConfig.read(benches_dir / "m2").mariadb.root_password == password
 
