@@ -43,6 +43,42 @@ def is_linux() -> bool:
     return detect() == Platform.LINUX
 
 
+def mariadb_config_bin() -> str | None:
+    """Find mariadb_config/mysql_config, including keg-only Homebrew installs."""
+    if found := (which("mariadb_config") or which("mysql_config")):
+        return found
+    prefix = _read_command(["brew", "--prefix", "mariadb"])
+    if prefix is None:
+        return None
+    candidate = Path(prefix) / "bin" / "mariadb_config"
+    return str(candidate) if candidate.exists() else None
+
+
+def add_mysqlclient_flags(env: dict) -> None:
+    """Set the flags mysqlclient needs to compile against a Homebrew MariaDB."""
+    if not is_macos():
+        return
+    config_bin = mariadb_config_bin()
+    if not config_bin:
+        return
+    for variable, option in (("MYSQLCLIENT_CFLAGS", "--cflags"), ("MYSQLCLIENT_LDFLAGS", "--libs")):
+        flags = _read_command([config_bin, option])
+        if flags is None:
+            return
+        env.setdefault(variable, flags)
+
+
+def _read_command(argv: list[str]) -> str | None:
+    """Stripped stdout of a short-lived probe, or None if it could not run."""
+    from pilot.exceptions import CommandError
+    from pilot.utils import run_command
+
+    try:
+        return run_command(argv, timeout=5).stdout.decode().strip()
+    except (CommandError, OSError, UnicodeDecodeError):
+        return None
+
+
 class Distro(Enum):
     DEBIAN = "debian"
     UBUNTU = "ubuntu"
