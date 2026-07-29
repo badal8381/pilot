@@ -135,6 +135,28 @@ def test_api_benches_admin_url_is_http_until_cert_exists(tmp_path: Path) -> None
     assert entry["admin_url"] == "http://admin-prod.example.com"
 
 
+def test_api_benches_admin_url_and_process_manager_available_before_wizard_finishes(
+    tmp_path: Path,
+) -> None:
+    benches_dir = tmp_path / "benches"
+    client = _client(benches_dir / "current")
+
+    with _listening_socket() as live_port:
+        pending_dir = benches_dir / "pending-bench"
+        pending_dir.mkdir(parents=True, exist_ok=True)
+        (pending_dir / "bench.toml").write_text(
+            f'[bench]\nname = "pending-bench"\n\n'
+            f'[admin]\nport = {live_port}\ndomain = "pending-admin.example.com"\ntls = false\n\n'
+            f'[production]\nenabled = false\nprocess_manager = "systemd"\n'
+        )
+        resp = client.get("/api/v1/benches")
+
+    entry = next(b for b in resp.get_json() if b["name"] == "pending-bench")
+    assert entry["production"] is False
+    assert entry["process_manager"] == "systemd"
+    assert entry["admin_url"] == "http://pending-admin.example.com"
+
+
 def test_api_benches_includes_site_count(tmp_path: Path) -> None:
     benches_dir = tmp_path / "benches"
     client = _client(benches_dir / "current")

@@ -80,8 +80,7 @@ function benchMode(bench) {
 }
 
 function benchManager(bench) {
-  // Mirrors `bench ls`: dev benches run their processes in the foreground.
-  const mgr = bench.production ? bench.process_manager || 'supervisor' : 'foreground'
+  const mgr = bench.process_manager || 'foreground'
   return mgr.charAt(0).toUpperCase() + mgr.slice(1)
 }
 
