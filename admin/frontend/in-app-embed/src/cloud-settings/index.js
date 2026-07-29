@@ -10,9 +10,18 @@ import CloudSettings from "./CloudSettings.vue";
 
 const TAG = "fc-cloud-settings";
 
+// frappe-ui declares every design token (colors, radius, elevation, focus) on
+// `:root` and flips the dark set on `[data-theme=dark]`. Inside a shadow root
+// neither selector matches — `:root` is the document, not the host — so the
+// embed would inherit whatever tokens Desk happens to expose and silently drop
+// the rest (radius has none on older Desk).
+const scopedStyleText = styleText
+  .replace(/:root\b/g, ":host")
+  .replace(/\[data-theme=(["']?)dark\1\]/g, ":host([data-theme=dark])");
+
 // One sheet shared by every instance; adopting it costs nothing per element.
 const sheet = new CSSStyleSheet();
-sheet.replaceSync(styleText);
+sheet.replaceSync(scopedStyleText);
 
 const CloudSettingsElement = defineCustomElement({
   props: { context: Object, open: Boolean },
@@ -39,6 +48,24 @@ class CloudSettingsHost extends CloudSettingsElement {
     if (!root.adoptedStyleSheets.includes(sheet)) {
       root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
     }
+    // Desk flips its theme on <html data-theme>; mirror it onto the host so the
+    // shadow tree's `:host([data-theme=dark])` tokens follow it.
+    this.syncTheme();
+    this.themeObserver = new MutationObserver(() => this.syncTheme());
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["data-theme"],
+    });
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback?.();
+    this.themeObserver?.disconnect();
+  }
+
+  syncTheme() {
+    const theme = document.documentElement.getAttribute("data-theme") || "light";
+    this.setAttribute("data-theme", theme);
   }
 }
 
