@@ -332,6 +332,7 @@ def test_api_benches_create_does_not_prompt_for_system_privileges(tmp_path: Path
             return_value=True,
         ),
         patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.sudoers.has_passwordless_sudo_for", return_value=False),
         patch("admin.backend.api.v1.benches.create.Bench.create_at") as create,
         patch(
             "pilot.core.adapters.domain_provider.DomainRouteProvider.wildcard_domains",
@@ -344,6 +345,18 @@ def test_api_benches_create_does_not_prompt_for_system_privileges(tmp_path: Path
     assert resp.get_json()["error"]["code"] == "privileged_operation_unavailable"
     assert not (benches_dir / "fresh").exists()
     create.assert_not_called()
+
+
+def test_validate_production_privileges_allows_scoped_nginx_sudo_grant() -> None:
+    """install.sh grants passwordless sudo for exactly `nginx -t` etc, not a bare
+    `sudo -n true` - the scoped grant alone must be enough to create a bench."""
+    from admin.backend.api.v1.benches.create import _validate_production_privileges
+
+    with (
+        patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.sudoers.has_passwordless_sudo_for", return_value=True),
+    ):
+        assert _validate_production_privileges() is None
 
 
 def test_api_benches_create_reports_busy_without_waiting(tmp_path: Path) -> None:
@@ -770,6 +783,7 @@ def test_api_benches_drop_does_not_prompt_for_system_privileges(tmp_path: Path) 
 
     with (
         patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.nginx.has_passwordless_sudo_for", return_value=False),
         patch("admin.backend.api.v1.benches.Bench.drop") as drop,
     ):
         resp = client.delete("/api/v1/benches/prod-bench")
@@ -777,6 +791,24 @@ def test_api_benches_drop_does_not_prompt_for_system_privileges(tmp_path: Path) 
     assert resp.status_code == 409
     assert resp.get_json()["error"]["code"] == "privileged_operation_unavailable"
     drop.assert_not_called()
+
+
+def test_api_benches_drop_allows_scoped_nginx_sudo_grant(tmp_path: Path) -> None:
+    """install.sh grants passwordless sudo for exactly `nginx -t` etc, not a bare
+    `sudo -n true` - the scoped grant alone must be enough to drop a bench."""
+    benches_dir = tmp_path / "benches"
+    client = _client(benches_dir / "current")
+    _write_prod_bench_toml(benches_dir / "prod-bench", "prod-bench")
+
+    with (
+        patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.nginx.has_passwordless_sudo_for", return_value=True),
+        patch("admin.backend.api.v1.benches.Bench.drop") as drop,
+    ):
+        resp = client.delete("/api/v1/benches/prod-bench")
+
+    assert resp.status_code == 204
+    drop.assert_called_once()
 
 
 def test_create_site_does_not_carry_db_type(tmp_path: Path) -> None:

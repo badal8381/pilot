@@ -101,9 +101,11 @@ def _validate_admin_domain(new_dir: Path, name: str, admin_domain: str):
 
 
 def _validate_production_privileges():
-    from pilot.managers.platform import has_passwordless_sudo
+    from pilot.managers.platform import has_passwordless_sudo, is_root, which
+    from pilot.managers.sudoers import has_passwordless_sudo_for
 
-    if has_passwordless_sudo():
+    nginx = which("nginx") or "/usr/sbin/nginx"
+    if is_root() or has_passwordless_sudo() or has_passwordless_sudo_for([nginx, "-t"]):
         return None
     return error_response(
         "privileged_operation_unavailable",
