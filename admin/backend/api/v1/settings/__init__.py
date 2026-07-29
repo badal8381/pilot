@@ -142,6 +142,15 @@ def _saved_llm_api_key() -> str:
         return ""
 
 
+def _saved_llm_api_base() -> str:
+    """The endpoint already stored in bench.toml - listing models must hit the same
+    server the assistant will, not the provider's default."""
+    try:
+        return BenchConfig.read(Path(current_app.config["BENCH_ROOT"])).llm.api_base
+    except Exception:
+        return ""
+
+
 @settings_bp.post("/llm/models")
 def llm_models():
     """Models available for a provider — powers the model combobox. POST so the
@@ -157,8 +166,10 @@ def llm_models():
     if not api_key and models_need_api_key(provider):
         api_key = _saved_llm_api_key()
 
+    api_base = str(payload.get("api_base", "")).strip() or _saved_llm_api_base()
+
     try:
-        return jsonify(models_for(provider, api_key))
+        return jsonify(models_for(provider, api_key, api_base))
     except ValueError as exc:
         return error_response("llm_models_unavailable", str(exc), 400)
 

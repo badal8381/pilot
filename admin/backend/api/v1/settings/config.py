@@ -236,5 +236,8 @@ class ConfigPatcher:
         if not llm_config.model:
             return "llm.model is required. Select a model for the provider."
         if requires_api_base(llm_config.provider) and not llm_config.api_base:
-            return "llm.api_base is required for a self-hosted provider."
+            return (
+                f"llm.api_base is required for {llm_config.provider!r} - it is served from "
+                "your own endpoint, so there is no default to fall back to."
+            )
         return None

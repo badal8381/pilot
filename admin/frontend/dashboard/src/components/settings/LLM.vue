@@ -39,6 +39,22 @@
         @update:model-value="onProviderSelect"
       />
 
+      <div v-if="needsApiBase" class="space-y-1.5">
+        <FormControl
+          label="API Base URL"
+          type="text"
+          v-model="apiBase"
+          placeholder="http://your-host:8000/v1"
+        />
+        <p v-if="apiBaseError" class="text-ink-red-6 text-p-sm">{{ apiBaseError }}</p>
+      </div>
+      <FormControl
+        label="API Key"
+        type="password"
+        v-model="apiKey"
+        :placeholder="apiKeySet ? '••••••••' : 'Provider API key'"
+      />
+
       <FormControl
         v-if="freeTextModel"
         label="Model"
@@ -58,20 +74,6 @@
         <p v-if="modelsError" class="text-ink-red-6 text-p-sm">{{ modelsError }}</p>
         <p v-else-if="modelsHint" class="text-ink-gray-5 text-p-sm">{{ modelsHint }}</p>
       </div>
-
-      <FormControl
-        v-if="needsApiBase"
-        label="API Base URL"
-        type="text"
-        v-model="apiBase"
-        placeholder="http://your-host:8000/v1"
-      />
-      <FormControl
-        label="API Key"
-        type="password"
-        v-model="apiKey"
-        :placeholder="apiKeySet ? '••••••••' : 'Provider API key'"
-      />
       <FormControl
         label="System Prompt"
         type="textarea"
@@ -103,7 +105,7 @@
 
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="saving" @click="save">
+        <Button variant="solid" :loading="saving" :disabled="Boolean(apiBaseError)" @click="save">
           {{ connected ? 'Update' : 'Connect' }}
         </Button>
       </div>
@@ -151,8 +153,15 @@ const modelOptions = computed(() => models.value.map((m) => ({ label: m, value: 
 const modelSelection = computed(() =>
   model.value ? { label: model.value, value: model.value } : null,
 )
+const hasApiBase = computed(() => Boolean(apiBase.value.trim()))
+const apiBaseError = computed(() => {
+  if (!provider.value || !needsApiBase.value || hasApiBase.value) return ''
+  return `${providerLabel.value} needs the endpoint of your server, e.g. http://your-host:8000/v1`
+})
+
 const modelPlaceholder = computed(() => {
   if (!provider.value) return 'Select a provider first'
+  if (needsApiBase.value && !hasApiBase.value) return 'Enter the API base URL to load models'
   if (!models.value.length && !hasApiKey.value) return 'Enter the API key to load models'
   return 'Search models…'
 })
@@ -160,8 +169,10 @@ const modelPlaceholder = computed(() => {
 // say so rather than leaving a silently empty dropdown. Self-hosted types the model
 // by hand, so it never reaches here.
 const modelsHint = computed(() => {
-  if (!provider.value || modelsLoading.value || models.value.length || hasApiKey.value) return ''
-  return `Enter the ${providerLabel.value} API key below to load models.`
+  if (!provider.value || modelsLoading.value || models.value.length) return ''
+  if (needsApiBase.value && !hasApiBase.value) return ''
+  if (hasApiKey.value) return ''
+  return `Enter the ${providerLabel.value} API key above to load models.`
 })
 
 async function fetchModels(providerValue) {
@@ -171,9 +182,10 @@ async function fetchModels(providerValue) {
   // Providers without a static catalog list models from their own API, so the key
   // is sent along; the backend falls back to the key already saved in bench.toml.
   if (modelsNeedApiKey.value && !hasApiKey.value) return
+  if (needsApiBase.value && !hasApiBase.value) return
   modelsLoading.value = true
   try {
-    const result = await settingsApi.llmModels(providerValue, apiKey.value.trim())
+    const result = await settingsApi.llmModels(providerValue, apiKey.value.trim(), apiBase.value.trim())
     if (result?.error) modelsError.value = apiErrorMessage(result, 'Could not load models.')
     else models.value = result || []
   } catch (e) {
@@ -191,7 +203,7 @@ function onProviderSelect(option) {
 
 // A key-gated provider can only list models once a key exists, so reload when it settles.
 let apiKeyDebounce = null
-watch(apiKey, () => {
+watch([apiKey, apiBase], () => {
   if (!modelsNeedApiKey.value || !provider.value) return
   clearTimeout(apiKeyDebounce)
   apiKeyDebounce = setTimeout(() => fetchModels(provider.value), 600)
