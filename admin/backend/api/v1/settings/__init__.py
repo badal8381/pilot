@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import error_response
 from admin.backend.api.v1.settings.config import ConfigPatcher
-from admin.backend.middleware import client_ip, rate_limit
+from admin.backend.middleware import client_ip
 from pilot.config import (
     WAF_MODES,
     WAF_RULE_ACTIONS,
@@ -134,15 +134,33 @@ def llm_provider_options() -> list[dict]:
     return provider_options()
 
 
-@settings_bp.get("/llm/models")
-def llm_models():
-    """Models litellm knows for a provider — powers the model combobox."""
-    from pilot.integrations.llm.registry import models_for
+def _saved_llm_api_key() -> str:
+    """The key already stored in bench.toml, so editing settings does not force a retype."""
+    try:
+        return BenchConfig.read(Path(current_app.config["BENCH_ROOT"])).llm.api_key
+    except Exception:
+        return ""
 
-    provider = request.args.get("provider", "").strip()
+
+@settings_bp.post("/llm/models")
+def llm_models():
+    """Models available for a provider — powers the model combobox. POST so the
+    API key stays out of the URL; providers with a static litellm catalog ignore it."""
+    from pilot.integrations.llm.registry import models_for, models_need_api_key
+
+    payload = request.get_json(silent=True) or {}
+    provider = str(payload.get("provider", "")).strip()
     if not provider:
         return jsonify([])
-    return jsonify(models_for(provider))
+
+    api_key = str(payload.get("api_key", "")).strip()
+    if not api_key and models_need_api_key(provider):
+        api_key = _saved_llm_api_key()
+
+    try:
+        return jsonify(models_for(provider, api_key))
+    except ValueError as exc:
+        return error_response("llm_models_unavailable", str(exc), 400)
 
 
 @settings_bp.get("")

@@ -46,15 +46,18 @@
         v-model="model"
         placeholder="Your served model name"
       />
-      <Autocomplete
-        v-else
-        label="Model"
-        :options="modelOptions"
-        :model-value="modelSelection"
-        :loading="modelsLoading"
-        :placeholder="provider ? 'Search models…' : 'Select a provider first'"
-        @update:model-value="(o) => (model = o?.value || '')"
-      />
+      <div v-else class="space-y-1.5">
+        <Autocomplete
+          label="Model"
+          :options="modelOptions"
+          :model-value="modelSelection"
+          :loading="modelsLoading"
+          :placeholder="modelPlaceholder"
+          @update:model-value="(o) => (model = o?.value || '')"
+        />
+        <p v-if="modelsError" class="text-ink-red-6 text-p-sm">{{ modelsError }}</p>
+        <p v-else-if="modelsHint" class="text-ink-gray-5 text-p-sm">{{ modelsHint }}</p>
+      </div>
 
       <FormControl
         v-if="needsApiBase"
@@ -109,7 +112,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Alert, Autocomplete, Button, ErrorMessage, FormControl, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
@@ -128,12 +131,15 @@ const systemPrompt = ref('')
 const apiKeySet = ref(false)
 const providers = ref([])
 const models = ref([])
+const modelsError = ref('')
 
 const connected = computed(() => Boolean(provider.value && apiKeySet.value))
 const selectedProvider = computed(() => providers.value.find((p) => p.value === provider.value))
 const providerLabel = computed(() => selectedProvider.value?.label || provider.value)
 const needsApiBase = computed(() => Boolean(selectedProvider.value?.requires_api_base))
 const freeTextModel = computed(() => Boolean(selectedProvider.value?.free_text_model))
+const modelsNeedApiKey = computed(() => Boolean(selectedProvider.value?.models_need_api_key))
+const hasApiKey = computed(() => Boolean(apiKey.value.trim() || apiKeySet.value))
 
 const providerOptions = computed(() =>
   providers.value.map((p) => ({ label: p.label, value: p.value })),
@@ -145,13 +151,33 @@ const modelOptions = computed(() => models.value.map((m) => ({ label: m, value: 
 const modelSelection = computed(() =>
   model.value ? { label: model.value, value: model.value } : null,
 )
+const modelPlaceholder = computed(() => {
+  if (!provider.value) return 'Select a provider first'
+  if (!models.value.length && !hasApiKey.value) return 'Enter the API key to load models'
+  return 'Search models…'
+})
+// An empty picklist with no key entered is a missing key, not a missing provider —
+// say so rather than leaving a silently empty dropdown. Self-hosted types the model
+// by hand, so it never reaches here.
+const modelsHint = computed(() => {
+  if (!provider.value || modelsLoading.value || models.value.length || hasApiKey.value) return ''
+  return `Enter the ${providerLabel.value} API key below to load models.`
+})
 
 async function fetchModels(providerValue) {
   models.value = []
+  modelsError.value = ''
   if (!providerValue || freeTextModel.value) return
+  // Providers without a static catalog list models from their own API, so the key
+  // is sent along; the backend falls back to the key already saved in bench.toml.
+  if (modelsNeedApiKey.value && !hasApiKey.value) return
   modelsLoading.value = true
   try {
-    models.value = (await settingsApi.llmModels(providerValue)) || []
+    const result = await settingsApi.llmModels(providerValue, apiKey.value.trim())
+    if (result?.error) modelsError.value = apiErrorMessage(result, 'Could not load models.')
+    else models.value = result || []
+  } catch (e) {
+    modelsError.value = e.message || 'Could not load models.'
   } finally {
     modelsLoading.value = false
   }
@@ -162,6 +188,14 @@ function onProviderSelect(option) {
   model.value = ''
   fetchModels(provider.value)
 }
+
+// A key-gated provider can only list models once a key exists, so reload when it settles.
+let apiKeyDebounce = null
+watch(apiKey, () => {
+  if (!modelsNeedApiKey.value || !provider.value) return
+  clearTimeout(apiKeyDebounce)
+  apiKeyDebounce = setTimeout(() => fetchModels(provider.value), 600)
+})
 
 async function load() {
   loading.value = true
@@ -238,6 +272,7 @@ async function disconnect() {
       systemPrompt.value = ''
       apiKeySet.value = false
       models.value = []
+      modelsError.value = ''
       toast.success('AI assistant disconnected')
     } else {
       toast.error(apiErrorMessage(result, 'Could not disconnect the AI assistant.'))

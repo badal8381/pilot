@@ -5,22 +5,13 @@
         v-if="isLoading"
         class="bg-surface-gray-2 rounded-2xl size-20 shrink-0 animate-pulse"
       />
-      <div
+      <AppIcon
         v-else
-        class="place-items-center grid rounded-2xl size-20 overflow-hidden shrink-0 ring-1 ring-outline-gray-2"
-        :style="logoStyle"
-      >
-        <img
-          v-if="logoUrl && !imageFailed"
-          :src="logoUrl"
-          :alt="title"
-          class="size-full object-contain"
-          @error="imageFailed = true"
-        />
-        <span v-else class="font-bold text-white text-3xl leading-none">
-          {{ title?.[0]?.toUpperCase() }}
-        </span>
-      </div>
+        :name="appName"
+        :label="title"
+        class="rounded-2xl size-20 ring-1 ring-outline-gray-2"
+        initial-class="text-3xl"
+      />
 
       <div v-if="isLoading" class="flex flex-col items-center gap-2 mt-5">
         <div class="bg-surface-gray-2 rounded w-32 h-5 animate-pulse" />
@@ -45,7 +36,8 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Button, Dialog, toast } from 'frappe-ui'
-import { hashColor, useAppRegistry } from '@/composables/apps/useAppRegistry'
+import AppIcon from '@/components/apps/AppIcon.vue'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useSite } from '@/composables/sites/useSite'
 
 const DESCRIPTION_MAX_LENGTH = 50
@@ -57,9 +49,8 @@ const props = defineProps({
 })
 const open = defineModel('open')
 
-const { titleMap, descriptionMap, logoMap, loaded, load } = useAppRegistry()
+const { titleMap, descriptionMap, loaded, load } = useAppRegistry()
 const { login } = useSite(props.siteName)
-const imageFailed = ref(false)
 const loggingIn = ref(false)
 
 const isLoading = computed(() => !loaded.value)
@@ -69,12 +60,6 @@ const description = computed(() => {
   if (text.length <= DESCRIPTION_MAX_LENGTH) return text
   return `${text.slice(0, DESCRIPTION_MAX_LENGTH)}…`
 })
-const logoUrl = computed(() => logoMap.value[props.appName] || null)
-const logoStyle = computed(() => {
-  if (logoUrl.value && !imageFailed.value) return {}
-  return { background: hashColor(props.appName) }
-})
-
 const isInstall = computed(() => props.action === 'install-app')
 const statusText = computed(() =>
   isInstall.value ? 'Installed successfully' : 'Uninstalled successfully',

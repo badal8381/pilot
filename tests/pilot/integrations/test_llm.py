@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
+import urllib.error
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
-from pilot.integrations.llm import base, lite, read_system_prompt, registry
+from pilot.integrations.llm import base, frappe_llm, lite, read_system_prompt, registry
 from pilot.integrations.llm.base import LLMAuthError, LLMError
 from pilot.integrations.llm.frappe_llm import FrappeLLMIntegration
 from pilot.integrations.llm.lite import LiteLLMIntegration
@@ -97,7 +99,7 @@ def test_frappe_llm_uses_fixed_base_api(fake_litellm) -> None:
     integration.prompt("hi", bench_root=Path("/tmp/bench"))
     kwargs = fake_litellm.completion.call_args.kwargs
     assert kwargs["model"] == "hosted_vllm/qwen3.6-27b-fp8"
-    assert kwargs["api_base"] == "http://x.x.x.x/v1"
+    assert kwargs["api_base"] == FrappeLLMIntegration.base_api
 
 
 # -- responses / errors -----------------------------------------------------
@@ -143,6 +145,8 @@ def test_provider_options_aggregate_across_integrations(fake_litellm) -> None:
     # the two special integrations
     assert options["frappe-llm"]["requires_api_base"] is False
     assert options["frappe-llm"]["free_text_model"] is False
+    assert options["frappe-llm"]["models_need_api_key"] is True
+    assert options["openai"]["models_need_api_key"] is False
     assert options["self-hosted"]["requires_api_base"] is True
     assert options["self-hosted"]["free_text_model"] is True
 
@@ -155,6 +159,11 @@ def test_litellm_providers_filtered_to_catalogued(fake_litellm) -> None:
 def test_models_for(fake_litellm) -> None:
     assert registry.models_for("openai") == ["gpt-4o", "gpt-4o-mini"]
     assert registry.models_for("self-hosted") == []
+
+
+def test_models_need_api_key(fake_litellm) -> None:
+    assert registry.models_need_api_key("frappe-llm") is True
+    assert registry.models_need_api_key("openai") is False
 
 
 def test_requires_api_base(fake_litellm) -> None:
@@ -184,9 +193,83 @@ def test_build_integration_picks_owning_class(fake_litellm) -> None:
         SimpleNamespace(provider="frappe-llm", api_key="k", model="qwen3.6-27b-fp8", api_base="")
     )
     assert isinstance(frappe, FrappeLLMIntegration)
-    assert frappe.api_base == "http://x.x.x.x/v1"
+    assert frappe.api_base == FrappeLLMIntegration.base_api
 
 
 def test_unknown_provider_raises(fake_litellm) -> None:
     with pytest.raises(ValueError, match="Unknown LLM provider"):
         registry.models_for("nope")
+
+
+# -- frappe llm model listing ------------------------------------------------
+
+
+class _FakeResponse:
+    def __init__(self, payload: bytes) -> None:
+        self._payload = payload
+
+    def read(self) -> bytes:
+        return self._payload
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args) -> bool:
+        return False
+
+
+def _patch_urlopen(monkeypatch: pytest.MonkeyPatch, result):
+    calls = []
+
+    def fake_urlopen(request, timeout=None):
+        calls.append(request)
+        if isinstance(result, Exception):
+            raise result
+        return _FakeResponse(result)
+
+    monkeypatch.setattr(frappe_llm.urllib.request, "urlopen", fake_urlopen)
+    return calls
+
+
+def test_frappe_models_need_a_key() -> None:
+    with pytest.raises(ValueError, match="needs an API key"):
+        FrappeLLMIntegration.get_models("frappe-llm")
+
+
+def test_frappe_models_sorted_and_authorized(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = json.dumps({"data": [{"id": "qwen3.6-27b-fp8"}, {"id": "gpt-oss-120b"}, {}]}).encode()
+    calls = _patch_urlopen(monkeypatch, payload)
+
+    models = FrappeLLMIntegration.get_models("frappe-llm", "sk-key")
+
+    assert models == ["gpt-oss-120b", "qwen3.6-27b-fp8"]
+    assert calls[0].full_url == f"{FrappeLLMIntegration.base_api}/models"
+    assert calls[0].get_header("Authorization") == "Bearer sk-key"
+
+
+def test_frappe_models_reject_bad_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    error = urllib.error.HTTPError("url", 401, "Unauthorized", {}, None)
+    _patch_urlopen(monkeypatch, error)
+
+    with pytest.raises(ValueError, match="rejected the API key"):
+        FrappeLLMIntegration.get_models("frappe-llm", "sk-bad")
+
+
+def test_frappe_models_unreachable(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_urlopen(monkeypatch, urllib.error.URLError("no route"))
+
+    with pytest.raises(ValueError, match="Could not reach"):
+        FrappeLLMIntegration.get_models("frappe-llm", "sk-key")
+
+
+def test_frappe_models_empty_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
+    _patch_urlopen(monkeypatch, json.dumps({"data": []}).encode())
+
+    with pytest.raises(ValueError, match="no models"):
+        FrappeLLMIntegration.get_models("frappe-llm", "sk-key")
+
+
+def test_registry_passes_key_through(monkeypatch: pytest.MonkeyPatch, fake_litellm) -> None:
+    _patch_urlopen(monkeypatch, json.dumps({"data": [{"id": "qwen3.6-27b-fp8"}]}).encode())
+
+    assert registry.models_for("frappe-llm", "sk-key") == ["qwen3.6-27b-fp8"]
