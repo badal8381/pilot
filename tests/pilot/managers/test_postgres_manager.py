@@ -285,9 +285,15 @@ def test_move_generated_config_into_config_dir_relocates_all_three(tmp_path) -> 
         for name in ("postgresql.conf", "pg_hba.conf", "pg_ident.conf"):
             (m.data_dir / name).write_text(f"# {name}")
         m._move_generated_config_into_config_dir()
-        for name in ("postgresql.conf", "pg_hba.conf", "pg_ident.conf"):
+        for name in ("pg_hba.conf", "pg_ident.conf"):
             assert not (m.data_dir / name).exists()
             assert (m.config_dir / name).read_text() == f"# {name}"
+
+        conf = m.config_dir / "postgresql.conf"
+        content = conf.read_text()
+        assert content.startswith("# postgresql.conf")
+        assert f"hba_file = '{m.config_dir / 'pg_hba.conf'}'" in content
+        assert f"ident_file = '{m.config_dir / 'pg_ident.conf'}'" in content
 
 
 def test_install_unit_uses_explicit_config_file(tmp_path) -> None:

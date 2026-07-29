@@ -438,7 +438,7 @@ class TestProductionSSL:
 
         admin_conf = (_nginx_conf_dir(production) / "include.conf").read_text()
         assert ADMIN_DOMAIN_2 in admin_conf
-        status, body = _request(ADMIN_DOMAIN_2, "/api/v1/bootstrap")
+        status, body = _request_ok(ADMIN_DOMAIN_2, "/api/v1/bootstrap")
         assert status == "200", f"new admin domain /api/v1/bootstrap returned {status}: {body!r}"
         assert json.loads(body).get("production") is True, f"admin not live on new domain: {body!r}"
 
@@ -493,7 +493,7 @@ class TestProductionNoTLS:
         assert "return 301 https" not in conf, conf
 
     def test_admin_served_over_http(self, http_only_production: Path) -> None:
-        status, body = _request(ADMIN_DOMAIN, "/api/v1/bootstrap", scheme="http")
+        status, body = _request_ok(ADMIN_DOMAIN, "/api/v1/bootstrap", scheme="http")
         assert status == "200", f"admin /api/v1/bootstrap over http returned {status}: {body!r}"
         assert json.loads(body).get("production") is True, body
 
@@ -555,7 +555,7 @@ class TestProcessManagerMigration:
 
         data = tomllib.loads((systemd_production / "bench.toml").read_text())
         assert data["production"]["process_manager"] == "supervisor", data
-        assert (systemd_production / "config" / "supervisor" / "supervisord.conf").exists()
+        assert (systemd_production / "config" / "services" / "supervisord.conf").exists()
         assert not systemd_target.exists(), "systemd units left behind after migration"
 
         status, body = _request_ok(SITE, "/api/method/frappe.ping")

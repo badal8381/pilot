@@ -111,12 +111,18 @@ class PostgresManager(UserOwnedDBManager):
 
     def _move_generated_config_into_config_dir(self) -> None:
         """initdb writes postgresql.conf/pg_hba.conf/pg_ident.conf into the data
-        dir; move them into our own config/ and point --config-file at them, so
-        Postgres' ConfigDir (and the hba_file/ident_file it derives from it)
-        stops defaulting to the data directory."""
+        dir; move them into our own config/ dir. hba_file/ident_file default to
+        the -D data directory regardless of --config-file, so point them at
+        their new location explicitly from within postgresql.conf."""
         self.config_dir.mkdir(parents=True, exist_ok=True)
         for name in _GENERATED_CONFIG_FILES:
             (self.data_dir / name).replace(self.config_dir / name)
+        postgresql_conf = self.config_dir / "postgresql.conf"
+        postgresql_conf.write_text(
+            postgresql_conf.read_text()
+            + f"\nhba_file = '{self.config_dir / 'pg_hba.conf'}'\n"
+            + f"ident_file = '{self.config_dir / 'pg_ident.conf'}'\n"
+        )
 
     def _ensure_port_available(self) -> None:
         """Fail if an unowned process is already listening on the configured port."""
