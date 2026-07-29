@@ -43,14 +43,23 @@ def test_press_unified_memory_sizing_is_adapted_for_pilot() -> None:
     assert sizing.memory_max_mb == 3172
 
 
-def test_memory_sizing_has_a_valid_buffer_pool_on_small_vms() -> None:
+def test_small_vm_limits_leave_memory_for_other_pilot_processes() -> None:
     sizing = calculate_mariadb_memory(2048)
 
     assert sizing.innodb_buffer_pool_mb == 128
     assert sizing.max_connections == 50
     assert sizing.innodb_log_file_mb == 48
-    assert sizing.memory_high_mb == 1024
-    assert sizing.memory_max_mb == 2048
+    assert sizing.memory_high_mb == 384
+    assert sizing.memory_max_mb == 512
+    assert sizing.memory_max_mb < sizing.total_memory_mb
+
+
+@pytest.mark.parametrize("total_memory_mb", [256, 512, 1024, 2048, 8192])
+def test_memory_limits_never_claim_more_than_half_the_host(total_memory_mb: int) -> None:
+    sizing = calculate_mariadb_memory(total_memory_mb)
+
+    assert 0 < sizing.memory_high_mb <= sizing.memory_max_mb
+    assert sizing.memory_max_mb <= total_memory_mb // 2
 
 
 @pytest.mark.parametrize(
@@ -114,6 +123,20 @@ def test_provision_initialises_and_installs_unit_when_fresh(tmp_path) -> None:
     secure.assert_called_once()
     argv_calls = [c.args[0] for c in rc.call_args_list]
     assert any("mariadb-install-db" in argv for argv in argv_calls)
+
+
+def test_macos_provision_does_not_write_linux_configuration() -> None:
+    manager = _manager()
+    with (
+        patch(f"{MODULE}.is_macos", return_value=True),
+        patch.object(manager, "install"),
+        patch.object(manager, "_provision_macos") as provision_macos,
+        patch.object(manager, "_write_config") as write_config,
+    ):
+        manager.provision()
+
+    provision_macos.assert_called_once()
+    write_config.assert_not_called()
 
 
 def test_write_config_contains_all_server_settings(tmp_path) -> None:
@@ -257,6 +280,7 @@ def test_provision_reuses_already_provisioned_server() -> None:
         patch.object(m, "install"),
         patch.object(m, "is_provisioned", return_value=True),
         patch.object(m, "is_running", return_value=True),
+        patch.object(m, "_write_config") as write_config,
         patch.object(m, "_install_unit") as install_unit,
         patch.object(m, "_wait_until_reachable"),
         patch.object(m, "secure_installation") as secure,
@@ -264,6 +288,7 @@ def test_provision_reuses_already_provisioned_server() -> None:
     ):
         m.provision()
     install_unit.assert_not_called()
+    write_config.assert_not_called()
     rc.assert_not_called()
     secure.assert_called_once()
 

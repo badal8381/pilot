@@ -7,6 +7,9 @@ _HARDWARE_MEMORY_RESERVE_MB = 218
 _MARIADB_OPERATING_RESERVE_MB = 700
 _MEMORY_PER_CONNECTION_MB = 35
 _MIN_BUFFER_POOL_MB = 128
+_MIN_MEMORY_MAX_MB = 512
+_MIN_MEMORY_LIMIT_GAP_MB = 128
+_MAX_HOST_MEMORY_SHARE = 0.5
 
 
 @dataclass(frozen=True)
@@ -44,8 +47,20 @@ def calculate_mariadb_memory(total_memory_mb: int) -> MariaDBMemorySizing:
         min(connection_aware_pool_mb, percentage_pool_mb),
     )
 
-    memory_high_mb = round(max(mariadb_memory_mb - 1024, 1024))
-    memory_max_mb = round(max(mariadb_memory_mb, 2048))
+    # Pilot shares the VM with web, worker, and Redis processes. Keep the
+    # startup floor, but never let it claim more than half of a small host.
+    host_share_cap_mb = max(1, int(total_memory_mb * _MAX_HOST_MEMORY_SHARE))
+    memory_max_mb = min(
+        host_share_cap_mb,
+        max(_MIN_MEMORY_MAX_MB, round(mariadb_memory_mb)),
+    )
+    memory_high_mb = max(
+        1,
+        min(
+            memory_max_mb - _MIN_MEMORY_LIMIT_GAP_MB,
+            round(max(mariadb_memory_mb - 1024, 1024)),
+        ),
+    )
 
     return MariaDBMemorySizing(
         total_memory_mb=total_memory_mb,
