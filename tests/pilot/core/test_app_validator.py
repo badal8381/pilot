@@ -334,3 +334,29 @@ def test_import_check_skips_test_files(tmp_path: Path) -> None:
     )
     check = ImportCheck()
     assert check._imported_module_locations(app) == {}
+
+
+def test_validation_env_installs_with_mysqlclient_build_flags(monkeypatch, tmp_path: Path) -> None:
+    """The throwaway venv builds mysqlclient too, so it needs the same flags
+    the bench env gets - without them uv fails on macOS ('Can not find valid
+    pkg-config name')."""
+    from pilot.core.app.validator.utils import tmp_env as tmp_env_module
+
+    captured: dict = {}
+
+    def fake_run_command(argv, **kwargs):
+        captured["env"] = kwargs.get("env")
+
+    monkeypatch.setattr(tmp_env_module, "run_command", fake_run_command)
+    monkeypatch.setattr(
+        tmp_env_module,
+        "add_mysqlclient_flags",
+        lambda env: env.setdefault("MYSQLCLIENT_CFLAGS", "-I/opt/mariadb/include"),
+    )
+
+    env = tmp_env_module.TmpEnv()
+    env._dir = str(tmp_path)
+    env._pip_install([tmp_path / "frappe"])
+
+    assert captured["env"]["MYSQLCLIENT_CFLAGS"] == "-I/opt/mariadb/include"
+    assert "PATH" in captured["env"]

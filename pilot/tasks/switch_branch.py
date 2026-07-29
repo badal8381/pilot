@@ -2,7 +2,7 @@ import sys
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pilot.tasks import Task, step
+from pilot.tasks import Task, on_success, step
 
 
 @dataclass(kw_only=True)
@@ -24,6 +24,12 @@ class SwitchBranchTask(Task):
 
         app.record_branch()
         print(f"'{self.name}' switched to '{self.branch}' successfully.")
+
+    @on_success
+    def reload_workers(self) -> dict:
+        """Long-lived web and background workers hold the old app list and
+        import map, so they need a restart once this task lands."""
+        return {"web_only": False}
 
     @step("checkout", lambda self: f"Switch to branch '{self.branch}'")
     def checkout(self, app) -> None:

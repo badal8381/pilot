@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import tempfile
 import typing
@@ -8,6 +9,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from pilot.exceptions import AppValidationError, BenchError, CommandError
+from pilot.managers.platform import add_mysqlclient_flags
 from pilot.utils import run_command
 
 if typing.TYPE_CHECKING:
@@ -78,7 +80,9 @@ class TmpEnv:
 
     def _pip_install(self, paths: list[Path]) -> None:
         python = str(self.path / "bin" / "python")
-        run_command([self._uv(), "pip", "install", "--python", python, *map(str, paths)])
+        env = os.environ.copy()
+        add_mysqlclient_flags(env)
+        run_command([self._uv(), "pip", "install", "--python", python, *map(str, paths)], env=env)
 
     def delete(self) -> None:
         if self._dir is not None:
