@@ -33,6 +33,7 @@ class LLMIntegration:
     base_api: ClassVar[str] = ""  # fixed endpoint baked into the provider
     requires_api_base: ClassVar[bool] = False  # user must supply an api_base
     free_text_model: ClassVar[bool] = False  # user types the model, not a picklist
+    models_need_api_key: ClassVar[bool] = False  # `get_models` calls the provider with the key
     # litellm route prefix. Blank => use the config `provider` slug (litellm-native
     # providers); set it when the UI slug differs from the litellm route.
     litellm_provider: ClassVar[str] = ""
@@ -52,8 +53,9 @@ class LLMIntegration:
         return {}
 
     @classmethod
-    def get_models(cls, provider: str) -> list[str]:
-        """Selectable models for a provider slug; empty means free-text entry."""
+    def get_models(cls, provider: str, api_key: str = "") -> list[str]:
+        """Selectable models for a provider slug; empty means free-text entry,
+        `api_key` is only used by providers with `models_need_api_key`."""
         return []
 
     @property

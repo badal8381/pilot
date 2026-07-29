@@ -78,9 +78,9 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
     assert len({(method, path) for method, path, _, _ in routes}) == 161
     assert Counter(method for method, _, _, _ in routes) == {
         "DELETE": 12,
-        "GET": 84,
+        "GET": 83,
         "PATCH": 4,
-        "POST": 56,
+        "POST": 57,
         "PUT": 5,
     }
     assert Counter(policy for _, _, _, policy in routes) == {
@@ -215,7 +215,7 @@ def test_admin_route_inventory_matches_baseline(tmp_path: Path) -> None:
     assert {
         ("GET", "/api/v1/settings"),
         ("PATCH", "/api/v1/settings"),
-        ("GET", "/api/v1/settings/llm/models"),
+        ("POST", "/api/v1/settings/llm/models"),
         ("POST", "/api/v1/auth/password"),
         ("GET", "/api/v1/auth/two-factor"),
         ("POST", "/api/v1/auth/two-factor/enrollment"),
