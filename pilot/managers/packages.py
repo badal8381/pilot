@@ -1,5 +1,3 @@
-"""System package installation with per-distro package aliases."""
-
 import os
 import subprocess
 from abc import ABC, abstractmethod
@@ -79,7 +77,6 @@ class DnfPackageManager(SystemPackageManager):
         "redis-server": "valkey",
         "postgresql": "postgresql-server",
         "postgresql-client": "postgresql",
-        "zfsutils-linux": "zfs",
         "modsecurity-nginx": "nginx-mod-modsecurity",
     }
 
@@ -110,8 +107,6 @@ class PacmanPackageManager(SystemPackageManager):
         # Arch moved redis to the AUR in favour of valkey.
         "redis-server": "valkey",
         "postgresql-client": "postgresql",
-        # Only available via the third-party archzfs repository.
-        "zfsutils-linux": "zfs-utils",
         "modsecurity-nginx": "nginx-mod-modsecurity",
     }
 
