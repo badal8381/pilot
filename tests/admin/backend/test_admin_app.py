@@ -310,11 +310,15 @@ def test_api_benches_create_routes_wizard_at_domain_when_production(tmp_path: Pa
     # crash-loop and permanently rate-limit the units. WizardSetupTask starts
     # it once init actually finishes, not this view.
     mock_apply.assert_not_called()
+    # The wizard itself is always reached over http - no cert can exist yet, since
+    # Let's Encrypt's HTTP-01 challenge needs nginx serving plain http first.
     assert data["scheme"] == "http"
     fresh_toml = (benches_dir / "fresh" / "bench.toml").read_text()
-    # admin.tls is a per-bench choice, not inherited from a production sibling -
-    # the new bench starts on plain HTTP until its own wizard/setup requests TLS.
-    assert "tls = false" in fresh_toml
+    # admin.tls isn't auto-inherited by BenchCreator (it moved out with the
+    # common_config.toml split), so the caller matches the parent's own choice
+    # instead - the eventual production+TLS switch happens once the wizard's
+    # init + SetupProductionCommand finish.
+    assert "tls = true" in fresh_toml
     # production.enabled stays false until the wizard's init + SetupProductionCommand
     # actually finish - a half-built deployment must never look "done" to the switcher.
     assert "enabled = false" in fresh_toml.split("[production]")[1].split("[")[0]
