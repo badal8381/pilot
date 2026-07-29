@@ -213,16 +213,16 @@ class AppRepository:
         if pin.kind == "tag":
             self._sync_remote_url()
             run_command(["git", "-C", str(self.app.path), "fetch", "--depth", "1", "origin", pin.ref])
-            run_command(["git", "-C", str(self.app.path), "checkout", "FETCH_HEAD"])
+            self._checkout_pinned_ref("FETCH_HEAD")
         else:
             self.checkout_pinned_commit(pin.ref)
 
     def checkout_pinned_commit(self, sha: str) -> None:
-        """Check out a specific commit SHA."""
+        """Check out a specific commit SHA, staying on the app's configured branch."""
         self._sync_remote_url()
         try:
             run_command(["git", "-C", str(self.app.path), "fetch", "--depth", "1", "origin", sha])
-            run_command(["git", "-C", str(self.app.path), "checkout", "FETCH_HEAD"])
+            self._checkout_pinned_ref("FETCH_HEAD")
             return
         except CommandError:
             pass
@@ -238,4 +238,11 @@ class AppRepository:
                 self.app.config.branch,
             ]
         )
-        run_command(["git", "-C", str(self.app.path), "checkout", sha])
+        self._checkout_pinned_ref(sha)
+
+    def _checkout_pinned_ref(self, ref: str) -> None:
+        """Land on `ref`, keeping the configured branch name attached instead of a detached HEAD."""
+        branch = self.app.config.branch
+        if branch and not self.is_commit_hash(branch) and self.repo.checkout_new_branch(branch, ref):
+            return
+        run_command(["git", "-C", str(self.app.path), "checkout", ref])
