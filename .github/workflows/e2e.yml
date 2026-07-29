@@ -2,9 +2,9 @@ name: E2E (Admin UI)
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
   pull_request:
-    branches: [main]
+    branches: [develop]
   # Heavy (bench init clones the framework); allow manual runs too.
   workflow_dispatch:
 
