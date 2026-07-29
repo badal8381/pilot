@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pilot.exceptions import BenchError
-from pilot.managers.platform import is_macos, which
+from pilot.managers.platform import add_mysqlclient_flags, is_macos, which
 from pilot.managers.python_assets import PythonAssetBuilder
 from pilot.utils import get_yarn_bin, run_command
 
@@ -131,48 +131,9 @@ class PythonEnvManager:
         except BenchError:
             pass  # yarn not installed yet (e.g. compiling C extensions pre-node)
 
-        if is_macos():
-            self._add_mysqlclient_flags(env)
+        add_mysqlclient_flags(env)
 
         return env
-
-    def _add_mysqlclient_flags(self, env: dict) -> None:
-        config_bin = self._mariadb_config_bin()
-        if not config_bin:
-            return
-        try:
-            env.setdefault(
-                "MYSQLCLIENT_CFLAGS",
-                subprocess.run(
-                    [config_bin, "--cflags"], capture_output=True, text=True, check=True, timeout=5
-                ).stdout.strip(),
-            )
-            env.setdefault(
-                "MYSQLCLIENT_LDFLAGS",
-                subprocess.run(
-                    [config_bin, "--libs"], capture_output=True, text=True, check=True, timeout=5
-                ).stdout.strip(),
-            )
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            pass
-
-    @staticmethod
-    def _mariadb_config_bin() -> str | None:
-        """Find mariadb_config/mysql_config, including keg-only Homebrew installs."""
-        if found := (shutil.which("mariadb_config") or shutil.which("mysql_config")):
-            return found
-        try:
-            prefix = subprocess.run(
-                ["brew", "--prefix", "mariadb"],
-                capture_output=True,
-                text=True,
-                check=True,
-                timeout=5,
-            ).stdout.strip()
-        except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
-            return None
-        candidate = Path(prefix) / "bin" / "mariadb_config"
-        return str(candidate) if candidate.exists() else None
 
     def install_app(self, app: "App") -> None:
         uv = self._ensure_uv()

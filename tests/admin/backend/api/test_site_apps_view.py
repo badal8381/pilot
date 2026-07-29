@@ -285,6 +285,22 @@ def test_install_app_fetches_by_repo_when_not_cloned(tmp_path: Path) -> None:
     assert body["args"]["branch"] == "develop"
 
 
+def test_install_app_uses_fast_path_when_repo_points_at_a_cloned_app(tmp_path: Path) -> None:
+    """Re-cloning an app the bench already has is wasted work - a repo URL for a
+    cloned app must install straight onto the site."""
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site1.localhost", [])
+    _make_cloned_app(bench_root, "suite")
+    client = _client(bench_root)
+
+    response = _post_install(client, "site1.localhost", repo="https://github.com/frappe/suite.git")
+
+    body = response.get_json()
+    assert response.status_code == 202
+    assert body["command"] == "install-app"
+    assert body["args"] == {"site": "site1.localhost", "app": "suite"}
+
+
 def test_install_app_does_not_resolve_repo_before_queueing(tmp_path: Path) -> None:
     bench_root = tmp_path / "benches" / "current"
     _make_site(bench_root, "site1.localhost", [])
@@ -378,3 +394,21 @@ def test_delete_site_app_rejects_missing_site(tmp_path: Path) -> None:
     response = _delete_app(client, "missing.localhost", "suite")
 
     assert response.status_code == 404
+
+
+def test_install_app_queues_the_importable_module_name(tmp_path: Path) -> None:
+    """A repo folder named india-compliance holds the module india_compliance;
+    install-app must be queued with the name frappe can actually import."""
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site1.localhost", [])
+    app_dir = bench_root / "apps" / "india-compliance"
+    (app_dir / "india_compliance").mkdir(parents=True)
+    (app_dir / ".git").mkdir()
+    (app_dir / "india_compliance" / "hooks.py").write_text("")
+    client = _client(bench_root)
+
+    response = _post_install(client, "site1.localhost", repo="https://github.com/frappe/india-compliance")
+
+    body = response.get_json()
+    assert response.status_code == 202
+    assert body["args"] == {"site": "site1.localhost", "app": "india_compliance"}

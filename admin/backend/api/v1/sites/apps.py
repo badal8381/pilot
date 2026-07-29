@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from flask import current_app, jsonify, request, url_for
 
@@ -31,6 +32,9 @@ from pilot.managers.task import TaskReader
 from pilot.tasks.get_and_install_app import GetAndInstallAppTask
 from pilot.tasks.install_app import InstallAppTask
 from pilot.tasks.uninstall_app import UninstallAppTask
+
+if TYPE_CHECKING:
+    from pilot.core.app import App
 
 
 @sites_bp.get("/<name>/apps")
@@ -123,18 +127,23 @@ def _submit_install_task(bench_root: Path, site: str, app: str, repo: str, branc
     """An app already cloned into the bench installs directly; otherwise it is
     fetched first, by repository URL or by marketplace name."""
     bench = Bench(bench_root)
-    if app and _is_app_cloned(bench_root, app):
-        return InstallAppTask.queue(bench, site=site, app=app)
+    if cloned := _cloned_app(bench, app, repo):
+        return InstallAppTask.queue(bench, site=site, app=cloned.module_name)
     if repo:
         return GetAndInstallAppTask.queue(bench, repo=repo, branch=branch, site=site)
     return GetAndInstallAppTask.queue(bench, marketplace_app=app, site=site)
 
 
-def _is_app_cloned(bench_root: Path, app: str) -> bool:
+def _cloned_app(bench: Bench, app: str, repo: str) -> "App | None":
+    """The app this request refers to, if the bench already has it cloned - by
+    name, or by repository URL so re-installing from a URL skips the fetch too."""
+    from pilot.core.app import App
+
     try:
-        return Bench(bench_root).app(app).is_cloned
+        candidate = bench.app(app) if app else App.from_repo(bench, repo)
     except BenchError:
-        return False
+        return None
+    return candidate if candidate.is_cloned else None
 
 
 @sites_bp.post("/<name>/actions/update-apps")
