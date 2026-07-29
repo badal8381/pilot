@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Badge, Button, ErrorMessage } from 'frappe-ui'
+import { Badge, Button, ErrorMessage, Skeleton } from 'frappe-ui'
 
 import { h, onMounted, ref } from 'vue'
 import { apiErrorMessage } from '@/api/client'
@@ -62,18 +62,31 @@ onMounted(load)
       <Button :iconLeft="h(FCLogo, { class: 'size-4' })"> Manage Storage </Button>
     </div>
 
-    <div v-if="loading && !storageData" class="gap-4 grid grid-cols-1 lg:grid-cols-2 fade-in">
+    <!-- loader -->
+    <div
+      v-if="loading && !storageData"
+      class="bg-surface-elevation-1 border border-outline-gray-2 rounded-xl overflow-hidden"
+    >
       <div
-        v-for="col in 2"
-        :key="col"
-        class="bg-surface-gray-2 border border-outline-gray-2 rounded-xl h-72 animate-pulse"
-      />
+        class="divide-y lg:divide-x lg:divide-y-0 grid grid-cols-1 divide-outline-gray-2 lg:grid-cols-2"
+      >
+        <div v-for="col in 2" :key="col" class="flex flex-col gap-3 p-5">
+          <Skeleton class="rounded-full w-full h-5" />
+          <Skeleton
+            v-for="row in 4"
+            :key="row"
+            class="h-3.5 rounded"
+            :class="row % 2 ? 'w-full' : 'w-2/3'"
+          />
+        </div>
+      </div>
     </div>
+
     <ErrorMessage v-else-if="error" :message="error" />
 
     <div
       v-else-if="storageData"
-      class="bg-surface-elevation-1 border border-outline-gray-2 rounded-xl overflow-hidden"
+      class="bg-surface-elevation-1 border border-outline-gray-2 rounded-xl fade-in overflow-hidden"
     >
       <div
         class="divide-y lg:divide-x lg:divide-y-0 grid grid-cols-1 divide-outline-gray-2 lg:grid-cols-2"
