@@ -6,14 +6,14 @@ import secrets
 import time
 from typing import TYPE_CHECKING, ClassVar
 
-import jwt
-from jwt import PyJWKClient
-
 from pilot.config import BenchConfig
+from pilot.internal import hs256_jwt
 from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from jwt import PyJWKClient
 
     from pilot.core.bench import Bench
 
@@ -263,9 +263,11 @@ class Session:
             payload["jti"] = jti
         if site:
             payload["site"] = site
-        return jwt.encode(payload, self.ensure_jwt_secret(), algorithm="HS256")
+        return hs256_jwt.encode(payload, self.ensure_jwt_secret())
 
     def _decode_local(self, token: str) -> dict | None:
+        import jwt
+
         secret = self.admin_config.jwt_secret
         if not token or not secret:
             return None
@@ -275,6 +277,9 @@ class Session:
             return None
 
     def _decode_jwks(self, token: str) -> dict | None:
+        import jwt
+        from jwt import PyJWKClient
+
         url, audience = self.admin_config.jwks_url, self.admin_config.jwks_audience
         if not token or not url or not audience:
             return None
@@ -297,7 +302,9 @@ class Session:
             return None
 
     @classmethod
-    def _jwks_client(cls, url: str) -> PyJWKClient:
+    def _jwks_client(cls, url: str) -> "PyJWKClient":
+        from jwt import PyJWKClient
+
         client = cls._jwks_clients.get(url)
         if client is None:
             # A real User-Agent; urllib's default is blocked as a bot by Cloudflare
