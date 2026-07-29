@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from admin.backend.app import create_app
-from pilot.config import BenchConfig
+from pilot.config import BenchConfig, MariaDBConfig
 from pilot.internal.tasks.store import TaskStore
 from pilot.managers.task.models import TaskStatus
 
@@ -273,7 +273,7 @@ def test_database_validation_uses_one_engine_neutral_resource(tmp_path: Path) ->
     config = manager_class.call_args.args[0]
     assert config.root_password == "secret"
     assert config.admin_user == "root"
-    assert config.port == 3306
+    assert config.port == MariaDBConfig().port
 
 
 def test_database_validation_supports_existing_postgres(tmp_path: Path) -> None:

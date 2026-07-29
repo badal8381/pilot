@@ -339,6 +339,31 @@ def test_provision_user_owned_reuses_already_provisioned_server() -> None:
     rc.assert_not_called()
 
 
+def test_is_provisioned_false_when_data_dir_wiped_but_unit_still_exists(tmp_path) -> None:
+    """A stale systemd unit outliving a deleted state dir must not look provisioned."""
+    m = _mgr()
+    with (
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{BASE_MODULE}.UserOwnedDBManager.is_provisioned", return_value=True),
+    ):
+        assert m.is_provisioned() is False
+
+
+def test_provision_user_owned_resets_failed_state_before_restarting_stopped_unit() -> None:
+    m = _mgr()
+    with (
+        patch.object(m, "is_provisioned", return_value=True),
+        patch.object(m, "is_running", return_value=False),
+        patch(f"{MODULE}.run_command") as rc,
+        patch(f"{BASE_MODULE}.subprocess.run") as reset_run,
+    ):
+        m._provision_user_owned()
+    reset_run.assert_called_once()
+    assert reset_run.call_args.args[0] == ["systemctl", "--user", "reset-failed", "pilot-postgres.service"]
+    assert rc.call_args.args[0] == ["systemctl", "--user", "start", "pilot-postgres.service"]
+
+
 def test_run_sql_as_superuser_uses_local_psql() -> None:
     m = _mgr(port=5440)
     with (

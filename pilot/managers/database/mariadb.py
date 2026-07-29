@@ -59,7 +59,7 @@ class MariaDBManager(UserOwnedDBManager):
     def is_provisioned(self) -> bool:
         if is_macos():
             return self.is_running() and not self.is_unsecured()
-        return super().is_provisioned()
+        return super().is_provisioned() and self.my_cnf_path.exists()
 
     def _provision_macos(self):
         if not self.is_running():
@@ -77,9 +77,11 @@ class MariaDBManager(UserOwnedDBManager):
             self._initialize_data_dir()
             self._write_config()
             self._install_unit()
+            self._reset_failed_state()
             run_command(self._systemctl("enable", "--now", self._UNIT_NAME), env=self._systemctl_env())
 
         elif not self.is_running():
+            self._reset_failed_state()
             run_command(self._systemctl("start", self._UNIT_NAME), env=self._systemctl_env())
 
         self._wait_until_reachable()
