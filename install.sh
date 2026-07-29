@@ -12,14 +12,14 @@ set -e
 # All three point at the same GitHub repo; override PILOT_GITHUB_SLUG to install
 # from a fork (releases + self-reference URL follow it).
 GITHUB_SLUG="${PILOT_GITHUB_SLUG:-frappe/pilot}"
-INSTALL_URL="https://raw.githubusercontent.com/$GITHUB_SLUG/main/install.sh"
+INSTALL_URL="https://raw.githubusercontent.com/$GITHUB_SLUG/develop/install.sh"
 REPO_URL="${PILOT_REPO_URL:-https://github.com/$GITHUB_SLUG}"
-BRANCH_NAME="${PILOT_BRANCH:-main}"
+BRANCH_NAME="${PILOT_BRANCH:-develop}"
 PILOT_DIR="$HOME/pilot"
 BENCH_USER="${BENCH_USER:-frappe}"
 # Lets an unattended run answer sudo, which `curl | sh` cannot prompt for.
 SUDO_PASS="${SUDO_PASS:-}"
-# The default install pulls a prebuilt release tarball; --dev clones main and
+# The default install pulls a prebuilt release tarball; --dev clones develop and
 # compiles the admin frontend from source.
 DEV_MODE="${PILOT_DEV:-}"
 

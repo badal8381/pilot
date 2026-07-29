@@ -38,7 +38,7 @@ Pilot makes it simple to run Frappe on your own servers. Use the Admin UI to man
 Run the installer as your normal user:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/frappe/pilot/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/frappe/pilot/develop/install.sh | bash
 ```
 
 On a root-only VPS, run it as root; the installer creates a non-root bench user.
@@ -47,7 +47,7 @@ This installs the latest release (prebuilt admin UI, no build step). Contributor
 who want a source checkout that compiles the admin UI locally can pass `--dev`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/frappe/pilot/main/install.sh | bash -s -- --dev
+curl -fsSL https://raw.githubusercontent.com/frappe/pilot/develop/install.sh | bash -s -- --dev
 ```
 
 ## Basic Usage
