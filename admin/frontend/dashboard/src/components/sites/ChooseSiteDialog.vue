@@ -11,43 +11,30 @@
         </p>
 
         <div class="gap-2 grid max-h-96 overflow-y-auto">
-          <button
-            type="button"
-            class="flex items-center gap-3 p-3 border rounded-lg text-left transition duration-150 ease-[var(--ease-out)] active:scale-[0.98]"
-            :class="rowClass('')"
+          <SiteRow
+            label="All sites"
+            subtitle="Browse every available app"
+            icon="lucide-layout-grid"
+            :selected="!site"
             @click="choose('')"
           >
-            <span class="place-items-center grid bg-surface-gray-2 rounded-md size-8 shrink-0">
-              <span class="size-4 text-ink-gray-6 lucide-layout-grid" />
-            </span>
-            <div class="flex-1 min-w-0">
-              <p class="font-medium text-ink-gray-8 text-sm truncate">All sites</p>
-              <p class="text-ink-gray-5 text-p-sm truncate">Browse every available app</p>
-            </div>
-            <span v-if="!site" class="size-4 text-ink-gray-8 shrink-0 lucide-check" />
-          </button>
+            <template #suffix>
+              <span v-if="!site" class="size-4 text-ink-gray-8 shrink-0 lucide-check" />
+            </template>
+          </SiteRow>
 
-          <button
+          <SiteRow
             v-for="s in sites"
             :key="s.name"
-            type="button"
-            class="flex items-center gap-3 p-3 border rounded-lg text-left transition duration-150 ease-[var(--ease-out)] active:scale-[0.98]"
-            :class="rowClass(s.name)"
+            :label="s.name"
+            :subtitle="siteSubtitle(s)"
+            :selected="s.name === site"
             @click="choose(s.name)"
           >
-            <span class="place-items-center grid bg-surface-gray-2 rounded-md size-8 shrink-0">
-              <span class="size-4 text-ink-gray-6 lucide-globe" />
-            </span>
-            <div class="flex-1 min-w-0">
-              <p class="font-medium text-ink-gray-8 text-sm truncate">{{ s.name }}</p>
-              <p class="text-ink-gray-5 text-p-sm truncate">
-                {{ s.installed_apps?.length || 0 }}
-                app{{ s.installed_apps?.length === 1 ? '' : 's' }}
-                <template v-if="siteVersion(s)"> · {{ siteVersion(s) }}</template>
-              </p>
-            </div>
-            <span v-if="s.name === site" class="size-4 text-ink-gray-8 shrink-0 lucide-check" />
-          </button>
+            <template #suffix>
+              <span v-if="s.name === site" class="size-4 text-ink-gray-8 shrink-0 lucide-check" />
+            </template>
+          </SiteRow>
         </div>
       </template>
     </template>
@@ -56,6 +43,7 @@
 
 <script setup>
 import { Dialog } from 'frappe-ui'
+import SiteRow from '@/components/sites/SiteRow.vue'
 
 defineProps({
   sites: { type: Array, default: () => [] },
@@ -63,15 +51,11 @@ defineProps({
 const open = defineModel('open')
 const site = defineModel('site')
 
-function rowClass(name) {
-  return name === site.value
-    ? 'border-outline-gray-4 bg-surface-gray-1'
-    : 'border-outline-gray-2 hover:bg-surface-gray-1'
-}
-
-function siteVersion(s) {
+function siteSubtitle(s) {
+  const count = s.installed_apps?.length || 0
   const match = /^version-(\d+)/.exec(s.framework_branch || '')
-  return match ? `Version ${match[1]}` : ''
+  const version = match ? ` · Version ${match[1]}` : ''
+  return `${count} app${count === 1 ? '' : 's'}${version}`
 }
 
 function choose(name) {

@@ -3,7 +3,7 @@ import { Tree } from 'frappe-ui'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { appsApi } from '@/api/apps'
 import UsageMeter from '@/components/common/UsageMeter.vue'
-import { logoColor } from '@/composables/apps/useMarketplace'
+import { hashColor } from '@/composables/apps/useAppRegistry'
 import type { BenchBreakdown, SiteStorage } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
 
@@ -151,7 +151,7 @@ const treeNodes = computed(() => reactive([
         <span
           v-else-if="'logo' in rawNode"
           class="grid place-items-center rounded-sm size-4 font-bold text-[9px] text-white shrink-0"
-          :style="{ backgroundColor: logoColor(asStorageNode(rawNode).label) }"
+          :style="{ backgroundColor: hashColor(asStorageNode(rawNode).label) }"
         >
           {{ asStorageNode(rawNode).label[0]?.toUpperCase() }}
         </span>

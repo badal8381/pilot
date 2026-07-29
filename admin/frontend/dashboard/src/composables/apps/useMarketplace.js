@@ -5,14 +5,6 @@ import { sitesApi } from '@/api/sites'
 import { parseBranchVersion, toSentenceCase } from '@/utils/format'
 import { matchesPill } from '@/utils/marketplaceCategories'
 
-const COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed']
-
-export function logoColor(name) {
-  let hash = 0
-  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) | 0
-  return COLORS[Math.abs(hash) % COLORS.length]
-}
-
 function parseVersion(branch) {
   const match = /^version-(\d+)/.exec(branch || '')
   return match ? Number(match[1]) : null

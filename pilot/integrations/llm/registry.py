@@ -44,15 +44,21 @@ def provider_options() -> list[dict]:
             "label": label,
             "requires_api_base": cls.requires_api_base,
             "free_text_model": cls.free_text_model,
+            "models_need_api_key": cls.models_need_api_key,
         }
         for cls in INTEGRATIONS
         for slug, label in cls.providers().items()
     ]
 
 
-def models_for(provider: str) -> list[str]:
-    """Selectable models for a provider (empty means free-text entry)."""
-    return _integration_for(provider).get_models(provider)
+def models_for(provider: str, api_key: str = "") -> list[str]:
+    """Selectable models for a provider (empty means free-text entry). Providers
+    with `models_need_api_key` list models from their own API, so they need the key."""
+    return _integration_for(provider).get_models(provider, api_key)
+
+
+def models_need_api_key(provider: str) -> bool:
+    return _integration_for(provider).models_need_api_key
 
 
 def requires_api_base(provider: str) -> bool:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from flask import Flask
 
 from admin.backend.api.v1.settings import (
@@ -13,6 +14,7 @@ from admin.backend.api.v1.settings import (
 )
 from pilot.config import BenchConfig
 from pilot.integrations.llm import DEFAULT_SYSTEM_PROMPT, system_prompt_path
+from pilot.integrations.llm.frappe_llm import FrappeLLMIntegration
 
 
 def _config() -> BenchConfig:
@@ -147,3 +149,59 @@ def test_disconnect_clears_sidecar_prompt(tmp_path: Path) -> None:
 
     client.patch("/api/v1/settings", json={"llm": {"disconnect": True}})
     assert not system_prompt_path(bench_root).exists()
+
+
+def test_llm_models_needs_a_key_for_frappe_llm(tmp_path: Path) -> None:
+    client = _client(tmp_path / "test-bench")
+
+    response = client.post("/api/v1/settings/llm/models", json={"provider": "frappe-llm"})
+
+    assert response.status_code == 400
+    assert "API key" in response.get_json()["error"]["message"]
+
+
+def test_llm_models_uses_the_saved_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    bench_root = tmp_path / "test-bench"
+    client = _client(bench_root)
+    client.patch(
+        "/api/v1/settings",
+        json={"llm": {"provider": "frappe-llm", "api_key": "sk-saved", "model": "qwen3.6-27b-fp8"}},
+    )
+    seen = {}
+
+    def fake_get_models(provider: str, api_key: str = "") -> list[str]:
+        seen["provider"] = provider
+        seen["api_key"] = api_key
+        return ["qwen3.6-27b-fp8"]
+
+    monkeypatch.setattr(FrappeLLMIntegration, "get_models", fake_get_models)
+
+    response = client.post("/api/v1/settings/llm/models", json={"provider": "frappe-llm"})
+
+    assert response.status_code == 200
+    assert response.get_json() == ["qwen3.6-27b-fp8"]
+    assert seen == {"provider": "frappe-llm", "api_key": "sk-saved"}
+
+
+def test_llm_models_prefers_the_posted_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    client = _client(tmp_path / "test-bench")
+    seen = {}
+
+    def fake_get_models(provider: str, api_key: str = "") -> list[str]:
+        seen["api_key"] = api_key
+        return []
+
+    monkeypatch.setattr(FrappeLLMIntegration, "get_models", fake_get_models)
+
+    client.post("/api/v1/settings/llm/models", json={"provider": "frappe-llm", "api_key": "sk-typed"})
+
+    assert seen == {"api_key": "sk-typed"}
+
+
+def test_llm_models_without_a_provider(tmp_path: Path) -> None:
+    client = _client(tmp_path / "test-bench")
+
+    response = client.post("/api/v1/settings/llm/models", json={})
+
+    assert response.status_code == 200
+    assert response.get_json() == []
