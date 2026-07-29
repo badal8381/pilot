@@ -5,7 +5,8 @@ from dataclasses import dataclass
 class MariaDBConfig:
     # existing is a deliberate user choice, never inferred from host (see MariaDBManager).
     host: str = "localhost"
-    port: int = 3306
+    # Avoids clashing with a stock MariaDB/MySQL install on the well-known 3306.
+    port: int = 3310
     root_password: str = ""
     admin_user: str = "root"
     socket_path: str = ""

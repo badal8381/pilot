@@ -251,7 +251,7 @@ def test_new_command_mariadb_port_is_not_offset_between_benches(
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert CommonConfig.read(benches_dir).mariadb.port == 3306
+    assert CommonConfig.read(benches_dir).mariadb.port == MariaDBConfig().port
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -262,14 +262,15 @@ def test_new_command_mariadb_port_ignores_live_scan_on_macos(
     from pilot.commands.bench.create import NewCommand
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    # 3306 reads as live, which would normally push the picker to 3307+.
-    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == 3306)
+    default_port = MariaDBConfig().port
+    # The default port reads as live, which would normally push the picker up.
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == default_port)
     target = tmp_path / "benches" / "m"
     with patch("pilot.managers.platform.is_macos", return_value=True):
         NewCommand(target_directory=target, bench_name="m").run()
         _ensure_database_credentials(target)
 
-    assert CommonConfig.read(tmp_path / "benches").mariadb.port == 3306
+    assert CommonConfig.read(tmp_path / "benches").mariadb.port == default_port
 
 
 def test_new_command_second_mariadb_bench_inherits_password(
