@@ -25,6 +25,10 @@ def test_socket_path_honors_explicit_value() -> None:
     assert MariaDBManager(MariaDBConfig(socket_path="/tmp/custom.sock")).socket_path == "/tmp/custom.sock"
 
 
+def test_default_port_avoids_standard_mysql_port() -> None:
+    assert MariaDBConfig().port == 3310
+
+
 def test_existing_defaults_to_false() -> None:
     assert MariaDBConfig().existing is False
 
@@ -119,6 +123,45 @@ def test_is_provisioned_on_macos_checks_live_server_not_a_marker_file() -> None:
         patch.object(m, "is_unsecured", return_value=False),
     ):
         assert m.is_provisioned() is True  # up and already secured
+
+
+def test_is_provisioned_false_when_data_dir_wiped_but_unit_still_exists(tmp_path) -> None:
+    """A stale systemd unit outliving a deleted state dir must not look provisioned."""
+    m = _manager()
+    with (
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{BASE_MODULE}.UserOwnedDBManager.is_provisioned", return_value=True),
+    ):
+        assert m.is_provisioned() is False
+
+
+def test_wait_until_reachable_raises_after_timeout() -> None:
+    m = _manager()
+    with (
+        patch.object(m, "is_reachable", return_value=False),
+        patch(f"{BASE_MODULE}.time.sleep"),
+        pytest.raises(DatabaseError, match="did not become reachable"),
+    ):
+        m._wait_until_reachable(timeout=0.01)
+
+
+def test_provision_resets_failed_state_before_restarting_stopped_unit() -> None:
+    m = _manager()
+    with (
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(m, "install"),
+        patch.object(m, "is_provisioned", return_value=True),
+        patch.object(m, "is_running", return_value=False),
+        patch.object(m, "_wait_until_reachable"),
+        patch.object(m, "secure_installation"),
+        patch(f"{MODULE}.run_command") as rc,
+        patch(f"{BASE_MODULE}.subprocess.run") as reset_run,
+    ):
+        m.provision()
+    reset_run.assert_called_once()
+    assert reset_run.call_args.args[0] == ["systemctl", "--user", "reset-failed", "pilot-mariadb.service"]
+    assert rc.call_args.args[0] == ["systemctl", "--user", "start", "pilot-mariadb.service"]
 
 
 def test_provision_reuses_already_provisioned_server() -> None:

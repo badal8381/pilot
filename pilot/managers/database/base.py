@@ -32,6 +32,7 @@ class UserOwnedDBManager(SystemdUserMixin):
             if self.is_reachable():
                 return
             time.sleep(0.5)
+        raise DatabaseError(f"{self._DISPLAY_NAME} did not become reachable within {timeout:.0f}s.")
 
     def install(self) -> None:
         if self.is_installed():
@@ -78,6 +79,19 @@ class UserOwnedDBManager(SystemdUserMixin):
             run_command(["brew", "services", action, self._brew_package()])
         else:
             run_command(self._systemctl(action, self._UNIT_NAME), env=self._systemctl_env())
+
+    def _reset_failed_state(self) -> None:
+        """Clear a stuck failed/rate-limited unit before (re)starting it.
+
+        A never-loaded unit makes this exit non-zero ("not loaded") - that's
+        not a failure worth raising on, so this doesn't use run_command.
+        """
+        subprocess.run(
+            self._systemctl("reset-failed", self._UNIT_NAME),
+            env=self._systemctl_env(),
+            capture_output=True,
+            timeout=5,
+        )
 
     def _brew_package(self) -> str:
         return self._installed_brew_formula() or f"{self._BREW_FORMULA_BASE}@{self._DEFAULT_VERSION}"
