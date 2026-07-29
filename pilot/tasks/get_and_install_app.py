@@ -29,7 +29,6 @@ class GetAndInstallAppTask(Task):
         result = self.fetch()
         # Frappe cascades dependency installs on sites, but not asset builds.
         self.install_on_sites(result.app)
-        self.build_assets([result.app, *result.installed_dependencies])
 
     @step("fetch", lambda self: f"Fetch {self.marketplace_app or self.repo}")
     def fetch(self) -> AppInstallResult:
