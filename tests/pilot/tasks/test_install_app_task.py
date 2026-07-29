@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import ANY, patch
 
 import pytest
 
@@ -48,6 +48,8 @@ def test_install_app_task_uses_site_install_app(tmp_path: Path) -> None:
     with (
         patch.object(Site, "install_app") as mock_install,
         patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app"),
+        patch.object(Site, "clear_cache"),
+        patch.object(Site, "under_maintenance"),
     ):
         task.run()
 
@@ -64,6 +66,8 @@ def test_install_app_task_builds_assets_for_app_and_required_apps(tmp_path: Path
     with (
         patch.object(Site, "install_app"),
         patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(Site, "clear_cache"),
+        patch.object(Site, "under_maintenance"),
     ):
         task.run()
 
@@ -78,6 +82,8 @@ def test_install_app_task_skips_required_app_missing_from_bench(tmp_path: Path) 
     with (
         patch.object(Site, "install_app"),
         patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(Site, "clear_cache"),
+        patch.object(Site, "under_maintenance"),
     ):
         task.run()
 
@@ -91,8 +97,29 @@ def test_install_app_task_exits_nonzero_when_site_install_fails(tmp_path: Path) 
 
     with (
         patch.object(Site, "install_app", side_effect=CommandError("boom")),
+        patch.object(Site, "under_maintenance"),
         pytest.raises(SystemExit) as exc,
     ):
         task.run()
 
     assert exc.value.code == 1
+
+
+def test_install_clears_the_site_cache_after_building_assets(tmp_path: Path) -> None:
+    """Running processes keep a cached installed-apps list and asset manifest."""
+    from unittest.mock import MagicMock, call
+
+    from pilot.tasks.install_app import InstallAppTask
+
+    bench = MagicMock()
+    task = InstallAppTask(bench=bench, bench_root=tmp_path, site="a.local", app="lms")
+    order = MagicMock()
+    bench.site.return_value.clear_cache = order.clear_cache
+
+    with (
+        patch.object(InstallAppTask, "install", return_value=[]),
+        patch.object(InstallAppTask, "build_assets", order.build_assets),
+    ):
+        task.run()
+
+    assert order.mock_calls == [call.build_assets(ANY), call.clear_cache()]

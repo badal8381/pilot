@@ -1,12 +1,15 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pilot.tasks import Task, on_success, step
+from pilot.tasks import Task, step
 
 
 @dataclass(kw_only=True)
 class UninstallAppTask(Task):
     command: ClassVar[str] = "uninstall-app"
+    # frappe writes module defs and doctypes before recording the app as
+    # installed, so a kill mid-run leaves rows behind that fail every retry.
+    is_cancellable_while_running: ClassVar[bool] = False
 
     site: str
     app: str
@@ -15,16 +18,12 @@ class UninstallAppTask(Task):
     def run(self) -> None:
         self.uninstall()
 
-    @on_success
-    def reload_workers(self) -> dict:
-        """Long-lived web and background workers hold the old app list and
-        import map, so they need a restart once this task lands."""
-        return {"web_only": False}
-
     @step("uninstall", lambda self: f"Uninstall {self.app} from {self.site}")
     def uninstall(self) -> None:
         site = self.bench.site(self.site)
-        site.uninstall_apps([self.app], force=self.force, on_progress=self.report)
+        with site.under_maintenance():
+            site.uninstall_apps([self.app], force=self.force, on_progress=self.report)
+        site.clear_cache()
 
 
 if __name__ == "__main__":

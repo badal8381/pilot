@@ -60,6 +60,9 @@ class Task:
     required_submit_args: ClassVar[tuple[str, ...]] = ()
     # Audit "who queued this" on queue. Turn off for frequent polling/read-only tasks.
     audit_on_queue: ClassVar[bool] = True
+    # Turn off for tasks that leave partial state behind when killed mid-run.
+    # Queued tasks can always be cancelled - nothing has run yet.
+    is_cancellable_while_running: ClassVar[bool] = True
     # Non-sensitive queue args safe to record in the audit entry.
     _AUDIT_ARG_KEYS: ClassVar[tuple[str, ...]] = ("site", "app", "name", "repo", "branch", "marketplace_app")
 

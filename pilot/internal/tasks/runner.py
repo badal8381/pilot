@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from pilot.exceptions import TaskNotRunningError
+from pilot.exceptions import TaskNotCancellableError, TaskNotRunningError
 from pilot.internal.tasks.authoring import required_task_args
 from pilot.internal.tasks.models import TaskStatus
 from pilot.internal.tasks.payload import TaskPayloadBuilder
@@ -122,6 +122,10 @@ class TaskRunner:
         if not status.is_active:
             raise TaskNotRunningError(f"Task is not active: {task_id} (status={status.value})")
 
+        command = self._store.read_metadata(task_id).get("command", "")
+        if status == TaskStatus.RUNNING and not is_command_cancellable_while_running(command):
+            raise TaskNotCancellableError(f"'{command}' cannot be cancelled once it has started.")
+
         if status == TaskStatus.QUEUED:
             if not self._store.transition(
                 task_id,
@@ -168,6 +172,14 @@ def task_registry() -> tuple[dict[str, type[Task]], dict[str, list[str]]]:
         required_args = {cls.command: required_task_args(cls) for cls in tasks}
         _REGISTRY = (jobs, required_args)
     return _REGISTRY
+
+
+def is_command_cancellable_while_running(command: str) -> bool:
+    """Killing some tasks mid-run leaves partial state behind, so they opt out.
+    Queued tasks are always cancellable - none of their work has started."""
+    jobs, _ = task_registry()
+    task_class = jobs.get(command)
+    return task_class.is_cancellable_while_running if task_class else True
 
 
 def discover_tasks() -> list[type[Task]]:

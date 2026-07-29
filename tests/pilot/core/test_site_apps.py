@@ -101,3 +101,40 @@ def test_uninstall_app_clears_cache_after_failure(tmp_path: Path) -> None:
     assert len(commands) == 2
     assert "uninstall-app" in commands[0]
     assert commands[1][-1] == "clear-cache"
+
+
+def test_under_maintenance_restores_the_previous_settings(tmp_path: Path) -> None:
+    """A site that was already down stays down - the guard restores what it read,
+    it does not blindly switch maintenance off."""
+    from unittest.mock import MagicMock
+
+    from pilot.core.site import Site
+
+    site = MagicMock(spec=Site)
+    site.maintenance_settings = {"maintenance_mode": 1, "pause_scheduler": 0}
+
+    with Site.under_maintenance(site):
+        site.set_maintenance_mode.assert_called_once_with(True)
+
+    site.set_maintenance_settings.assert_called_once_with(
+        {"maintenance_mode": 1, "pause_scheduler": 0}
+    )
+
+
+def test_under_maintenance_lifts_maintenance_when_the_body_raises(tmp_path: Path) -> None:
+    """A failed install must not strand the site in maintenance mode."""
+    from unittest.mock import MagicMock
+
+    import pytest
+
+    from pilot.core.site import Site
+
+    site = MagicMock(spec=Site)
+    site.maintenance_settings = {"maintenance_mode": 0, "pause_scheduler": 0}
+
+    with pytest.raises(RuntimeError), Site.under_maintenance(site):
+        raise RuntimeError("install blew up")
+
+    site.set_maintenance_settings.assert_called_once_with(
+        {"maintenance_mode": 0, "pause_scheduler": 0}
+    )

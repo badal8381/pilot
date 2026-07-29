@@ -281,7 +281,7 @@ def test_stream_output_yields_structured_events(tmp_path: Path) -> None:
     events = list(TaskReader(tmp_path).stream_output(task_id))
 
     assert events == [
-        {"type": "status", "status": "success", "queue_position": None},
+        {"type": "status", "status": "success", "queue_position": None, "is_cancellable": False},
         {"type": "line", "line": "alpha"},
         {"type": "line", "line": "beta"},
         {

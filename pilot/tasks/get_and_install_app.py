@@ -13,6 +13,7 @@ class GetAndInstallAppTask(Task):
     """Fetch an app and optionally install it on sites."""
 
     command: ClassVar[str] = "get-and-install-app"
+    is_cancellable_while_running: ClassVar[bool] = False
 
     repo: str = ""
     branch: str = ""
