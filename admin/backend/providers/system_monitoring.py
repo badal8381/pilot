@@ -18,16 +18,17 @@ class SystemMonitoringProvider(WindowedLogProvider):
         self._bench_root = bench_root
 
     def get_history(self) -> dict:
-        from pilot.config import BenchConfig, MonitorConfig
+        from pilot.config import BenchConfig
+        from pilot.config.monitor import bench_log_path, system_log_path
 
         config = BenchConfig.read(self._bench_root)
-        app_log = config.monitor.log_path or MonitorConfig.default_log_path(config.name)
+        app_log = bench_log_path(config.name)
         return {
             "window": self.window,
             "window_seconds": self.window_seconds,
             # Absolute epoch ms so the browser windows correctly regardless of its timezone.
             "now": self.now_ms(),
-            "system": self.get_system_metrics(config.monitor.system_log_path),
+            "system": self.get_system_metrics(system_log_path()),
             "application": self.get_application_metrics(app_log, config.name),
         }
 

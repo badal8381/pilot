@@ -119,7 +119,7 @@ def test_extract_rejects_existing_symlink_parent(tmp_path: Path) -> None:
 def test_prebuilt_asset_download_rejects_unsafe_archive(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from pilot.managers.environment import PythonEnvManager
+    from pilot.managers.python_assets import PythonAssetBuilder
 
     archive = _archive(tmp_path / "assets.tar", [_file("../escape.txt")])
 
@@ -130,7 +130,7 @@ def test_prebuilt_asset_download_rejects_unsafe_archive(
     monkeypatch.setattr(urllib.request, "urlretrieve", retrieve)
 
     assert (
-        PythonEnvManager._download_and_extract("https://example.test/assets.tar", tmp_path / "public")
+        PythonAssetBuilder.download_and_extract("https://example.test/assets.tar", tmp_path / "public")
         is False
     )
     assert not (tmp_path / "escape.txt").exists()

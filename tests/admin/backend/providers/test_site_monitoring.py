@@ -139,15 +139,18 @@ def _site_root(tmp_path: Path, site: str, db_name: str) -> Path:
 def test_slow_query_timelines_scoped_to_site_db(tmp_path: Path) -> None:
     root = _site_root(tmp_path, "site-a.local", "_dba")
     config = BenchConfig.default(name="test-bench")
-    config.monitor.slow_query_log_path = tmp_path / "slow-queries.json"
+    slow_query_log_file = tmp_path / "slow-queries.json"
     now = datetime.now(UTC)
-    SlowQueryLog(config.monitor.slow_query_log_path).append([
+    SlowQueryLog(slow_query_log_file).append([
         {"db": "_dba", "sql_text": "SELECT 1", "query_time": 1.5, "start_time": now},
         {"db": "_dba", "sql_text": "SELECT 1", "query_time": 1.5, "start_time": now},
         {"db": "_other_site_db", "sql_text": "SELECT 2", "query_time": 9.0, "start_time": now},
     ])
 
-    with patch.object(BenchConfig, "read", return_value=config):
+    with (
+        patch.object(BenchConfig, "read", return_value=config),
+        patch("pilot.config.monitor.slow_query_log_path", return_value=slow_query_log_file),
+    ):
         result = SiteMonitoringProvider(root, "site-a.local", "1h").get_analytics()
 
     assert result["frequent_slow_queries"]["categories"] == ["SELECT ?"]

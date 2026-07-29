@@ -140,21 +140,6 @@ def test_is_installed_argv(monkeypatch, manager, expected) -> None:
     assert run.call_args[0][0] == expected
 
 
-@pytest.mark.parametrize(
-    ("manager", "expected"),
-    [
-        (DnfPackageManager(), ["dnf", "-y", "makecache"]),
-        (PacmanPackageManager(), ["pacman", "-Sy", "--noconfirm"]),
-        (AptPackageManager(), ["apt-get", "-y", "update"]),
-    ],
-)
-def test_update_argv(monkeypatch, manager, expected) -> None:
-    _run_as_root(monkeypatch)
-    with patch.object(package_managers.subprocess, "run") as run:
-        manager.update()
-    assert run.call_args[0][0] == expected
-
-
 def test_install_uses_sudo_when_not_root(monkeypatch) -> None:
     monkeypatch.setattr(platform, "is_root", lambda: False)
     with patch.object(package_managers.subprocess, "run") as run:

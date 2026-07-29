@@ -224,14 +224,17 @@ def _write_archive_member(
 
 
 def iter_sibling_benches(bench_path: Path) -> Iterator[tuple[Path, "BenchConfig"]]:
-    """Yield parse-only configs for sibling benches."""
+    """Yield sibling bench configs, merged with the real common_config.toml
+    (mariadb/postgres credentials, jwks) - not just their own bench.toml."""
     import tomllib
 
+    from pilot.config.common import CommonConfig
     from pilot.core.bench import BenchConfig
 
     parent = bench_path.parent
     if not parent.is_dir():
         return
+    common = CommonConfig.read(parent)
     me = bench_path.resolve()
     for sibling in parent.iterdir():
         if not sibling.is_dir() or sibling.resolve() == me:
@@ -241,7 +244,7 @@ def iter_sibling_benches(bench_path: Path) -> Iterator[tuple[Path, "BenchConfig"
             continue
         try:
             # Half-configured siblings still count for ports and hostnames.
-            yield sibling, BenchConfig._from_dict(tomllib.loads(toml_path.read_text()))
+            yield sibling, BenchConfig._from_dict(tomllib.loads(toml_path.read_text()), common=common)
         except Exception:
             continue
 

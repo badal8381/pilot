@@ -7,7 +7,6 @@ from pilot.config.firewall import FirewallConfig, FirewallRule
 from pilot.config.gunicorn import GunicornConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
 from pilot.config.mariadb import MariaDBConfig
-from pilot.config.monitor import MonitorConfig
 from pilot.config.nginx import NginxConfig
 from pilot.config.postgres import PostgresConfig
 from pilot.config.production import VALID_PROCESS_MANAGERS, ProductionConfig
@@ -47,7 +46,6 @@ __all__ = [
     "GunicornConfig",
     "LetsEncryptConfig",
     "MariaDBConfig",
-    "MonitorConfig",
     "NginxConfig",
     "PostgresConfig",
     "ProductionConfig",

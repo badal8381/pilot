@@ -28,7 +28,7 @@ class RegistryCache:
 
     @property
     def path(self) -> Path:
-        return self._cli_root / "registry-cache"
+        return self._cli_root / "system" / "registry-cache"
 
     @property
     def apps_json_path(self) -> Path:
@@ -36,7 +36,7 @@ class RegistryCache:
 
     @property
     def _last_checked_path(self) -> Path:
-        return self._cli_root / "registry-cache.last_checked"
+        return self._cli_root / "system" / "registry-cache.last_checked"
 
     def ensure_fresh(self) -> None:
         """Clone on first use; later reject tampering and refresh hourly."""
@@ -113,7 +113,7 @@ class RegistryCache:
 
     def install_daily_refresh_cron(self) -> None:
         """Register the daily cache refresh cron entry."""
-        log_file = self._cli_root / "logs" / "registry-refresh.log"
+        log_file = self._cli_root / "system" / "registry-cache.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         python, cli_root, log = (shlex.quote(str(p)) for p in (sys.executable, self._cli_root, log_file))
         command = f"{python} -m pilot.core.registry_cache {cli_root} >> {log} 2>&1"

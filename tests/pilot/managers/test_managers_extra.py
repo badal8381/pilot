@@ -94,7 +94,7 @@ def _make_supervisor_manager(tmp_path: Path):
     from pilot.managers.processes.supervisor import SupervisorProcessManager
 
     bench = make_bench(tmp_path)
-    (tmp_path / "config" / "supervisor").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "config" / "services").mkdir(parents=True, exist_ok=True)
     return SupervisorProcessManager(bench)
 
 
@@ -215,17 +215,17 @@ def test_supervisor_conf_redis_gets_stop_timeout(tmp_path: Path) -> None:
 
 def test_supervisor_conf_path(tmp_path: Path) -> None:
     mgr = _make_supervisor_manager(tmp_path)
-    assert mgr.supervisor_conf_path == tmp_path / "config" / "supervisor" / "supervisord.conf"
+    assert mgr.supervisor_conf_path == tmp_path / "config" / "services" / "supervisord.conf"
 
 
 def test_supervisor_sock_path(tmp_path: Path) -> None:
     mgr = _make_supervisor_manager(tmp_path)
-    assert mgr.supervisor_sock == tmp_path / "config" / "supervisor" / "supervisord.sock"
+    assert mgr.supervisor_sock == tmp_path / "config" / "services" / "supervisord.sock"
 
 
 def test_supervisor_pid_path(tmp_path: Path) -> None:
     mgr = _make_supervisor_manager(tmp_path)
-    assert mgr.supervisor_pid == tmp_path / "config" / "supervisor" / "supervisord.pid"
+    assert mgr.supervisor_pid == tmp_path / "config" / "services" / "supervisord.pid"
 
 
 def test_supervisor_generate_config_writes_file(tmp_path: Path) -> None:

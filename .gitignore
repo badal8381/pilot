@@ -1,11 +1,15 @@
 # Benches (created by `bench new`)
 /benches/
 
+# Rootless per-host database servers (created by `bench init`)
+/databases/
+
 # Local ad-hoc screenshots
 /screenshots/
 
-# Monitor logs (written beside the install)
-/logs/
+# Host-level daemons/state, written beside the install (monitor, uptime,
+# registry cache, shared WAF ruleset)
+/system/
 
 # Local agent scratch files
 /plan_refactor.md
@@ -78,6 +82,7 @@ admin/frontend/dashboard/src/types/
 .ruff_cache
 .claude
 .opencode
+logs/
 
 registry-cache*
 
