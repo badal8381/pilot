@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Badge, Button, ErrorMessage, LoadingText } from 'frappe-ui'
+import { Badge, Button, ErrorMessage } from 'frappe-ui'
 
 import { h, onMounted, ref } from 'vue'
 import { apiErrorMessage } from '@/api/client'
@@ -62,7 +62,13 @@ onMounted(load)
       <Button :iconLeft="h(FCLogo, { class: 'size-4' })"> Manage Storage </Button>
     </div>
 
-    <LoadingText v-if="loading && !storageData" />
+    <div v-if="loading && !storageData" class="gap-4 grid grid-cols-1 lg:grid-cols-2 fade-in">
+      <div
+        v-for="col in 2"
+        :key="col"
+        class="bg-surface-gray-2 border border-outline-gray-2 rounded-xl h-72 animate-pulse"
+      />
+    </div>
     <ErrorMessage v-else-if="error" :message="error" />
 
     <div

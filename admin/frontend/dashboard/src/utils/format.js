@@ -1,4 +1,5 @@
 export function formatBytes(bytes) {
+  if(!Number.isFinite(bytes)) bytes = 0
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 ** 2) return `${(bytes / 1024).toFixed(1)} KB`
   if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
