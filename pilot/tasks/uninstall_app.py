@@ -18,7 +18,8 @@ class UninstallAppTask(Task):
     @step("uninstall", lambda self: f"Uninstall {self.app} from {self.site}")
     def uninstall(self) -> None:
         site = self.bench.site(self.site)
-        site.uninstall_apps([self.app], force=self.force, on_progress=self.report)
+        with site.under_maintenance():
+            site.uninstall_apps([self.app], force=self.force, on_progress=self.report)
         site.clear_cache()
 
 

@@ -49,6 +49,7 @@ def test_install_app_task_uses_site_install_app(tmp_path: Path) -> None:
         patch.object(Site, "install_app") as mock_install,
         patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app"),
         patch.object(Site, "clear_cache"),
+        patch.object(Site, "under_maintenance"),
     ):
         task.run()
 
@@ -66,6 +67,7 @@ def test_install_app_task_builds_assets_for_app_and_required_apps(tmp_path: Path
         patch.object(Site, "install_app"),
         patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
         patch.object(Site, "clear_cache"),
+        patch.object(Site, "under_maintenance"),
     ):
         task.run()
 
@@ -81,6 +83,7 @@ def test_install_app_task_skips_required_app_missing_from_bench(tmp_path: Path) 
         patch.object(Site, "install_app"),
         patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
         patch.object(Site, "clear_cache"),
+        patch.object(Site, "under_maintenance"),
     ):
         task.run()
 
@@ -94,6 +97,7 @@ def test_install_app_task_exits_nonzero_when_site_install_fails(tmp_path: Path) 
 
     with (
         patch.object(Site, "install_app", side_effect=CommandError("boom")),
+        patch.object(Site, "under_maintenance"),
         pytest.raises(SystemExit) as exc,
     ):
         task.run()

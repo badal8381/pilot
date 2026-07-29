@@ -19,8 +19,9 @@ class InstallAppTask(Task):
     def run(self) -> None:
         app = self.bench.app(self.app)
         site = self.bench.site(self.site)
-        dependencies = self.install(site, app)
-        self.build_assets([app, *dependencies])
+        with site.under_maintenance():
+            dependencies = self.install(site, app)
+            self.build_assets([app, *dependencies])
         site.clear_cache()
         self.bench.audit_action("app", {"event": "installed", "app": self.app, "site": self.site})
 
