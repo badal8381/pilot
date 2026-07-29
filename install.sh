@@ -352,7 +352,7 @@ install_nginx_include() {
     [ -n "$home" ] && [ -d /etc/nginx/conf.d ] || return 0
     echo "Installing the nginx include for '$1'..."
     cat > /etc/nginx/conf.d/00-pilot.conf <<EOF
-include $home/pilot/nginx/*.conf;
+include $home/pilot/system/nginx/*.conf;
 include $home/pilot/benches/*/config/nginx/include.conf;
 EOF
     chmod 644 /etc/nginx/conf.d/00-pilot.conf
@@ -389,7 +389,7 @@ install_logrotate() {
     [ -n "$home" ] && [ -d /etc/logrotate.d ] || return 0
     echo "Installing log rotation for '$1'..."
     cat > /etc/logrotate.d/pilot <<EOF
-$home/pilot/logs/*.log $home/pilot/benches/*/logs/*.log {
+$home/pilot/system/logs/*.log $home/pilot/benches/*/logs/*.log {
     size 500M
     rotate 3
     compress
