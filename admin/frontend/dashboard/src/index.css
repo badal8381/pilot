@@ -68,6 +68,21 @@ body {
   background-color: var(--outline-gray-3);
 }
 
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.35s var(--ease-out);
+}
+
 /* Ensure frappe-ui dialog overlay sits above the sticky app header */
 .dialog-overlay {
   z-index: 50;
