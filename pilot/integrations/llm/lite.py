@@ -37,5 +37,5 @@ class LiteLLMIntegration(LLMIntegration):
         }
 
     @classmethod
-    def get_models(cls, provider: str, api_key: str = "") -> list[str]:
+    def get_models(cls, provider: str, api_key: str = "", api_base: str = "") -> list[str]:
         return sorted(litellm.models_by_provider.get(provider, set()))

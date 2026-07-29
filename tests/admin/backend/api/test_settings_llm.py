@@ -165,13 +165,21 @@ def test_llm_models_uses_the_saved_key(tmp_path: Path, monkeypatch: pytest.Monke
     client = _client(bench_root)
     client.patch(
         "/api/v1/settings",
-        json={"llm": {"provider": "frappe-llm", "api_key": "sk-saved", "model": "qwen3.6-27b-fp8"}},
+        json={
+            "llm": {
+                "provider": "frappe-llm",
+                "api_key": "sk-saved",
+                "model": "qwen3.6-27b-fp8",
+                "api_base": "http://frappe-llm.example/v1",
+            }
+        },
     )
     seen = {}
 
-    def fake_get_models(provider: str, api_key: str = "") -> list[str]:
+    def fake_get_models(provider: str, api_key: str = "", api_base: str = "") -> list[str]:
         seen["provider"] = provider
         seen["api_key"] = api_key
+        seen["api_base"] = api_base
         return ["qwen3.6-27b-fp8"]
 
     monkeypatch.setattr(FrappeLLMIntegration, "get_models", fake_get_models)
@@ -180,22 +188,36 @@ def test_llm_models_uses_the_saved_key(tmp_path: Path, monkeypatch: pytest.Monke
 
     assert response.status_code == 200
     assert response.get_json() == ["qwen3.6-27b-fp8"]
-    assert seen == {"provider": "frappe-llm", "api_key": "sk-saved"}
+    # The saved endpoint matters as much as the key - listing must hit the same
+    # server the assistant will.
+    assert seen == {
+        "provider": "frappe-llm",
+        "api_key": "sk-saved",
+        "api_base": "http://frappe-llm.example/v1",
+    }
 
 
 def test_llm_models_prefers_the_posted_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     client = _client(tmp_path / "test-bench")
     seen = {}
 
-    def fake_get_models(provider: str, api_key: str = "") -> list[str]:
+    def fake_get_models(provider: str, api_key: str = "", api_base: str = "") -> list[str]:
         seen["api_key"] = api_key
+        seen["api_base"] = api_base
         return []
 
     monkeypatch.setattr(FrappeLLMIntegration, "get_models", fake_get_models)
 
-    client.post("/api/v1/settings/llm/models", json={"provider": "frappe-llm", "api_key": "sk-typed"})
+    client.post(
+        "/api/v1/settings/llm/models",
+        json={
+            "provider": "frappe-llm",
+            "api_key": "sk-typed",
+            "api_base": "http://typed.example/v1",
+        },
+    )
 
-    assert seen == {"api_key": "sk-typed"}
+    assert seen == {"api_key": "sk-typed", "api_base": "http://typed.example/v1"}
 
 
 def test_llm_models_without_a_provider(tmp_path: Path) -> None:

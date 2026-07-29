@@ -8,6 +8,7 @@ only on these class-level APIs, so a new provider is just a new subclass.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 from typing import ClassVar
 
@@ -15,6 +16,9 @@ import litellm
 
 from pilot.exceptions import BenchError
 from pilot.integrations.llm import read_system_prompt
+
+# Answers are small; the cap only stops a long-lived process growing without bound.
+_CACHE_LIMIT = 32
 
 
 class LLMError(BenchError):
@@ -37,6 +41,7 @@ class LLMIntegration:
     # litellm route prefix. Blank => use the config `provider` slug (litellm-native
     # providers); set it when the UI slug differs from the litellm route.
     litellm_provider: ClassVar[str] = ""
+    _cached_responses: ClassVar[dict[str, str]] = {}
 
     def __init__(
         self, api_key: str, *, provider: str, model: str, stream: bool = False, api_base: str = ""
@@ -53,7 +58,7 @@ class LLMIntegration:
         return {}
 
     @classmethod
-    def get_models(cls, provider: str, api_key: str = "") -> list[str]:
+    def get_models(cls, provider: str, api_key: str = "", api_base: str = "") -> list[str]:
         """Selectable models for a provider slug; empty means free-text entry,
         `api_key` is only used by providers with `models_need_api_key`."""
         return []
@@ -63,12 +68,48 @@ class LLMIntegration:
         """The model string handed to litellm.completion (routing lives here)."""
         return f"{self.litellm_provider or self.provider}/{self.model}"
 
-    def prompt(self, prompt: str, *, bench_root: Path, max_tokens: int = 4096, **kwargs):
-        """Send a single-turn prompt and return the litellm response."""
-        messages = [
-            {"role": "system", "content": read_system_prompt(bench_root)},
-            {"role": "user", "content": prompt},
-        ]
+    def _cache_key(self, system_prompt: str, prompt: str) -> str:
+        return f"{system_prompt}-{prompt}-{self._litellm_model}"
+
+    def get_cached_response(self, cache_key: str) -> str | None:
+        """The answer already produced for this exact system prompt, prompt and model."""
+        return self._cached_responses.get(cache_key)
+
+    def _remember_response(self, cache_key: str, text: str) -> None:
+        """Only called once an answer is complete - a half-read stream is not an answer."""
+        if not text:
+            return
+        self._cached_responses[cache_key] = text
+        while len(self._cached_responses) > _CACHE_LIMIT:
+            self._cached_responses.pop(next(iter(self._cached_responses)))
+
+    def prompt(
+        self,
+        prompt: str,
+        *,
+        bench_root: Path,
+        max_tokens: int = 4096,
+        refresh: bool = False,
+        **kwargs,
+    ) -> str | Iterator[str]:
+        """The answer to a single-turn prompt: text, or text deltas when streaming.
+        Repeating a prompt replays the cached answer; `refresh` asks the provider
+        again and replaces what was cached."""
+        system_prompt = read_system_prompt(bench_root)
+        cache_key = self._cache_key(system_prompt, prompt)
+
+        cached = None if refresh else self.get_cached_response(cache_key)
+        if cached is not None:
+            return iter([cached]) if self.stream else cached
+
+        raw = self._complete(system_prompt, prompt, max_tokens, **kwargs)
+        if self.stream:
+            return self._iter_answer(raw, cache_key)
+        return self._answer_text(raw, cache_key)
+
+    def _complete(self, system_prompt: str, prompt: str, max_tokens: int, **kwargs):
+        """Call litellm, mapping its errors onto ours."""
+        messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": prompt}]
         try:
             return litellm.completion(
                 model=self._litellm_model,
@@ -79,9 +120,6 @@ class LLMIntegration:
                 stream=self.stream,
                 **kwargs,
             )
-        # Specific subclasses first — NotFoundError etc. subclass APIError, so a
-        # bare APIError catch above them would shadow them. Messages stay
-        # actionable and never echo the raw provider body (it can be HTML).
         except litellm.AuthenticationError as exc:
             raise LLMAuthError("The API key was rejected. Check the provider key in Settings.") from exc
         except litellm.NotFoundError as exc:
@@ -95,14 +133,17 @@ class LLMIntegration:
         except litellm.APIError as exc:
             raise LLMError("The AI provider returned an error. Check the model and endpoint.") from exc
 
-    def get_response_text(self, response) -> str:
-        """Extract the assistant's text from a `prompt` response."""
+    def _answer_text(self, response, cache_key: str) -> str:
+        """The assistant's text from a non-streamed litellm response, cached."""
         if not response.choices:
             return ""
-        return response.choices[0].message.content or ""
+        text = response.choices[0].message.content or ""
+        self._remember_response(cache_key, text)
+        return text
 
-    def iter_response_text(self, stream):
-        """Yield text deltas from a streamed `prompt` response (stream=True)."""
+    def _iter_answer(self, stream, cache_key: str) -> Iterator[str]:
+        """Yield deltas, caching the answer once the stream has run to completion."""
+        deltas: list[str] = []
         for chunk in stream:
             choices = getattr(chunk, "choices", None)
             if not choices:
@@ -110,4 +151,9 @@ class LLMIntegration:
             delta = getattr(choices[0], "delta", None)
             text = getattr(delta, "content", None) if delta else None
             if text:
+                deltas.append(text)
                 yield text
+
+        # Unreached when the caller abandons the stream or the provider fails, so a
+        # partial answer is never cached.
+        self._remember_response(cache_key, "".join(deltas))

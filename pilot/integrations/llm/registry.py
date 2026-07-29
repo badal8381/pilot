@@ -51,10 +51,11 @@ def provider_options() -> list[dict]:
     ]
 
 
-def models_for(provider: str, api_key: str = "") -> list[str]:
+def models_for(provider: str, api_key: str = "", api_base: str = "") -> list[str]:
     """Selectable models for a provider (empty means free-text entry). Providers
-    with `models_need_api_key` list models from their own API, so they need the key."""
-    return _integration_for(provider).get_models(provider, api_key)
+    with `models_need_api_key` list models from their own API, so they need the key,
+    and an `api_base` overrides wherever that provider defaults to."""
+    return _integration_for(provider).get_models(provider, api_key, api_base)
 
 
 def models_need_api_key(provider: str) -> bool:

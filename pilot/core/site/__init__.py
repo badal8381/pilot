@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -78,6 +79,17 @@ class Site:
             config = json.loads(config_path.read_text())
             config.update(settings)
             replace_private_text_locked(config_path, json.dumps(config, indent=1))
+
+    @contextmanager
+    def under_maintenance(self) -> Iterator[None]:
+        """Hold the site in maintenance mode for a schema change, restoring the
+        settings it had before - a site already down stays down afterwards."""
+        original = self.maintenance_settings
+        self.set_maintenance_mode(True)
+        try:
+            yield
+        finally:
+            self.set_maintenance_settings(original)
 
     def _frappe_call(self, *args: str) -> list[str]:
         """Build a frappe bench_helper command."""

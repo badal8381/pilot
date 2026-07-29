@@ -122,7 +122,7 @@ def drop_site(page: Page, base_url: str, site_name: str) -> None:
     task_id = run_task_action(
         page,
         f"/api/v1/sites/{site_name}",
-        lambda: dialog.get_by_role("button", name="Delete site").click(),
+        lambda: dialog.get_by_role("button", name="Drop site", exact=True).click(),
         method="DELETE",
     )
     wait_for_task(page.request, base_url, task_id)

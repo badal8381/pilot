@@ -58,11 +58,13 @@ def _make_task(bench_root: Path, status: TaskStatus) -> None:
 
 
 class _FakeIntegration:
-    def prompt(self, *args, **kwargs):
-        self.received = (args, kwargs)
-        return "stream-handle"
+    """`prompt` yields the answer's deltas directly when streaming."""
 
-    def iter_response_text(self, stream):
+    def __init__(self) -> None:
+        self.received: dict = {}
+
+    def prompt(self, *args, **kwargs):
+        self.received = kwargs
         yield "Root "
         yield "cause: bad migration."
 
@@ -104,3 +106,26 @@ def test_debug_missing_task_is_404(tmp_path: Path) -> None:
     _write_bench(tmp_path, connect_ai=True)
     response = _client(tmp_path).get("/api/v1/tasks/nope/debug")
     assert response.status_code == 404
+
+
+def test_debug_passes_refresh_through_to_the_model(tmp_path: Path) -> None:
+    """The Regenerate button sends ?refresh=1; without it the cached answer replays."""
+    _write_bench(tmp_path, connect_ai=True)
+    _make_task(tmp_path, TaskStatus.FAILED)
+    integration = _FakeIntegration()
+
+    with patch("pilot.managers.task.debug.build_integration", return_value=integration):
+        _client(tmp_path).get(f"/api/v1/tasks/{TASK_ID}/debug?refresh=1")
+
+    assert integration.received["refresh"] is True
+
+
+def test_debug_defaults_to_the_cached_answer(tmp_path: Path) -> None:
+    _write_bench(tmp_path, connect_ai=True)
+    _make_task(tmp_path, TaskStatus.FAILED)
+    integration = _FakeIntegration()
+
+    with patch("pilot.managers.task.debug.build_integration", return_value=integration):
+        _client(tmp_path).get(f"/api/v1/tasks/{TASK_ID}/debug")
+
+    assert integration.received["refresh"] is False

@@ -39,6 +39,7 @@ class StatusEvent(TypedDict):
     type: Literal["status"]
     status: str
     queue_position: int | None
+    is_cancellable: bool
 
 
 TaskStreamEvent = OutputEvent | StatusEvent | DoneEvent
@@ -48,11 +49,12 @@ def output_event(line: str, *, overwrite: bool = False) -> OutputEvent:
     return {"type": "overwrite" if overwrite else "line", "line": line}
 
 
-def status_event(status: str, queue_position: int | None) -> StatusEvent:
+def status_event(task: "TaskInfo") -> StatusEvent:
     return {
         "type": "status",
-        "status": status,
-        "queue_position": queue_position,
+        "status": task.status.value,
+        "queue_position": task.queue_position,
+        "is_cancellable": task.is_cancellable,
     }
 
 
@@ -143,7 +145,7 @@ class TaskReader:
         task = self.read_task(task_id)
         output_path = task.output_path
         last_state = (task.status, task.queue_position)
-        yield status_event(task.status.value, task.queue_position)
+        yield status_event(task)
 
         open_private(output_path, "a").close()
         with open(output_path, "r", errors="replace", newline="") as log_file:
@@ -157,7 +159,7 @@ class TaskReader:
                 task = self.read_task(task_id)
                 current_state = (task.status, task.queue_position)
                 if current_state != last_state:
-                    yield status_event(task.status.value, task.queue_position)
+                    yield status_event(task)
                     last_state = current_state
 
                 if not task.status.is_active:

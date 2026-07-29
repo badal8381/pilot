@@ -25,6 +25,18 @@ class TaskInfo:
     failure: TaskFailure | None = None
 
     @property
+    def is_cancellable(self) -> bool:
+        """Queued work can always be dropped; killing a running task is only safe
+        when the task says so, since some leave partial state behind."""
+        from pilot.internal.tasks.runner import is_command_cancellable_while_running
+
+        if not self.status.is_active:
+            return False
+        if self.status == TaskStatus.QUEUED:
+            return True
+        return is_command_cancellable_while_running(self.command)
+
+    @property
     def duration_seconds(self) -> float | None:
         if self.started_at is None or self.finished_at is None:
             return None
@@ -43,6 +55,7 @@ class TaskInfo:
             "exit_code": self.exit_code,
             "duration_seconds": self.duration_seconds,
             "queue_position": self.queue_position,
+            "is_cancellable": self.is_cancellable,
             "failure": (
                 {"code": self.failure.code, "message": self.failure.message} if self.failure else None
             ),

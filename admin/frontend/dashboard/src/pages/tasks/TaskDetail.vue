@@ -45,7 +45,7 @@
           Debug with AI
         </Button>
         <Button
-          v-if="isTaskActive(task)"
+          v-if="isTaskCancellable(task)"
           variant="subtle"
           size="sm"
           theme="red"
@@ -108,6 +108,7 @@ import {
   fmtDateTime,
   fmtDuration,
   isTaskActive,
+  isTaskCancellable,
   redirectRouteOnSuccess,
   siteLabel,
   siteRoute,
@@ -159,6 +160,7 @@ function updateStatus(event) {
   if (!['queued', 'running'].includes(event.status)) return
   task.value.status = event.status
   task.value.queue_position = event.queue_position
+  task.value.is_cancellable = event.is_cancellable
 }
 
 function handleDone(success) {

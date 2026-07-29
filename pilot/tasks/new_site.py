@@ -19,7 +19,15 @@ class NewSiteTask(Task):
     def run(self) -> None:
         self.require_production_privileges()
         self.fetch_missing_apps()
+        self.reload_for_site_apps()
         self.create()
+
+    @step("reload", "Reload workers for the site's apps")
+    def reload_for_site_apps(self) -> None:
+        """Provisioning runs install-app, which enqueues jobs that import the
+        site's apps. Always reload: an app already on the bench may still predate
+        the running workers, having arrived through `bench get-app`."""
+        self.bench.reload_workers()
 
     @on_failure
     @on_cancel

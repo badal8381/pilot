@@ -18,6 +18,18 @@
             class="inline-block bg-ink-gray-6 ml-0.5 w-2 h-4 align-text-bottom animate-pulse"
           />
         </div>
+
+        <div v-if="text || error" class="flex justify-end">
+          <Button
+            variant="subtle"
+            size="sm"
+            icon-left="lucide-refresh-cw"
+            :loading="streaming"
+            @click="start({ refresh: true })"
+          >
+            Regenerate
+          </Button>
+        </div>
       </div>
     </template>
   </Dialog>
@@ -25,7 +37,7 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { Alert, Dialog, LoadingText } from 'frappe-ui'
+import { Alert, Button, Dialog, LoadingText } from 'frappe-ui'
 import { markdownToHTML } from 'frappe-ui/markdown'
 import DOMPurify from 'dompurify'
 import { tasksApi } from '@/api/tasks'
@@ -48,12 +60,14 @@ function close() {
   streaming.value = false
 }
 
-function start() {
+// Answers are cached per task, so reopening replays the previous one instantly.
+// `refresh` asks the model again and replaces it.
+function start({ refresh = false } = {}) {
   close()
   text.value = ''
   error.value = ''
   streaming.value = true
-  source = new EventSource(tasksApi.debugUrl(props.taskId))
+  source = new EventSource(tasksApi.debugUrl(props.taskId, refresh))
   source.onmessage = (message) => {
     let event
     try {
