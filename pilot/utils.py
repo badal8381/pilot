@@ -71,6 +71,27 @@ def benches_dir() -> Path:
     return cli_root() / "benches"
 
 
+def pick_free_port(port: int) -> int:
+    """First free TCP port at or after `port` (unchanged on macOS)."""
+    from pilot.managers.platform import is_macos
+
+    if is_macos():
+        return port
+    while _port_is_live(port):
+        port += 1
+    return port
+
+
+def _port_is_live(port: int) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+            return True
+    except OSError:
+        return False
+
+
 @dataclass(frozen=True)
 class ArchiveLimits:
     max_members: int = 100_000

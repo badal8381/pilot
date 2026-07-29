@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import secrets
 import socket
 from collections.abc import Callable
 from pathlib import Path
@@ -15,9 +14,8 @@ if TYPE_CHECKING:
 
 class BenchCreator:
     """Creates a bench. Host-shared settings (MariaDB/Postgres server, ACME
-    email, admin JWKS trust) live in common_config.toml and are merged in
-    automatically by BenchConfig - only a first-ever database needs seeding
-    here."""
+    email, admin JWKS trust) live in common_config.toml. Database credentials
+    are generated at `bench init`, not here - see BenchInitializer."""
 
     def __init__(
         self,
@@ -73,34 +71,9 @@ class BenchCreator:
             "admin_tls": bool(self.admin_tls),
             "db_type": self.db_type,
         }
-        self._add_database_settings(settings)
         if self.process_manager:
             settings["production_process_manager"] = self.process_manager
         return settings
-
-    def _add_database_settings(self, settings: dict) -> None:
-        """Pick a fresh port/password only the first time this host
-        provisions the server; later benches inherit them automatically
-        through BenchConfig's merge with common_config.toml."""
-        from pilot.config import BenchConfig, MariaDBConfig, PostgresConfig
-
-        defaults = BenchConfig.default(benches_root=self.target_directory.parent)
-        if self.db_type == "mariadb" and not defaults.mariadb.root_password:
-            settings["mariadb_port"] = self._pick_free_port(MariaDBConfig().port)
-            settings["mariadb_password"] = secrets.token_hex(nbytes=8)
-        if self.db_type == "postgres" and not defaults.postgres.root_password:
-            settings["postgres_port"] = self._pick_free_port(PostgresConfig().port)
-            settings["postgres_password"] = secrets.token_hex(nbytes=8)
-
-    def _pick_free_port(self, port: int) -> int:
-        """Pick the first free port at or after `port`, for the first bench on this host."""
-        from pilot.managers.platform import is_macos
-
-        if is_macos():
-            return port
-        while self._port_is_live(port):
-            port += 1
-        return port
 
     def _pick_port_offset(self, bench_path: Path) -> int:
         """Pick the first base-port offset unused by configs or live processes."""
