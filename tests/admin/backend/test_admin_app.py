@@ -135,6 +135,28 @@ def test_api_benches_admin_url_is_http_until_cert_exists(tmp_path: Path) -> None
     assert entry["admin_url"] == "http://admin-prod.example.com"
 
 
+def test_api_benches_admin_url_and_process_manager_available_before_wizard_finishes(
+    tmp_path: Path,
+) -> None:
+    benches_dir = tmp_path / "benches"
+    client = _client(benches_dir / "current")
+
+    with _listening_socket() as live_port:
+        pending_dir = benches_dir / "pending-bench"
+        pending_dir.mkdir(parents=True, exist_ok=True)
+        (pending_dir / "bench.toml").write_text(
+            f'[bench]\nname = "pending-bench"\n\n'
+            f'[admin]\nport = {live_port}\ndomain = "pending-admin.example.com"\ntls = false\n\n'
+            f'[production]\nenabled = false\nprocess_manager = "systemd"\n'
+        )
+        resp = client.get("/api/v1/benches")
+
+    entry = next(b for b in resp.get_json() if b["name"] == "pending-bench")
+    assert entry["production"] is False
+    assert entry["process_manager"] == "systemd"
+    assert entry["admin_url"] == "http://pending-admin.example.com"
+
+
 def test_api_benches_includes_site_count(tmp_path: Path) -> None:
     benches_dir = tmp_path / "benches"
     client = _client(benches_dir / "current")
@@ -310,11 +332,15 @@ def test_api_benches_create_routes_wizard_at_domain_when_production(tmp_path: Pa
     # crash-loop and permanently rate-limit the units. WizardSetupTask starts
     # it once init actually finishes, not this view.
     mock_apply.assert_not_called()
+    # The wizard itself is always reached over http - no cert can exist yet, since
+    # Let's Encrypt's HTTP-01 challenge needs nginx serving plain http first.
     assert data["scheme"] == "http"
     fresh_toml = (benches_dir / "fresh" / "bench.toml").read_text()
-    # admin.tls is a per-bench choice, not inherited from a production sibling -
-    # the new bench starts on plain HTTP until its own wizard/setup requests TLS.
-    assert "tls = false" in fresh_toml
+    # admin.tls isn't auto-inherited by BenchCreator (it moved out with the
+    # common_config.toml split), so the caller matches the parent's own choice
+    # instead - the eventual production+TLS switch happens once the wizard's
+    # init + SetupProductionCommand finish.
+    assert "tls = true" in fresh_toml
     # production.enabled stays false until the wizard's init + SetupProductionCommand
     # actually finish - a half-built deployment must never look "done" to the switcher.
     assert "enabled = false" in fresh_toml.split("[production]")[1].split("[")[0]
@@ -332,6 +358,7 @@ def test_api_benches_create_does_not_prompt_for_system_privileges(tmp_path: Path
             return_value=True,
         ),
         patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.sudoers.has_passwordless_sudo_for", return_value=False),
         patch("admin.backend.api.v1.benches.create.Bench.create_at") as create,
         patch(
             "pilot.core.adapters.domain_provider.DomainRouteProvider.wildcard_domains",
@@ -344,6 +371,18 @@ def test_api_benches_create_does_not_prompt_for_system_privileges(tmp_path: Path
     assert resp.get_json()["error"]["code"] == "privileged_operation_unavailable"
     assert not (benches_dir / "fresh").exists()
     create.assert_not_called()
+
+
+def test_validate_production_privileges_allows_scoped_nginx_sudo_grant() -> None:
+    """install.sh grants passwordless sudo for exactly `nginx -t` etc, not a bare
+    `sudo -n true` - the scoped grant alone must be enough to create a bench."""
+    from admin.backend.api.v1.benches.create import _validate_production_privileges
+
+    with (
+        patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.sudoers.has_passwordless_sudo_for", return_value=True),
+    ):
+        assert _validate_production_privileges() is None
 
 
 def test_api_benches_create_reports_busy_without_waiting(tmp_path: Path) -> None:
@@ -770,6 +809,7 @@ def test_api_benches_drop_does_not_prompt_for_system_privileges(tmp_path: Path) 
 
     with (
         patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.nginx.has_passwordless_sudo_for", return_value=False),
         patch("admin.backend.api.v1.benches.Bench.drop") as drop,
     ):
         resp = client.delete("/api/v1/benches/prod-bench")
@@ -777,6 +817,24 @@ def test_api_benches_drop_does_not_prompt_for_system_privileges(tmp_path: Path) 
     assert resp.status_code == 409
     assert resp.get_json()["error"]["code"] == "privileged_operation_unavailable"
     drop.assert_not_called()
+
+
+def test_api_benches_drop_allows_scoped_nginx_sudo_grant(tmp_path: Path) -> None:
+    """install.sh grants passwordless sudo for exactly `nginx -t` etc, not a bare
+    `sudo -n true` - the scoped grant alone must be enough to drop a bench."""
+    benches_dir = tmp_path / "benches"
+    client = _client(benches_dir / "current")
+    _write_prod_bench_toml(benches_dir / "prod-bench", "prod-bench")
+
+    with (
+        patch("pilot.managers.platform.has_passwordless_sudo", return_value=False),
+        patch("pilot.managers.nginx.has_passwordless_sudo_for", return_value=True),
+        patch("admin.backend.api.v1.benches.Bench.drop") as drop,
+    ):
+        resp = client.delete("/api/v1/benches/prod-bench")
+
+    assert resp.status_code == 204
+    drop.assert_called_once()
 
 
 def test_create_site_does_not_carry_db_type(tmp_path: Path) -> None:

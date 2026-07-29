@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from pilot.internal.toml import Toml
-from pilot.utils import host_owner, hosts_line_contains, normalize_host
+from pilot.utils import host_owner, hosts_line_contains, iter_sibling_benches, normalize_host
 
 
 @pytest.mark.parametrize(
@@ -39,6 +39,24 @@ def _make_bench(benches: Path, name: str, *, admin_domain: str, sites: list[str]
         site_dir.mkdir(parents=True, exist_ok=True)
         (site_dir / "site_config.json").write_text("{}")
     return bench
+
+
+def test_iter_sibling_benches_merges_real_common_config(tmp_path: Path) -> None:
+    """Regression: iter_sibling_benches used to parse each sibling's bench.toml
+    with BenchConfig._from_dict(data) - no common= kwarg - which silently
+    defaults to an empty CommonConfig, leaving mariadb.root_password blank
+    even when a real common_config.toml sits right beside the benches. This
+    broke _production_monitors()' DB metrics collection: make_database()
+    got an empty password and failed silently (except Exception: return)."""
+    benches = tmp_path / "benches"
+    alpha = _make_bench(benches, "alpha", admin_domain="alpha-admin.localhost")
+    (benches / "common_config.toml").write_text(
+        '[mariadb]\nhost = "localhost"\nport = 3306\nroot_password = "s3cret"\n'
+        'admin_user = "root"\nsocket_path = ""\nexisting = false\n'
+    )
+
+    results = dict(iter_sibling_benches(benches / "beta"))
+    assert results[alpha].mariadb.root_password == "s3cret"
 
 
 def test_host_owner_detects_sibling_site(tmp_path: Path) -> None:

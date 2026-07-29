@@ -4,11 +4,19 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, patch
 
 import pytest
 
-from pilot.config import AppConfig, BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig, WorkerGroup
+from pilot.config import (
+    AppConfig,
+    BenchConfig,
+    MariaDBConfig,
+    PostgresConfig,
+    RedisConfig,
+    WorkerConfig,
+    WorkerGroup,
+)
 from pilot.config.common import CommonConfig
 from pilot.core.bench import Bench
 from pilot.exceptions import BenchAlreadyExistsError, BenchError
@@ -30,6 +38,15 @@ def make_bench(tmp_path: Path) -> Bench:
         ),
     )
     return Bench(config, tmp_path)
+
+
+def _ensure_database_credentials(bench_dir: Path) -> None:
+    """The DB-credential step of `bench init` (see BenchInitializer) - database
+    ports/passwords are generated there, not by `bench new`."""
+    from pilot.core.bench import Bench
+    from pilot.core.bench.initializer import BenchInitializer
+
+    BenchInitializer(Bench(bench_dir))._ensure_database_credentials()
 
 
 def test_new_command_creates_directory_and_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -136,20 +153,21 @@ def test_new_command_first_bench_has_no_jwks_url(tmp_path: Path, monkeypatch: py
     assert BenchConfig.read(target).admin.jwks_url == ""
 
 
-def test_new_command_postgres_bench(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Postgres benches record db_type and a provisioning password."""
+def test_new_command_postgres_bench_has_no_password_yet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`bench new` alone must not provision the shared DB server - only `bench
+    init` does (BenchInitializer._ensure_database_credentials)."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "pg", bench_name="pg", database="postgres").run()
 
     with open(benches_dir / "pg" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "postgres"
-    assert CommonConfig.read(benches_dir).postgres.root_password  # generated for provisioning
+    assert not CommonConfig.read(benches_dir).postgres.root_password
 
 
 def test_new_command_second_postgres_bench_inherits_password(
@@ -157,14 +175,16 @@ def test_new_command_second_postgres_bench_inherits_password(
 ) -> None:
     """Second Postgres bench reuses the shared server password."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "pg1", bench_name="pg1", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "pg1")
     password = CommonConfig.read(benches_dir).postgres.root_password
+    assert password
     NewCommand(target_directory=benches_dir / "pg2", bench_name="pg2", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "pg2")
 
     assert CommonConfig.read(benches_dir).postgres.root_password == password
     assert BenchConfig.read(benches_dir / "pg2").postgres.root_password == password
@@ -179,13 +199,15 @@ def test_new_command_postgres_port_is_not_offset_between_benches(
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "first", bench_name="first", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "first")
     NewCommand(target_directory=benches_dir / "second", bench_name="second", database="postgres").run()
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert CommonConfig.read(benches_dir).postgres.port == 5432
+    assert CommonConfig.read(benches_dir).postgres.port == PostgresConfig().port
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -194,32 +216,31 @@ def test_new_command_postgres_port_ignores_live_scan_on_macos(
 ) -> None:
     """macOS Postgres uses Homebrew's default service port."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    # 5432 reads as live, which would normally push the picker to 5433+.
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: port == 5432))
+    default_port = PostgresConfig().port
+    # The default port reads as live, which would normally push the picker up.
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == default_port)
+    target = tmp_path / "benches" / "pg"
     with patch("pilot.managers.platform.is_macos", return_value=True):
-        NewCommand(target_directory=tmp_path / "benches" / "pg", bench_name="pg", database="postgres").run()
+        NewCommand(target_directory=target, bench_name="pg", database="postgres").run()
+        _ensure_database_credentials(target)
 
-    assert CommonConfig.read(tmp_path / "benches").postgres.port == 5432
+    assert CommonConfig.read(tmp_path / "benches").postgres.port == default_port
 
 
-def test_new_command_mariadb_bench_has_no_postgres_password(
+def test_new_command_mariadb_bench_has_no_password_yet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     NewCommand(target_directory=tmp_path / "benches" / "m", bench_name="m").run()
 
     with open(tmp_path / "benches" / "m" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "mariadb"
-    # not provisioned for mariadb benches
-    assert not CommonConfig.read(tmp_path / "benches").postgres.root_password
+    assert not CommonConfig.read(tmp_path / "benches").mariadb.root_password
 
 
 def test_new_command_mariadb_port_is_not_offset_between_benches(
@@ -231,13 +252,15 @@ def test_new_command_mariadb_port_is_not_offset_between_benches(
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "first", bench_name="first").run()
+    _ensure_database_credentials(benches_dir / "first")
     NewCommand(target_directory=benches_dir / "second", bench_name="second").run()
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert CommonConfig.read(benches_dir).mariadb.port == 3306
+    assert CommonConfig.read(benches_dir).mariadb.port == MariaDBConfig().port
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -246,15 +269,17 @@ def test_new_command_mariadb_port_ignores_live_scan_on_macos(
 ) -> None:
     """macOS MariaDB uses Homebrew's default service port."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    # 3306 reads as live, which would normally push the picker to 3307+.
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: port == 3306))
+    default_port = MariaDBConfig().port
+    # The default port reads as live, which would normally push the picker up.
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == default_port)
+    target = tmp_path / "benches" / "m"
     with patch("pilot.managers.platform.is_macos", return_value=True):
-        NewCommand(target_directory=tmp_path / "benches" / "m", bench_name="m").run()
+        NewCommand(target_directory=target, bench_name="m").run()
+        _ensure_database_credentials(target)
 
-    assert CommonConfig.read(tmp_path / "benches").mariadb.port == 3306
+    assert CommonConfig.read(tmp_path / "benches").mariadb.port == default_port
 
 
 def test_new_command_second_mariadb_bench_inherits_password(
@@ -262,18 +287,19 @@ def test_new_command_second_mariadb_bench_inherits_password(
 ) -> None:
     """Second MariaDB bench reuses the shared server password."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "m1", bench_name="m1").run()
+    _ensure_database_credentials(benches_dir / "m1")
     password = CommonConfig.read(benches_dir).mariadb.root_password
     # Random, not the old guessable hardcoded default.
     assert password != "root"
     assert len(password) == 16  # secrets.token_hex(nbytes=8)
 
     NewCommand(target_directory=benches_dir / "m2", bench_name="m2").run()
+    _ensure_database_credentials(benches_dir / "m2")
     assert CommonConfig.read(benches_dir).mariadb.root_password == password
     assert BenchConfig.read(benches_dir / "m2").mariadb.root_password == password
 
@@ -830,35 +856,6 @@ def test_bench_update_apps_uses_captured_target_for_unpinned_app(tmp_path: Path)
     mock_registry.assert_not_called()
 
 
-def test_bench_migrate_sites_raises_on_failure(tmp_path: Path) -> None:
-    from pilot.exceptions import MigrateError
-
-    bench = make_bench(tmp_path)
-    bench.create_directories()
-    site_dir = bench.sites_path / "site1.localhost"
-    site_dir.mkdir()
-    (site_dir / "site_config.json").write_text("{}")
-
-    with (
-        patch("pilot.core.site.Site.migrate", side_effect=MigrateError("migrate failed")),
-        pytest.raises(MigrateError),
-    ):
-        bench._migrate_sites(False, lambda message: None)
-
-
-def test_bench_migrate_sites_passes_skip_failing_patches(tmp_path: Path) -> None:
-    bench = make_bench(tmp_path)
-    bench.create_directories()
-    site_dir = bench.sites_path / "site1.localhost"
-    site_dir.mkdir()
-    (site_dir / "site_config.json").write_text("{}")
-
-    with patch("pilot.core.site.Site.migrate") as mock_migrate:
-        bench._migrate_sites(True, lambda message: None)
-
-    mock_migrate.assert_called_once_with(skip_failing=True)
-
-
 def test_drop_site_removes_site_from_bench_toml(tmp_path: Path) -> None:
     import tomllib
 
@@ -966,6 +963,36 @@ def test_ls_lists_benches_with_mode_and_address(tmp_path: Path, capsys: pytest.C
     out = capsys.readouterr().out
     assert "alpha" in out and "production" in out and "alpha-admin.example.com" in out
     assert "beta" in out and "development" in out and "http://localhost:7005" in out
+
+
+def test_ls_shows_manager_and_domain_before_wizard_finishes(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    from pilot.commands.bench.list import ListCommand
+
+    benches = tmp_path / "benches"
+    (benches / "pending").mkdir(parents=True)
+    (benches / "pending" / "bench.toml").write_text(
+        '[bench]\nname = "pending"\n\n[production]\nenabled = false\nprocess_manager = "systemd"\n\n'
+        '[admin]\ndomain = "pending-admin.example.com"\n'
+    )
+
+    with (
+        patch("pilot.utils.cli_root", return_value=tmp_path),
+        patch("pilot.commands.bench.list.ListCommand._state", return_value="stopped"),
+        patch(
+            "pilot.managers.nginx.NginxManager.has_admin_cert",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+    ):
+        ListCommand().run()
+
+    out = capsys.readouterr().out
+    assert "development" in out
+    assert "systemd" in out
+    assert "http://pending-admin.example.com" in out
+    assert "foreground" not in out
 
 
 def test_ls_state_admin_active_when_workload_down_but_admin_up(tmp_path: Path) -> None:

@@ -73,7 +73,7 @@ def _shared_nginx_dir() -> Path:
     """Host-wide nginx artifacts the bench user owns, globbed in by 00-pilot.conf."""
     from pilot.utils import cli_root
 
-    return cli_root() / "nginx"
+    return cli_root() / "system" / "nginx"
 
 
 def render_error_html(code: int, title: str, message: str) -> str:

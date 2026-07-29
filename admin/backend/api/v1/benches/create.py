@@ -37,6 +37,11 @@ def create_bench_locked(
     if response is not None:
         return response
 
+    if admin_tls is None and production_parent:
+        # admin.tls is per-bench, not inherited by BenchCreator (see common_config.toml
+        # split) - so match the parent's own choice unless the caller says otherwise.
+        admin_tls = BenchConfig.read(bench_root, validate=False).admin.tls
+
     try:
         Bench.create_at(
             new_dir,
@@ -101,9 +106,11 @@ def _validate_admin_domain(new_dir: Path, name: str, admin_domain: str):
 
 
 def _validate_production_privileges():
-    from pilot.managers.platform import has_passwordless_sudo
+    from pilot.managers.platform import has_passwordless_sudo, is_root, which
+    from pilot.managers.sudoers import has_passwordless_sudo_for
 
-    if has_passwordless_sudo():
+    nginx = which("nginx") or "/usr/sbin/nginx"
+    if is_root() or has_passwordless_sudo() or has_passwordless_sudo_for([nginx, "-t"]):
         return None
     return error_response(
         "privileged_operation_unavailable",

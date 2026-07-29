@@ -15,22 +15,19 @@ from pilot.managers.processes.base import (
 )
 from pilot.managers.processes.local import ProcessDefinition
 from pilot.managers.processes.systemd_render import SystemdRenderer
+from pilot.managers.systemd_user import SystemdUserMixin
 from pilot.utils import cli_root, run_command
 
 _ADMIN_IDLE_TIMEOUT = 60  # seconds of inactivity before socket-activated admin stops
 _SYSTEMCTL_TIMEOUT = 90
 
 
-class SystemdProcessManager(ManagedProcessManager):
+class SystemdProcessManager(SystemdUserMixin, ManagedProcessManager):
     """Manages bench processes via systemd --user (no sudo required)."""
 
     @property
     def systemd_conf_dir(self) -> Path:
-        return self.bench.config_path / "systemd"
-
-    @property
-    def user_unit_dir(self) -> Path:
-        return Path.home() / ".config" / "systemd" / "user"
+        return self.bench.config_path / "services"
 
     @override
     def write_config(self) -> None:
@@ -196,15 +193,6 @@ class SystemdProcessManager(ManagedProcessManager):
 
     def _target_name(self) -> str:
         return f"{self.bench.config.name}.target"
-
-    def _systemctl_env(self) -> dict:
-        env = dict(os.environ)
-        if not env.get("XDG_RUNTIME_DIR"):
-            env["XDG_RUNTIME_DIR"] = f"/run/user/{os.getuid()}"
-        return env
-
-    def _systemctl(self, *args: str) -> list[str]:
-        return ["systemctl", "--user", *args]
 
     def _admin_service_text(self) -> str:
         root = cli_root()

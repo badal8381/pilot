@@ -17,5 +17,5 @@ class SelfHostedIntegration(LLMIntegration):
         return {"self-hosted": "Self-hosted Model"}
 
     @classmethod
-    def get_models(cls, provider: str) -> list[str]:
+    def get_models(cls, provider: str, api_key: str = "") -> list[str]:
         return []  # the served model name is entered by hand

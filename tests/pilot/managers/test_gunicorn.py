@@ -20,7 +20,12 @@ from pilot.config import (
 from pilot.core.bench import Bench
 from pilot.exceptions import ConfigError
 from pilot.managers.gunicorn import GunicornManager
+from pilot.managers.processes.definitions import ProcessDefinitionBuilder
 from pilot.managers.processes.local import ProcessManager
+
+
+def _definitions(bench: Bench, watch_admin_js: bool = False) -> ProcessDefinitionBuilder:
+    return ProcessDefinitionBuilder(bench, bench.env_path / "bin" / "python", watch_admin_js)
 
 
 def make_bench(tmp_path: Path, gunicorn: GunicornConfig | None = None) -> Bench:
@@ -169,9 +174,8 @@ def test_gunicorn_manager_bind_uses_bench_http_port(tmp_path: Path) -> None:
 
 def test_web_definition_uses_gunicorn_in_production(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
-    manager = ProcessManager(bench)
 
-    pd = manager._web_definition(dev=False)
+    pd = _definitions(bench).web_definition(dev=False)
     command_line = shlex.join(pd.argv)
 
     assert "gunicorn" in command_line
@@ -183,7 +187,7 @@ def test_web_definition_uses_gunicorn_in_production(tmp_path: Path) -> None:
 def test_admin_definition_uses_pinned_gunicorn_config(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
 
-    process = ProcessManager(bench)._admin_definition()
+    process = _definitions(bench).admin_definition()
 
     assert process.argv[1:] == [
         "-c",
@@ -197,9 +201,8 @@ def test_admin_definition_uses_pinned_gunicorn_config(tmp_path: Path) -> None:
 
 def test_web_definition_uses_frappe_serve_in_dev(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
-    manager = ProcessManager(bench)
 
-    pd = manager._web_definition(dev=True)
+    pd = _definitions(bench).web_definition(dev=True)
     command_line = shlex.join(pd.argv)
 
     assert "frappe serve" in command_line
@@ -208,9 +211,9 @@ def test_web_definition_uses_frappe_serve_in_dev(tmp_path: Path) -> None:
 
 def test_admin_runs_dev_server_on_admin_port_in_dev(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
-    manager = ProcessManager(bench, watch_admin_js=False)
+    definitions = _definitions(bench, watch_admin_js=False)
 
-    pd = manager._to_dev(manager._admin_definition())
+    pd = definitions.to_dev(definitions.admin_definition())
     command_line = shlex.join(pd.argv)
 
     assert "admin.backend.run_server" in command_line
@@ -222,9 +225,9 @@ def test_admin_runs_dev_server_on_admin_port_in_dev(tmp_path: Path) -> None:
 
 def test_admin_dev_server_enables_reload_when_watching(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
-    manager = ProcessManager(bench, watch_admin_js=True)
+    definitions = _definitions(bench, watch_admin_js=True)
 
-    pd = manager._to_dev(manager._admin_definition())
+    pd = definitions.to_dev(definitions.admin_definition())
     command_line = shlex.join(pd.argv)
 
     assert "admin.backend.run_server" in command_line
@@ -592,10 +595,10 @@ def test_malloc_arena_max_validation(tmp_path: Path) -> None:
 
 def test_py_memory_env_caps_glibc_arenas(tmp_path: Path) -> None:
     bench = make_bench(tmp_path, GunicornConfig(malloc_arena_max=2))
-    assert ProcessManager(bench)._py_memory_env() == {"MALLOC_ARENA_MAX": "2"}
+    assert _definitions(bench).py_memory_env() == {"MALLOC_ARENA_MAX": "2"}
 
     bench0 = make_bench(tmp_path, GunicornConfig(malloc_arena_max=0))
-    assert ProcessManager(bench0)._py_memory_env() == {}
+    assert _definitions(bench0).py_memory_env() == {}
 
 
 def test_max_requests_emitted_when_enabled(tmp_path: Path) -> None:

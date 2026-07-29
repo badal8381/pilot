@@ -6,10 +6,8 @@ from pathlib import Path
 from pilot.config import MariaDBConfig
 from pilot.managers.database.base import UserOwnedDBManager
 from pilot.managers.platform import is_macos, which
-from pilot.utils import run_command
+from pilot.utils import cli_root, run_command
 
-# One rootless MariaDB server per OS user, shared by all their benches.
-_STATE_DIR = Path.home() / ".local" / "share" / "pilot" / "mariadb"
 _CLIENT_TIMEOUT = 5
 
 
@@ -24,18 +22,35 @@ class MariaDBManager(UserOwnedDBManager):
         self.config = config
 
     @property
+    def state_dir(self) -> Path:
+        """One rootless MariaDB server per host, shared by all its benches."""
+        return cli_root() / "databases" / "mariadb"
+
+    @property
+    def config_dir(self) -> Path:
+        return self.state_dir / "config"
+
+    @property
+    def my_cnf_path(self) -> Path:
+        return self.config_dir / "my.cnf"
+
+    @property
     def data_dir(self) -> Path:
-        return _STATE_DIR / "data"
+        return self.state_dir / "data"
+
+    @property
+    def run_dir(self) -> Path:
+        return self.state_dir / "run"
 
     @property
     def pid_file(self) -> Path:
-        return _STATE_DIR / "mysqld.pid"
+        return self.run_dir / "mysqld.pid"
 
     @property
     def socket_path(self) -> str:
         if self.config.socket_path:
             return self.config.socket_path
-        return str(_STATE_DIR / "mysqld.sock")
+        return str(self.run_dir / "mysqld.sock")
 
     def is_installed(self) -> bool:
         # which() searches sbin too; mysqld/mariadbd live in /usr/sbin.
@@ -44,7 +59,7 @@ class MariaDBManager(UserOwnedDBManager):
     def is_provisioned(self) -> bool:
         if is_macos():
             return self.is_running() and not self.is_unsecured()
-        return super().is_provisioned()
+        return super().is_provisioned() and self.my_cnf_path.exists()
 
     def _provision_macos(self):
         if not self.is_running():
@@ -60,10 +75,13 @@ class MariaDBManager(UserOwnedDBManager):
 
         if not self.is_provisioned():
             self._initialize_data_dir()
+            self._write_config()
             self._install_unit()
+            self._reset_failed_state()
             run_command(self._systemctl("enable", "--now", self._UNIT_NAME), env=self._systemctl_env())
 
         elif not self.is_running():
+            self._reset_failed_state()
             run_command(self._systemctl("start", self._UNIT_NAME), env=self._systemctl_env())
 
         self._wait_until_reachable()
@@ -74,6 +92,21 @@ class MariaDBManager(UserOwnedDBManager):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         run_command(["mariadb-install-db", f"--datadir={self.data_dir}", "--skip-test-db"])
 
+    def _write_config(self) -> None:
+        """Write every server setting into our own my.cnf so mariadbd, launched
+        with --defaults-file, never falls back to reading /etc/mysql/my.cnf."""
+        self.config_dir.mkdir(parents=True, exist_ok=True)
+        self.run_dir.mkdir(parents=True, exist_ok=True)
+        content = (
+            "[mysqld]\n"
+            f"datadir = {self.data_dir}\n"
+            f"socket = {self.socket_path}\n"
+            f"port = {self.config.port}\n"
+            f"pid-file = {self.pid_file}\n"
+            "bind-address = 127.0.0.1\n"
+        )
+        self.my_cnf_path.write_text(content)
+
     def _install_unit(self) -> None:
         mariadbd = which("mariadbd") or which("mysqld") or "/usr/sbin/mariadbd"
         content = (
@@ -81,13 +114,14 @@ class MariaDBManager(UserOwnedDBManager):
             "Description=MariaDB (pilot, user-owned)\n\n"
             "[Service]\n"
             "Type=simple\n"
-            f"ExecStart={mariadbd} --datadir={self.data_dir} --socket={self.socket_path} "
-            f"--port={self.config.port} --pid-file={self.pid_file} --bind-address=127.0.0.1\n"
+            # --defaults-file must be the first argument; it makes mariadbd
+            # skip every system default file instead of layering over them.
+            f"ExecStart={mariadbd} --defaults-file={self.my_cnf_path}\n"
             "Restart=on-failure\n\n"
             "[Install]\n"
             "WantedBy=default.target\n"
         )
-        unit_dir = self._user_unit_dir()
+        unit_dir = self.user_unit_dir
         unit_dir.mkdir(parents=True, exist_ok=True)
         self.unit_path.write_text(content)
         run_command(self._systemctl("daemon-reload"), env=self._systemctl_env())
@@ -97,7 +131,7 @@ class MariaDBManager(UserOwnedDBManager):
             return False
         if is_macos():
             # Homebrew owns the socket location here, not socket_path() (our
-            # own _STATE_DIR, only ever created for the Linux systemd unit) -
+            # own state_dir, only ever created for the Linux systemd unit) -
             # is_running() is the only signal we have.
             return True
         return Path(self.socket_path).exists()

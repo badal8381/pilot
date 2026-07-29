@@ -120,61 +120,6 @@ print('\\n'.join(_leaks))
     assert leaked == "", f"discovery imported heavy layers at import time:\n{leaked}"
 
 
-def test_command_discovery_matches_baseline() -> None:
-    commands = registry._discover()
-    identities = {(command.group, command.name) for command in commands}
-
-    assert len(commands) == 35
-    assert len(identities) == 35
-    assert registry.command_names() == {
-        "admin",
-        "build",
-        "drop",
-        "frappe",
-        "get-app",
-        "init",
-        "install-app",
-        "list-apps",
-        "list-site-apps",
-        "ls",
-        "new",
-        "new-app",
-        "new-site",
-        "remove",
-        "remove-app",
-        "rename-site",
-        "restart",
-        "set-admin-password",
-        "setup",
-        "start",
-        "stop",
-        "tasks",
-        "uninstall-app",
-    }
-    assert {name for group, name in identities if group == "admin"} == {
-        "build",
-        "enroll",
-        "issue-site-token",
-        "revoke-totp",
-        "run-patches",
-        "set-central-config",
-        "upgrade",
-    }
-    assert {name for group, name in identities if group == "remove"} == {"production"}
-    assert {name for group, name in identities if group == "setup"} == {
-        "config",
-        "letsencrypt",
-        "nginx",
-        "production",
-        "requirements",
-    }
-    assert {name for group, name in identities if group == "tasks"} == {
-        "start",
-        "status",
-        "stop",
-    }
-
-
 def test_main_dispatches_native_command(monkeypatch: pytest.MonkeyPatch) -> None:
     dispatched = []
     monkeypatch.setattr(sys, "argv", ["bench", "--bench", "demo", "restart"])

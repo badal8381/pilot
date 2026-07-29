@@ -71,6 +71,27 @@ def benches_dir() -> Path:
     return cli_root() / "benches"
 
 
+def pick_free_port(port: int) -> int:
+    """First free TCP port at or after `port` (unchanged on macOS)."""
+    from pilot.managers.platform import is_macos
+
+    if is_macos():
+        return port
+    while _port_is_live(port):
+        port += 1
+    return port
+
+
+def _port_is_live(port: int) -> bool:
+    import socket
+
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=0.2):
+            return True
+    except OSError:
+        return False
+
+
 @dataclass(frozen=True)
 class ArchiveLimits:
     max_members: int = 100_000
@@ -224,14 +245,17 @@ def _write_archive_member(
 
 
 def iter_sibling_benches(bench_path: Path) -> Iterator[tuple[Path, "BenchConfig"]]:
-    """Yield parse-only configs for sibling benches."""
+    """Yield sibling bench configs, merged with the real common_config.toml
+    (mariadb/postgres credentials, jwks) - not just their own bench.toml."""
     import tomllib
 
+    from pilot.config.common import CommonConfig
     from pilot.core.bench import BenchConfig
 
     parent = bench_path.parent
     if not parent.is_dir():
         return
+    common = CommonConfig.read(parent)
     me = bench_path.resolve()
     for sibling in parent.iterdir():
         if not sibling.is_dir() or sibling.resolve() == me:
@@ -241,7 +265,7 @@ def iter_sibling_benches(bench_path: Path) -> Iterator[tuple[Path, "BenchConfig"
             continue
         try:
             # Half-configured siblings still count for ports and hostnames.
-            yield sibling, BenchConfig._from_dict(tomllib.loads(toml_path.read_text()))
+            yield sibling, BenchConfig._from_dict(tomllib.loads(toml_path.read_text()), common=common)
         except Exception:
             continue
 

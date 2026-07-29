@@ -368,11 +368,6 @@ class Bench:
 
         BenchUpdater(self).rebuild_assets(apps_filter, on_progress)
 
-    def _migrate_sites(self, skip_failing_patches: bool, on_progress: Callable[[str], None]) -> None:
-        from pilot.core.bench.update import BenchUpdater
-
-        BenchUpdater(self).migrate_sites(skip_failing_patches, on_progress)
-
 
 def _marketplace_pin(app: "App", marketplace_by_name: dict) -> "RevisionPin | None":
     """Marketplace's advertised pin for app's installed version, or None for a

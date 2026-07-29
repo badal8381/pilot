@@ -5,7 +5,7 @@ from __future__ import annotations
 import tomllib
 from pathlib import Path
 
-from pilot.config import BenchConfig
+from pilot.config import BenchConfig, MariaDBConfig
 
 
 def test_default_ports_returns_all_fields() -> None:
@@ -56,7 +56,7 @@ def test_mariadb_port_not_offset() -> None:
     # It lives in common_config.toml, not bench.toml, so it's checked on the
     # in-memory config rather than the rendered TOML.
     config = BenchConfig.from_flat("my-bench", port_offset=1)
-    assert config.mariadb.port == 3306
+    assert config.mariadb.port == MariaDBConfig().port
 
 
 def test_port_fields_not_settable_via_settings(tmp_path: Path) -> None:

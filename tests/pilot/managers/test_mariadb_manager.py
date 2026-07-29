@@ -18,11 +18,15 @@ def _manager(password: str = "root") -> MariaDBManager:
 
 
 def test_socket_path_defaults_under_state_dir() -> None:
-    assert _manager().socket_path.endswith("/.local/share/pilot/mariadb/mysqld.sock")
+    assert _manager().socket_path.endswith("/databases/mariadb/run/mysqld.sock")
 
 
 def test_socket_path_honors_explicit_value() -> None:
     assert MariaDBManager(MariaDBConfig(socket_path="/tmp/custom.sock")).socket_path == "/tmp/custom.sock"
+
+
+def test_default_port_avoids_standard_mysql_port() -> None:
+    assert MariaDBConfig().port == 3310
 
 
 def test_existing_defaults_to_false() -> None:
@@ -58,7 +62,7 @@ def test_provision_initialises_and_installs_unit_when_fresh(tmp_path) -> None:
     with (
         patch(f"{MODULE}.is_macos", return_value=False),
         patch.object(m, "install"),
-        patch.object(type(m), "data_dir", new_callable=PropertyMock, return_value=tmp_path / "data"),
+        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch.object(m, "is_provisioned", return_value=False),
         patch.object(m, "is_running", return_value=False),
         patch.object(m, "_install_unit") as install_unit,
@@ -67,10 +71,36 @@ def test_provision_initialises_and_installs_unit_when_fresh(tmp_path) -> None:
         patch(f"{MODULE}.run_command") as rc,
     ):
         m.provision()
+        assert m.my_cnf_path.read_text().startswith("[mysqld]\n")
     install_unit.assert_called_once()
     secure.assert_called_once()
     argv_calls = [c.args[0] for c in rc.call_args_list]
     assert any("mariadb-install-db" in argv for argv in argv_calls)
+
+
+def test_write_config_contains_all_server_settings(tmp_path) -> None:
+    m = _manager()
+    with patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path):
+        m._write_config()
+        content = m.my_cnf_path.read_text()
+        assert f"datadir = {m.data_dir}" in content
+        assert f"socket = {m.socket_path}" in content
+        assert f"pid-file = {m.pid_file}" in content
+        assert "bind-address = 127.0.0.1" in content
+
+
+def test_install_unit_uses_defaults_file_only(tmp_path) -> None:
+    m = _manager()
+    with (
+        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch.object(type(m), "user_unit_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.which", return_value="/usr/sbin/mariadbd"),
+        patch(f"{MODULE}.run_command"),
+    ):
+        m._write_config()
+        m._install_unit()
+        content = m.unit_path.read_text()
+        assert f"ExecStart=/usr/sbin/mariadbd --defaults-file={m.my_cnf_path}\n" in content
 
 
 def test_is_provisioned_on_macos_checks_live_server_not_a_marker_file() -> None:
@@ -93,6 +123,45 @@ def test_is_provisioned_on_macos_checks_live_server_not_a_marker_file() -> None:
         patch.object(m, "is_unsecured", return_value=False),
     ):
         assert m.is_provisioned() is True  # up and already secured
+
+
+def test_is_provisioned_false_when_data_dir_wiped_but_unit_still_exists(tmp_path) -> None:
+    """A stale systemd unit outliving a deleted state dir must not look provisioned."""
+    m = _manager()
+    with (
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{BASE_MODULE}.UserOwnedDBManager.is_provisioned", return_value=True),
+    ):
+        assert m.is_provisioned() is False
+
+
+def test_wait_until_reachable_raises_after_timeout() -> None:
+    m = _manager()
+    with (
+        patch.object(m, "is_reachable", return_value=False),
+        patch(f"{BASE_MODULE}.time.sleep"),
+        pytest.raises(DatabaseError, match="did not become reachable"),
+    ):
+        m._wait_until_reachable(timeout=0.01)
+
+
+def test_provision_resets_failed_state_before_restarting_stopped_unit() -> None:
+    m = _manager()
+    with (
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(m, "install"),
+        patch.object(m, "is_provisioned", return_value=True),
+        patch.object(m, "is_running", return_value=False),
+        patch.object(m, "_wait_until_reachable"),
+        patch.object(m, "secure_installation"),
+        patch(f"{MODULE}.run_command") as rc,
+        patch(f"{BASE_MODULE}.subprocess.run") as reset_run,
+    ):
+        m.provision()
+    reset_run.assert_called_once()
+    assert reset_run.call_args.args[0] == ["systemctl", "--user", "reset-failed", "pilot-mariadb.service"]
+    assert rc.call_args.args[0] == ["systemctl", "--user", "start", "pilot-mariadb.service"]
 
 
 def test_provision_reuses_already_provisioned_server() -> None:

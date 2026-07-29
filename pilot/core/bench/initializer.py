@@ -38,6 +38,7 @@ class BenchInitializer:
         steps: list[tuple[str, Callable[[], None]]] = [
             ("Validate bench.toml", self.bench.config.validate),
             ("Ensure admin password", self._ensure_admin_password),
+            ("Ensure database credentials", self._ensure_database_credentials),
             ("Install system packages", self._install_system_packages),
             ("Create bench directory structure", self._create_bench_structure),
             ("Create Python virtualenv", lambda: self._create_virtualenv(python_env_manager)),
@@ -104,6 +105,23 @@ class BenchInitializer:
         if not admin.enabled or admin.password:
             return
         admin.password = secrets.token_hex(nbytes=5)
+        self.bench.config.write(self.bench.path)
+
+    def _ensure_database_credentials(self) -> None:
+        """Generate a root password and free port for a fresh shared DB server,
+        the first time any bench on this host provisions one. Later benches on
+        the same host inherit them from common_config.toml instead."""
+        if self.bench.config.db_type not in ("mariadb", "postgres"):
+            return
+        import secrets
+
+        from pilot.utils import pick_free_port
+
+        db = self.bench.config.mariadb if self.bench.config.db_type == "mariadb" else self.bench.config.postgres
+        if db.existing or db.root_password:
+            return
+        db.port = pick_free_port(db.port)
+        db.root_password = secrets.token_hex(nbytes=8)
         self.bench.config.write(self.bench.path)
 
     def _configure_redis(self) -> None:
