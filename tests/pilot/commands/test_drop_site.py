@@ -11,7 +11,6 @@ from pilot.core.site import Site
 _BENCH_DATA: dict = {
     "bench": {"name": "test-bench", "python": "3.14"},
     "apps": [{"name": "frappe", "repo": "https://github.com/frappe/frappe", "branch": "version-16"}],
-    "mariadb": {"root_password": "root"},
     "redis": {"cache_port": 13000, "queue_port": 11000},
 }
 
@@ -41,7 +40,12 @@ def _install_provider(tmp_path: Path, monkeypatch) -> Path:
 
 
 def _make_bench(tmp_path: Path) -> Bench:
-    return Bench(BenchConfig._from_dict(_BENCH_DATA), tmp_path)
+    # Nested so mariadb/postgres writes (common_config.toml, one level up from
+    # the bench directory) land under this test's own tmp_path, not the
+    # shared pytest session root.
+    bench_dir = tmp_path / "bench"
+    bench_dir.mkdir(parents=True, exist_ok=True)
+    return Bench(BenchConfig._from_dict(_BENCH_DATA), bench_dir)
 
 
 def _write_site(bench: Bench, name: str, config: dict) -> None:
@@ -129,7 +133,8 @@ def test_drop_uses_postgres_root_creds(tmp_path: Path, monkeypatch) -> None:
 
 def test_drop_uses_mariadb_root_creds(tmp_path: Path, monkeypatch) -> None:
     _install_provider(tmp_path, monkeypatch)
-    bench = _make_bench(tmp_path)  # mariadb, root_password "root"
+    bench = _make_bench(tmp_path)  # defaults to mariadb
+    bench.config.mariadb.root_password = "root"
 
     cmd = _capture_drop_cmd(tmp_path, monkeypatch, bench)["cmd"]
     assert cmd[cmd.index("--db-root-username") + 1] == "root"

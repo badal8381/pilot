@@ -48,9 +48,15 @@ def test_port_offset_shifts_all_fields_together(tmp_path: Path) -> None:
     assert data["redis"]["cache_port"] == 13001
     assert data["redis"]["queue_port"] == 11001
     assert data["admin"]["port"] == 7001
+
+
+def test_mariadb_port_not_offset() -> None:
     # mariadb.port is deliberately NOT offset: every bench for this OS user
     # shares one MariaDB server, so it must stay identical across benches.
-    assert data["mariadb"]["port"] == 3306
+    # It lives in common_config.toml, not bench.toml, so it's checked on the
+    # in-memory config rather than the rendered TOML.
+    config = BenchConfig.from_flat("my-bench", port_offset=1)
+    assert config.mariadb.port == 3306
 
 
 def test_port_fields_not_settable_via_settings(tmp_path: Path) -> None:
@@ -77,20 +83,24 @@ def test_current_port_offset_zero_when_file_invalid(tmp_path: Path) -> None:
 
 
 def test_mariadb_host_and_existing_round_trip(tmp_path: Path) -> None:
+    # mariadb.* is shared state (common_config.toml next to the bench
+    # directory), so the round trip needs the real write_flat path, not a
+    # bare .dumps() to a loose file.
+    bench_dir = tmp_path / "benches" / "my-bench"
+    bench_dir.mkdir(parents=True)
     settings = {
         "mariadb_existing": True,
         "mariadb_host": "db.example.com",
         "mariadb_admin_user": "admin",
     }
-    toml_path = tmp_path / "bench.toml"
-    toml_path.write_text(BenchConfig.from_flat("my-bench", settings).dumps())
+    BenchConfig.write_flat(bench_dir, "my-bench", settings)
 
-    read_back = BenchConfig.read_flat(toml_path)
+    read_back = BenchConfig.read_flat(bench_dir)
     assert read_back["mariadb_existing"] is True
     assert read_back["mariadb_host"] == "db.example.com"
 
 
-def test_existing_defaults_to_false_when_unset(tmp_path: Path) -> None:
-    data = _render(tmp_path)
-    assert data["mariadb"]["existing"] is False
-    assert data["postgres"]["existing"] is False
+def test_existing_defaults_to_false_when_unset() -> None:
+    config = BenchConfig.from_flat("my-bench")
+    assert config.mariadb.existing is False
+    assert config.postgres.existing is False

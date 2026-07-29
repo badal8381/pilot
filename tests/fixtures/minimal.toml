@@ -8,9 +8,6 @@ name = "frappe"
 repo = "https://github.com/frappe/frappe"
 branch = "version-16"
 
-[mariadb]
-root_password = "root"
-
 [redis]
 cache_port = 13000
 queue_port = 11000

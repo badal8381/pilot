@@ -23,16 +23,24 @@ def _make_bench(
     process_manager: str = "supervisor",
     tls: bool = True,
 ) -> Bench:
-    bench_dir = tmp_path / "benches" / name
+    from pilot.config.common import CommonConfig
+    from pilot.config.letsencrypt import LetsEncryptConfig
+    from pilot.config.mariadb import MariaDBConfig
+
+    benches_dir = tmp_path / "benches"
+    bench_dir = benches_dir / name
     (bench_dir / "sites").mkdir(parents=True, exist_ok=True)
-    le = f'\n[letsencrypt]\nemail = "{email}"\n' if email else ""
+    # mariadb/letsencrypt are host-shared state (common_config.toml), not
+    # bench.toml fields, since this change.
+    CommonConfig(
+        mariadb=MariaDBConfig(root_password="root"),
+        letsencrypt=LetsEncryptConfig(email=email),
+    ).write(benches_dir)
     (bench_dir / "bench.toml").write_text(
         f'[bench]\nname = "{name}"\npython = "3.14"\n\n'
         '[[apps]]\nname = "frappe"\nrepo = "https://github.com/frappe/frappe"\nbranch = "version-16"\n\n'
-        '[mariadb]\nroot_password = "root"\n\n'
         "[redis]\ncache_port = 13000\nqueue_port = 11000\n\n"
-        f'[admin]\ndomain = "{admin_domain}"\ntls = {"true" if tls else "false"}\n'
-        f"{le}\n"
+        f'[admin]\ndomain = "{admin_domain}"\ntls = {"true" if tls else "false"}\n\n'
         f'[production]\nprocess_manager = "{process_manager}"\n'
     )
     config = BenchConfig.from_file(bench_dir / "bench.toml")
@@ -48,8 +56,9 @@ def test_persist_preserves_other_fields(tmp_path: Path) -> None:
     assert data["admin"]["domain"] == "admin.example.com"
     # Untouched sections survive the rewrite.
     assert data["production"]["process_manager"] == "supervisor"
-    assert data["mariadb"]["root_password"] == "root"
     assert data["apps"][0]["name"] == "frappe"
+    # mariadb lives in common_config.toml now, untouched by this rewrite too.
+    assert bench.config.mariadb.root_password == "root"
 
 
 def test_check_admin_domain_uses_toml_value(tmp_path: Path) -> None:

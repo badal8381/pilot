@@ -12,6 +12,7 @@ from typing import Any, ClassVar
 from pilot.config.admin import AdminConfig
 from pilot.config.app import AppConfig
 from pilot.config.central import CentralConfig
+from pilot.config.common import CommonConfig
 from pilot.config.firewall import FirewallConfig, FirewallRule
 from pilot.config.gunicorn import GunicornConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
@@ -82,8 +83,10 @@ _DEFAULT_DATA: dict = {
             "branch": FRAMEWORK_BRANCHES[0],
         }
     ],
-    "mariadb": {"root_password": "root"},
 }
+
+# Wizard suggestion for a brand-new host with no common_config.toml yet.
+_DEFAULT_COMMON_CONFIG = CommonConfig(mariadb=MariaDBConfig(root_password="root"))
 
 # Offset-managed ports stay out of wizard/settings input.
 _PORT_FIELDS = ("http_port", "socketio_port", "redis.cache_port", "redis.queue_port", "admin.port")
@@ -132,16 +135,19 @@ class BenchConfig:
     def from_file(cls, path: Path) -> "BenchConfig":
         with path.open("rb") as fh:
             data = tomllib.load(fh)
-        config = cls._from_dict(data)
+        config = cls._from_dict(data, common=cls._read_common(path))
         config.validate()
         return config
 
     @classmethod
-    def default(cls, name: str = "") -> "BenchConfig":
-        """A fresh config seeded with the setup wizard's baseline values."""
+    def default(cls, name: str = "", benches_root: Path | None = None) -> "BenchConfig":
+        """A fresh config seeded with the setup wizard's baseline values. With
+        no benches_root (nothing created on this host yet), suggests a
+        starter MariaDB password instead of leaving it blank."""
+        common = CommonConfig.read(benches_root) if benches_root else _DEFAULT_COMMON_CONFIG
         data = copy.deepcopy(_DEFAULT_DATA)
         data["bench"]["name"] = name
-        return cls._from_dict(data)
+        return cls._from_dict(data, common=common)
 
     @classmethod
     def default_flat_settings(cls) -> dict:
@@ -149,9 +155,15 @@ class BenchConfig:
         return {key: value for key, value in cls.default()._to_flat_dict().items() if key != "bench_name"}
 
     @classmethod
-    def from_flat(cls, name: str, settings: dict | None = None, port_offset: int = 0) -> "BenchConfig":
+    def from_flat(
+        cls,
+        name: str,
+        settings: dict | None = None,
+        port_offset: int = 0,
+        benches_root: Path | None = None,
+    ) -> "BenchConfig":
         """Build a config from the setup wizard/settings API's flat-key input."""
-        config = cls.default(name)
+        config = cls.default(name, benches_root=benches_root)
         config._apply_flat_settings(settings or {})
         if name:
             config.name = name
@@ -161,8 +173,9 @@ class BenchConfig:
         return config
 
     @classmethod
-    def _from_dict(cls, data: dict, *, strict: bool = False) -> "BenchConfig":
+    def _from_dict(cls, data: dict, *, common: CommonConfig | None = None, strict: bool = False) -> "BenchConfig":
         cls._report_unknown_fields(data, strict=strict)
+        common = common or CommonConfig()
         bench_data = data.get("bench", {})
         apps = [
             AppConfig(
@@ -174,7 +187,7 @@ class BenchConfig:
             for a in data.get("apps", [])
         ]
         sections = {section.attr: section.read(data) for section in _SECTIONS}
-        return cls(
+        config = cls(
             name=bench_data.get("name", ""),
             python_version=bench_data.get("python", ""),
             http_port=bench_data.get("http_port", 8000),
@@ -187,8 +200,14 @@ class BenchConfig:
             default_branch=bench_data.get("default_branch", ""),
             allow_developer_mode=bench_data.get("allow_developer_mode", False),
             apps=apps,
+            mariadb=common.mariadb,
+            postgres=common.postgres,
+            letsencrypt=common.letsencrypt,
             **sections,
         )
+        config.admin.jwks_url = common.jwks_url
+        config.admin.jwks_audience = common.jwks_audience
+        return config
 
     @staticmethod
     def _known_fields(dataclass_type: type, data: dict) -> dict:
@@ -301,6 +320,20 @@ class BenchConfig:
         return path / cls.FILENAME if path.is_dir() else path
 
     @classmethod
+    def _benches_root(cls, bench_root: Path) -> Path:
+        """The directory holding every bench folder as siblings, one level
+        above whichever bench directory (or bench.toml path) was given."""
+        path = Path(bench_root)
+        bench_dir = path if path.is_dir() else path.parent
+        return bench_dir.parent
+
+    @classmethod
+    def _read_common(cls, bench_root: Path | None) -> CommonConfig | None:
+        """The host-shared config this bench merges with, or None if bench_root
+        is unknown (only _validate_serialized calls it without one)."""
+        return CommonConfig.read(cls._benches_root(bench_root)) if bench_root else None
+
+    @classmethod
     def exists(cls, bench_root: Path) -> bool:
         return cls.toml_path(bench_root).exists()
 
@@ -308,7 +341,8 @@ class BenchConfig:
     def read(cls, bench_root: Path, *, validate: bool = True, strict: bool = False) -> "BenchConfig":
         """Typed config. ``validate=False`` parses a half-configured file."""
         path = cls.toml_path(bench_root)
-        config = cls._from_dict(Toml.loads(path.read_text(encoding="utf-8")), strict=strict)
+        data = Toml.loads(path.read_text(encoding="utf-8"))
+        config = cls._from_dict(data, common=cls._read_common(bench_root), strict=strict)
         if validate:
             config.validate()
         return config
@@ -323,10 +357,11 @@ class BenchConfig:
         """Wizard's flat-key settings dict (parse-only)."""
         with open(cls.toml_path(bench_root), "rb") as fh:
             data = tomllib.load(fh)
-        return cls._from_dict(data)._to_flat_dict()
+        return cls._from_dict(data, common=cls._read_common(bench_root))._to_flat_dict()
 
     def write(self, bench_root: Path) -> None:
-        atomic_write_private_text(self.toml_path(bench_root), self._validated_dumps())
+        atomic_write_private_text(self.toml_path(bench_root), self._validated_dumps(bench_root))
+        self._write_common(bench_root)
 
     @classmethod
     @contextmanager
@@ -344,14 +379,15 @@ class BenchConfig:
                 yield data
                 if data != original_data:
                     content = Toml.dumps(data)
-                    cls._validate_serialized(content)
+                    cls._validate_serialized(content, bench_root)
                     replace_private_text_locked(path, content)
             else:
                 config = cls.read(bench_root)
                 original_config = copy.deepcopy(config)
                 yield config
                 if config != original_config:
-                    replace_private_text_locked(path, config._validated_dumps())
+                    replace_private_text_locked(path, config._validated_dumps(bench_root))
+                    config._write_common(bench_root)
 
     @classmethod
     def write_flat(cls, bench_root: Path, name: str, settings: dict, port_offset: int = 0) -> None:
@@ -360,32 +396,52 @@ class BenchConfig:
         with exclusive_file_lock(path):
             if path.exists():
                 original = Toml.loads(path.read_text(encoding="utf-8"))
-                config = cls._from_dict(original)
+                config = cls._from_dict(original, common=cls._read_common(bench_root))
                 config._apply_flat_settings(settings)
                 if name:
                     config.name = name
-                replacement = Toml.loads(config._validated_dumps())
+                replacement = Toml.loads(config._validated_dumps(bench_root))
                 content = Toml.dumps(cls._preserve_unknown_config(original, replacement))
-                cls._validate_serialized(content)
+                cls._validate_serialized(content, bench_root)
             else:
-                content = cls.from_flat(name, settings, port_offset=port_offset)._validated_dumps()
+                config = cls.from_flat(
+                    name, settings, port_offset=port_offset, benches_root=cls._benches_root(bench_root)
+                )
+                content = config._validated_dumps(bench_root)
             replace_private_text_locked(path, content)
+            config._write_common(bench_root)
 
     @classmethod
     def write_raw(cls, bench_root: Path, data: dict) -> None:
         content = Toml.dumps(data)
-        cls._validate_serialized(content)
+        cls._validate_serialized(content, bench_root)
         atomic_write_private_text(cls.toml_path(bench_root), content)
 
+    def _write_common(self, bench_root: Path) -> None:
+        """Persist this config's shared subset (mariadb/postgres/letsencrypt/
+        jwks) to common_config.toml, the single source every bench merges.
+        A no-op when nothing shared changed, so an unrelated bench.toml write
+        never disturbs the file other benches are reading."""
+        common = CommonConfig(
+            mariadb=self.mariadb,
+            postgres=self.postgres,
+            letsencrypt=self.letsencrypt,
+            jwks_url=self.admin.jwks_url,
+            jwks_audience=self.admin.jwks_audience,
+        )
+        benches_root = self._benches_root(bench_root)
+        if common != CommonConfig.read(benches_root):
+            common.write(benches_root)
+
     @classmethod
-    def _validate_serialized(cls, content: str) -> None:
-        config = cls._from_dict(Toml.loads(content))
+    def _validate_serialized(cls, content: str, bench_root: Path | None = None) -> None:
+        config = cls._from_dict(Toml.loads(content), common=cls._read_common(bench_root))
         config.validate()
 
-    def _validated_dumps(self) -> str:
+    def _validated_dumps(self, bench_root: Path | None = None) -> str:
         self.validate()
         content = self.dumps()
-        self._validate_serialized(content)
+        self._validate_serialized(content, bench_root)
         return content
 
     # -- TOML serialization --
@@ -427,25 +483,6 @@ class BenchConfig:
             apps.append(app_data)
         return apps
 
-    def _mariadb_section(self) -> ConfigDict:
-        return {
-            "host": self.mariadb.host,
-            "port": self.mariadb.port,
-            "root_password": self.mariadb.root_password,
-            "admin_user": self.mariadb.admin_user,
-            "socket_path": self.mariadb.socket_path,
-            "existing": self.mariadb.existing,
-        }
-
-    def _postgres_section(self) -> ConfigDict:
-        return {
-            "host": self.postgres.host,
-            "port": self.postgres.port,
-            "root_password": self.postgres.root_password,
-            "admin_user": self.postgres.admin_user,
-            "existing": self.postgres.existing,
-        }
-
     def _redis_section(self) -> ConfigDict:
         redis: ConfigDict = {
             "cache_port": self.redis.cache_port,
@@ -478,12 +515,6 @@ class BenchConfig:
             "max_requests_jitter": self.gunicorn.max_requests_jitter,
         }
 
-    def _letsencrypt_section(self) -> ConfigDict:
-        return {
-            "email": self.letsencrypt.email,
-            "webroot_path": str(self.letsencrypt.webroot_path),
-        }
-
     def _admin_section(self) -> ConfigDict:
         admin: ConfigDict = {
             "port": self.admin.port,
@@ -494,11 +525,10 @@ class BenchConfig:
             "tls": self.admin.tls,
             "allow_bench_management": self.admin.allow_bench_management,
         }
+        # jwks_url/jwks_audience are host-shared (common_config.toml), not written here.
         optional_admin = {
             "jwt_secret": self.admin.jwt_secret,
             "recovery_codes": self.admin.recovery_codes,
-            "jwks_url": self.admin.jwks_url,
-            "jwks_audience": self.admin.jwks_audience,
         }
         admin.update({key: value for key, value in optional_admin.items() if value})
         return admin
@@ -673,16 +703,6 @@ class _Section:
 
 _SECTIONS: tuple[_Section, ...] = (
     _Section(
-        "mariadb",
-        lambda data: MariaDBConfig(**BenchConfig._known_fields(MariaDBConfig, data.get("mariadb", {}))),
-        lambda config: config._mariadb_section(),
-    ),
-    _Section(
-        "postgres",
-        lambda data: PostgresConfig(**BenchConfig._known_fields(PostgresConfig, data.get("postgres", {}))),
-        lambda config: config._postgres_section(),
-    ),
-    _Section(
         "redis",
         lambda data: RedisConfig.from_dict(data.get("redis", {})),
         lambda config: config._redis_section(),
@@ -701,11 +721,6 @@ _SECTIONS: tuple[_Section, ...] = (
         "gunicorn",
         lambda data: GunicornConfig.from_dict(data.get("gunicorn", {})),
         lambda config: config._gunicorn_section(),
-    ),
-    _Section(
-        "letsencrypt",
-        lambda data: LetsEncryptConfig.from_dict(data.get("letsencrypt", {})),
-        lambda config: config._letsencrypt_section(),
     ),
     _Section(
         "admin",
@@ -835,14 +850,11 @@ def _bench_schema() -> _Table:
     return _Table(
         tables={
             "bench": _Table(keys=set(_BENCH_KEYS)),
-            "mariadb": _Table(keys=_keys(MariaDBConfig)),
-            "postgres": _Table(keys=_keys(PostgresConfig)),
             "redis": _Table(keys=_keys(RedisConfig)),
             "production": _Table(keys=_keys(ProductionConfig) | _PRODUCTION_LEGACY),
             "monitor": _Table(keys=_keys(MonitorConfig)),
             "nginx": _Table(keys=_keys(NginxConfig)),
             "gunicorn": _Table(keys=_keys(GunicornConfig)),
-            "letsencrypt": _Table(keys=_keys(LetsEncryptConfig)),
             "admin": _Table(keys=_keys(AdminConfig)),
             "central": _Table(keys=_keys(CentralConfig)),
             "s3": _Table(keys=_keys(S3Config)),
