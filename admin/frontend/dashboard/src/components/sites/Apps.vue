@@ -26,45 +26,25 @@
     </div>
   </div>
 
-  <Dialog v-model="showUninstall" :options="{ title: 'Uninstall App', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Uninstall <span class="font-semibold text-ink-gray-8 break-all">{{ uninstallTarget }}</span>
-        from <span class="font-semibold text-ink-gray-8 break-all">{{ siteName }}</span>?
-      </p>
-      <p class="mt-2 text-ink-red-6 text-sm">
-        This action will drop the doctype of {{ uninstallTarget }} and can't be undone.
-      </p>
-      <ErrorMessage v-if="uninstallError" :message="uninstallError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showUninstall = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="uninstalling" @click="confirmUninstall">
-          Uninstall
-        </Button>
-      </div>
-    </template>
-  </Dialog>
+  <UninstallAppDialog v-model:open="showUninstall" :app="uninstallTarget" :site-name="siteName" />
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { Button, Dialog, Dropdown, ErrorMessage, LoadingText } from 'frappe-ui'
-import { apiErrorMessage } from '@/api/client'
+import { Button, Dropdown, LoadingText } from 'frappe-ui'
 import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
+import UninstallAppDialog from '@/components/apps/UninstallAppDialog.vue'
 import { useSite } from '@/composables/sites/useSite'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useSession } from '@/composables/auth/useSession'
-import { openTaskDetailPage } from '@/utils/taskRoute'
 import { toSentenceCase } from '@/utils/format'
 
 const props = defineProps({
   siteName: { type: String, required: true },
 })
-const router = useRouter()
 const { session } = useSession()
 
-const { apps, installedApps, appsLoading, loadApps, uninstallApp } = useSite(props.siteName)
+const { apps, installedApps, appsLoading, loadApps } = useSite(props.siteName)
 const {
   titleMap,
   descriptionMap,
@@ -89,9 +69,7 @@ const appObjects = computed(() =>
 )
 
 const showUninstall = ref(false)
-const uninstallTarget = ref('')
-const uninstalling = ref(false)
-const uninstallError = ref('')
+const uninstallTarget = ref(null)
 
 function openLink(url) {
   window.open(url, '_blank', 'noopener,noreferrer')
@@ -121,32 +99,13 @@ function menuOptions(app) {
             icon: 'lucide-trash-2',
             theme: 'red',
             onClick: () => {
-              uninstallTarget.value = app.name
-              uninstallError.value = ''
+              uninstallTarget.value = app
               showUninstall.value = true
             },
           },
         ]
       : []),
   ]
-}
-
-async function confirmUninstall() {
-  uninstalling.value = true
-  uninstallError.value = ''
-  try {
-    const result = await uninstallApp(uninstallTarget.value)
-    if (result.task_id) {
-      showUninstall.value = false
-      openTaskDetailPage(router, result.task_id)
-    } else {
-      uninstallError.value = apiErrorMessage(result, 'Uninstall failed.')
-    }
-  } catch (e) {
-    uninstallError.value = e.message || 'Uninstall failed.'
-  } finally {
-    uninstalling.value = false
-  }
 }
 
 onMounted(() => {
