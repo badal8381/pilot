@@ -589,7 +589,7 @@ class _FakeProcessManager:
             def are_units_running(self_impl, role) -> bool:
                 return fake._is_running
 
-            def _invalidate_assets_cache(self_impl) -> None:
+            def _clear_frappe_cache(self_impl) -> None:
                 pass
 
         self.manager = _Impl()

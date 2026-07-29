@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pilot.tasks import Task, step
+from pilot.tasks import Task, on_success, step
 
 
 @dataclass(kw_only=True)
@@ -14,6 +14,12 @@ class UninstallAppTask(Task):
 
     def run(self) -> None:
         self.uninstall()
+
+    @on_success
+    def reload_workers(self) -> dict:
+        """Long-lived web and background workers hold the old app list and
+        import map, so they need a restart once this task lands."""
+        return {"web_only": False}
 
     @step("uninstall", lambda self: f"Uninstall {self.app} from {self.site}")
     def uninstall(self) -> None:

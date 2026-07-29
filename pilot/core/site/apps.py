@@ -27,7 +27,6 @@ class SiteApps:
             )
         finally:
             self._clear_cache()
-        self.site.bench.reload_workers(raises=True)
 
     def install_app_with_dependencies(self, app: "App") -> list["App"]:
         self.site.install_app(app)
@@ -58,7 +57,6 @@ class SiteApps:
             run_command(cmd, cwd=self.site.bench.sites_path, stream_output=True)
         finally:
             self._clear_cache()
-        self.site.bench.reload_workers(raises=True)
 
     def _clear_cache(self) -> None:
         run_command(

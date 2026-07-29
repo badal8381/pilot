@@ -47,35 +47,19 @@ def test_install_on_sites_only_installs_the_given_app(tmp_path: Path) -> None:
     mock_install.assert_called_once_with(app)
 
 
-def test_build_assets_builds_for_app_and_every_dependency(tmp_path: Path) -> None:
-    task = make_task(tmp_path, [])
-    app = MagicMock()
-    app.config.name = "helpdesk"
-    dep = MagicMock()
-    dep.config.name = "telephony"
-
-    with patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build:
-        task.build_assets([app, dep])
-
-    assert mock_build.call_args_list == [((app,),), ((dep,),)]
-
-
-def test_run_installs_only_app_on_sites_but_builds_assets_for_dependencies_too(
-    tmp_path: Path,
-) -> None:
-    """run() builds assets for dependencies cascaded by install-app."""
+def test_run_installs_the_fetched_app_on_sites(tmp_path: Path) -> None:
+    """App.install already builds assets, so run() must not build them again."""
     task = make_task(tmp_path, ["site1.localhost"])
 
-    fake_cmd = MagicMock()
-    fake_cmd.app.config.name = "helpdesk"
-    fake_cmd.installed_dependencies = [MagicMock()]
+    fake_result = MagicMock()
+    fake_result.app.config.name = "helpdesk"
 
     with (
-        patch.object(task, "fetch", return_value=fake_cmd),
+        patch.object(task, "fetch", return_value=fake_result),
         patch.object(task, "install_on_sites") as mock_install_on_sites,
-        patch.object(task, "build_assets") as mock_build_assets,
+        patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
     ):
         task.run()
 
-    mock_install_on_sites.assert_called_once_with(fake_cmd.app)
-    mock_build_assets.assert_called_once_with([fake_cmd.app, *fake_cmd.installed_dependencies])
+    mock_install_on_sites.assert_called_once_with(fake_result.app)
+    mock_build.assert_not_called()

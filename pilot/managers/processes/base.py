@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 
@@ -92,7 +91,7 @@ class ManagedProcessManager(ProcessManager, ABC):
 
     @override
     def reload_workers(self, web_only: bool = False) -> None:
-        self._invalidate_assets_cache()
+        self._clear_frappe_cache()
         if self.is_running():
             self.apply_unit_action("restart", UnitGroup.WEB if web_only else UnitGroup.WORKLOAD)
 
@@ -101,11 +100,3 @@ class ManagedProcessManager(ProcessManager, ABC):
         self.write_config()
         self.ensure_ready()
         self.apply_unit_action("start", UnitGroup.ADMIN)
-
-    def _invalidate_assets_cache(self) -> None:
-        cache_port = self.bench.config.redis.cache_port
-        subprocess.run(
-            ["redis-cli", "-p", str(cache_port), "del", "assets_json"],
-            capture_output=True,
-            timeout=5,
-        )
