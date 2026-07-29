@@ -1,93 +1,60 @@
 <template>
-  <Dialog v-model="open" :title="`Install App`" size="md">
-    <template #default>
-      <div class="space-y-4">
-        <div class="flex items-center gap-3">
-          <AppIcon
-            :name="app?.name || ''"
-            :label="appLabel"
-            :logo="app?.logo_url || ''"
-            class="rounded-[10px] size-11"
-            initial-class="text-lg"
-          />
-          <div class="min-w-0">
-            <div class="flex items-center gap-1.5">
-              <p class="font-medium text-ink-gray-8 text-base truncate">{{ appLabel }}</p>
-              <span v-if="app?.label" class="text-ink-gray-5 text-p-xs shrink-0">
-                {{ app.label }}
-              </span>
-            </div>
-            <p v-if="app?.description" class="text-ink-gray-5 text-p-sm line-clamp-2">
-              {{ app.description }}
-            </p>
-          </div>
-        </div>
+  <ActionDialog
+    v-model:open="open"
+    title="Install App"
+    :subject="{ name: app?.name, label: appLabel, badge: app?.label, description: app?.description, logo: app?.logo_url }"
+    :error="error"
+    confirm-label="Install"
+    :loading="installing"
+    :disabled="!selection || presetInstalled"
+    @confirm="confirmInstall"
+  >
+    <div class="space-y-2">
+      <p class="font-medium text-ink-gray-5 text-p-xs uppercase tracking-wide">Install on</p>
 
-        <div class="border-outline-gray-2 border-t" />
+      <SiteRow
+        v-if="presetSite"
+        :label="presetSite.name"
+        :subtitle="presetInstalled ? 'Already installed' : siteVersion(presetSite)"
+        :icon="presetInstalled ? 'lucide-check' : 'lucide-globe'"
+        :checked="presetInstalled"
+        :interactive="false"
+      />
 
-        <div class="space-y-2">
-          <p class="font-medium text-ink-gray-5 text-p-xs uppercase tracking-wide">Install on</p>
+      <div v-else class="gap-2 grid max-h-80 overflow-y-auto">
+        <SiteRow
+          v-if="showAllSitesOption"
+          label="All sites"
+          :subtitle="`Installs on ${installableSites.length} sites`"
+          icon="lucide-layout-grid"
+          :selected="selection === 'all'"
+          @click="selection = 'all'"
+        />
 
-          <SiteRow
-            v-if="presetSite"
-            :label="presetSite.name"
-            :subtitle="presetInstalled ? 'Already installed' : siteVersion(presetSite)"
-            :icon="presetInstalled ? 'lucide-check' : 'lucide-globe'"
-            :checked="presetInstalled"
-            :interactive="false"
-          />
+        <SiteRow
+          v-for="s in sites"
+          :key="s.name"
+          :label="s.name"
+          :subtitle="isInstalled(s) ? 'Already installed' : siteVersion(s)"
+          :icon="isInstalled(s) ? 'lucide-check' : 'lucide-globe'"
+          :checked="isInstalled(s)"
+          :disabled="isInstalled(s)"
+          :selected="selection === s.name"
+          @click="selection = s.name"
+        />
 
-          <div v-else class="gap-2 grid max-h-80 overflow-y-auto">
-            <SiteRow
-              v-if="showAllSitesOption"
-              label="All sites"
-              :subtitle="`Installs on ${installableSites.length} sites`"
-              icon="lucide-layout-grid"
-              :selected="selection === 'all'"
-              @click="selection = 'all'"
-            />
-
-            <SiteRow
-              v-for="s in sites"
-              :key="s.name"
-              :label="s.name"
-              :subtitle="isInstalled(s) ? 'Already installed' : siteVersion(s)"
-              :icon="isInstalled(s) ? 'lucide-check' : 'lucide-globe'"
-              :checked="isInstalled(s)"
-              :disabled="isInstalled(s)"
-              :selected="selection === s.name"
-              @click="selection = s.name"
-            />
-
-            <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-sm text-center">
-              No sites available on this bench.
-            </p>
-          </div>
-        </div>
-
-        <ErrorMessage v-if="error" :message="error" />
-
-        <div class="flex justify-end gap-2">
-          <Button variant="subtle" @click="open = false">Cancel</Button>
-          <Button
-            variant="solid"
-            :disabled="!selection || presetInstalled"
-            :loading="installing"
-            @click="confirmInstall"
-          >
-            Install
-          </Button>
-        </div>
+        <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-sm text-center">
+          No sites available on this bench.
+        </p>
       </div>
-    </template>
-  </Dialog>
+    </div>
+  </ActionDialog>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, Dialog, ErrorMessage } from 'frappe-ui'
-import AppIcon from '@/components/apps/AppIcon.vue'
+import ActionDialog from '@/components/common/ActionDialog.vue'
 import SiteRow from '@/components/sites/SiteRow.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'

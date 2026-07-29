@@ -108,6 +108,7 @@ const REDIRECT_ON_SUCCESS_COMMANDS = [
   'install-app',
   'uninstall-app',
   'get-and-install-app',
+  'drop-site',
 ]
 
 const APP_ARG_KEY = {
@@ -124,6 +125,7 @@ const APP_ACTION_FOR_COMMAND = {
 
 export function redirectRouteOnSuccess(task) {
   if (!REDIRECT_ON_SUCCESS_COMMANDS.includes(task.command)) return null
+  if (task.command === 'drop-site') return { name: 'Sites' }
   const route = siteRoute(task)
   if (!route) return null
   const appKey = APP_ARG_KEY[task.command]

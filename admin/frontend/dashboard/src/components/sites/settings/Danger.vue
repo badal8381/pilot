@@ -22,93 +22,86 @@
     </div>
   </div>
 
-  <!-- Migrate dialog -->
-  <Dialog v-model="showMigrate" :options="{ title: 'Migrate this site', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
-        This takes a recovery backup of
-        <span class="font-semibold text-ink-gray-8 break-all">{{ siteName }}</span>, then runs
-        <span class="font-mono text-ink-gray-8">bench migrate</span>. If the migration fails, you
-        can retry it or restore the backup from the migration page.
-      </p>
-      <ErrorMessage v-if="migrateError" :message="migrateError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="outline" @click="showMigrate = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="migrating" @click="confirmMigrate"
-          >Migrate</Button
-        >
-      </div>
-    </template>
-  </Dialog>
+  <ActionDialog
+    v-model:open="showMigrate"
+    title="Migrate Site"
+    :subject="siteSubject"
+    :warning="{
+      title: 'The site goes down while this runs.',
+      message: `A recovery backup is taken first. If the migration fails you can retry it, or restore that backup from the migration page.`,
+    }"
+    :error="migrateError"
+    confirm-label="Migrate"
+    confirm-theme="red"
+    :loading="migrating"
+    @confirm="confirmMigrate"
+  />
 
-  <!-- Reset dialog -->
-  <Dialog v-model="showReset" :options="{ title: 'Reset this site', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
-        This reinstalls
-        <span class="font-semibold text-ink-gray-8 break-all">{{ siteName }}</span> and wipes all
-        its data. Apps stay installed.
-      </p>
-      <TextInput v-model="confirmName" :placeholder="siteName" class="mt-4 w-full">
+  <ActionDialog
+    v-model:open="showReset"
+    title="Reset Site"
+    :subject="siteSubject"
+    :warning="{
+      title: `This can't be undone.`,
+      message: `Every record on ${siteName} is wiped and the database goes back to a fresh install. Installed apps stay.`,
+    }"
+    :error="resetError"
+    confirm-label="Reset site"
+    confirm-theme="red"
+    :loading="resetting"
+    :disabled="confirmName !== siteName"
+    @confirm="confirmReset"
+  >
+    <template #after-warning>
+      <TextInput v-model="confirmName" :placeholder="siteName" class="w-full">
         <template #label>
           <span class="text-sm break-all">Type {{ siteName }} to confirm</span>
         </template>
       </TextInput>
-      <ErrorMessage v-if="resetError" :message="resetError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="outline" @click="showReset = false">Cancel</Button>
-        <Button
-          variant="solid"
-          theme="red"
-          :loading="resetting"
-          :disabled="confirmName !== siteName"
-          @click="confirmReset"
-        >
-          Reset site
-        </Button>
-      </div>
     </template>
-  </Dialog>
+  </ActionDialog>
 
-  <!-- Drop dialog -->
-  <Dialog v-model="showDrop" :options="{ title: 'Delete this site', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
-        This permanently deletes
-        <span class="font-semibold text-ink-gray-8 break-all">{{ siteName }}</span>
-        and everything on it. Backups are kept for 30 days.
-      </p>
-      <TextInput v-model="confirmName" :placeholder="siteName" class="mt-4 w-full">
+  <ActionDialog
+    v-model:open="showDrop"
+    title="Drop Site"
+    :subject="siteSubject"
+    :warning="{
+      title: `This can't be undone.`,
+      message: `The database and every file belonging to ${siteName} are deleted. Existing backups are kept for 30 days.`,
+    }"
+    :error="dropError"
+    confirm-label="Drop site"
+    confirm-theme="red"
+    :loading="dropping"
+    :disabled="confirmName !== siteName"
+    @confirm="confirmDrop"
+  >
+    <template #after-warning>
+      <TextInput v-model="confirmName" :placeholder="siteName" class="w-full">
         <template #label>
           <span class="text-sm break-all">Type {{ siteName }} to confirm</span>
         </template>
       </TextInput>
-      <ErrorMessage v-if="dropError" :message="dropError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="outline" @click="showDrop = false">Cancel</Button>
-        <Button
-          variant="solid"
-          theme="red"
-          :loading="dropping"
-          :disabled="confirmName !== siteName"
-          @click="confirmDrop"
-        >
-          Delete site
-        </Button>
-      </div>
     </template>
-  </Dialog>
+  </ActionDialog>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, Dialog, ErrorMessage, TextInput } from 'frappe-ui'
+import { Button, TextInput } from 'frappe-ui'
+import ActionDialog from '@/components/common/ActionDialog.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
 const props = defineProps({ siteName: { type: String, required: true } })
+
+const siteSubject = computed(() => ({
+  label: props.siteName,
+  description: 'Site, database and uploaded files',
+  icon: 'lucide-globe',
+}))
 
 const router = useRouter()
 
