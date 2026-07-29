@@ -20,6 +20,7 @@ from admin.backend.api.responses import (
 )
 from pilot.exceptions import (
     TaskConflictError,
+    TaskNotCancellableError,
     TaskNotFoundError,
     TaskNotRunningError,
 )
@@ -106,6 +107,8 @@ def cancel_task(task_id: str):
         return error_response("task_not_found", str(error), 404)
     except TaskNotRunningError as error:
         return error_response("task_not_active", str(error), 409)
+    except TaskNotCancellableError as error:
+        return error_response("task_not_cancellable", str(error), 409)
     except Exception:
         return error_response("task_cancellation_failed", "Could not cancel task.", 500)
     return no_content_response()

@@ -26,11 +26,15 @@ class TaskInfo:
 
     @property
     def is_cancellable(self) -> bool:
-        """Whether cancelling is safe, decided by the task class - killing some
-        tasks leaves partial state behind."""
-        from pilot.internal.tasks.runner import is_command_cancellable
+        """Queued work can always be dropped; killing a running task is only safe
+        when the task says so, since some leave partial state behind."""
+        from pilot.internal.tasks.runner import is_command_cancellable_while_running
 
-        return self.status.is_active and is_command_cancellable(self.command)
+        if not self.status.is_active:
+            return False
+        if self.status == TaskStatus.QUEUED:
+            return True
+        return is_command_cancellable_while_running(self.command)
 
     @property
     def duration_seconds(self) -> float | None:

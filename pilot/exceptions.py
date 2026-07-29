@@ -25,6 +25,10 @@ class TaskNotRunningError(BenchError):
     pass
 
 
+class TaskNotCancellableError(BenchError):
+    pass
+
+
 class TaskConflictError(BenchError):
     pass
 
