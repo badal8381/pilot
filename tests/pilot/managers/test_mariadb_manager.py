@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import stat
 import subprocess
 from unittest.mock import PropertyMock, patch
 
 import pytest
 
 from pilot.config import MariaDBConfig
+from pilot.core.mariadb_memory import calculate_mariadb_memory
 from pilot.exceptions import DatabaseError
 from pilot.managers.database.mariadb import MariaDBManager
 
@@ -27,6 +29,39 @@ def test_socket_path_honors_explicit_value() -> None:
 
 def test_default_port_avoids_standard_mysql_port() -> None:
     assert MariaDBConfig().port == 3310
+
+
+def test_press_unified_memory_sizing_is_adapted_for_pilot() -> None:
+    sizing = calculate_mariadb_memory(8192)
+
+    assert sizing.mariadb_memory_mb == 3172
+    assert sizing.innodb_buffer_pool_mb == 1692
+    assert sizing.max_connections == 50
+    assert sizing.key_buffer_mb == 32
+    assert sizing.innodb_log_file_mb == 512
+    assert sizing.memory_high_mb == 2148
+    assert sizing.memory_max_mb == 3172
+
+
+def test_memory_sizing_has_a_valid_buffer_pool_on_small_vms() -> None:
+    sizing = calculate_mariadb_memory(2048)
+
+    assert sizing.innodb_buffer_pool_mb == 128
+    assert sizing.max_connections == 50
+    assert sizing.innodb_log_file_mb == 48
+    assert sizing.memory_high_mb == 1024
+    assert sizing.memory_max_mb == 2048
+
+
+@pytest.mark.parametrize(
+    ("total_memory_mb", "expected_log_file_mb"),
+    [(4096, 128), (8192, 512), (16384, 1024), (32768, 2048)],
+)
+def test_log_file_size_uses_press_memory_bands(
+    total_memory_mb: int,
+    expected_log_file_mb: int,
+) -> None:
+    assert calculate_mariadb_memory(total_memory_mb).innodb_log_file_mb == expected_log_file_mb
 
 
 def test_existing_defaults_to_false() -> None:
@@ -65,42 +100,93 @@ def test_provision_initialises_and_installs_unit_when_fresh(tmp_path) -> None:
         patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
         patch.object(m, "is_provisioned", return_value=False),
         patch.object(m, "is_running", return_value=False),
+        patch.object(m, "_total_memory_mb", return_value=8192),
         patch.object(m, "_install_unit") as install_unit,
+        patch.object(m, "_reset_failed_state") as reset_failed_state,
         patch.object(m, "_wait_until_reachable"),
         patch.object(m, "secure_installation") as secure,
         patch(f"{MODULE}.run_command") as rc,
     ):
         m.provision()
-        assert m.my_cnf_path.read_text().startswith("[mysqld]\n")
+        assert m.my_cnf_path.read_text().startswith("# Managed by Pilot.\n[mysqld]\n")
     install_unit.assert_called_once()
+    reset_failed_state.assert_called_once()
     secure.assert_called_once()
     argv_calls = [c.args[0] for c in rc.call_args_list]
     assert any("mariadb-install-db" in argv for argv in argv_calls)
 
 
 def test_write_config_contains_all_server_settings(tmp_path) -> None:
-    m = _manager()
-    with patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path):
-        m._write_config()
-        content = m.my_cnf_path.read_text()
-        assert f"datadir = {m.data_dir}" in content
-        assert f"socket = {m.socket_path}" in content
-        assert f"pid-file = {m.pid_file}" in content
-        assert "bind-address = 127.0.0.1" in content
-
-
-def test_install_unit_uses_defaults_file_only(tmp_path) -> None:
-    m = _manager()
+    manager = MariaDBManager(MariaDBConfig(port=4306))
     with (
-        patch.object(type(m), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
-        patch.object(type(m), "user_unit_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch.object(manager, "_total_memory_mb", return_value=8192),
+    ):
+        sizing = manager._write_config()
+
+    option_file = tmp_path / "config" / "my.cnf"
+    content = option_file.read_text()
+    assert stat.S_IMODE(option_file.stat().st_mode) == 0o600
+    assert f"datadir = {tmp_path / 'data'}" in content
+    assert f"socket = {tmp_path / 'run' / 'mysqld.sock'}" in content
+    assert f"pid-file = {tmp_path / 'run' / 'mysqld.pid'}" in content
+    assert "bind-address = 127.0.0.1" in content
+    assert "port = 4306" in content
+    assert "character-set-server = utf8mb4" in content
+    assert "collation-server = utf8mb4_unicode_ci" in content
+    assert "local-infile = OFF" in content
+    assert "innodb-stats-persistent-sample-pages = 256" in content
+    assert f"innodb-buffer-pool-size = {sizing.innodb_buffer_pool_mb}M" in content
+    assert f"innodb-log-file-size = {sizing.innodb_log_file_mb}M" in content
+    assert f"key-buffer-size = {sizing.key_buffer_mb}M" in content
+    assert f"max-connections = {sizing.max_connections}" in content
+
+    for unsupported_or_unmanaged_option in (
+        "innodb-file-format",
+        "innodb-file-per-table",
+        "innodb-flush-method",
+        "innodb-large-prefix",
+        "log-bin",
+        "query-cache",
+        "slow-query-log",
+    ):
+        assert unsupported_or_unmanaged_option not in content
+
+
+def test_data_directory_initialization_uses_pilot_option_file(tmp_path) -> None:
+    manager = _manager()
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.run_command") as run,
+    ):
+        manager._initialize_data_dir()
+
+    assert run.call_args.args[0] == [
+        "mariadb-install-db",
+        f"--defaults-file={tmp_path / 'config' / 'my.cnf'}",
+        f"--datadir={tmp_path / 'data'}",
+        "--skip-test-db",
+    ]
+
+
+def test_linux_unit_starts_with_option_file_and_memory_limits(tmp_path) -> None:
+    manager = _manager()
+    sizing = calculate_mariadb_memory(8192)
+    unit_dir = tmp_path / "units"
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch.object(type(manager), "user_unit_dir", new_callable=PropertyMock, return_value=unit_dir),
         patch(f"{MODULE}.which", return_value="/usr/sbin/mariadbd"),
         patch(f"{MODULE}.run_command"),
     ):
-        m._write_config()
-        m._install_unit()
-        content = m.unit_path.read_text()
-        assert f"ExecStart=/usr/sbin/mariadbd --defaults-file={m.my_cnf_path}\n" in content
+        manager._install_unit(sizing)
+
+    content = (unit_dir / "pilot-mariadb.service").read_text()
+    assert f"ExecStart=/usr/sbin/mariadbd --defaults-file={tmp_path / 'config' / 'my.cnf'}" in content
+    assert "LimitNOFILE=65535" in content
+    assert f"MemoryHigh={sizing.memory_high_mb}M" in content
+    assert f"MemoryMax={sizing.memory_max_mb}M" in content
+    assert "MemorySwapMax=100M" in content
 
 
 def test_is_provisioned_on_macos_checks_live_server_not_a_marker_file() -> None:
