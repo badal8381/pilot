@@ -82,6 +82,7 @@ admin/frontend/dashboard/src/types/
 .ruff_cache
 .claude
 .opencode
+logs/
 
 registry-cache*
 
