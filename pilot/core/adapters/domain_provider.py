@@ -138,6 +138,8 @@ class DomainRouteProvider:
             return False, None
         argv = [exe, action, *([site] if site else []), *([domain] if domain else [])]
         result = subprocess.run(argv, capture_output=True, text=True)
+        if result.returncode == 2:
+            raise DomainConflictError(result.stderr.strip() or f"{domain or site} was declined.")
         if result.returncode != 0:
             raise DomainProviderError(result.stderr.strip() or f"{_PROVIDER_BIN} {action} failed.")
         # Do not parse status text from mutating verbs.
