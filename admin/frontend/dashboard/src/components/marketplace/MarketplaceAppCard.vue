@@ -1,20 +1,12 @@
 <template>
   <div class="flex items-center gap-3">
-    <div
-      class="place-items-center grid rounded-[10px] size-9 overflow-hidden shrink-0"
-      :style="logoStyle"
-    >
-      <img
-        v-if="app.logo_url && !imageFailed"
-        :src="app.logo_url"
-        :alt="app.title"
-        class="size-full object-contain"
-        @error="imageFailed = true"
-      />
-      <span v-else class="font-bold text-white text-base leading-none">
-        {{ app.title?.[0]?.toUpperCase() || app.name?.[0]?.toUpperCase() }}
-      </span>
-    </div>
+    <AppIcon
+      :name="app.name"
+      :label="app.title"
+      :logo="app.logo_url || ''"
+      class="rounded-[10px] size-9"
+      initial-class="text-base"
+    />
 
     <div class="flex flex-1 justify-between items-center gap-2 py-2 min-w-0">
       <div class="min-w-0">
@@ -80,23 +72,17 @@
 import { computed, ref } from 'vue'
 import { Button, Dialog, Tooltip } from 'frappe-ui'
 import LucideDownload from '~icons/lucide/download'
-import { logoColor } from '@/composables/apps/useMarketplace'
+import AppIcon from '@/components/apps/AppIcon.vue'
 
 const props = defineProps({
   app: { type: Object, required: true },
 })
 defineEmits(['install'])
 
-const imageFailed = ref(false)
 const showIncompatible = ref(false)
 
 const incompatibleReason = computed(
   () =>
     `${props.app.title} requires ${props.app.needs ? `Frappe ${props.app.needs}` : 'a newer Frappe version'} to install.`,
 )
-
-const logoStyle = computed(() => {
-  if (props.app.logo_url && !imageFailed.value) return {}
-  return { background: logoColor(props.app.name) }
-})
 </script>

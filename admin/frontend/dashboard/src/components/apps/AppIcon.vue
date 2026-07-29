@@ -6,11 +6,11 @@
     <img
       v-if="logoUrl"
       :src="logoUrl"
-      :alt="name"
+      :alt="label || name"
       class="size-full object-contain"
       @error="onError"
     />
-    <span v-else class="text-sm font-bold text-white">
+    <span v-else class="font-bold text-white leading-none" :class="initialClass">
       {{ initial }}
     </span>
   </div>
@@ -26,6 +26,9 @@ import {
 
 const props = defineProps({
   name: { type: String, required: true },
+  label: { type: String, default: '' },
+  logo: { type: String, default: '' },
+  initialClass: { type: String, default: 'text-sm' },
 })
 
 const { logoMap, hashColor } = useAppRegistry()
@@ -35,9 +38,10 @@ const isFrappe = computed(() => isFrappeFramework(props.name))
 
 const logoUrl = computed(() => {
   if (isFrappe.value) return FRAPPE_LOGO_URL
-  return hasError.value ? null : logoMap.value[props.name]
+  if (hasError.value) return null
+  return props.logo || logoMap.value[props.name]
 })
-const initial = computed(() => props.name[0]?.toUpperCase() || '')
+const initial = computed(() => (props.label || props.name)[0]?.toUpperCase() || '')
 
 function onError() {
   if (!isFrappe.value) hasError.value = true
