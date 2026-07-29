@@ -65,10 +65,11 @@ These commands control the task worker, not individual Frappe workers.
 ## Admin Commands
 
 - `bench admin build`: rebuild Admin frontend assets from source.
-- `bench admin upgrade`: update bench-cli to the latest version and restart the admin service.
+- `bench admin upgrade`: update bench-cli to the latest version, run pending upgrade patches (pre_update before, post_update after), and restart the admin service.
 - `bench admin enroll`: exchange the bootstrap token for this bench's Central credential.
 - `bench admin set-central-config`: store Central endpoint and Pilot auth token.
 - `bench admin issue-site-token`: issue a scoped site-to-bench API token.
+- `bench admin run-patches [--phase pre_update|post_update|all]`: run pending bench-cli upgrade patches by hand (see [Configuration](configuration.md#common-config)); `bench admin upgrade` already runs both phases automatically.
 
 Admin commands live in `pilot/commands/admin`. Backend route behavior lives under `admin/backend/api/v1`.
 

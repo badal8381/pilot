@@ -1,10 +1,10 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem } from 'frappe-ui'
+import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem, SidebarCollapseToggle } from 'frappe-ui'
 import { sidebarSections } from './list'
 import { useAppMenu } from './useAppMenu'
-import PilotLogo from '@/components/common/PilotLogo.vue'
+import PilotLogo from '@/components/icons/Pilot.vue'
 
 const props = defineProps({
   isMobile: { type: Boolean, default: false },
@@ -37,11 +37,12 @@ function isActive(to) {
     class="border-r dark:border-outline-gray-2"
     :class="isMobile ? '!w-full !border-r-0 mobile-sidebar bg-transparent' : ''"
   >
-    <SidebarHeader v-if="!isMobile" title="Pilot" :menu-items="menuItems">
-      <template #logo>
-        <PilotLogo class="size-7" />
-      </template>
-    </SidebarHeader>
+    <SidebarHeader
+      v-if="!isMobile"
+      title="Pilot"
+      :menu-items="menuItems"
+      :logo="PilotLogo"
+    />
 
     <nav class="flex-1 overflow-y-auto px-2 pt-2">
       <template v-for="section in visibleSections" :key="section.label || 'main'">
@@ -52,7 +53,7 @@ function isActive(to) {
           :icon="item.icon"
           :to="item.to"
           :active="isActive(item.to)"
-          class="mb-0.5"
+          class="mb-0.5 text-sm"
         >
           {{ item.label }}
 
@@ -60,5 +61,7 @@ function isActive(to) {
         </SidebarItem>
       </template>
     </nav>
+
+    <SidebarCollapseToggle class="mt-auto mx-2 mb-2" />
   </Sidebar>
 </template>

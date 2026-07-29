@@ -24,6 +24,8 @@ admin/backend/
   providers/     backend provider integrations
 
 admin/frontend/dashboard/  Vue Admin UI
+admin/frontend/editor/     Vue code editor
+admin/frontend/in-app-embed/  Desk Cloud Settings IIFE (served at /embed/cloud-settings/)
 ```
 
 ## Install Modes
@@ -35,7 +37,7 @@ admin/frontend/dashboard/  Vue Admin UI
   Admin UI in `admin/backend/static/dist/` and a `VERSION` file. The frontend
   source ships too, but released installs never build it or install its Node
   deps — they serve the bundled dist. A missing dist is a hard error.
-- **Dev** (`--dev`): a `git clone` of `main`, with no `VERSION` file. Node.js is
+- **Dev** (`--dev`): a `git clone` of `develop`, with no `VERSION` file. Node.js is
   required; the Admin UI is compiled from `admin/frontend/` and rebuilt when the
   source changes.
 

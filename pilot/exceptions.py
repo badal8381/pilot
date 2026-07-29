@@ -74,3 +74,7 @@ class DependencyResolutionError(RegistryError):
 
 class DatabaseError(BenchError):
     """A database server operation failed (connection, provisioning, credentials)."""
+
+
+class TwoFactorError(BenchError):
+    """Raised when an enrollment request cannot be honoured."""

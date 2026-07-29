@@ -247,7 +247,6 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import {
   Button,
   Checkbox,
@@ -262,11 +261,13 @@ import {
   Tooltip,
   toast,
 } from 'frappe-ui'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { apiErrorMessage } from '@/api/client'
+import { databaseApi } from '@/api/database'
 import DatabasePanel from '@/components/database/DatabasePanel.vue'
 import SizeBreakup from '@/components/database/SizeBreakup.vue'
 import TableSizesDialog from '@/components/database/TableSizesDialog.vue'
-import { apiErrorMessage } from '@/api/client'
-import { databaseApi } from '@/api/database'
 import { formatBytes } from '@/utils/format'
 import { relativeTime } from '@/utils/taskFormat'
 
@@ -311,6 +312,8 @@ const engineOptions = [
   { label: 'MariaDB', value: 'mariadb' },
   { label: 'PostgreSQL', value: 'postgres' },
 ]
+
+const route = useRoute()
 
 const loading = ref(false)
 const error = ref('')
@@ -597,6 +600,7 @@ onUnmounted(stopLockWaitsAutoRefresh)
 async function load() {
   loading.value = true
   error.value = ''
+  if (route.query.site) selectedSite.value = String(route.query.site)
   try {
     const result = await databaseApi.diagnostics()
     if (result.error)

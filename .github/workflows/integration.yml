@@ -2,9 +2,9 @@ name: Integration Test
 
 on:
   push:
-    branches: [main]
+    branches: [develop]
   pull_request:
-    branches: [main]
+    branches: [develop]
 
 jobs:
   integration:
@@ -28,8 +28,11 @@ jobs:
         run: |
           sudo apt-get update -y
           sudo apt-get install -y mariadb-server libmariadb-dev redis-server git nginx openssl
-          sudo systemctl start mariadb redis-server
-          sudo mysql -e "SET PASSWORD FOR root@localhost = PASSWORD('admin'); FLUSH PRIVILEGES;"
+          sudo systemctl start redis-server
+          # bench runs its own rootless, per-user MariaDB server (see
+          # MariaDBManager) — disable the system service so it doesn't hold
+          # port 3306 the wizard provisions a fresh server on.
+          sudo systemctl disable --now mariadb
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -43,6 +46,7 @@ jobs:
         run: |
           mkdir -p benches/ci-bench
           cp tests/fixtures/ci_bench.toml benches/ci-bench/bench.toml
+          cp tests/fixtures/ci_common_config.toml benches/common_config.toml
 
       - name: bench init
         run: bench init -b ci-bench

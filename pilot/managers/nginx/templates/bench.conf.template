@@ -234,12 +234,21 @@ server {
     }
 
     {% endfor %}
-    {# editor + dashboard static assets served straight from disk, off the admin worker #}
+    {# editor + dashboard + in-app-embed static assets served straight from disk, off the admin worker #}
     location /editor-assets/ {
         alias {{ admin_static }}/editor/;
         try_files $uri =404;
         expires 1y;
         add_header Cache-Control "public, immutable";
+    }
+
+    location /embed/cloud-settings/ {
+        alias {{ admin_static }}/in-app-embed/cloud-settings/;
+        try_files $uri =404;
+        # Fixed filename (cloud-settings.js), so it must revalidate: a rebuild
+        # changes the bytes, not the URL. nginx's ETag/Last-Modified keeps this
+        # to a 304 until the bundle actually changes. Never `immutable` here.
+        add_header Cache-Control "no-cache";
     }
 
     location /assets/ {

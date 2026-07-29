@@ -139,6 +139,6 @@ async function load() {
   }
 }
 
-watch(() => props.window, load)
+watch(() => [props.siteName, props.window], load)
 onMounted(load)
 </script>

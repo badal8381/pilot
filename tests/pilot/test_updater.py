@@ -43,6 +43,7 @@ def test_perform_upgrade_routes_to_dev_when_dev_build() -> None:
         patch.object(updater.pilot, "is_dev_build", True),
         patch.object(updater, "_upgrade_dev") as dev,
         patch.object(updater, "_upgrade_release") as release,
+        patch("pilot.internal.patch_runner.run_patches"),
     ):
         updater.perform_upgrade()
 
@@ -55,11 +56,40 @@ def test_perform_upgrade_routes_to_release_when_not_dev() -> None:
         patch.object(updater.pilot, "is_dev_build", False),
         patch.object(updater, "_upgrade_dev") as dev,
         patch.object(updater, "_upgrade_release") as release,
+        patch("pilot.internal.patch_runner.run_patches"),
     ):
         updater.perform_upgrade()
 
     release.assert_called_once()
     dev.assert_not_called()
+
+
+def test_perform_upgrade_runs_pre_and_post_update_patches_in_order() -> None:
+    calls: list[str] = []
+    with (
+        patch.object(updater.pilot, "is_dev_build", True),
+        patch.object(updater, "_upgrade_dev", side_effect=lambda _on_progress: calls.append("upgrade")),
+        patch(
+            "pilot.internal.patch_runner.run_patches",
+            side_effect=lambda phase, on_progress=None: calls.append(phase),
+        ),
+    ):
+        updater.perform_upgrade()
+
+    assert calls == ["pre_update", "upgrade", "post_update"]
+
+
+def test_perform_upgrade_skips_post_update_patches_when_upgrade_fails() -> None:
+    with (
+        patch.object(updater.pilot, "is_dev_build", True),
+        patch.object(updater, "_upgrade_dev", side_effect=RuntimeError("boom")),
+        patch("pilot.internal.patch_runner.run_patches") as run_patches,
+        pytest.raises(RuntimeError, match="boom"),
+    ):
+        updater.perform_upgrade()
+
+    assert run_patches.call_count == 1
+    assert run_patches.call_args.args[0] == "pre_update"
 
 
 def _make_install(tmp_path: Path) -> tuple[Path, Path]:

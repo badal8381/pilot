@@ -10,6 +10,7 @@
       </div>
       <div class="flex flex-col gap-3 w-full">
         <TextInput
+          v-if="!twoFactorRequired"
           v-model="password"
           label="Password"
           :type="showPassword ? 'text' : 'password'"
@@ -32,7 +33,24 @@
             </button>
           </template>
         </TextInput>
+        <TextInput
+          v-else
+          v-model="otp"
+          label="Authentication code"
+          type="text"
+          placeholder="123456"
+          autofocus
+          @keydown.enter="login"
+        >
+          <template #prefix>
+            <LucideShield class="size-4 text-ink-gray-5" />
+          </template>
+        </TextInput>
+        <p v-if="twoFactorRequired" class="text-ink-gray-5 text-p-sm">
+          Enter the code from an enrolled device, or one of your recovery codes.
+        </p>
         <button
+          v-else
           type="button"
           class="self-end text-ink-gray-6 text-p-sm hover:text-ink-gray-8 hover:underline"
           @click="showForgotPassword = true"
@@ -41,8 +59,16 @@
         </button>
         <ErrorMessage v-if="errorMessage" :message="errorMessage" />
         <Button variant="solid" :loading="isSubmitting" class="w-full" @click="login">
-          Continue
+          {{ twoFactorRequired ? 'Verify' : 'Continue' }}
         </Button>
+        <button
+          v-if="twoFactorRequired"
+          type="button"
+          class="text-ink-gray-6 text-p-sm hover:text-ink-gray-8 hover:underline"
+          @click="cancelTwoFactor"
+        >
+          Back
+        </button>
       </div>
     </div>
 
@@ -73,9 +99,10 @@ import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Dialog, TextInput, ErrorMessage } from 'frappe-ui'
 import LucideLock from '~icons/lucide/lock'
+import LucideShield from '~icons/lucide/shield'
 import LucideEye from '~icons/lucide/eye'
 import LucideEyeOff from '~icons/lucide/eye-off'
-import PilotLogo from '@/components/common/PilotLogo.vue'
+import PilotLogo from '@/components/icons/Pilot.vue'
 import { apiErrorMessage } from '../../api/client'
 import { authApi } from '../../api/auth'
 import { useSession } from '../../composables/auth/useSession'
@@ -90,14 +117,27 @@ const errorMessage = ref('')
 const isSubmitting = ref(false)
 const showPassword = ref(false)
 const showForgotPassword = ref(false)
+const otp = ref('')
+const twoFactorRequired = ref(false)
 const isMobile = useIsMobile()
 
+function cancelTwoFactor() {
+  twoFactorRequired.value = false
+  otp.value = ''
+  errorMessage.value = ''
+}
+
 async function login() {
-  if (!password.value) return
+  if (twoFactorRequired.value ? !otp.value : !password.value) return
   isSubmitting.value = true
   errorMessage.value = ''
   try {
-    const result = await authApi.login(password.value)
+    const result = await authApi.login(password.value, otp.value)
+    if (result.two_factor_required) {
+      // Password accepted; the sign-in still needs a code.
+      twoFactorRequired.value = true
+      return
+    }
     if (result.authenticated !== true) {
       errorMessage.value = apiErrorMessage(result, 'Login failed')
       return

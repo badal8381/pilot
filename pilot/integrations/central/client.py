@@ -12,13 +12,42 @@ if TYPE_CHECKING:
 
 
 class CentralClientError(BenchError):
-    """A Central API call could not be made or was rejected."""
+    """A Central call failed. `status_code` is Central's status when it answered
+    and rejected; None when Central was unreachable. Callers need the two apart."""
+
+    def __init__(self, message: str, status_code: int | None = None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def _message(payload: Any) -> Any:
     if isinstance(payload, dict) and "message" in payload:
         return payload["message"]
     return payload
+
+
+def _error_detail(body: bytes) -> str:
+    """The reason out of a Frappe error response. Central rejects billing input
+    with a specific message; a bare "HTTP 417" would be unactionable."""
+    try:
+        payload = json.loads(body.decode())
+    except (ValueError, UnicodeDecodeError):
+        return ""
+    if not isinstance(payload, dict):
+        return ""
+
+    raw = payload.get("_server_messages")
+    if raw:
+        try:
+            messages = [json.loads(item).get("message", "") for item in json.loads(raw)]
+            if joined := ". ".join(m for m in messages if m):
+                return joined
+        except (ValueError, AttributeError, TypeError):
+            pass
+
+    # Frappe prefixes the exception class; the reason follows the colon.
+    exception = payload.get("exception") or ""
+    return exception.split(":", 1)[-1].strip() if ":" in exception else exception.strip()
 
 
 class CentralClient:
@@ -76,7 +105,10 @@ class CentralClient:
             with urllib.request.urlopen(request, timeout=10) as response:
                 return json.loads(response.read().decode())
         except urllib.error.HTTPError as exc:
-            raise CentralClientError(f"Central returned HTTP {exc.code} for {path}") from exc
+            detail = _error_detail(exc.read())
+            raise CentralClientError(
+                detail or f"Central returned HTTP {exc.code} for {path}", status_code=exc.code
+            ) from exc
         except urllib.error.URLError as exc:
             raise CentralClientError(f"Cannot reach Central at {endpoint}: {exc.reason}") from exc
         except ValueError as exc:

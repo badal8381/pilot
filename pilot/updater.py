@@ -47,10 +47,14 @@ def update_available() -> tuple[bool, str | None]:
 
 def perform_upgrade(on_progress: Progress = lambda message: None) -> None:
     """Update the bench-cli code in place. Restarting the admin service is the caller's job."""
+    from pilot.internal.patch_runner import run_patches
+
+    run_patches("pre_update", on_progress=on_progress)
     if pilot.is_dev_build:
         _upgrade_dev(on_progress)
     else:
         _upgrade_release(on_progress)
+    run_patches("post_update", on_progress=on_progress)
 
 
 def _upgrade_dev(on_progress: Progress) -> None:
