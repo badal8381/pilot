@@ -1,5 +1,5 @@
 <template>
-  <Dialog v-model="open" :title="`Install ${appLabel}`" size="md">
+  <Dialog v-model="open" :title="`Install App`" size="md">
     <template #default>
       <div class="space-y-4">
         <div class="flex items-center gap-3">
