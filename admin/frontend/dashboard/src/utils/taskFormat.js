@@ -39,6 +39,11 @@ export function isTaskActive(task) {
   return task?.status === 'queued' || task?.status === 'running'
 }
 
+// The backend decides this - some tasks leave partial state behind when killed.
+export function isTaskCancellable(task) {
+  return Boolean(task?.is_cancellable)
+}
+
 export function taskActivityLabel(task) {
   if (task.status === 'queued') {
     return task.queue_position ? `Queued · #${task.queue_position} in queue` : 'Queued'

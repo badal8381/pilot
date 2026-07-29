@@ -12,6 +12,9 @@ if TYPE_CHECKING:
 @dataclass(kw_only=True)
 class InstallAppTask(Task):
     command: ClassVar[str] = "install-app"
+    # frappe writes module defs and doctypes before recording the app as
+    # installed, so a kill leaves rows behind that fail every retry.
+    is_cancellable: ClassVar[bool] = False
 
     site: str
     app: str

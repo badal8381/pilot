@@ -25,6 +25,14 @@ class TaskInfo:
     failure: TaskFailure | None = None
 
     @property
+    def is_cancellable(self) -> bool:
+        """Whether cancelling is safe, decided by the task class - killing some
+        tasks leaves partial state behind."""
+        from pilot.internal.tasks.runner import is_command_cancellable
+
+        return self.status.is_active and is_command_cancellable(self.command)
+
+    @property
     def duration_seconds(self) -> float | None:
         if self.started_at is None or self.finished_at is None:
             return None
@@ -43,6 +51,7 @@ class TaskInfo:
             "exit_code": self.exit_code,
             "duration_seconds": self.duration_seconds,
             "queue_position": self.queue_position,
+            "is_cancellable": self.is_cancellable,
             "failure": (
                 {"code": self.failure.code, "message": self.failure.message} if self.failure else None
             ),

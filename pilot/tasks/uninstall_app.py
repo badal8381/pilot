@@ -7,6 +7,9 @@ from pilot.tasks import Task, step
 @dataclass(kw_only=True)
 class UninstallAppTask(Task):
     command: ClassVar[str] = "uninstall-app"
+    # frappe writes module defs and doctypes before recording the app as
+    # installed, so a kill leaves rows behind that fail every retry.
+    is_cancellable: ClassVar[bool] = False
 
     site: str
     app: str

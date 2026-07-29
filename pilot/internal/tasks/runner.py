@@ -170,6 +170,13 @@ def task_registry() -> tuple[dict[str, type[Task]], dict[str, list[str]]]:
     return _REGISTRY
 
 
+def is_command_cancellable(command: str) -> bool:
+    """Killing some tasks leaves partial state behind, so they opt out."""
+    jobs, _ = task_registry()
+    task_class = jobs.get(command)
+    return task_class.is_cancellable if task_class else True
+
+
 def discover_tasks() -> list[type[Task]]:
     tasks = []
     for module_info in pkgutil.iter_modules([str(_TASK_PACKAGE_DIR)], prefix="pilot.tasks."):

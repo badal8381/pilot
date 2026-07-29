@@ -18,7 +18,11 @@ from admin.backend.api.responses import (
     error_response,
     no_content_response,
 )
-from pilot.exceptions import TaskConflictError, TaskNotFoundError, TaskNotRunningError
+from pilot.exceptions import (
+    TaskConflictError,
+    TaskNotFoundError,
+    TaskNotRunningError,
+)
 from pilot.managers.task import (
     TaskActivityReader,
     TaskReader,

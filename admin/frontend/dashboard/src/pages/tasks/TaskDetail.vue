@@ -45,7 +45,7 @@
           Debug with AI
         </Button>
         <Button
-          v-if="isTaskActive(task)"
+          v-if="isTaskCancellable(task)"
           variant="subtle"
           size="sm"
           theme="red"
@@ -108,6 +108,7 @@ import {
   fmtDateTime,
   fmtDuration,
   isTaskActive,
+  isTaskCancellable,
   redirectRouteOnSuccess,
   siteLabel,
   siteRoute,

@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   isTaskActive,
+  isTaskCancellable,
   redirectRouteOnSuccess,
   relativeTime,
   siteRoute,
@@ -80,4 +81,11 @@ test('site-creating and app tasks redirect to the site page on success', () => {
     name: 'Sites',
   })
   assert.equal(redirectRouteOnSuccess({ command: 'backup-site', args: { site: 'a.local' } }), null)
+})
+
+test('cancelling follows the flag the backend sends', () => {
+  assert.equal(isTaskCancellable({ status: 'running', is_cancellable: true }), true)
+  assert.equal(isTaskCancellable({ status: 'running', is_cancellable: false }), false)
+  assert.equal(isTaskCancellable({ status: 'running' }), false)
+  assert.equal(isTaskCancellable(null), false)
 })
