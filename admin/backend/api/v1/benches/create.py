@@ -37,6 +37,11 @@ def create_bench_locked(
     if response is not None:
         return response
 
+    if admin_tls is None and production_parent:
+        # admin.tls is per-bench, not inherited by BenchCreator (see common_config.toml
+        # split) - so match the parent's own choice unless the caller says otherwise.
+        admin_tls = BenchConfig.read(bench_root, validate=False).admin.tls
+
     try:
         Bench.create_at(
             new_dir,
