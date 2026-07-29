@@ -1,5 +1,8 @@
 import json
+from datetime import UTC, datetime
+from pathlib import Path
 
+from pilot.managers.task.models import TaskInfo, TaskStatus
 from pilot.managers.task.reader import (
     done_event,
     output_event,
@@ -36,9 +39,36 @@ def test_done_event_keeps_terminal_details() -> None:
     }
 
 
+def _task(command: str, status: TaskStatus, queue_position: int | None = None) -> TaskInfo:
+    return TaskInfo(
+        task_id="20260521-143022-aabbcc",
+        command=command,
+        args={},
+        status=status,
+        pid=None,
+        queued_at=datetime.now(UTC),
+        started_at=None,
+        finished_at=None,
+        exit_code=None,
+        output_path=Path("/tmp/output.log"),
+        queue_position=queue_position,
+    )
+
+
 def test_status_event_reports_queue_position() -> None:
-    assert status_event("queued", 2) == {
+    assert status_event(_task("build", TaskStatus.QUEUED, 2)) == {
         "type": "status",
         "status": "queued",
         "queue_position": 2,
+        "is_cancellable": True,
     }
+
+
+def test_status_event_marks_a_running_app_install_uncancellable() -> None:
+    """Killing one mid-run leaves doctypes behind that fail every retry, so the
+    stream has to tell the UI the moment it starts running."""
+    queued = status_event(_task("install-app", TaskStatus.QUEUED))
+    running = status_event(_task("install-app", TaskStatus.RUNNING))
+
+    assert queued["is_cancellable"] is True
+    assert running["is_cancellable"] is False
