@@ -15,22 +15,12 @@ from pilot.managers.cron import CronManager
 from pilot.utils import run_command
 
 REGISTRY_URL = "https://github.com/frappe/marketplace"
-_REGISTRY_URL_ENV = "PILOT_REGISTRY_URL"
 
 _REFRESH_INTERVAL_SECONDS = 60 * 60
 _LS_REMOTE_TIMEOUT_SECONDS = 15
 _CRON_JOB_KEY = "marketplace-registry-refresh"
 _CRON_SCHEDULE = "0 3 * * *"  # once a day, 03:00
 _APP_NAME = re.compile(r"[a-z][a-z0-9_]*")
-
-
-def registry_url() -> str:
-    """Where the registry is cloned from. PILOT_REGISTRY_URL points a bench at a
-    local registry checkout - the e2e run uses it so the catalog needs no
-    network, and so this branch works before the public registry is split."""
-    import os
-
-    return os.environ.get(_REGISTRY_URL_ENV) or REGISTRY_URL
 
 
 class RegistryCache:
@@ -103,7 +93,7 @@ class RegistryCache:
     def _clone(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            run_command(["git", "clone", "--depth", "1", registry_url(), str(self.path)])
+            run_command(["git", "clone", "--depth", "1", REGISTRY_URL, str(self.path)])
         except CommandError as exc:
             raise RegistryUnavailableError(f"Could not clone marketplace registry:\n{exc.message}") from exc
         self.install_daily_refresh_cron()
@@ -146,7 +136,7 @@ class RegistryCache:
     def _remote_head_sha(self) -> str | None:
         try:
             result = run_command(
-                ["git", "ls-remote", registry_url(), "HEAD"], timeout=_LS_REMOTE_TIMEOUT_SECONDS
+                ["git", "ls-remote", REGISTRY_URL, "HEAD"], timeout=_LS_REMOTE_TIMEOUT_SECONDS
             )
         except (CommandError, subprocess.SubprocessError, OSError):
             return None
