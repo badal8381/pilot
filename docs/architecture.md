@@ -51,9 +51,19 @@ admin/frontend/in-app-embed/  Desk Cloud Settings IIFE (served at /embed/cloud-s
 
 `App` represents one app repository. It owns cloning, dependency install, validation, revision pins, and app metadata.
 
-`App.install` clones into `.staging`, validates there, then moves the app into `apps/` under its importable name. A
-failed install is undone, so a half-installed app never reaches a site. `pilot.core.app.validator` holds one class per
-check, each raising `AppValidationError` with the fix. See [App Dependencies](app-dependencies.md) for what apps must declare and how conflicts between them are resolved.
+`App.install` puts the app in `.staging`, validates there, then moves it into `apps/` under its importable name. An app
+already sitting in `apps/` is moved into staging too, and moved back if it fails - nothing unvetted stays in the
+directory that `bench.apps()` scans to decide what to update, reinstall and constrain. A failed install is undone, so a
+half-installed app never reaches a site.
+
+`App.validate` runs the full install gate; `App.validate_update` runs the narrower one an app gets after moving to a new
+revision, which `update` and `switch-branch` both use. `pilot.core.app.validator` holds one class per check, each
+raising `AppValidationError` with the fix, and `Validator.for_update` owns which of them an update runs. See
+[App Dependencies](app-dependencies.md) for what apps must declare and how conflicts between them are resolved.
+
+Checks read the app's source, never run it. Hooks validation resolves each dotted path to a name that exists on disk -
+not to code that works: it cannot see a wrong signature, and stops at the first attribute, so `module.Class.method`
+is checked only as far as `Class`.
 
 A new app must ship `pyproject.toml` with a `[tool.bench.frappe-dependencies]` table pinning the frappe versions it
 supports. `setup.py`-only apps are legacy: they still install with `--skip-validations` and still update, so benches
