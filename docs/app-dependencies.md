@@ -36,6 +36,10 @@ That means `pyproject.toml` and `[tool.bench.frappe-dependencies]` are mandatory
 updating, not only to be installed. A `setup.py`-only app installs with `--skip-validations` but
 will fail its next update until it ships both.
 
+`--skip-validations` is the only way past the checks, and it is a deliberate choice made per install.
+Marketplace dependencies pulled in automatically are validated like anything else - skipping them
+put apps on a bench that a later update would refuse, naming an app nobody chose to install.
+
 Validating on update matters most for resolution: the reinstall that follows runs `uv pip install`
 with no constraints, so it resolves only that app's own requirements and will move a package
 another app pinned without complaint.

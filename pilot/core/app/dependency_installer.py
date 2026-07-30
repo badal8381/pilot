@@ -64,7 +64,6 @@ class AppDependencyInstaller:
             dependency = App(AppConfig(name=dep.app, repo=dep.repo, branch=dep.branch), self.bench)
             dependency.install(
                 install_dependencies=False,
-                skip_validations=True,
                 commit=dep.commit,
                 on_progress=on_progress,
             )
