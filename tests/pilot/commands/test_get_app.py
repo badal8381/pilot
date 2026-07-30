@@ -145,10 +145,12 @@ def test_still_installs_missing_dependency_when_parent_already_installed(tmp_pat
     assert [app.config.name for app in cmd.installed_dependencies] == ["telephony"]
 
 
-def test_skip_validations_flag_still_skips_validate(tmp_path: Path) -> None:
+def test_get_app_always_validates(tmp_path: Path) -> None:
+    """There is no way past the checks. An app that cannot pass them cannot be
+    installed, so nothing reaches a bench unvalidated."""
     bench = make_bench(tmp_path)
     bench.create_directories()
-    cmd = GetAppCommand(bench, repo="https://github.com/frappe/myapp", skip_validations=True)
+    cmd = GetAppCommand(bench, repo="https://github.com/frappe/myapp")
 
     with (
         patch.object(
@@ -163,7 +165,7 @@ def test_skip_validations_flag_still_skips_validate(tmp_path: Path) -> None:
     ):
         cmd.run()
 
-    mock_validate.assert_not_called()
+    mock_validate.assert_called_once()
 
 
 def test_bench_is_app_installed_reflects_apps_txt_contents(tmp_path: Path) -> None:

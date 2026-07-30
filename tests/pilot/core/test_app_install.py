@@ -39,10 +39,11 @@ def test_install_clones_into_staging_then_moves_into_apps(tmp_path: Path) -> Non
 
     with (
         patch.object(App, "clone", _cloner("myapp", cloned_at)),
+        patch.object(App, "validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
-        result = _make_app(bench, "myapp").install(skip_validations=True)
+        result = _make_app(bench, "myapp").install()
 
     assert cloned_at == [bench.staging_path / "myapp"]
     assert (bench.apps_path / "myapp" / "pyproject.toml").exists()
@@ -72,10 +73,11 @@ def test_install_moves_the_app_under_its_importable_name(tmp_path: Path) -> None
 
     with (
         patch.object(App, "clone", _cloner("india_compliance", [])),
+        patch.object(App, "validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
-        result = _make_app(bench, "india-compliance").install(skip_validations=True)
+        result = _make_app(bench, "india-compliance").install()
 
     assert (bench.apps_path / "india_compliance" / "india_compliance" / "hooks.py").exists()
     assert not (bench.apps_path / "india-compliance").exists()
@@ -135,10 +137,11 @@ def test_install_discards_a_staged_clone_left_by_an_interrupted_run(tmp_path: Pa
 
     with (
         patch.object(App, "clone", _cloner("myapp", [])),
+        patch.object(App, "validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
-        _make_app(bench, "myapp").install(skip_validations=True)
+        _make_app(bench, "myapp").install()
 
     assert not (bench.apps_path / "myapp" / "leftover.txt").exists()
 
@@ -152,12 +155,13 @@ def test_install_undoes_itself_when_the_asset_build_fails(tmp_path: Path) -> Non
 
     with (
         patch.object(App, "clone", _cloner("myapp", [])),
+        patch.object(App, "validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_pip_uninstall") as mock_uninstall,
         patch.object(App, "_build_assets_via_env_manager", side_effect=BenchError("yarn build failed")),
         pytest.raises(BenchError, match="yarn build failed"),
     ):
-        _make_app(bench, "myapp").install(skip_validations=True)
+        _make_app(bench, "myapp").install()
 
     assert (bench.sites_path / "apps.txt").read_text() == "frappe\n"
     assert not (bench.apps_path / "myapp").exists()
@@ -170,12 +174,13 @@ def test_install_failure_keeps_a_clone_that_predates_the_run(tmp_path: Path) -> 
     _write_app_tree(bench.apps_path / "myapp", "myapp")
 
     with (
+        patch.object(App, "validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_pip_uninstall"),
         patch.object(App, "_build_assets_via_env_manager", side_effect=BenchError("yarn build failed")),
         pytest.raises(BenchError),
     ):
-        _make_app(bench, "myapp").install(skip_validations=True)
+        _make_app(bench, "myapp").install()
 
     assert (bench.apps_path / "myapp" / "pyproject.toml").exists()
     assert "myapp" not in (bench.sites_path / "apps.txt").read_text()
@@ -188,12 +193,13 @@ def test_install_records_the_branch_only_once_it_succeeds(tmp_path: Path) -> Non
 
     with (
         patch.object(App, "clone", _cloner("myapp", [])),
+        patch.object(App, "validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_pip_uninstall"),
         patch.object(App, "_build_assets_via_env_manager", side_effect=BenchError("yarn build failed")),
         pytest.raises(BenchError),
     ):
-        _make_app(bench, "myapp").install(skip_validations=True)
+        _make_app(bench, "myapp").install()
 
     assert "myapp" not in (bench.path / "bench.toml").read_text()
 

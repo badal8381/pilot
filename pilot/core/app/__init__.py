@@ -225,7 +225,6 @@ class App:
         self,
         *,
         install_dependencies: bool = False,
-        skip_validations: bool = False,
         commit: str = "",
         on_progress: Callable[[str], None] = lambda message: None,
     ) -> AppInstallResult:
@@ -244,8 +243,7 @@ class App:
                 on_progress(f"Checking out {app.config.name} at {commit[:8]}...")
                 app.checkout_commit(commit)
             dependencies = app._install_dependencies(on_progress) if install_dependencies else []
-            if not skip_validations:
-                app.validate()
+            app.validate()
             if app.is_staged:
                 app = app.promote()
         except BenchError:

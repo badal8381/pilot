@@ -66,8 +66,7 @@ not to code that works: it cannot see a wrong signature, and stops at the first 
 is checked only as far as `Class`.
 
 Every app must ship `pyproject.toml` with a `[tool.bench.frappe-dependencies]` table pinning the frappe versions it
-supports, and the declared ranges are compared against the versions actually installed. `setup.py`-only apps still
-install with `--skip-validations`, but will fail their next update until they ship both.
+supports, and the declared ranges are compared against the versions actually installed.
 
 Database objects are created from `bench.db_type`. A bench uses one engine for its sites: `mariadb`, `postgres`, or `sqlite`.
 
