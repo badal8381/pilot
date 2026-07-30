@@ -14,10 +14,10 @@
             variant="subtle"
             size="sm"
             icon="lucide-arrow-left"
-            @click="router.push({ name: 'Migrations' })"
+            @click="router.push({ name: 'Updates' })"
           />
           <h1 class="flex-1 min-w-0 font-semibold text-ink-gray-9 text-xl truncate">{{ title }}</h1>
-          <MigrationStateBadge class="shrink-0" :state="op.state" />
+          <UpdateStateBadge class="shrink-0" :state="op.state" />
         </div>
         <Button
           variant="subtle"
@@ -56,7 +56,7 @@
         <div class="flex items-start gap-3 bg-surface-red-1 p-4 sm:p-5">
           <span class="lucide-alert-triangle mt-0.5 size-5 shrink-0 text-ink-red-6" />
           <div class="min-w-0 flex-1">
-            <h2 class="font-semibold text-sm">This migration needs attention</h2>
+            <h2 class="font-semibold text-sm">This update needs attention</h2>
             <p v-if="op.diagnosis?.message" class="mt-1 text-p-sm leading-5 text-ink-red-8">
               {{ op.diagnosis.message }}
             </p>
@@ -102,7 +102,7 @@
                 :loading="acting"
                 @click="doRetry"
               >
-                Retry migration
+                Retry update
               </Button>
               <Button
                 v-if="op.can_restore"
@@ -178,7 +178,7 @@
           </div>
         </div>
         <p v-else class="px-5 py-8 text-center text-p-sm text-ink-gray-5">
-          No sites are part of this migration.
+          No sites are part of this update.
         </p>
       </section>
 
@@ -256,7 +256,7 @@
             Skipping marks
             <code class="rounded bg-surface-gray-2 px-1 font-mono">{{ op.diagnosis?.patch }}</code>
             as completed for <b class="text-ink-gray-9">{{ op.failed_site }}</b> without running it.
-            This cannot be undone. Retry the migration afterwards to continue.
+            This cannot be undone. Retry the update afterwards to continue.
           </p>
         </template>
         <template #actions>
@@ -290,10 +290,10 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Badge, Button, Dialog, Dropdown, ErrorMessage, LoadingText } from 'frappe-ui'
-import { migrationsApi, isActive, isResolved, needsAttention } from '@/api/migrations'
+import { updatesApi, isActive, isResolved, needsAttention } from '@/api/updates'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { fmtDateTime, fmtDuration } from '@/utils/taskFormat'
-import { opTitle, patchSkipped, siteStatus } from '@/utils/migrationFormat'
+import { opTitle, patchSkipped, siteStatus } from '@/utils/updateFormat'
 
 const props = defineProps({ operationId: { type: String, required: true } })
 const router = useRouter()
@@ -324,7 +324,7 @@ const durationSeconds = computed(() => {
 })
 
 // The 'update' phase runs once per operation, so a single chain entry identifies it;
-// 'restore' is the task_ids role the restore/revert action is queued under (api/migrations.js).
+// 'restore' is the task_ids role the restore/revert action is queued under (api/updates.js).
 const updateTaskId = computed(
   () => op.value?.chain?.find((entry) => entry.command === 'update')?.task_id,
 )
@@ -360,11 +360,11 @@ function siteLogOptions(siteName) {
 
 async function load() {
   try {
-    op.value = await migrationsApi.detail(props.operationId)
+    op.value = await updatesApi.detail(props.operationId)
     error.value = ''
-    setBreadcrumbs([{ label: 'Migrations', route: { name: 'Migrations' } }, { label: title.value }])
+    setBreadcrumbs([{ label: 'Updates', route: { name: 'Updates' } }, { label: title.value }])
   } catch (e) {
-    error.value = e?.message || 'Could not load this migration.'
+    error.value = e?.message || 'Could not load this update.'
   } finally {
     schedule()
   }
@@ -400,14 +400,14 @@ async function runAction(action) {
   }
 }
 
-const doRetry = () => runAction(() => migrationsApi.retry(props.operationId))
+const doRetry = () => runAction(() => updatesApi.retry(props.operationId))
 const doRestore = () => {
   confirmRestore.value = false
-  return runAction(() => migrationsApi.restore(props.operationId))
+  return runAction(() => updatesApi.restore(props.operationId))
 }
 const doSkip = () => {
   confirmSkip.value = false
-  return runAction(() => migrationsApi.bypassPatch(props.operationId, op.value.diagnosis.patch))
+  return runAction(() => updatesApi.bypassPatch(props.operationId, op.value.diagnosis.patch))
 }
 
 const badgeTone = (tone) => (tone === 'orange' ? 'amber' : tone)
