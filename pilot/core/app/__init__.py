@@ -325,16 +325,10 @@ class App:
         return AppDependencyInstaller(self.bench, self).install(on_progress)
 
     def validate(self) -> None:
-        """Every check a new app must pass before it is installed."""
+        """Every check this app must pass, installing or after moving revision."""
         from pilot.core.app.validator import Validator
 
         Validator(self).validate()
-
-    def validate_update(self) -> None:
-        """The checks an app must pass once it has moved to a new revision."""
-        from pilot.core.app.validator import Validator
-
-        Validator.for_update(self).validate()
 
     def _install_into_environment(self) -> None:
         from pilot.managers.environment import PythonEnvManager

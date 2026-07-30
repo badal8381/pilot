@@ -18,7 +18,10 @@ def _write_app(bench, name: str, hooks: str = "app_name = 'x'\n", fixture: str |
     app_path = bench.apps_path / name
     (app_path / name).mkdir(parents=True)
     (app_path / ".git").mkdir()
-    (app_path / "pyproject.toml").write_text(f'[project]\nname = "{name}"\n')
+    (app_path / "pyproject.toml").write_text(
+        f'[project]\nname = "{name}"\n\n'
+        '[tool.bench.frappe-dependencies]\nfrappe = ">=16.0.0,<17.0.0"\n'
+    )
     (app_path / name / "__init__.py").write_text("")
     (app_path / name / "hooks.py").write_text(hooks)
     if fixture is not None:
@@ -80,9 +83,9 @@ def test_update_apps_only_validates_the_filtered_apps(tmp_path: Path) -> None:
         BenchUpdater(bench).update_apps({"myapp"}, lambda message: None, pins=_pins("myapp", "brokenapp"))
 
 
-def test_update_apps_skips_checks_an_installed_app_may_predate(tmp_path: Path) -> None:
-    """No pyproject.toml or hooks.py: those rules apply to new installs, not to
-    an app that is already on the bench and working."""
+def test_update_apps_rejects_an_app_with_no_pyproject(tmp_path: Path) -> None:
+    """A setup.py-only app is held to the same rules as a new one: pyproject.toml
+    is mandatory, and an update is where a bench finds out it is missing."""
     bench = make_bench(tmp_path)
     bench.create_directories()
     app_path = bench.apps_path / "oldapp"
@@ -90,7 +93,10 @@ def test_update_apps_skips_checks_an_installed_app_may_predate(tmp_path: Path) -
     (app_path / ".git").mkdir()
     (app_path / "setup.py").write_text("from setuptools import setup; setup()\n")
 
-    with patch.object(App, "update"):
+    with (
+        patch.object(App, "update"),
+        pytest.raises(AppValidationError, match=r"pyproject\.toml"),
+    ):
         BenchUpdater(bench).update_apps(None, lambda message: None, pins=_pins("oldapp"))
 
 
@@ -108,37 +114,14 @@ def test_update_apps_leaves_alone_an_app_that_is_not_moving(tmp_path: Path) -> N
     assert mock_update.call_count == 1
 
 
-def test_update_re_checks_everything_a_new_revision_can_change(tmp_path: Path) -> None:
-    """A revision can add an import, bump the frappe it needs, or pin a package
-    another app already pinned. The reinstall that follows an update catches
-    none of those: it resolves the app's own requirements, unconstrained."""
-    from pilot.core.app.validator import Validator
-    from pilot.core.app.validator.dependency_resolution import DependencyResolutionCheck
-    from pilot.core.app.validator.frappe_compatibility import FrappeCompatibilityCheck
-    from pilot.core.app.validator.imports import ImportCheck
-
+def test_update_validates_the_new_revision_against_every_check(tmp_path: Path) -> None:
+    """A revision can drop a pyproject.toml or a declaration as easily as it can
+    break a hook, so an update is held to the same standard as an install."""
     bench = make_bench(tmp_path)
     bench.create_directories()
     _write_app(bench, "myapp")
 
-    checks = Validator.for_update(bench.app("myapp")).checks
+    with patch.object(App, "update"), patch.object(App, "validate") as mock_validate:
+        BenchUpdater(bench).update_apps(None, lambda message: None, pins=_pins("myapp"))
 
-    for expected in (ImportCheck, FrappeCompatibilityCheck, DependencyResolutionCheck):
-        assert any(isinstance(check, expected) for check in checks), expected.__name__
-
-
-def test_update_still_spares_an_app_that_predates_the_declaration_rules(tmp_path: Path) -> None:
-    """Adding checks to the update gate must not start demanding a pyproject.toml
-    table from an app that has been on the bench since before it existed."""
-    from pilot.core.app.validator import Validator
-    from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
-    from pilot.core.app.validator.repo_structure import RepoStructureCheck
-
-    bench = make_bench(tmp_path)
-    bench.create_directories()
-    _write_app(bench, "myapp")
-
-    checks = Validator.for_update(bench.app("myapp")).checks
-
-    for unwanted in (DependencyDeclarationsCheck, RepoStructureCheck):
-        assert not any(isinstance(check, unwanted) for check in checks), unwanted.__name__
+    mock_validate.assert_called_once()

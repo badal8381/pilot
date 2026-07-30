@@ -450,7 +450,7 @@ def test_frappe_compatibility_counts_a_dev_build_as_a_prerelease(tmp_path: Path)
     FrappeCompatibilityCheck().run(_make_app_needing_frappe(tmp_path, ">=16.0.0,<=17.0.0-dev"))
 
     stops_at_16 = _make_app_needing_frappe(tmp_path, ">=16.0.0,<17.0.0", name="otherapp")
-    with pytest.raises(AppValidationError, match="17.0.0.dev0 is installed"):
+    with pytest.raises(AppValidationError, match=r"17\.0\.0\.dev0 is installed"):
         FrappeCompatibilityCheck().run(stops_at_16)
 
 
@@ -458,6 +458,16 @@ def test_frappe_compatibility_leaves_an_app_that_declares_nothing_alone(tmp_path
     """This check runs on update, where an app may predate the table entirely."""
     _make_frappe_at(tmp_path, "16.5.0")
     FrappeCompatibilityCheck().run(_make_app_needing_frappe(tmp_path, None))
+
+
+def test_frappe_compatibility_rejects_an_unreadable_range(tmp_path: Path) -> None:
+    """Nothing else reads this table on update: VersionSpecifiersCheck covers
+    [project], and DependencyDeclarationsCheck only runs on install."""
+    _make_frappe_at(tmp_path, "16.5.0")
+    app = _make_app_needing_frappe(tmp_path, ">=16.0.0 <17.0.0")  # missing comma
+
+    with pytest.raises(AppValidationError, match="unreadable version for 'frappe'"):
+        FrappeCompatibilityCheck().run(app)
 
 
 def test_frappe_compatibility_ignores_an_app_that_is_not_installed(tmp_path: Path) -> None:

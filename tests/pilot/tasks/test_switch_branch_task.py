@@ -18,7 +18,9 @@ def _write_app(bench, fixture: str) -> None:
     app_path = bench.apps_path / "myapp"
     (app_path / "myapp").mkdir(parents=True)
     (app_path / ".git").mkdir()
-    (app_path / "pyproject.toml").write_text('[project]\nname = "myapp"\n')
+    (app_path / "pyproject.toml").write_text(
+        '[project]\nname = "myapp"\n\n[tool.bench.frappe-dependencies]\nfrappe = ">=16.0.0,<17.0.0"\n'
+    )
     (app_path / "myapp" / "__init__.py").write_text("")
     (app_path / "myapp" / "hooks.py").write_text("app_name = 'myapp'\n")
     (app_path / "myapp" / "fixtures").mkdir()
@@ -96,7 +98,7 @@ def test_switch_branch_rolls_back_when_a_check_itself_fails(tmp_path: Path) -> N
         patch.object(App, "head_sha", "abc1234"),
         patch.object(App, "current_branch", "main"),
         patch.object(App, "switch_branch") as mock_switch,
-        patch.object(App, "validate_update", side_effect=CommandError("uv exploded")),
+        patch.object(App, "validate", side_effect=CommandError("uv exploded")),
         patch.object(PythonEnvManager, "install_app") as mock_install,
         pytest.raises(CommandError),
     ):

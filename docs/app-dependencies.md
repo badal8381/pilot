@@ -28,17 +28,17 @@ different version - which is a claim about other people's apps, not just your ow
 
 ## What Pilot checks, and when
 
-| Path | Declarations required | Frappe compatibility | Resolution | Imports |
-|---|---|---|---|---|
-| `get-app` (install) | yes | yes | yes | yes |
-| `update` / migration | no | yes, if declared | yes | yes |
-| `switch-branch` | no | yes, if declared | yes | yes |
+Every check runs on every path - `get-app`, `update`/migration, and `switch-branch`. A revision can
+drop a `pyproject.toml` or a declaration as easily as it can break a hook, so an app that has moved
+is held to the same standard as one being installed.
 
-Declarations are not *required* on update: an app already on the bench predates the rule, and an
-update is the wrong moment to start applying it. But everything a new revision can change is
-re-checked - a revision can bump the frappe it needs, or pin a package another app already pinned.
-The reinstall that follows an update sees neither: it runs `uv pip install` with no constraints, so
-it resolves only that app's own requirements and will move a shared package without complaint.
+That means `pyproject.toml` and `[tool.bench.frappe-dependencies]` are mandatory for an app to keep
+updating, not only to be installed. A `setup.py`-only app installs with `--skip-validations` but
+will fail its next update until it ships both.
+
+Validating on update matters most for resolution: the reinstall that follows runs `uv pip install`
+with no constraints, so it resolves only that app's own requirements and will move a package
+another app pinned without complaint.
 
 ### Frappe compatibility
 

@@ -55,7 +55,7 @@ class SwitchBranchTask(Task):
         from pilot.exceptions import BenchError
 
         try:
-            app.validate_update()
+            app.validate()
         except BenchError:
             if previous_branch:
                 app.switch_branch(previous_branch)

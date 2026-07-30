@@ -50,7 +50,7 @@ class BenchUpdater:
         # installed or built yet, and reverting is a checkout.
         for app in updated:
             on_progress(f"Validating {app.config.name}...")
-            app.validate_update()
+            app.validate()
 
     @staticmethod
     def _follows_its_branch(app: "App", marketplace_by_name: dict, live_lookup: bool) -> bool:

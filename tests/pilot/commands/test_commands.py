@@ -49,6 +49,17 @@ def _ensure_database_credentials(bench_dir: Path) -> None:
     BenchInitializer(Bench(bench_dir))._ensure_database_credentials()
 
 
+
+def _write_installable_app(app_dir: Path, name: str) -> None:
+    """The minimum an app needs to pass validation, which every update runs."""
+    (app_dir / "pyproject.toml").write_text(
+        f'[project]\nname = "{name}"\n\n'
+        '[tool.bench.frappe-dependencies]\nfrappe = ">=16.0.0,<17.0.0"\n'
+    )
+    (app_dir / name).mkdir(exist_ok=True)
+    (app_dir / name / "__init__.py").write_text("")
+    (app_dir / name / "hooks.py").write_text(f"app_name = '{name}'\n")
+
 def test_new_command_creates_directory_and_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from pilot.commands.bench.create import NewCommand
 
@@ -753,6 +764,7 @@ def test_bench_update_apps_passes_marketplace_pin_to_app_update(tmp_path: Path) 
     bench.create_directories()
     app_dir = bench.apps_path / "helpdesk"
     app_dir.mkdir()
+    _write_installable_app(app_dir, "helpdesk")
     subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
     subprocess.run(
         [
@@ -795,6 +807,7 @@ def test_bench_update_apps_skips_a_marketplace_app_with_nothing_newer(tmp_path: 
     bench.create_directories()
     app_dir = bench.apps_path / "helpdesk"
     app_dir.mkdir()
+    _write_installable_app(app_dir, "helpdesk")
     subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
     subprocess.run(
         ["git", "-C", str(app_dir), "remote", "add", "origin", "https://github.com/frappe/helpdesk"],
@@ -831,6 +844,7 @@ def test_bench_update_apps_updates_an_app_outside_the_registry_branch_wide(tmp_p
     bench.create_directories()
     app_dir = bench.apps_path / "private_app"
     app_dir.mkdir()
+    _write_installable_app(app_dir, "private_app")
     subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
 
     with (
@@ -852,6 +866,7 @@ def test_bench_update_apps_uses_captured_target_for_unpinned_app(tmp_path: Path)
     bench.create_directories()
     app_dir = bench.apps_path / "helpdesk"
     app_dir.mkdir()
+    _write_installable_app(app_dir, "helpdesk")
     subprocess.run(["git", "init", "-q", str(app_dir)], check=True)
 
     with (

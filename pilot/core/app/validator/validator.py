@@ -23,20 +23,18 @@ class Validator:
 
     def __init__(self, app: "App", checks: list["ValidationCheck"] | None = None) -> None:
         self.app = app
-        self.checks = checks or _install_checks()
-
-    @classmethod
-    def for_update(cls, app: "App") -> "Validator":
-        """The narrower gate for an app already on the bench that has just moved
-        to a new revision."""
-        return cls(app, checks=_update_checks())
+        self.checks = checks or _all_checks()
 
     def validate(self) -> None:
         for check in self.checks:
             check.run(self.app)
 
 
-def _install_checks() -> list["ValidationCheck"]:
+def _all_checks() -> list["ValidationCheck"]:
+    """Every check, on every path. An app that has moved to a new revision is
+    held to the same standard as one being installed: the revision can have
+    dropped a pyproject.toml or a declaration just as easily as a hook.
+    """
     return [
         RepoStructureCheck(),
         VersionSpecifiersCheck(),
@@ -45,27 +43,6 @@ def _install_checks() -> list["ValidationCheck"]:
         HooksCheck(),
         FixturesCheck(),
         DependencyDeclarationsCheck(),
-        FrappeCompatibilityCheck(),
-        DependencyResolutionCheck(),
-        ImportCheck(),
-    ]
-
-
-def _update_checks() -> list["ValidationCheck"]:
-    """Leaves out repo-structure and dependency-declarations, which demand a
-    layout and a pyproject.toml table an app already on the bench predates.
-
-    Everything a new revision can change is still checked. The reinstall that
-    follows an update runs `uv pip install` with no constraints, so it resolves
-    the app's own requirements and will happily move a package another app
-    pinned - resolution here is the only thing that sees that.
-    """
-    return [
-        VersionSpecifiersCheck(),
-        SymlinkCheck(),
-        SyntaxCheck(),
-        HooksCheck(),
-        FixturesCheck(),
         FrappeCompatibilityCheck(),
         DependencyResolutionCheck(),
         ImportCheck(),

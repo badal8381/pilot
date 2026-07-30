@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import contextlib
 import typing
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
@@ -10,8 +11,6 @@ from pilot.core.app.validator.base import module_path, read_pyproject
 from pilot.exceptions import AppValidationError, BenchError
 
 if typing.TYPE_CHECKING:
-    from pathlib import Path
-
     from pilot.core.app import App
 
 
@@ -46,41 +45,39 @@ class FrappeCompatibilityCheck:
     def _mismatch(self, app: "App", name: str, specifier: str) -> str | None:
         """Why the installed `name` falls outside `specifier`, or None if it fits.
 
-        None also covers what this check can't judge: an app that isn't installed
-        (the dependency installer reports that), and a version or range it can't read.
+        None also means there is nothing to compare: the app isn't installed - the
+        dependency installer reports that - or it states no readable version.
         """
-        try:
-            installed = app.bench.app(name)
-        except BenchError:
-            return None
-        version = self._declared_version(module_path(installed) / "__init__.py")
-        if version is None:
-            return None
         try:
             # Without prereleases the bench's own dev build matches nothing.
             allowed = SpecifierSet(specifier, prereleases=True)
-        except InvalidSpecifier:
-            return None  # VersionSpecifiersCheck reports an unreadable range
-        if version in allowed:
+        except InvalidSpecifier as exc:
+            # Nothing else reads this table on update: VersionSpecifiersCheck
+            # covers [project], and DependencyDeclarationsCheck is install-only.
+            raise AppValidationError(
+                f"'{app.config.name}' declares an unreadable version for '{name}' in "
+                f"pyproject.toml's [tool.bench.frappe-dependencies]: {specifier!r} ({exc}).\n"
+                'Use comma-separated PEP 440 ranges, e.g. frappe = ">=16.0.0,<17.0.0"'
+            ) from exc
+
+        version = self._installed_version(app, name)
+        if version is None or version in allowed:
             return None
         return f"needs {name} {specifier}, but {version} is installed"
 
     @staticmethod
-    def _declared_version(init_file: "Path") -> Version | None:
-        """The `__version__` an app assigns at the top of its package."""
+    def _installed_version(app: "App", name: str) -> Version | None:
+        """The `__version__` the named app assigns at the top of its package."""
         try:
+            init_file = module_path(app.bench.app(name)) / "__init__.py"
             tree = ast.parse(init_file.read_text())
-        except (OSError, SyntaxError):
+        except (BenchError, OSError, SyntaxError):
             return None
 
         for node in tree.body:
-            if not isinstance(node, ast.Assign):
+            if not isinstance(node, ast.Assign) or not isinstance(node.value, ast.Constant):
                 continue
-            names = [target.id for target in node.targets if isinstance(target, ast.Name)]
-            if "__version__" not in names or not isinstance(node.value, ast.Constant):
-                continue
-            try:
-                return Version(str(node.value.value))
-            except InvalidVersion:
-                return None
+            if any(isinstance(target, ast.Name) and target.id == "__version__" for target in node.targets):
+                with contextlib.suppress(InvalidVersion):
+                    return Version(str(node.value.value))
         return None
