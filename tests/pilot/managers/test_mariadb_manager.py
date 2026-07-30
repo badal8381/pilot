@@ -159,6 +159,8 @@ def test_write_config_contains_all_server_settings(tmp_path) -> None:
     assert "collation-server = utf8mb4_unicode_ci" in content
     assert "local-infile = OFF" in content
     assert "innodb-stats-persistent-sample-pages = 256" in content
+    assert "innodb-snapshot-isolation = OFF" in content
+    assert "slave-connections-needed-for-purge = 0" in content
     assert f"innodb-buffer-pool-size = {sizing.innodb_buffer_pool_mb}M" in content
     assert f"innodb-log-file-size = {sizing.innodb_log_file_mb}M" in content
     assert f"key-buffer-size = {sizing.key_buffer_mb}M" in content
