@@ -57,9 +57,13 @@
           <span class="lucide-alert-triangle mt-0.5 size-5 shrink-0 text-ink-red-6" />
           <div class="min-w-0 flex-1">
             <h2 class="font-semibold text-sm">This update needs attention</h2>
-            <p v-if="op.diagnosis?.message" class="mt-1 text-p-sm leading-5 text-ink-red-8">
-              {{ op.diagnosis.message }}
-            </p>
+            <!-- Tool output: uv and frappe both indent and box-draw, which a
+                 collapsing <p> turns into one unreadable paragraph. -->
+            <pre
+              v-if="op.diagnosis?.message"
+              class="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-ink-red-8"
+              >{{ op.diagnosis.message }}</pre
+            >
             <p v-if="op.diagnosis?.patch" class="mt-2 text-p-sm text-ink-gray-7">
               Failing patch
               <code
