@@ -55,8 +55,8 @@ class NewSiteTask(Task):
         for app_name in missing:
             resolver = marketplace.find_app(app_name)
             with self.step("fetch", f"Fetch {app_name}"):
-                App.from_repo(self.bench, resolver.repo, resolver.target).install(
-                    install_dependencies=True, on_progress=self.report
+                App.from_repo(self.bench, resolver.repo, resolver.branch).install(
+                    install_dependencies=True, commit=resolver.commit, on_progress=self.report
                 )
 
 
