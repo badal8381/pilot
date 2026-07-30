@@ -723,69 +723,24 @@ def test_bench_update_apps_raises_on_command_error(tmp_path: Path) -> None:
         bench._update_apps(None, lambda message: None)
 
 
-def test_bench_marketplace_pin_matched_by_version(tmp_path: Path) -> None:
-    from pilot.core.app import RevisionPin
-    from pilot.core.bench import _marketplace_pin
+def _commit_ahead_of_head(repo: Path) -> str:
+    """Commit on top of the repo's HEAD, left unchecked-out - what a release
+    advertises once the app has been running an older commit."""
+    import subprocess
 
-    app = MagicMock()
-    app.config.name = "helpdesk"
-    app.config.repo = "https://github.com/frappe/helpdesk"
-    app.installed_version = "1.0.0"
-    registry = {
-        "helpdesk": {
-            "repo": "https://github.com/frappe/helpdesk",
-            "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v1.0.0"}],
-        },
-    }
+    from pilot.internal.git import GitRepo
 
-    pin = _marketplace_pin(app, registry)
+    def git(*args: str) -> None:
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
 
-    assert pin == RevisionPin(kind="tag", ref="v1.0.0")
-
-
-def test_bench_marketplace_pin_none_on_repo_mismatch() -> None:
-    from pilot.core.bench import _marketplace_pin
-
-    app = MagicMock()
-    app.config.name = "helpdesk"
-    app.config.repo = "https://github.com/someone/helpdesk"  # a fork
-    app.installed_version = "1.0.0"
-    registry = {
-        "helpdesk": {
-            "repo": "https://github.com/frappe/helpdesk",
-            "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v1.0.0"}],
-        },
-    }
-
-    assert _marketplace_pin(app, registry) is None
-
-
-def test_bench_marketplace_pin_none_when_not_in_registry() -> None:
-    from pilot.core.bench import _marketplace_pin
-
-    app = MagicMock()
-    app.config.name = "frappe"
-    app.config.repo = "https://github.com/frappe/frappe"
-    app.installed_version = "16.0.0"
-
-    assert _marketplace_pin(app, {}) is None
-
-
-def test_bench_marketplace_pin_none_for_branch_target() -> None:
-    from pilot.core.bench import _marketplace_pin
-
-    app = MagicMock()
-    app.config.name = "hrms"
-    app.config.repo = "https://github.com/frappe/hrms"
-    app.installed_version = "3.0.0"
-    registry = {
-        "hrms": {
-            "repo": "https://github.com/frappe/hrms",
-            "targets": [{"version": "3.0.0", "target_type": "branch", "target": "main"}],
-        },
-    }
-
-    assert _marketplace_pin(app, registry) is None
+    git("config", "user.email", "t@t.com")
+    git("config", "user.name", "t")
+    git("commit", "-q", "--allow-empty", "-m", "installed")
+    head = GitRepo(repo).head_sha
+    git("commit", "-q", "--allow-empty", "-m", "published")
+    published = GitRepo(repo).head_sha
+    git("reset", "--hard", "-q", head)
+    return published
 
 
 def test_bench_update_apps_passes_marketplace_pin_to_app_update(tmp_path: Path) -> None:
@@ -798,7 +753,7 @@ def test_bench_update_apps_passes_marketplace_pin_to_app_update(tmp_path: Path) 
     bench.create_directories()
     app_dir = bench.apps_path / "helpdesk"
     app_dir.mkdir()
-    subprocess.run(["git", "init", "-q", str(app_dir)], check=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
     subprocess.run(
         [
             "git",
@@ -812,25 +767,79 @@ def test_bench_update_apps_passes_marketplace_pin_to_app_update(tmp_path: Path) 
         check=True,
     )
 
+    published = _commit_ahead_of_head(app_dir)
     registry = [
         {
             "name": "helpdesk",
             "repo": "https://github.com/frappe/helpdesk",
-            "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v2.0.0"}],
+            "releases": [{"version": "1.1.0", "branch": "main", "commit": published}],
         }
     ]
 
     with (
         patch.object(Marketplace, "registry", return_value=registry),
-        patch(
-            "pilot.core.app.App.installed_version",
-            new_callable=lambda: property(lambda self: "1.0.0"),
-        ),
         patch("pilot.core.app.App.update") as mock_update,
     ):
         bench._update_apps(None, lambda message: None)
 
-    mock_update.assert_called_once_with(pin=RevisionPin(kind="tag", ref="v2.0.0"))
+    mock_update.assert_called_once_with(pin=RevisionPin(kind="commit", ref=published))
+
+
+def test_bench_update_apps_skips_a_marketplace_app_with_nothing_newer(tmp_path: Path) -> None:
+    """Pulling the branch for a registry app would install unpublished code."""
+    import subprocess
+
+    from pilot.integrations.marketplace import Marketplace
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    app_dir = bench.apps_path / "helpdesk"
+    app_dir.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
+    subprocess.run(
+        ["git", "-C", str(app_dir), "remote", "add", "origin", "https://github.com/frappe/helpdesk"],
+        check=True,
+    )
+
+    from pilot.internal.git import GitRepo
+
+    _commit_ahead_of_head(app_dir)  # leaves HEAD on a real commit
+    registry = [
+        {
+            "name": "helpdesk",
+            "repo": "https://github.com/frappe/helpdesk",
+            # Exactly what is checked out - no forward release.
+            "releases": [{"version": "1.0.0", "branch": "main", "commit": GitRepo(app_dir).head_sha}],
+        }
+    ]
+
+    with (
+        patch.object(Marketplace, "registry", return_value=registry),
+        patch("pilot.core.app.App.update") as mock_update,
+    ):
+        bench._update_apps(None, lambda message: None)
+
+    mock_update.assert_not_called()
+
+
+def test_bench_update_apps_updates_an_app_outside_the_registry_branch_wide(tmp_path: Path) -> None:
+    import subprocess
+
+    from pilot.integrations.marketplace import Marketplace
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    app_dir = bench.apps_path / "private_app"
+    app_dir.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
+
+    with (
+        patch.object(Marketplace, "registry", return_value=[]),
+        patch("pilot.core.app.App.update") as mock_update,
+    ):
+        bench._update_apps(None, lambda message: None)
+
+    mock_update.assert_called_once_with(pin=None)
 
 
 def test_bench_update_apps_uses_captured_target_for_unpinned_app(tmp_path: Path) -> None:
