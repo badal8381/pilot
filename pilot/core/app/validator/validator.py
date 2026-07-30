@@ -3,6 +3,7 @@ from __future__ import annotations
 import typing
 
 from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
+from pilot.core.app.validator.hooks import HooksCheck
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
 from pilot.core.app.validator.syntax import SyntaxCheck
@@ -22,6 +23,7 @@ class Validator:
             RepoStructureCheck(),
             VersionSpecifiersCheck(),
             SyntaxCheck(),
+            HooksCheck(),
             DependencyDeclarationsCheck(),
             ImportCheck(),
         ]

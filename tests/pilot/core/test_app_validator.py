@@ -11,6 +11,7 @@ from pilot.config import AppConfig
 from pilot.core.app import App
 from pilot.core.app.validator import Validator
 from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
+from pilot.core.app.validator.hooks import HooksCheck
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
 from pilot.core.app.validator.syntax import SyntaxCheck
@@ -52,7 +53,13 @@ def _make_app(bench_root: Path, name: str, pyproject: str, files: dict[str, str]
 
 def _static_checks() -> list:
     """Static checks only; ImportCheck needs a real throwaway venv."""
-    return [RepoStructureCheck(), VersionSpecifiersCheck(), SyntaxCheck(), DependencyDeclarationsCheck()]
+    return [
+        RepoStructureCheck(),
+        VersionSpecifiersCheck(),
+        SyntaxCheck(),
+        HooksCheck(),
+        DependencyDeclarationsCheck(),
+    ]
 
 
 _SETUPTOOLS_BUILD = '[build-system]\nrequires = ["setuptools>=61"]\nbuild-backend = "setuptools.build_meta"\n'
@@ -208,6 +215,93 @@ def test_version_specifiers_passes_for_valid_specs(tmp_path: Path) -> None:
         {"myapp/hooks.py": "app_name = 'myapp'\n"},
     )
     Validator(app, checks=[RepoStructureCheck(), VersionSpecifiersCheck()]).validate()
+
+
+def _make_hooks_app(tmp_path: Path, hooks: str, **extra_files: str) -> App:
+    files = {"myapp/hooks.py": hooks, "myapp/__init__.py": ""}
+    files.update({f"myapp/{name.replace('__', '/')}.py": source for name, source in extra_files.items()})
+    return _make_app(tmp_path, "myapp", '[project]\nname = "myapp"\n', files)
+
+
+def test_hooks_passes_for_well_formed_hooks(tmp_path: Path) -> None:
+    app = _make_hooks_app(
+        tmp_path,
+        'required_apps = ["erpnext"]\n'
+        'boot_session = "myapp.startup.boot"\n'
+        'doc_events = {"ToDo": {"on_update": ["myapp.overrides.on_update"]}}\n'
+        'override_doctype_class = {"ToDo": "myapp.overrides.CustomToDo"}\n',
+        startup="def boot():\n    pass\n",
+        overrides="def on_update():\n    pass\n\n\nclass CustomToDo:\n    pass\n",
+    )
+    HooksCheck().run(app)
+
+
+def test_hooks_allows_bare_string_for_list_hooks(tmp_path: Path) -> None:
+    """frappe's append_hook listifies non-dict values, so a bare string is valid."""
+    HooksCheck().run(_make_hooks_app(tmp_path, 'required_apps = "erpnext"\nfixtures = "DocType"\n'))
+
+
+def test_hooks_fails_when_dict_hook_is_not_a_dict(tmp_path: Path) -> None:
+    app = _make_hooks_app(tmp_path, 'doc_events = ["myapp.overrides.on_update"]\n')
+    with pytest.raises(AppValidationError, match="doc_events must be a dict"):
+        HooksCheck().run(app)
+
+
+def test_hooks_fails_when_path_points_at_missing_submodule(tmp_path: Path) -> None:
+    app = _make_hooks_app(tmp_path, 'after_migrate = "myapp.setup.install.after_migrate"\n')
+    with pytest.raises(AppValidationError, match="'myapp' has no 'setup'"):
+        HooksCheck().run(app)
+
+
+def test_hooks_fails_when_path_walks_into_a_non_package_directory(tmp_path: Path) -> None:
+    app = _make_hooks_app(tmp_path, 'on_login = "myapp.public.js.on_login"\n')
+    (app.path / "myapp" / "public").mkdir()
+    with pytest.raises(AppValidationError, match=r"no module 'myapp\.public\.js\.on_login'"):
+        HooksCheck().run(app)
+
+
+def test_hooks_fails_when_path_points_at_missing_attribute(tmp_path: Path) -> None:
+    app = _make_hooks_app(
+        tmp_path, 'after_migrate = "myapp.setup.renamed"\n', setup="def original():\n    pass\n"
+    )
+    with pytest.raises(AppValidationError, match="'setup' has no 'renamed'"):
+        HooksCheck().run(app)
+
+
+def test_hooks_resolves_attribute_defined_in_package_init(tmp_path: Path) -> None:
+    """`myapp.utils.helper` where utils is a package and helper lives in its __init__."""
+    app = _make_hooks_app(tmp_path, 'on_login = "myapp.utils.helper"\n')
+    (app.path / "myapp" / "utils").mkdir()
+    (app.path / "myapp" / "utils" / "__init__.py").write_text("def helper():\n    pass\n")
+    HooksCheck().run(app)
+
+
+def test_hooks_resolves_path_into_a_sibling_installed_app(tmp_path: Path) -> None:
+    app = _make_hooks_app(tmp_path, 'boot_session = "erpnext.startup.boot.boot_session"\n')
+    boot = tmp_path / "apps" / "erpnext" / "erpnext" / "startup" / "boot.py"
+    boot.parent.mkdir(parents=True)
+    boot.write_text("def boot_session():\n    pass\n")
+    HooksCheck().run(app)
+
+
+def test_hooks_skips_paths_into_packages_that_are_not_bench_apps(tmp_path: Path) -> None:
+    """Non-app packages are ImportCheck's job - the apps dir can't resolve them."""
+    HooksCheck().run(_make_hooks_app(tmp_path, 'on_login = "some_pypi_package.hooks.on_login"\n'))
+
+
+def test_hooks_skips_attribute_check_when_module_has_a_star_import(tmp_path: Path) -> None:
+    app = _make_hooks_app(tmp_path, 'on_login = "myapp.utils.helper"\n', utils="from os.path import *\n")
+    HooksCheck().run(app)
+
+
+def test_hooks_reads_jenv_style_alias_paths(tmp_path: Path) -> None:
+    app = _make_hooks_app(
+        tmp_path, 'jinja = {"methods": ["shout:myapp.utils.shout"]}\n', utils="def whisper():\n    pass\n"
+    )
+    with pytest.raises(AppValidationError, match="'utils' has no 'shout'"):
+        HooksCheck().run(app)
+    (app.path / "myapp" / "utils.py").write_text("def shout():\n    pass\n")
+    HooksCheck().run(app)
 
 
 def test_import_check_passes_when_all_imports_resolve(tmp_path: Path) -> None:
