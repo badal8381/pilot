@@ -55,6 +55,10 @@ admin/frontend/in-app-embed/  Desk Cloud Settings IIFE (served at /embed/cloud-s
 failed install is undone, so a half-installed app never reaches a site. `pilot.core.app.validator` holds one class per
 check, each raising `AppValidationError` with the fix.
 
+A new app must ship `pyproject.toml` with a `[tool.bench.frappe-dependencies]` table pinning the frappe versions it
+supports. `setup.py`-only apps are legacy: they still install with `--skip-validations` and still update, so benches
+that already run one keep working, but nothing new is accepted without the table.
+
 Database objects are created from `bench.db_type`. A bench uses one engine for its sites: `mariadb`, `postgres`, or `sqlite`.
 
 ## Control Flow
