@@ -48,6 +48,8 @@ class PythonAssetBuilder:
         if (app.path / "package.json").exists():
             self.ensure_yarn_install(app.path)
 
+        self.ensure_frontend_dependencies(app)
+
         print(f"  Building assets for {app.config.name}...")
         sys.stdout.flush()
         run_command(
@@ -66,6 +68,15 @@ class PythonAssetBuilder:
                     cwd=app.path / frontend_dir,
                     stream_output=True,
                 )
+
+    def ensure_frontend_dependencies(self, app: "App") -> None:
+        """frappe's own `bench build` shells into `frontend`/`roster`, so node_modules must
+        be synced there before that step runs, not just in the standalone build loop after it."""
+        for frontend_dir in ["frontend", "roster"]:
+            if (app.path / frontend_dir / "package.json").exists():
+                print(f"  Installing JS dependencies for {frontend_dir} of {app.config.name}...")
+                sys.stdout.flush()
+                self.ensure_yarn_install(app.path / frontend_dir)
 
     def ensure_yarn_install(self, path: Path) -> None:
         """Run yarn install when node_modules is missing or yarn.lock changed."""
