@@ -107,13 +107,9 @@ def test_resolution_names_the_app_that_pinned_the_package(monkeypatch, tmp_path:
 
 
 def test_resolution_leaves_out_requirements_that_cannot_be_constraints(monkeypatch, tmp_path) -> None:
-    """Constraints files reject URLs and extras, and an unbounded name constrains nothing."""
+    """Constraints files reject extras, and an unbounded name constrains nothing."""
     bench = _make_bench(tmp_path)
-    bench.add_app(
-        "other",
-        'dependencies = ["markdown~=3.5.1", "requests", "celery[redis]>=5", '
-        '"pypika @ git+https://github.com/frappe/pypika"]\n',
-    )
+    bench.add_app("other", 'dependencies = ["markdown~=3.5.1", "requests", "celery[redis]>=5"]\n')
     app = bench.add_app("myapp")
     captured: dict[str, str] = {}
 
@@ -129,6 +125,45 @@ def test_resolution_leaves_out_requirements_that_cannot_be_constraints(monkeypat
     DependencyResolutionCheck().run(app)
 
     assert captured["constraints"] == "markdown~=3.5.1  # other\n"
+
+
+def test_resolution_constrains_url_dependencies_too(monkeypatch, tmp_path) -> None:
+    """uv won't resolve a tree containing a URL dependency unless it is pinned
+    somewhere, and frappe pins two - leaving them out fails every app that
+    depends on frappe, with uv naming a package the app never mentioned."""
+    bench = _make_bench(tmp_path)
+    bench.add_app("frappe", 'dependencies = ["pypika @ git+https://github.com/frappe/pypika@2c50e61"]\n')
+    app = bench.add_app("myapp", 'dependencies = ["frappe>=14.0.0"]\n')
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(dependency_resolution, "ensure_uv", lambda: "/bin/uv")
+    monkeypatch.setattr(
+        dependency_resolution,
+        "run_command",
+        lambda argv, **kw: captured.update(
+            constraints=Path(argv[argv.index("--constraint") + 1]).read_text()
+        ),
+    )
+
+    DependencyResolutionCheck().run(app)
+
+    assert captured["constraints"] == "pypika @ git+https://github.com/frappe/pypika@2c50e61  # frappe\n"
+
+
+def test_resolution_blames_the_app_that_pinned_a_url_dependency(monkeypatch, tmp_path) -> None:
+    """A '#egg=' fragment must not be mistaken for the trailing app-name comment."""
+    bench = _make_bench(tmp_path)
+    bench.add_app("frappe", 'dependencies = ["pypika @ git+https://github.com/frappe/pypika#egg=pypika"]\n')
+    app = bench.add_app("myapp", 'dependencies = ["frappe>=14.0.0"]\n')
+
+    def fail(argv, **kwargs):
+        raise CommandError("Package `pypika` was included as a URL dependency.")
+
+    monkeypatch.setattr(dependency_resolution, "ensure_uv", lambda: "/bin/uv")
+    monkeypatch.setattr(dependency_resolution, "run_command", fail)
+
+    with pytest.raises(AppValidationError, match=r"pypika @ git\+https://github\.com/frappe/pypika#egg=pypika"):
+        DependencyResolutionCheck().run(app)
 
 
 def test_resolution_is_skipped_before_the_bench_has_an_environment(monkeypatch, tmp_path: Path) -> None:

@@ -79,7 +79,12 @@ class DependencyResolutionCheck:
 
 
 def _declared_requirements(app: "App") -> list[str]:
-    """`[project].dependencies` that make sense as constraints - no URLs, no extras."""
+    """`[project].dependencies` that make sense as constraints - no extras.
+
+    URL requirements are kept: uv refuses to resolve any tree containing one
+    unless it is pinned as a direct requirement or a constraint, and frappe pins
+    two. Dropping them fails every app that depends on frappe.
+    """
     data = read_pyproject(app) or {}
     requirements = []
     for entry in data.get("project", {}).get("dependencies", []):
@@ -87,14 +92,19 @@ def _declared_requirements(app: "App") -> list[str]:
             requirement = Requirement(entry)
         except (InvalidRequirement, TypeError):
             continue
-        if requirement.url or requirement.extras or requirement.marker or not str(requirement.specifier):
+        if requirement.extras or requirement.marker:
             continue
-        requirements.append(f"{requirement.name}{requirement.specifier}")
+        if requirement.url:
+            requirements.append(f"{requirement.name} @ {requirement.url}")
+        elif str(requirement.specifier):
+            requirements.append(f"{requirement.name}{requirement.specifier}")
     return requirements
 
 
 def _package_of(constraint_line: str) -> str:
-    return Requirement(constraint_line.split("#", 1)[0].strip()).name
+    # rsplit on the exact separator _write_constraints uses: a URL may carry its
+    # own '#egg=' fragment, and splitting on that would truncate it.
+    return Requirement(constraint_line.rsplit("  # ", 1)[0].strip()).name
 
 
 def _names(package: str, message: str) -> bool:
