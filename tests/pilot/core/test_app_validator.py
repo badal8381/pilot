@@ -11,6 +11,7 @@ from pilot.config import AppConfig
 from pilot.core.app import App
 from pilot.core.app.validator import Validator
 from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
+from pilot.core.app.validator.fixtures import FixturesCheck
 from pilot.core.app.validator.hooks import HooksCheck
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
@@ -59,6 +60,7 @@ def _static_checks() -> list:
         VersionSpecifiersCheck(),
         SyntaxCheck(),
         HooksCheck(),
+        FixturesCheck(),
         DependencyDeclarationsCheck(),
     ]
 
@@ -357,6 +359,39 @@ def test_hooks_reads_jenv_style_alias_paths(tmp_path: Path) -> None:
         HooksCheck().run(app)
     (app.path / "myapp" / "utils.py").write_text("def shout():\n    pass\n")
     HooksCheck().run(app)
+
+
+def test_fixtures_pass_when_every_file_parses(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n',
+        {
+            "myapp/hooks.py": "app_name = 'myapp'\n",
+            "myapp/fixtures/role.json": '[{"doctype": "Role", "role_name": "Coach"}]\n',
+        },
+    )
+    FixturesCheck().run(app)
+
+
+def test_fixtures_fail_on_unparsable_json(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n',
+        {
+            "myapp/hooks.py": "app_name = 'myapp'\n",
+            "myapp/fixtures/role.json": '[{"doctype": "Role"}]\n',
+            "myapp/fixtures/custom_field.json": '[{\n"doctype": "Custom Field",\n',
+        },
+    )
+    with pytest.raises(AppValidationError, match=r"myapp/fixtures/custom_field\.json"):
+        FixturesCheck().run(app)
+
+
+def test_fixtures_pass_when_the_app_has_no_fixtures(tmp_path: Path) -> None:
+    app = _make_app(tmp_path, "myapp", '[project]\nname = "myapp"\n', {"myapp/hooks.py": ""})
+    FixturesCheck().run(app)
 
 
 def test_import_check_passes_when_all_imports_resolve(tmp_path: Path) -> None:
