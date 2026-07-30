@@ -1,7 +1,7 @@
 import { computed, onUnmounted, ref } from 'vue'
-import { updatesApi, isActive, needsAttention } from '@/api/updates'
+import { updatesApi, isActive, isPending, needsAttention } from '@/api/updates'
 import { useAppUpdates } from '@/composables/apps/useAppUpdates'
-import { stateLabel } from '@/utils/updateFormat'
+import { pendingActionLabel, stateLabel } from '@/utils/updateFormat'
 
 const current = ref(null)
 const loaded = ref(false)
@@ -26,7 +26,7 @@ export function useUpdate() {
 
   function schedule() {
     clearTimeout(timer)
-    if (isActive(current.value)) {
+    if (isActive(current.value) || isPending(current.value)) {
       timer = setTimeout(load, POLL_INTERVAL_MS)
     }
   }
@@ -45,6 +45,14 @@ export function useUpdate() {
   // Priority: unresolved failure > active run > update available.
   const status = computed(() => {
     const operation = current.value
+    if (isPending(operation)) {
+      return {
+        kind: 'active',
+        label: pendingActionLabel(operation.pending_action),
+        operationId: operation.id,
+        icon: 'lucide-loader-circle',
+      }
+    }
     if (needsAttention(operation)) {
       return {
         kind: 'failed',

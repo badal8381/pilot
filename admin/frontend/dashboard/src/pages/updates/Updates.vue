@@ -39,9 +39,9 @@
         <!-- Status icon -->
         <span
           class="place-items-center grid rounded-full size-8 shrink-0"
-          :class="stateIcon(op.state).iconBg"
+          :class="rowIcon(op).iconBg"
         >
-          <span class="size-4" :class="stateIcon(op.state).icon" />
+          <span class="size-4" :class="rowIcon(op).icon" />
         </span>
 
         <div class="flex-1 min-w-0">
@@ -61,17 +61,19 @@
 import { onMounted, ref } from 'vue'
 import { Button, ErrorMessage, LoadingText } from 'frappe-ui'
 import { updatesApi } from '@/api/updates'
-import { appsSummary, opTitle, stateIcon, stateLabel } from '@/utils/updateFormat'
+import { appsSummary, opTitle, pendingActionLabel, stateIcon, stateLabel } from '@/utils/updateFormat'
 import { fmtDuration, relativeTime } from '@/utils/taskFormat'
 
 const operations = ref([])
 const loading = ref(false)
 const error = ref('')
 
+const rowIcon = (op) => stateIcon(op.pending_action ? 'retrying' : op.state)
+
 function subtitle(op) {
   const count = op.sites?.length || 0
   const parts = [
-    stateLabel(op.state),
+    op.pending_action ? pendingActionLabel(op.pending_action) : stateLabel(op.state),
     `${count} site${count === 1 ? '' : 's'}`,
     appsSummary(op),
     relativeTime(op.started_at || op.created_at),

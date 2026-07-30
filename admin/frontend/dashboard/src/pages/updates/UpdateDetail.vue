@@ -17,7 +17,15 @@
             @click="router.push({ name: 'Updates' })"
           />
           <h1 class="flex-1 min-w-0 font-semibold text-ink-gray-9 text-xl truncate">{{ title }}</h1>
-          <UpdateStateBadge class="shrink-0" :state="op.state" />
+          <Badge
+            v-if="pending"
+            class="shrink-0"
+            theme="amber"
+            variant="subtle"
+            size="md"
+            :label="pendingLabel"
+          />
+          <UpdateStateBadge v-else class="shrink-0" :state="op.state" />
         </div>
         <Button
           variant="subtle"
@@ -89,7 +97,11 @@
               </template>
             </p>
 
-            <div class="mt-4 flex flex-wrap gap-2">
+            <p v-if="pending" class="mt-4 flex items-center gap-2 text-p-sm text-ink-gray-7">
+              <span class="lucide-loader-circle size-4 animate-spin text-ink-amber-7" />
+              {{ pendingLabel }}
+            </p>
+            <div v-else class="mt-4 flex flex-wrap gap-2">
               <Button
                 v-if="op.state === 'needs_attention' && op.diagnosis?.patch && !patchAlreadySkipped"
                 variant="solid"
@@ -297,7 +309,7 @@ import { Badge, Button, Dialog, Dropdown, ErrorMessage, LoadingText } from 'frap
 import { updatesApi, isActive, isResolved, needsAttention } from '@/api/updates'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { fmtDateTime, fmtDuration } from '@/utils/taskFormat'
-import { opTitle, patchSkipped, siteStatus } from '@/utils/updateFormat'
+import { opTitle, patchSkipped, pendingActionLabel, siteStatus } from '@/utils/updateFormat'
 
 const props = defineProps({ operationId: { type: String, required: true } })
 const router = useRouter()
@@ -310,13 +322,12 @@ const acting = ref(false)
 const error = ref('')
 const confirmSkip = ref(false)
 const confirmRestore = ref(false)
-// Set after an action queues a task; keeps polling through the attention -> active
-// transition, which the backend applies only when the task starts running.
-const awaitingTransition = ref(false)
 let timer = null
 
 const title = computed(() => opTitle(op.value))
 const isAttention = computed(() => needsAttention(op.value))
+const pending = computed(() => op.value?.pending_action || null)
+const pendingLabel = computed(() => pendingActionLabel(pending.value))
 const patchAlreadySkipped = computed(() => patchSkipped(op.value))
 
 const durationSeconds = computed(() => {
@@ -385,8 +396,7 @@ async function refresh() {
 
 function schedule() {
   clearTimeout(timer)
-  if (isActive(op.value)) awaitingTransition.value = false
-  if (op.value && !isResolved(op.value) && (!isAttention.value || awaitingTransition.value)) {
+  if (op.value && !isResolved(op.value) && (!isAttention.value || pending.value)) {
     timer = setTimeout(load, 3000)
   }
 }
@@ -394,8 +404,7 @@ function schedule() {
 async function runAction(action) {
   acting.value = true
   try {
-    await action()
-    awaitingTransition.value = true
+    op.value = (await action()).operation || op.value
     await load()
   } catch (e) {
     error.value = e?.message || 'Action failed.'

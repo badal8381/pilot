@@ -34,3 +34,7 @@ export function needsAttention(operation) {
 export function isActive(operation) {
   return !!operation && ACTIVE_STATES.includes(operation.state)
 }
+
+export function isPending(operation) {
+  return !!operation?.pending_action
+}
