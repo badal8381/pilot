@@ -86,7 +86,9 @@ class App:
         on_progress(f"Creating new app '{name}'...")
         # Answers are piped, so keep make-app quiet - its echoed prompts are noise.
         run_command(
-            args, cwd=bench.sites_path, stream_output=options is None,
+            args,
+            cwd=bench.sites_path,
+            stream_output=options is None,
             stdin_text=options.as_answers() if options else None,
         )
 
@@ -138,6 +140,11 @@ class App:
     @property
     def installed_tag(self) -> str:
         return self._repository.installed_tag
+
+    @property
+    def head_sha(self) -> str:
+        """The commit checked out on disk, unlike installed_hash which reads dist-info."""
+        return self._repository.repo.head_sha
 
     def is_on_revision(self, pin: RevisionPin) -> bool:
         return self._repository.is_on_revision(pin)
@@ -329,7 +336,9 @@ class App:
             apps = raw.setdefault("apps", [])
             entry = next((a for a in apps if a.get("name") == self.config.name), None)
             if entry is None:
-                apps.append({"name": self.config.name, "repo": self.config.repo, "branch": self.config.branch})
+                apps.append(
+                    {"name": self.config.name, "repo": self.config.repo, "branch": self.config.branch}
+                )
             else:
                 entry["branch"] = self.config.branch
 

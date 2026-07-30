@@ -16,7 +16,9 @@ class SwitchBranchTask(Task):
         from pilot.managers.environment import PythonEnvManager
 
         app = self.bench.app(self.name)
+        previous_sha = app.head_sha
         self.checkout(app)
+        self.validate(app, previous_sha)
 
         env = PythonEnvManager(self.bench)
         self.install(env, app)
@@ -40,6 +42,19 @@ class SwitchBranchTask(Task):
         except BenchError as exc:
             print(str(exc))
             sys.exit(1)
+
+    @step("validate", lambda self: f"Validate {self.name} on '{self.branch}'")
+    def validate(self, app, previous_sha: str) -> None:
+        """The env installs the app editable, so the branch is live the moment it's
+        checked out - a branch that fails the checks has to go back."""
+        from pilot.core.app.validator import validate_updated_apps
+        from pilot.exceptions import AppValidationError
+
+        try:
+            validate_updated_apps([app], print)
+        except AppValidationError:
+            app.checkout_commit(previous_sha)
+            raise
 
     @step("install", lambda self: f"Reinstall {self.name}")
     def install(self, env, app) -> None:
