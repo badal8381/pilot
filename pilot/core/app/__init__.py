@@ -236,6 +236,7 @@ class App:
             on_progress(f"'{app.config.name}' already installed, skipping.")
             return AppInstallResult(app, already_installed=True, installed_dependencies=dependencies)
 
+        existing_clone = self.path if self.is_cloned else None
         app = self._clone_for_install(on_progress)
         staging_path = app.path if app.is_staged else None
         try:
@@ -248,8 +249,7 @@ class App:
             if app.is_staged:
                 app = app.promote()
         except BenchError:
-            if staging_path:
-                shutil.rmtree(staging_path, ignore_errors=True)
+            self._unstage(staging_path, existing_clone)
             raise
         on_progress(f"'{app.config.name}' validated successfully installing.")
         on_progress(f"Installing {app.config.name}...")
@@ -259,25 +259,39 @@ class App:
             on_progress(f"\nSetting up assets for {app.config.name}...")
             app._build_assets_via_env_manager()
         except Exception:
-            app._roll_back_install(delete_clone=staging_path is not None, on_progress=on_progress)
+            app._roll_back_install(delete_clone=existing_clone is None, on_progress=on_progress)
             raise
         app.record_branch()
         on_progress(f"\n'{app.config.name}' installed successfully.")
         return AppInstallResult(app, already_installed=False, installed_dependencies=dependencies)
 
     def _clone_for_install(self, on_progress: Callable[[str], None]) -> "App":
-        """Clone into staging, so an unvalidated app never sits in apps/ where
-        the running site would pick it up. Already-cloned apps stay put."""
-        if self.is_cloned:
-            on_progress(f"'{self.config.name}' already cloned, skipping clone.")
-            return self._rename_to_module_name()
-
-        on_progress(f"Cloning {self.config.name}...")
+        """Put the app in staging, so nothing unvalidated sits in apps/ where a
+        bench-wide operation would pick it up. A tree already in apps/ is moved
+        there rather than cloned again."""
         staged = App(self.config, self.bench, staged=True)
         shutil.rmtree(staged.path, ignore_errors=True)  # leftovers from an interrupted run
         staged.path.parent.mkdir(parents=True, exist_ok=True)
+        if self.is_cloned:
+            on_progress(f"'{self.config.name}' already cloned, moving it out of apps/ to validate.")
+            shutil.move(str(self.path), str(staged.path))
+            return staged
+
+        on_progress(f"Cloning {self.config.name}...")
         staged.clone()
         return staged
+
+    @staticmethod
+    def _unstage(staging_path: Path | None, existing_clone: Path | None) -> None:
+        """Undo staging after a failure: put a tree that was already in apps/ back
+        where it was, and delete one this run cloned. A working tree we did not
+        create is not ours to remove."""
+        if staging_path is None:
+            return
+        if existing_clone is None:
+            shutil.rmtree(staging_path, ignore_errors=True)
+        else:
+            shutil.move(str(staging_path), str(existing_clone))
 
     def promote(self) -> "App":
         """Move a validated staged clone into apps/ under its importable name."""
@@ -289,16 +303,6 @@ class App:
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.move(str(self.path), str(target))  # a rename, unless apps/ is another filesystem
         return self._as_installed(self.module_name)
-
-    def _rename_to_module_name(self) -> "App":
-        """Rename an app already in apps/ to its importable name, as get-app does."""
-        module = self.module_name
-        if module == self.config.name:
-            return self
-        target = self.bench.apps_path / module
-        if not target.exists():
-            self.path.rename(target)
-        return self._as_installed(module)
 
     def _as_installed(self, module: str) -> "App":
         config = AppConfig(name=module, repo=self.config.repo, branch=self.config.branch)

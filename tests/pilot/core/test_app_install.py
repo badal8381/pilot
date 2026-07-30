@@ -82,7 +82,9 @@ def test_install_moves_the_app_under_its_importable_name(tmp_path: Path) -> None
     assert result.app.config.name == "india_compliance"
 
 
-def test_install_validates_an_already_cloned_app_where_it_is(tmp_path: Path) -> None:
+def test_install_stages_an_already_cloned_app_instead_of_re_cloning(tmp_path: Path) -> None:
+    """It ends up back in apps/, but is validated outside it - a bench-wide
+    operation reads the apps directory, so nothing unvetted may sit there."""
     bench = make_bench(tmp_path)
     bench.create_directories()
     _write_app_tree(bench.apps_path / "myapp", "myapp")
@@ -90,15 +92,38 @@ def test_install_validates_an_already_cloned_app_where_it_is(tmp_path: Path) -> 
     def unexpected_clone(self: App) -> None:
         raise AssertionError("an app already in apps/ must not be re-cloned")
 
+    validated_at = []
     with (
         patch.object(App, "clone", unexpected_clone),
+        patch.object(App, "_validate", lambda self: validated_at.append(self.path)),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
-        result = _make_app(bench, "myapp").install(skip_validations=True)
+        result = _make_app(bench, "myapp").install()
 
+    assert validated_at == [bench.staging_path / "myapp"]
     assert result.app.path == bench.apps_path / "myapp"
-    assert not bench.staging_path.exists()
+    assert not (bench.staging_path / "myapp").exists()
+
+
+def test_install_puts_an_already_cloned_app_back_when_it_fails_validation(tmp_path: Path) -> None:
+    """A working tree we did not clone is not ours to delete."""
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _write_app_tree(bench.apps_path / "myapp", "myapp")
+    (bench.apps_path / "myapp" / "local_work.txt").write_text("not ours\n")
+
+    def reject(self: App) -> None:
+        raise AppValidationError("nope")
+
+    with (
+        patch.object(App, "_validate", reject),
+        pytest.raises(AppValidationError),
+    ):
+        _make_app(bench, "myapp").install()
+
+    assert (bench.apps_path / "myapp" / "local_work.txt").read_text() == "not ours\n"
+    assert not (bench.staging_path / "myapp").exists()
 
 
 def test_install_discards_a_staged_clone_left_by_an_interrupted_run(tmp_path: Path) -> None:
