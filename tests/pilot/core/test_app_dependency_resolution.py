@@ -113,7 +113,7 @@ def test_resolution_drops_the_lines_that_explain_nothing(monkeypatch, tmp_path: 
     noisy = (
         "Command '/home/frappe/.local/bin/uv' failed with exit code 1.\n"
         "Using Python 3.14.6 environment at: /benches/bench1/env\n"
-        "  × No solution found when resolving dependencies:"
+        "  No solution found when resolving dependencies:"
     )
 
     monkeypatch.setattr(dependency_resolution, "ensure_uv", lambda: "/bin/uv")

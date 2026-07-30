@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import sys
 import tomllib
@@ -17,13 +16,24 @@ if TYPE_CHECKING:
     from pilot.core.app import App
     from pilot.core.bench import Bench
 
-__all__ = ["AdminEnvManager", "PythonEnvManager", "ensure_uv"]
+__all__ = ["AdminEnvManager", "PythonEnvManager", "ensure_uv", "find_uv"]
+
+
+def find_uv() -> str | None:
+    """uv on PATH, or wherever its installers put it.
+
+    A service PATH rarely carries ~/.local/bin, which is exactly where the uv
+    installer writes, so asking PATH alone reports a working uv as missing.
+    """
+    if uv := which("uv"):
+        return uv
+    installed = (Path.home() / ".local" / "bin" / "uv", Path.home() / ".cargo" / "bin" / "uv")
+    return next((str(path) for path in installed if path.exists()), None)
 
 
 def ensure_uv() -> str:
     """Path to uv, installing it first when the host has none."""
-    uv = shutil.which("uv")
-    if uv:
+    if uv := find_uv():
         return uv
 
     print("uv not found - installing via official installer...", flush=True)
@@ -33,13 +43,7 @@ def ensure_uv() -> str:
         print("curl installer failed - falling back to pip install uv...", flush=True)
         run_command([sys.executable, "-m", "pip", "install", "--user", "uv"], stream_output=True)
 
-    for candidate in (Path.home() / ".local" / "bin" / "uv", Path.home() / ".cargo" / "bin" / "uv"):
-        if candidate.exists():
-            return str(candidate)
-
-    # Re-check PATH in case the installer updated the shell profile.
-    uv = shutil.which("uv")
-    if uv:
+    if uv := find_uv():
         return uv
 
     raise BenchError("uv was installed but cannot be found. Add ~/.local/bin to your PATH and re-run.")
@@ -61,7 +65,7 @@ class AdminEnvManager:
 
     @property
     def uv(self) -> str:
-        uv = shutil.which("uv")
+        uv = find_uv()
         if not uv:
             raise RuntimeError("uv not found - run the Pilot install script to set it up")
         return uv
