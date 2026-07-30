@@ -458,3 +458,13 @@ def test_symlink_check_ignores_git_and_node_modules_internals(tmp_path: Path) ->
         (directory / "linked").symlink_to("/nowhere")
 
     SymlinkCheck().run(app)  # no raise
+
+
+def test_symlink_check_does_not_walk_through_an_allowed_symlinked_dir(tmp_path: Path) -> None:
+    """An allowed link must not fall through to the directory branch: is_dir()
+    follows links, so a link to its own parent would recurse until the OS
+    refused and then report the valid link as broken."""
+    app = _app_with_symlink(tmp_path, "myapp/loop", ".")
+
+    SymlinkCheck().run(app)  # no raise, and terminates
+    assert SymlinkCheck.get_invalid_symlinks(app.path) == []

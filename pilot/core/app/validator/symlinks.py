@@ -46,8 +46,9 @@ class SymlinkCheck:
             with os.scandir(pending.pop()) as entries:
                 for entry in entries:
                     path = Path(entry.path)
-                    if entry.is_symlink() and (reason := cls._rejection_reason(path, root)):
-                        found.append(f"  {path.relative_to(root)} -> {os.readlink(path)} ({reason})")
+                    if entry.is_symlink():
+                        if reason := cls._rejection_reason(path, root):
+                            found.append(f"  {path.relative_to(root)} -> {os.readlink(path)} ({reason})")
                     elif entry.is_dir() and entry.name not in SKIPPED_DIRS:
                         pending.append(path)
         return sorted(found)
