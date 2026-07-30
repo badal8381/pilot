@@ -91,7 +91,10 @@ class HooksCheck:
     """
 
     def run(self, app: "App") -> None:
-        tree = ast.parse((module_path(app) / "hooks.py").read_text())
+        hooks_path = module_path(app) / "hooks.py"
+        if not hooks_path.is_file():
+            return  # RepoStructureCheck owns this when it runs; updates skip it
+        tree = ast.parse(hooks_path.read_text())
 
         problems = []
         for name, value in _hook_assignments(tree):

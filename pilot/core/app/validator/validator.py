@@ -12,6 +12,8 @@ from pilot.core.app.validator.syntax import SyntaxCheck
 from pilot.core.app.validator.version_specifiers import VersionSpecifiersCheck
 
 if typing.TYPE_CHECKING:
+    from collections.abc import Callable
+
     from pilot.core.app import App
     from pilot.core.app.validator.base import ValidationCheck
 
@@ -35,3 +37,21 @@ class Validator:
     def validate(self) -> None:
         for check in self.checks:
             check.run(self.app)
+
+
+def update_checks() -> list["ValidationCheck"]:
+    """Checks an app must pass after it moves to a new revision.
+
+    Leaves out the repo-structure and dependency-declaration checks: an app
+    already on the bench predates those rules, and an update is the wrong moment
+    to start enforcing them. The import check is left out too - the pip install
+    that follows resolves the same dependencies against the real environment.
+    """
+    return [VersionSpecifiersCheck(), SymlinkCheck(), SyntaxCheck(), HooksCheck(), FixturesCheck()]
+
+
+def validate_updated_apps(apps: list["App"], on_progress: "Callable[[str], None]") -> None:
+    """Validate updated apps in place, before anything installs or builds them."""
+    for app in apps:
+        on_progress(f"Validating {app.config.name}...")
+        Validator(app, checks=update_checks()).validate()

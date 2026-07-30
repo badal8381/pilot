@@ -20,7 +20,10 @@ class VersionSpecifiersCheck:
     """
 
     def run(self, app: "App") -> None:
-        with open(app.path / "pyproject.toml", "rb") as f:
+        pyproject_path = app.path / "pyproject.toml"
+        if not pyproject_path.is_file():
+            return  # RepoStructureCheck owns this when it runs; updates skip it
+        with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)
         project = data.get("project", {})
         if not isinstance(project, dict):

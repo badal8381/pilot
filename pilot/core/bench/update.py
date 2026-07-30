@@ -21,12 +21,14 @@ class BenchUpdater:
         """Update each app to its pin, or resolve marketplace/branch targets live when `pins` is None (direct CLI update)."""
         import sys
 
+        from pilot.core.app.validator import validate_updated_apps
         from pilot.exceptions import CommandError, MigrateError
 
         live_lookup = pins is None
         marketplace_by_name = self._marketplace_registry() if live_lookup else {}
         pins = pins or {}
 
+        updated = []
         for app in self.bench.apps():
             if apps_filter is not None and app.config.name not in apps_filter:
                 continue
@@ -39,6 +41,12 @@ class BenchUpdater:
             except CommandError as error:
                 print(f"  Error updating {app.config.name}: {error}", file=sys.stderr)
                 raise MigrateError(f"Failed to update {app.config.name}") from error
+            updated.append(app)
+
+        # Every app is on its target revision now, so the checks see the tree
+        # migrate will actually run against. Failing here means nothing has been
+        # installed or built yet, and reverting is a checkout.
+        validate_updated_apps(updated, on_progress)
 
     @staticmethod
     def _marketplace_registry() -> dict:
