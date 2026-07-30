@@ -83,7 +83,7 @@ class ImportCheck:
         # update, where an app is allowed to predate that rule.
         table = (read_pyproject(app) or {}).get("tool", {}).get("bench", {})
         declared = table.get("frappe-dependencies", {})
-        paths = []
+        paths: list[Path] = []
         if not isinstance(declared, dict):
             return paths  # DependencyDeclarationsCheck reports the bad table on install
         for name in declared:

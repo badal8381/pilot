@@ -146,6 +146,11 @@ class App:
         """The commit checked out on disk, unlike installed_hash which reads dist-info."""
         return self._repository.repo.head_sha
 
+    @property
+    def current_branch(self) -> str:
+        """The branch checked out on disk, empty when HEAD is detached."""
+        return self._repository.repo.branch
+
     def is_on_revision(self, pin: RevisionPin) -> bool:
         return self._repository.is_on_revision(pin)
 
