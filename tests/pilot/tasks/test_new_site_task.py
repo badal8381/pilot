@@ -128,7 +128,7 @@ def test_run_reloads_workers_after_fetching_apps_and_before_provisioning(tmp_pat
 
 def test_run_reloads_workers_even_when_no_app_was_fetched(tmp_path: Path) -> None:
     """An app already on the bench can still postdate the running workers - it
-    may have arrived through `bench get-app` after they started."""
+    may have arrived through `pilot get-app` after they started."""
     from unittest.mock import MagicMock
 
     task = make_task(tmp_path, ["frappe"])

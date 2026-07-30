@@ -5,7 +5,7 @@ on:
     branches: [develop]
   pull_request:
     branches: [develop]
-  # Heavy (bench init clones the framework); allow manual runs too.
+  # Heavy (pilot init clones the framework); allow manual runs too.
   workflow_dispatch:
 
 jobs:
@@ -80,7 +80,7 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install yarn, bench and e2e deps
+      - name: Install yarn, Pilot and e2e deps
         run: |
           npm install -g yarn
           pip install -e ".[test,admin,e2e]"
@@ -108,8 +108,8 @@ jobs:
 
       - name: Run e2e tests
         working-directory: tests/e2e
-        # BENCH_BIN is intentionally unset so the harness uses the repo launcher
-        # (<repo>/bench), which writes to <repo>/benches where the harness reads.
+        # PILOT_BIN is intentionally unset so the harness uses the repo launcher
+        # (<repo>/bin/pilot), which writes to <repo>/benches where the harness reads.
         run: pytest -v -s --durations=10
         env:
           E2E_MARIADB_PASSWORD: admin

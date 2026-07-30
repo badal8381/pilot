@@ -625,7 +625,7 @@ def test_bench_sites_scans_filesystem(tmp_path: Path) -> None:
 
 
 def test_bench_init_apps_comes_from_config(tmp_path: Path) -> None:
-    """bench.init_apps() returns apps from bench.toml (used during bench init)."""
+    """bench.init_apps() returns apps from bench.toml (used during pilot init)."""
     bench = make_bench(tmp_path)
     init_apps = bench.init_apps()
     assert len(init_apps) == 1
