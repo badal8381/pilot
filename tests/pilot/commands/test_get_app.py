@@ -15,8 +15,9 @@ def make_resolver(name: str, deps: dict[str, str] | None = None) -> Resolver:
     return Resolver(
         app=name,
         repo=f"https://github.com/frappe/{name}",
-        target_type="branch",
-        target="main",
+        branch="main",
+        commit="a" * 40,
+        channel="stable",
         version="1.0.0",
         frappe_version="16.0.0",
         required_version="",
@@ -101,7 +102,7 @@ def test_short_circuit_still_populates_installed_dependencies(tmp_path: Path) ->
     with (
         patch.object(Marketplace, "read_all_apps", return_value=[helpdesk]),
         patch.object(Marketplace, "get_current_frappe_version", return_value="16.0.0"),
-        patch.object(Marketplace, "_read_apps_json", return_value="[]"),
+        patch.object(Marketplace, "_load_registry", return_value=[]),
     ):
         cmd = GetAppCommand(bench, repo="https://github.com/frappe/helpdesk", install_dependencies=True)
         cmd.run()
@@ -123,13 +124,14 @@ def test_still_installs_missing_dependency_when_parent_already_installed(tmp_pat
     with (
         patch.object(Marketplace, "read_all_apps", return_value=[helpdesk]),
         patch.object(Marketplace, "get_current_frappe_version", return_value="16.0.0"),
-        patch.object(Marketplace, "_read_apps_json", return_value="[]"),
+        patch.object(Marketplace, "_load_registry", return_value=[]),
         patch.object(
             App,
             "clone",
             autospec=True,
             side_effect=lambda app: app.path.mkdir(parents=True, exist_ok=True),
         ) as mock_clone,
+        patch.object(App, "checkout_commit"),
         patch.object(App, "_validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),

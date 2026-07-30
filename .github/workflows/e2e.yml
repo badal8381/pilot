@@ -20,15 +20,13 @@ jobs:
       matrix:
         include:
           # Dev bench on the rootless, per-user MariaDB server the wizard
-          # provisions from scratch; exercises app install/uninstall.
+          # provisions from scratch.
           - variant: mariadb
             db_type: mariadb
-            extra_app: "1"
           # PostgreSQL bench on the rootless, per-user PostgreSQL server the
           # wizard provisions from scratch.
           - variant: postgres
             db_type: postgres
-            extra_app: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -117,7 +115,6 @@ jobs:
           # CI validates this branch's frontend, so build the admin UI from source.
           E2E_BUILD_ADMIN: "1"
           E2E_DB_TYPE: ${{ matrix.db_type }}
-          E2E_EXTRA_APP: ${{ matrix.extra_app }}
 
       - name: Upload Playwright traces
         if: ${{ !cancelled() }}

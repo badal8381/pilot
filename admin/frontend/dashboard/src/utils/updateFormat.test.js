@@ -9,7 +9,7 @@ import {
   siteStatus,
   stateLabel,
   stateTone,
-} from './migrationFormat.js'
+} from './updateFormat.js'
 import { fmtDateTime } from './taskFormat.js'
 
 test('kindLabel formats update and site_migrate', () => {
