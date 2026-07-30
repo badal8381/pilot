@@ -83,6 +83,11 @@ _PATH_HOOKS = frozenset(
 )
 
 
+# Shapes a dict hook definitely isn't. A name or a call may still evaluate to a
+# dict at import time, so those are left alone rather than guessed at.
+_NOT_A_DICT = (ast.List, ast.Tuple, ast.Set, ast.Constant)
+
+
 class HooksCheck:
     """Verify hooks.py shapes and that its dotted paths point at real code.
 
@@ -98,7 +103,7 @@ class HooksCheck:
 
         problems = []
         for name, value in _hook_assignments(tree):
-            if name in _DICT_HOOKS and not isinstance(value, ast.Dict):
+            if name in _DICT_HOOKS and isinstance(value, _NOT_A_DICT):
                 problems.append(f"line {value.lineno}: {name} must be a dict")
                 continue
             if name not in _PATH_HOOKS:

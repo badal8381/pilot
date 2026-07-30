@@ -323,6 +323,13 @@ def test_hooks_fails_when_dict_hook_is_not_a_dict(tmp_path: Path) -> None:
         HooksCheck().run(app)
 
 
+def test_hooks_allows_a_dict_hook_built_elsewhere(tmp_path: Path) -> None:
+    """A name or a call may evaluate to a dict at import time - only a literal of
+    the wrong shape can be judged from the source."""
+    HooksCheck().run(_make_hooks_app(tmp_path, "DOC_EVENTS = {}\ndoc_events = DOC_EVENTS\n"))
+    HooksCheck().run(_make_hooks_app(tmp_path / "call", "doc_events = build_events()\n"))
+
+
 def test_hooks_fails_when_path_points_at_missing_submodule(tmp_path: Path) -> None:
     app = _make_hooks_app(tmp_path, 'after_migrate = "myapp.setup.install.after_migrate"\n')
     with pytest.raises(AppValidationError, match="'myapp' has no 'setup'"):
