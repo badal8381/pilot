@@ -1241,7 +1241,7 @@ def test_drop_bench_deletes_directory_with_no_sites(tmp_path: Path) -> None:
 def test_build_admin_rejects_old_node(monkeypatch: pytest.MonkeyPatch) -> None:
     from admin.backend.frontend import _check_node_version
 
-    monkeypatch.setattr("subprocess.run", lambda *a, **k: MagicMock(stdout="v18.20.8\n"))
+    monkeypatch.setattr("pilot.utils.run_command", lambda *a, **k: MagicMock(stdout=b"v18.20.8\n"))
     with pytest.raises(BenchError, match=r"Node\.js"):
         _check_node_version()
 
@@ -1249,7 +1249,7 @@ def test_build_admin_rejects_old_node(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_build_admin_accepts_supported_node(monkeypatch: pytest.MonkeyPatch) -> None:
     from admin.backend.frontend import _check_node_version
 
-    monkeypatch.setattr("subprocess.run", lambda *a, **k: MagicMock(stdout="v20.11.0\n"))
+    monkeypatch.setattr("pilot.utils.run_command", lambda *a, **k: MagicMock(stdout=b"v20.11.0\n"))
     _check_node_version()  # no raise
 
 
@@ -1259,7 +1259,21 @@ def test_build_admin_errors_when_node_missing(monkeypatch: pytest.MonkeyPatch) -
     def _missing(*a, **k):
         raise FileNotFoundError("node")
 
-    monkeypatch.setattr("subprocess.run", _missing)
+    monkeypatch.setattr("pilot.utils.run_command", _missing)
+    with pytest.raises(BenchError, match=r"Node\.js is required"):
+        _check_node_version()
+
+
+def test_build_admin_errors_when_node_exits_nonzero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """run_command raises on a failing exit code rather than returning it."""
+    from pilot.exceptions import CommandError
+
+    from admin.backend.frontend import _check_node_version
+
+    def _failing(*a, **k):
+        raise CommandError("Command 'node' failed with exit code 1.", returncode=1)
+
+    monkeypatch.setattr("pilot.utils.run_command", _failing)
     with pytest.raises(BenchError, match=r"Node\.js is required"):
         _check_node_version()
 

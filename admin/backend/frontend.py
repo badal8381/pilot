@@ -134,13 +134,12 @@ def _is_npm_install_stale(frontend: Path) -> bool:
 
 
 def _check_node_version() -> None:
-    import subprocess
+    from pilot.exceptions import CommandError
+    from pilot.utils import run_command
 
     try:
-        output = subprocess.run(
-            ["node", "--version"], capture_output=True, text=True, check=True, timeout=5
-        ).stdout.strip()
-    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        output = run_command(["node", "--version"], timeout=5).stdout.decode().strip()
+    except (OSError, CommandError) as error:
         raise BenchError(
             "Node.js is required to build the admin frontend but was not found. "
             "Install Node.js >= 20.11, or install a released build that ships the prebuilt frontend."

@@ -234,7 +234,7 @@ class App:
             if cloned_this_run:
                 shutil.rmtree(app.path, ignore_errors=True)
             raise
-
+        on_progress(f"'{app.config.name}' validated successfully installing.")
         on_progress(f"Installing {app.config.name}...")
         app._install_into_environment()
         app._register()
