@@ -17,7 +17,32 @@ if TYPE_CHECKING:
     from pilot.core.app import App
     from pilot.core.bench import Bench
 
-__all__ = ["AdminEnvManager", "PythonEnvManager"]
+__all__ = ["AdminEnvManager", "PythonEnvManager", "ensure_uv"]
+
+
+def ensure_uv() -> str:
+    """Path to uv, installing it first when the host has none."""
+    uv = shutil.which("uv")
+    if uv:
+        return uv
+
+    print("uv not found - installing via official installer...", flush=True)
+    try:
+        run_command(["sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"], stream_output=True)
+    except Exception:
+        print("curl installer failed - falling back to pip install uv...", flush=True)
+        run_command([sys.executable, "-m", "pip", "install", "--user", "uv"], stream_output=True)
+
+    for candidate in (Path.home() / ".local" / "bin" / "uv", Path.home() / ".cargo" / "bin" / "uv"):
+        if candidate.exists():
+            return str(candidate)
+
+    # Re-check PATH in case the installer updated the shell profile.
+    uv = shutil.which("uv")
+    if uv:
+        return uv
+
+    raise BenchError("uv was installed but cannot be found. Add ~/.local/bin to your PATH and re-run.")
 
 
 class AdminEnvManager:
@@ -117,7 +142,7 @@ class PythonEnvManager:
     def create_venv(self) -> None:
         if self.bench.python.exists():
             return
-        uv = self._ensure_uv()
+        uv = ensure_uv()
         version = self.bench.config.python_version
         run_command([uv, "venv", "--python", version, str(self.bench.env_path)], stream_output=True)
 
@@ -136,7 +161,7 @@ class PythonEnvManager:
         return env
 
     def install_app(self, app: "App") -> None:
-        uv = self._ensure_uv()
+        uv = ensure_uv()
         python = str(self.bench.env_path / "bin" / "python")
         run_command(
             [uv, "pip", "install", "--python", python, "-e", str(app.path)],
@@ -145,7 +170,7 @@ class PythonEnvManager:
         )
 
     def uninstall_app(self, app_name: str) -> None:
-        uv = self._ensure_uv()
+        uv = ensure_uv()
         python = str(self.bench.env_path / "bin" / "python")
         run_command([uv, "pip", "uninstall", "--python", python, app_name], stream_output=True)
 
@@ -185,35 +210,3 @@ class PythonEnvManager:
 
     def build_assets_for_app(self, app: "App") -> None:
         self._assets.build_assets_for_app(app)
-
-    def _ensure_uv(self) -> str:
-        uv = shutil.which("uv")
-        if uv:
-            return uv
-
-        print("uv not found - installing via official installer...", flush=True)
-        try:
-            run_command(
-                ["sh", "-c", "curl -LsSf https://astral.sh/uv/install.sh | sh"],
-                stream_output=True,
-            )
-        except Exception:
-            print("curl installer failed - falling back to pip install uv...", flush=True)
-            run_command(
-                [sys.executable, "-m", "pip", "install", "--user", "uv"],
-                stream_output=True,
-            )
-
-        for candidate in [
-            Path.home() / ".local" / "bin" / "uv",
-            Path.home() / ".cargo" / "bin" / "uv",
-        ]:
-            if candidate.exists():
-                return str(candidate)
-
-        # Re-check PATH in case the shell profile was updated.
-        uv = shutil.which("uv")
-        if uv:
-            return uv
-
-        raise BenchError("uv was installed but cannot be found. Add ~/.local/bin to your PATH and re-run.")

@@ -620,7 +620,7 @@ def test_requirements_skips_app_without_python_setup_files(tmp_path: Path) -> No
     # No pyproject.toml or setup.py
 
     with (
-        patch("pilot.managers.environment.PythonEnvManager._ensure_uv", return_value="uv"),
+        patch("pilot.managers.environment.ensure_uv", return_value="uv"),
         patch("pilot.utils.run_command") as mock_rc,
     ):
         BenchRuntime(bench)._install_python_requirements(lambda _message: None)
@@ -638,7 +638,7 @@ def test_requirements_installs_app_with_pyproject_toml(tmp_path: Path) -> None:
     (app_dir / "pyproject.toml").write_text("[project]\nname = 'myapp'\n")
 
     with (
-        patch("pilot.managers.environment.PythonEnvManager._ensure_uv", return_value="uv"),
+        patch("pilot.managers.environment.ensure_uv", return_value="uv"),
         patch("pilot.utils.run_command") as mock_rc,
     ):
         BenchRuntime(bench)._install_python_requirements(lambda _message: None)
@@ -656,7 +656,7 @@ def test_requirements_installs_app_with_setup_py(tmp_path: Path) -> None:
     (app_dir / "setup.py").write_text("from setuptools import setup; setup()\n")
 
     with (
-        patch("pilot.managers.environment.PythonEnvManager._ensure_uv", return_value="uv"),
+        patch("pilot.managers.environment.ensure_uv", return_value="uv"),
         patch("pilot.utils.run_command") as mock_rc,
     ):
         BenchRuntime(bench)._install_python_requirements(lambda _message: None)

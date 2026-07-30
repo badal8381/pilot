@@ -9,6 +9,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from pilot.exceptions import AppValidationError, BenchError, CommandError
+from pilot.managers.environment import ensure_uv
 from pilot.managers.platform import add_mysqlclient_flags
 from pilot.utils import run_command
 
@@ -32,7 +33,7 @@ class TmpEnv:
     def create(self, frappe_path: Path) -> "TmpEnv":
         self._dir = tempfile.mkdtemp(prefix="pilot-app-validate-")
         try:
-            run_command([self._uv(), "venv", str(self.path)], stream_output=True)
+            run_command([ensure_uv(), "venv", str(self.path)], stream_output=True)
         except CommandError as exc:
             raise AppValidationError(
                 f"Failed to create temporary environment for validation:\n{exc.message}"
@@ -82,22 +83,9 @@ class TmpEnv:
         python = str(self.path / "bin" / "python")
         env = os.environ.copy()
         add_mysqlclient_flags(env)
-        run_command([self._uv(), "pip", "install", "--python", python, *map(str, paths)], env=env)
+        run_command([ensure_uv(), "pip", "install", "--python", python, *map(str, paths)], env=env)
 
     def delete(self) -> None:
         if self._dir is not None:
             shutil.rmtree(self._dir, ignore_errors=True)
             self._dir = None
-
-    @staticmethod
-    def _uv() -> str:
-        uv = shutil.which("uv")
-        if uv:
-            return uv
-        for candidate in (
-            Path.home() / ".local" / "bin" / "uv",
-            Path.home() / ".cargo" / "bin" / "uv",
-        ):
-            if candidate.exists():
-                return str(candidate)
-        raise BenchError("uv not found - run the pilot install script to set it up")

@@ -593,6 +593,22 @@ def test_dependency_paths_includes_all_installed_apps(tmp_path: Path) -> None:
     assert "myapp" not in paths  # the app being validated is excluded
 
 
+def test_validation_env_installs_uv_when_the_host_has_none(monkeypatch, tmp_path: Path) -> None:
+    """Validation must not fail just because uv isn't on PATH - it installs it,
+    the same way the real app install does."""
+    from pilot.core.app.validator.utils import tmp_env as tmp_env_module
+
+    commands: list[list[str]] = []
+    monkeypatch.setattr(tmp_env_module, "ensure_uv", lambda: "/installed/bin/uv")
+    monkeypatch.setattr(tmp_env_module, "run_command", lambda argv, **kwargs: commands.append(argv))
+
+    env = tmp_env_module.TmpEnv()
+    env._dir = str(tmp_path)
+    env._pip_install([tmp_path / "frappe"])
+
+    assert commands[0][0] == "/installed/bin/uv"
+
+
 def test_validation_env_installs_with_mysqlclient_build_flags(monkeypatch, tmp_path: Path) -> None:
     """The throwaway venv builds mysqlclient too, so it needs the same flags
     the bench env gets - without them uv fails on macOS ('Can not find valid
