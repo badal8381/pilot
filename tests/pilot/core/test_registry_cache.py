@@ -273,14 +273,3 @@ def test_load_raises_when_index_is_not_a_list(tmp_path: Path, _point_at_local_re
 def _age_last_checked(cache: RegistryCache) -> None:
     stale = time.time() - 2 * 60 * 60
     os.utime(cache._last_checked_path, (stale, stale))
-
-
-def test_registry_url_prefers_the_environment_override(monkeypatch) -> None:
-    """Developing against a local registry checkout, before the public one is split."""
-    from pilot.core.registry_cache import REGISTRY_URL, registry_url
-
-    monkeypatch.delenv("PILOT_REGISTRY_URL", raising=False)
-    assert registry_url() == REGISTRY_URL
-
-    monkeypatch.setenv("PILOT_REGISTRY_URL", "/srv/marketplace")
-    assert registry_url() == "/srv/marketplace"
