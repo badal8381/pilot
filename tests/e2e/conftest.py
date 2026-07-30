@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from harness.bench import Bench
+from harness.registry import build_registry
 from playwright.sync_api import Browser, BrowserContext, Page, expect
 
 HERE = Path(__file__).resolve().parent
@@ -38,11 +39,21 @@ def pytest_runtest_setup(item):
         pytest.skip(f"serial: earlier step '{earlier}' failed")
 
 
+@pytest.fixture(scope="session")
+def registry() -> Path:
+    """Registry the bench clones, so the catalog needs no network and cannot
+    break when the public registry's format changes."""
+    return build_registry(RESULTS_DIR / "registry")
+
+
 @pytest.fixture(scope="module")
-def bench(request) -> Bench:
+def bench(request, registry: Path) -> Bench:
     """Create a fresh bench, start the wizard, and tear it down after."""
     name = request.module.BENCH_NAME
-    extra_env = getattr(request.module, "BENCH_ENV", None)
+    extra_env = {
+        "PILOT_REGISTRY_URL": str(registry),
+        **(getattr(request.module, "BENCH_ENV", None) or {}),
+    }
     b = Bench(name=name, env=extra_env)
 
     # A previous keep-on-failure run may have left this bench behind; clear it so
