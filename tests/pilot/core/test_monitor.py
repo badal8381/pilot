@@ -1,12 +1,15 @@
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import PropertyMock, patch
 
+import psutil
 import pytest
 
 from pilot.config import BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig
 from pilot.core.bench import Bench
 from pilot.core.server.monitoring import Monitor, MonitorConfigurator
+from pilot.core.server.monitoring_proc import CPU_STAT_FIELDS
 
 
 @pytest.fixture(autouse=True)
@@ -187,18 +190,93 @@ def test_compute_io_reports_bytes_per_sec(tmp_path: Path) -> None:
     assert monitor._disk_io == {"read_bytes_per_sec": 1000.0, "write_bytes_per_sec": 500.0}
 
 
+def _disk_counter(read_bytes: int, write_bytes: int) -> SimpleNamespace:
+    return SimpleNamespace(read_bytes=read_bytes, write_bytes=write_bytes)
+
+
+def _net_counter(bytes_recv: int, bytes_sent: int) -> SimpleNamespace:
+    return SimpleNamespace(bytes_recv=bytes_recv, bytes_sent=bytes_sent)
+
+
 def test_disk_io_fields_ignores_partitions(tmp_path: Path) -> None:
+    """Partitions and dm-/loop devices double-count the disk underneath them."""
     monitor = _make_monitor(_make_bench(tmp_path))
-    diskstats = tmp_path / "diskstats"
-    diskstats.write_text(
-        "   8       0 sda 100 0 2000 0 50 0 1000 0 0 0 0\n"
-        "   8       1 sda1 40 0 800 0 20 0 400 0 0 0 0\n"
-        "  259       0 nvme0n1 10 0 200 0 5 0 100 0 0 0 0\n"
-    )
-    with patch(
-        "pilot.core.server.monitoring_proc.Path",
-        side_effect=lambda p: diskstats if p == "/proc/diskstats" else Path(p),
-    ):
+    counters = {
+        "sda": _disk_counter(2000, 1000),
+        "sda1": _disk_counter(800, 400),
+        "nvme0n1": _disk_counter(200, 100),
+        "dm-0": _disk_counter(9999, 9999),
+        "loop0": _disk_counter(5555, 5555),
+    }
+    with patch("psutil.disk_io_counters", return_value=counters):
         result = monitor._disk_io_fields()
 
-    assert result == {"read_bytes": (2000 + 200) * 512, "write_bytes": (1000 + 100) * 512}
+    assert result == {"read_bytes": 2000 + 200, "write_bytes": 1000 + 100}
+
+
+def test_net_fields_excludes_loopback(tmp_path: Path) -> None:
+    monitor = _make_monitor(_make_bench(tmp_path))
+    counters = {
+        "eth0": _net_counter(1000, 200),
+        "lo": _net_counter(9999, 9999),
+        "lo0": _net_counter(8888, 8888),
+    }
+    with patch("psutil.net_io_counters", return_value=counters):
+        result = monitor._net_fields()
+
+    assert result == {"rx_bytes": 1000, "tx_bytes": 200}
+
+
+def test_cpu_fields_defaults_absent_states_to_zero(tmp_path: Path) -> None:
+    """macOS reports no iowait/irq/softirq/steal; the sample must still complete."""
+    monitor = _make_monitor(_make_bench(tmp_path))
+    times = SimpleNamespace(user=100.0, nice=1.0, system=50.0, idle=800.0)
+    with patch("psutil.cpu_times", return_value=times):
+        fields = monitor._cpu_fields()
+
+    assert set(fields) == set(CPU_STAT_FIELDS)
+    assert fields["user"] == 100.0
+    assert fields["iowait"] == 0.0
+    assert fields["steal"] == 0.0
+
+
+def test_proc_memory_falls_back_to_uss_without_pss(tmp_path: Path) -> None:
+    """Linux reports PSS; platforms without it fall back to USS, not to zero."""
+    monitor = _make_monitor(_make_bench(tmp_path))
+    process = SimpleNamespace(memory_full_info=lambda: SimpleNamespace(uss=4 * 1024 * 1024))
+    with patch("psutil.Process", return_value=process):
+        assert monitor._proc_memory_kb(1234) == 4096
+
+    process = SimpleNamespace(
+        memory_full_info=lambda: SimpleNamespace(pss=2 * 1024 * 1024, uss=4 * 1024 * 1024)
+    )
+    with patch("psutil.Process", return_value=process):
+        assert monitor._proc_memory_kb(1234) == 2048
+
+
+def test_io_bytes_is_zero_where_the_platform_has_no_counters(tmp_path: Path) -> None:
+    monitor = _make_monitor(_make_bench(tmp_path))
+    with patch("psutil.Process", return_value=SimpleNamespace()):
+        assert monitor._io_bytes(1234) == (0, 0)
+
+    process = SimpleNamespace(
+        io_counters=lambda: SimpleNamespace(read_bytes=500, write_bytes=250)
+    )
+    with patch("psutil.Process", return_value=process):
+        assert monitor._io_bytes(1234) == (500, 250)
+
+
+def test_collect_application_metrics_marks_a_vanished_process_missing(tmp_path: Path) -> None:
+    """A pid that exits between resolution and reading must not kill the tick."""
+    monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
+    monitor._targets = {"web": 4242}
+    app_log = tmp_path / "app.log"
+
+    with (
+        patch.object(type(monitor), "log_path", new_callable=PropertyMock, return_value=app_log),
+        patch("psutil.Process", side_effect=psutil.NoSuchProcess(4242)),
+    ):
+        monitor.collect_application_metrics()
+
+    entry = json.loads(app_log.read_text().splitlines()[-1])
+    assert entry["processes"] == [{"service": "web", "pid": 4242, "missing": True}]

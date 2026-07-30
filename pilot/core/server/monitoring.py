@@ -8,6 +8,8 @@ import typing
 from datetime import UTC, datetime
 from pathlib import Path
 
+import psutil
+
 from pilot.core.server.monitoring_config import MonitorConfigurator
 from pilot.core.server.monitoring_proc import ProcMetricsReader
 from pilot.core.server.monitoring_processes import ProcessResolver
@@ -16,7 +18,7 @@ from pilot.utils import cli_root, iter_sibling_benches
 if typing.TYPE_CHECKING:
     from pilot.core.bench import Bench
 
-# Gap between the two /proc samples used to turn cumulative counters into a rate.
+# Gap between the two samples used to turn cumulative counters into a rate.
 CPU_SAMPLE_INTERVAL = 1.0
 
 # Raw MariaDB status counters/gauges + variables logged per cycle; the provider
@@ -56,8 +58,8 @@ class Monitor:
         return self._targets
 
     def sample_cpu(self) -> None:
-        pids = [pid for pid in self.monitored_targets().values() if Path(f"/proc/{pid}").exists()]
-        self._cpu_before = (self._cpu_fields(), {pid: self._proc_ticks(pid) for pid in pids})
+        pids = [pid for pid in self.monitored_targets().values() if psutil.pid_exists(pid)]
+        self._cpu_before = (self._cpu_fields(), {pid: self._proc_cpu_seconds(pid) for pid in pids})
 
     def compute_cpu(self) -> None:
         assert self._cpu_before is not None, "sample_cpu() must run before compute_cpu()"
@@ -191,10 +193,11 @@ class Monitor:
     def collect_application_metrics(self) -> None:
         processes = []
         for service, pid in self.monitored_targets().items():
-            if not Path(f"/proc/{pid}").exists():
+            try:
+                processes.append(self._process_metrics(service, pid))
+            except psutil.NoSuchProcess:
+                # Either never started, or exited between resolving the pid and reading it.
                 processes.append({"service": service, "pid": pid, "missing": True})
-                continue
-            processes.append(self._process_metrics(service, pid))
 
         self._append(
             self.log_path,
@@ -205,23 +208,22 @@ class Monitor:
             },
         )
 
-    def _proc_usage(self, ticks_before: int, pid: int, delta_total: int) -> float:
+    def _proc_usage(self, seconds_before: float, pid: int, delta_total: float) -> float:
         try:
-            delta = self._proc_ticks(pid) - ticks_before
-        except FileNotFoundError:
+            delta = self._proc_cpu_seconds(pid) - seconds_before
+        except psutil.NoSuchProcess:
             return 0.0
         return round(delta / delta_total * 100, 2) if delta_total > 0 else 0.0
 
     def _process_metrics(self, service: str, pid: int) -> dict:
-        status = self._read_status(pid)
-        pss_memory = self._read_pss(pid)
+        memory_kb = self._proc_memory_kb(pid)
         read_bytes, write_bytes = self._io_bytes(pid)
         return {
             "service": service,
             "pid": pid,
-            "state": status.get("State", "?").split()[0],
+            "state": self._process_state(pid),
             "cpu_percent": self._cpu_percent(pid),
-            "memory_rss_mb": round(pss_memory / 1024, 2),
+            "memory_rss_mb": round(memory_kb / 1024, 2),
             "read_bytes": read_bytes,
             "write_bytes": write_bytes,
             "open_fds": self._open_fds(pid),
@@ -230,11 +232,11 @@ class Monitor:
     def _cpu_percent(self, pid: int) -> float:
         return self._proc_cpu.get(pid, 0.0)
 
-    def _cpu_fields(self) -> dict[str, int]:
+    def _cpu_fields(self) -> dict[str, float]:
         return self._proc_reader.cpu_fields()
 
-    def _proc_ticks(self, pid: int) -> int:
-        return self._proc_reader.proc_ticks(pid)
+    def _proc_cpu_seconds(self, pid: int) -> float:
+        return self._proc_reader.proc_cpu_seconds(pid)
 
     def _net_fields(self) -> dict[str, int]:
         return self._proc_reader.net_fields()
@@ -242,11 +244,11 @@ class Monitor:
     def _disk_io_fields(self) -> dict[str, int]:
         return self._proc_reader.disk_io_fields()
 
-    def _read_status(self, pid: int) -> dict[str, str]:
-        return self._proc_reader.read_status(pid)
+    def _process_state(self, pid: int) -> str:
+        return self._proc_reader.process_state(pid)
 
-    def _read_pss(self, pid: int) -> int:
-        return self._proc_reader.read_pss(pid)
+    def _proc_memory_kb(self, pid: int) -> int:
+        return self._proc_reader.proc_memory_kb(pid)
 
     def _io_bytes(self, pid: int) -> tuple[int, int]:
         return self._proc_reader.io_bytes(pid)
