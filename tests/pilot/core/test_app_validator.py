@@ -154,7 +154,7 @@ def test_dependency_declarations_fails_when_frappe_dependencies_missing_entirely
         '[project]\nname = "myapp"\n',
         {"myapp/hooks.py": "app_name = 'myapp'\n"},
     )
-    with pytest.raises(AppValidationError, match="must declare 'frappe'"):
+    with pytest.raises(AppValidationError, match="must declare the frappe versions it supports"):
         Validator(app, checks=_static_checks()).validate()
 
 
@@ -167,7 +167,7 @@ def test_dependency_declarations_fails_when_frappe_dependencies_omits_frappe(
         '[project]\nname = "myapp"\n\n[tool.bench.frappe-dependencies]\nerpnext = ">=15"\n',
         {"myapp/hooks.py": "app_name = 'myapp'\n"},
     )
-    with pytest.raises(AppValidationError, match="must declare 'frappe'"):
+    with pytest.raises(AppValidationError, match="must declare the frappe versions it supports"):
         Validator(app, checks=_static_checks()).validate()
 
 
@@ -181,6 +181,60 @@ def test_dependency_declarations_excludes_frappe_from_hooks_comparison(tmp_path:
         {"myapp/hooks.py": "app_name = 'myapp'\n"},  # no required_apps at all
     )
     Validator(app, checks=_static_checks()).validate()
+
+
+def test_dependency_declarations_skips_the_frappe_app_itself(tmp_path: Path) -> None:
+    """frappe has no [tool.bench.frappe-dependencies] - it is the dependency."""
+    app = _make_app(
+        tmp_path, "frappe", '[project]\nname = "frappe"\n', {"frappe/hooks.py": "app_name = 'frappe'\n"}
+    )
+    Validator(app, checks=_static_checks()).validate()
+
+
+def test_dependency_declarations_accepts_a_prerelease_version_range(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n\n'
+        '[tool.bench.frappe-dependencies]\nfrappe = ">=16.0.0-dev,<=17.0.0-dev"\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    Validator(app, checks=_static_checks()).validate()
+
+
+def test_dependency_declarations_fails_on_an_invalid_version_specifier(tmp_path: Path) -> None:
+    """A missing comma is the same defect uv rejects in [project] dependencies."""
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n\n'
+        '[tool.bench.frappe-dependencies]\nfrappe = ">=16.0.0-dev <17.0.0-dev"\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    with pytest.raises(AppValidationError, match="declares an invalid version for 'frappe'"):
+        Validator(app, checks=_static_checks()).validate()
+
+
+def test_dependency_declarations_fails_on_an_unpinned_version(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n\n[tool.bench.frappe-dependencies]\nfrappe = ""\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    with pytest.raises(AppValidationError, match="declares 'frappe' with no version"):
+        Validator(app, checks=_static_checks()).validate()
+
+
+def test_dependency_declarations_rejects_a_list_of_apps_without_versions(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n\n[tool.bench]\nfrappe-dependencies = ["frappe", "erpnext"]\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    with pytest.raises(AppValidationError, match="expected a table of versions, got list"):
+        DependencyDeclarationsCheck().get_frappe_dependencies(app)
 
 
 def test_version_specifiers_fails_on_invalid_requires_python(tmp_path: Path) -> None:
