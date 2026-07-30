@@ -15,6 +15,7 @@ from pilot.utils import cli_root, extract_tar_archive
 RELEASE_REPO = "frappe/pilot"
 _RELEASES_API = f"https://api.github.com/repos/{RELEASE_REPO}/releases?per_page=1"
 _TARBALL_ASSET = "pilot.tar.gz"
+_OBSOLETE_TOP_LEVEL_ENTRIES = ("bench",)
 
 Progress = Callable[[str], None]
 
@@ -107,13 +108,18 @@ def _swap_in(root: Path, staging: Path, on_progress: Progress) -> None:
 
     Directories in the release (pilot/, admin/) are swapped whole, so files dropped between
     versions are pruned. Data dirs (benches/, .admin-venv, .git) are absent from the tarball
-    and never touched. A stale top-level entry removed entirely between versions is left in
-    place - rare, and harmless. (ponytail: prune those too only if it ever matters.)
+    and never touched. Top-level entries are otherwise preserved unless explicitly listed
+    as obsolete.
     """
     backup = root.with_name(root.name + ".backup")
     _reset_dir(backup)
     swapped: list[tuple[str, bool]] = []
     try:
+        for name in _OBSOLETE_TOP_LEVEL_ENTRIES:
+            target = root / name
+            if target.exists() or target.is_symlink():
+                os.rename(target, backup / name)
+                swapped.append((name, True))
         for entry in sorted(staging.iterdir()):
             target = root / entry.name
             had_original = target.exists()
