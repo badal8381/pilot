@@ -14,6 +14,7 @@ from pilot.core.app.validator.dependency_declarations import DependencyDeclarati
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
 from pilot.core.app.validator.syntax import SyntaxCheck
+from pilot.core.app.validator.version_specifiers import VersionSpecifiersCheck
 from pilot.exceptions import AppValidationError
 
 
@@ -51,7 +52,7 @@ def _make_app(bench_root: Path, name: str, pyproject: str, files: dict[str, str]
 
 def _static_checks() -> list:
     """Static checks only; ImportCheck needs a real throwaway venv."""
-    return [RepoStructureCheck(), SyntaxCheck(), DependencyDeclarationsCheck()]
+    return [RepoStructureCheck(), VersionSpecifiersCheck(), SyntaxCheck(), DependencyDeclarationsCheck()]
 
 
 _SETUPTOOLS_BUILD = '[build-system]\nrequires = ["setuptools>=61"]\nbuild-backend = "setuptools.build_meta"\n'
@@ -173,6 +174,40 @@ def test_dependency_declarations_excludes_frappe_from_hooks_comparison(tmp_path:
         {"myapp/hooks.py": "app_name = 'myapp'\n"},  # no required_apps at all
     )
     Validator(app, checks=_static_checks()).validate()
+
+
+def test_version_specifiers_fails_on_invalid_requires_python(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\nrequires-python = ">=20.19 <21"\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    with pytest.raises(AppValidationError, match="invalid requires-python"):
+        Validator(app, checks=_static_checks()).validate()
+
+
+def test_version_specifiers_fails_on_invalid_dependency_specifier(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\ndependencies = ["frappe >=20.19 <21"]\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    with pytest.raises(AppValidationError, match="invalid dependency"):
+        Validator(app, checks=_static_checks()).validate()
+
+
+def test_version_specifiers_passes_for_valid_specs(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\nrequires-python = ">=20.19,<21"\n'
+        'dependencies = ["requests>=2,<3"]\n'
+        '[project.optional-dependencies]\ndev = ["pytest>=7"]\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    Validator(app, checks=[RepoStructureCheck(), VersionSpecifiersCheck()]).validate()
 
 
 def test_import_check_passes_when_all_imports_resolve(tmp_path: Path) -> None:

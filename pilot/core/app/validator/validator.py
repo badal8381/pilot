@@ -6,6 +6,7 @@ from pilot.core.app.validator.dependency_declarations import DependencyDeclarati
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
 from pilot.core.app.validator.syntax import SyntaxCheck
+from pilot.core.app.validator.version_specifiers import VersionSpecifiersCheck
 
 if typing.TYPE_CHECKING:
     from pilot.core.app import App
@@ -19,6 +20,7 @@ class Validator:
         self.app = app
         self.checks = checks or [
             RepoStructureCheck(),
+            VersionSpecifiersCheck(),
             SyntaxCheck(),
             DependencyDeclarationsCheck(),
             ImportCheck(),
