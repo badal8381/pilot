@@ -71,7 +71,9 @@ class RegistryCache:
         try:
             return json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
-            raise RegistryUnavailableError(f"Could not read the marketplace registry at {path}: {exc}") from exc
+            raise RegistryUnavailableError(
+                f"Could not read the marketplace registry at {path}: {exc}"
+            ) from exc
 
     def ensure_fresh(self) -> None:
         """Clone on first use; later reject tampering and refresh hourly."""
