@@ -263,8 +263,21 @@ class AppRepository:
         self._checkout_pinned_ref(sha)
 
     def _checkout_pinned_ref(self, ref: str) -> None:
-        """Land on `ref`, keeping the configured branch name attached instead of a detached HEAD."""
+        """Land on `ref`, keeping the configured branch name attached instead of a detached HEAD.
+
+        Stashes first, as switching branches does. Building an app's assets writes
+        generated files back into its own repo - components.d.ts, yarn.lock - so
+        the update after a build would find a dirty tree and git would refuse to
+        check anything out. The stash is left alone on success: the revision being
+        moved to is free to conflict with it, and dropping it would lose work.
+        """
+        stashed = self.repo.stash_all()
         branch = self.app.config.branch
         if branch and not self.is_commit_hash(branch) and self.repo.checkout_new_branch(branch, ref):
             return
-        run_command(["git", "-C", str(self.app.path), "checkout", ref])
+        try:
+            run_command(["git", "-C", str(self.app.path), "checkout", ref])
+        except CommandError:
+            if stashed:
+                self.repo.stash_pop()
+            raise
