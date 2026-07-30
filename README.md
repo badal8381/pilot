@@ -149,6 +149,7 @@ See [Admin UI](docs/admin-ui.md) and [Admin API](docs/admin-api.md).
 - [Architecture](docs/architecture.md)
 - [Commands](docs/commands.md)
 - [Configuration](docs/configuration.md)
+- [App Dependencies](docs/app-dependencies.md)
 - [Tasks](docs/tasks.md)
 - [Admin API](docs/admin-api.md)
 - [Admin UI](docs/admin-ui.md)

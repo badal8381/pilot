@@ -64,7 +64,6 @@ class AppDependencyInstaller:
             dependency = App(AppConfig(name=dep.app, repo=dep.repo, branch=dep.branch), self.bench)
             dependency.install(
                 install_dependencies=False,
-                skip_validations=True,
                 commit=dep.commit,
                 on_progress=on_progress,
             )
@@ -90,5 +89,5 @@ class AppDependencyInstaller:
     def _missing_required_apps(self) -> list[str]:
         from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
 
-        required = DependencyDeclarationsCheck()._get_pyproject_required_apps(self.app)
+        required = DependencyDeclarationsCheck().get_frappe_dependencies(self.app)
         return [name for name in required if not self.bench.is_app_installed(name)]

@@ -219,11 +219,10 @@ class BenchRuntime:
         return self.bench.python.exists()
 
     def _install_python_requirements(self, on_progress: Callable[[str], None]) -> None:
-        from pilot.managers.environment import PythonEnvManager
+        from pilot.managers.environment import ensure_uv
         from pilot.utils import run_command
 
-        manager = PythonEnvManager(self.bench)
-        uv = manager._ensure_uv()
+        uv = ensure_uv()
         python = str(self.bench.python)
 
         for app in self.bench.apps():

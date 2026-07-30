@@ -27,6 +27,7 @@ class BenchUpdater:
         marketplace_by_name = self._marketplace_registry() if live_lookup else {}
         pins = pins or {}
 
+        updated = []
         for app in self.bench.apps():
             if apps_filter is not None and app.config.name not in apps_filter:
                 continue
@@ -42,6 +43,14 @@ class BenchUpdater:
             except CommandError as error:
                 print(f"  Error updating {app.config.name}: {error}", file=sys.stderr)
                 raise MigrateError(f"Failed to update {app.config.name}") from error
+            updated.append(app)
+
+        # Every app is on its target revision now, so the checks see the tree
+        # migrate will actually run against. Failing here means nothing has been
+        # installed or built yet, and reverting is a checkout.
+        for app in updated:
+            on_progress(f"Validating {app.config.name}...")
+            app.validate()
 
     @staticmethod
     def _follows_its_branch(app: "App", marketplace_by_name: dict, live_lookup: bool) -> bool:
