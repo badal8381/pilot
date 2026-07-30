@@ -25,7 +25,7 @@ def ensure_admin_frontend(on_progress: Callable[[str], None] = lambda message: N
     if _has_admin_dist(root):
         return
     raise BenchError(
-        "Admin UI is missing from this release. Reinstall bench-cli, or run it from a source checkout."
+        "Admin UI is missing from this release. Reinstall Pilot, or run it from a source checkout."
     )
 
 
@@ -92,7 +92,7 @@ def _find_frontend() -> Path:
     if (candidate / "package.json").exists():
         return candidate
     raise BenchError(
-        "admin/frontend/dashboard not found. This command requires the bench-cli source directory "
+        "admin/frontend/dashboard not found. This command requires the Pilot source directory "
         "with admin/frontend/dashboard/."
     )
 
@@ -104,7 +104,7 @@ def _find_editor() -> Path:
     if (candidate / "package.json").exists():
         return candidate
     raise BenchError(
-        "admin/frontend/editor not found. This command requires the bench-cli source directory "
+        "admin/frontend/editor not found. This command requires the Pilot source directory "
         "with admin/frontend/editor/."
     )
 
@@ -116,7 +116,7 @@ def _find_in_app_embed() -> Path:
     if (candidate / "package.json").exists():
         return candidate
     raise BenchError(
-        "admin/frontend/in-app-embed not found. This command requires the bench-cli source directory "
+        "admin/frontend/in-app-embed not found. This command requires the Pilot source directory "
         "with admin/frontend/in-app-embed/."
     )
 

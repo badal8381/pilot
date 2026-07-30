@@ -1,4 +1,4 @@
-"""Unit tests for bench-cli command classes."""
+"""Unit tests for Pilot command classes."""
 
 from __future__ import annotations
 
@@ -41,8 +41,8 @@ def make_bench(tmp_path: Path) -> Bench:
 
 
 def _ensure_database_credentials(bench_dir: Path) -> None:
-    """The DB-credential step of `bench init` (see BenchInitializer) - database
-    ports/passwords are generated there, not by `bench new`."""
+    """The DB-credential step of `pilot init` (see BenchInitializer) - database
+    ports/passwords are generated there, not by `pilot new`."""
     from pilot.core.bench import Bench
     from pilot.core.bench.initializer import BenchInitializer
 
@@ -156,7 +156,7 @@ def test_new_command_first_bench_has_no_jwks_url(tmp_path: Path, monkeypatch: py
 def test_new_command_postgres_bench_has_no_password_yet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`bench new` alone must not provision the shared DB server - only `bench
+    """`pilot new` alone must not provision the shared DB server - only `pilot
     init` does (BenchInitializer._ensure_database_credentials)."""
     from pilot.commands.bench.create import NewCommand
 
