@@ -30,15 +30,11 @@ class _FakeBench:
         apps = []
         for child in self.apps_path.iterdir():
             if child.is_dir() and (child / "pyproject.toml").exists():
-                apps.append(
-                    App(
-                        AppConfig(
-                            name=child.name, repo=f"https://example.com/{child.name}.git", branch="main"
-                        ),
-                        self,
-                    )
-                )
+                apps.append(self.app(child.name))
         return apps
+
+    def app(self, name: str) -> App:
+        return App(AppConfig(name=name, repo=f"https://example.com/{name}.git", branch="main"), self)
 
 
 def _make_app(bench_root: Path, name: str, pyproject: str, files: dict[str, str]) -> App:
@@ -592,9 +588,10 @@ def test_import_check_skips_test_files(tmp_path: Path) -> None:
     assert check._imported_module_locations(app) == {}
 
 
-def test_dependency_paths_includes_all_installed_apps(tmp_path: Path) -> None:
-    """Cross-app conflict detection: the tmp env resolves against every
-    installed bench app, not just the new app's declared required apps."""
+def test_dependency_paths_covers_declared_apps_only(tmp_path: Path) -> None:
+    """Installing every bench app instead would fail on apps that pin conflicting
+    versions of a shared package - they coexist only because the real environment
+    installs one app at a time."""
     _make_fake_frappe(tmp_path)
     _make_app(
         tmp_path,
@@ -602,18 +599,43 @@ def test_dependency_paths_includes_all_installed_apps(tmp_path: Path) -> None:
         '[project]\nname = "erpnext"\nversion = "0.0.1"\n',
         {"erpnext/hooks.py": "app_name = 'erpnext'\n"},
     )
+    _make_app(
+        tmp_path,
+        "unrelated",
+        '[project]\nname = "unrelated"\nversion = "0.0.1"\n',
+        {"unrelated/hooks.py": "app_name = 'unrelated'\n"},
+    )
     app = _make_app(
         tmp_path,
         "myapp",
-        '[project]\nname = "myapp"\nversion = "0.0.1"\n',
+        '[project]\nname = "myapp"\nversion = "0.0.1"\n\n'
+        '[tool.bench.frappe-dependencies]\nfrappe = ">=16.0.0,<17.0.0"\nerpnext = ">=16.0.0,<17.0.0"\n',
         {"myapp/hooks.py": "app_name = 'myapp'\n"},
     )
 
     paths = {p.name for p in ImportCheck._dependency_paths(app)}
 
-    assert "frappe" in paths
-    assert "erpnext" in paths
-    assert "myapp" not in paths  # the app being validated is excluded
+    assert paths == {"erpnext"}  # frappe is installed first, the app itself last
+
+
+def test_import_check_skips_the_throwaway_venv_when_everything_resolves(monkeypatch, tmp_path) -> None:
+    """The expensive path only runs when the bench can't already satisfy an import."""
+    _make_fake_frappe(tmp_path)
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n',
+        {
+            "myapp/hooks.py": "app_name = 'myapp'\n",
+            "myapp/utils.py": "import frappe\nfrom myapp.hooks import app_name\n",
+        },
+    )
+
+    def fail(*args, **kwargs):
+        raise AssertionError("no venv should be created when imports resolve on disk")
+
+    monkeypatch.setattr("pilot.core.app.validator.utils.tmp_env.TmpEnv.create", fail)
+    ImportCheck().run(app)
 
 
 def test_validation_env_installs_uv_when_the_host_has_none(monkeypatch, tmp_path: Path) -> None:

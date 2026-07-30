@@ -22,43 +22,54 @@ class ImportCheck:
         self.tmp_env = TmpEnv()
 
     def run(self, app: "App") -> None:
+        locations = self._imported_module_locations(app)
+        unresolved = self._on_disk_resolver(app).unresolved(locations)
+        if not unresolved:
+            return  # everything imported is already on the bench - nothing to install
+
+        # Whatever is left has to come from this app's own dependencies, so
+        # install it in a throwaway venv and ask there.
         try:
             self.tmp_env.create(app.bench.apps_path / "frappe")
             self.tmp_env.install_app(app, self._dependency_paths(app))
-            self._check_imports(app)
+            self._check_imports(app, locations, unresolved)
         finally:
             self.tmp_env.delete()
 
     @staticmethod
-    def _dependency_paths(app: "App") -> list[Path]:
-        """Installed app paths to resolve alongside the new app in the tmp env.
-
-        Includes every installed bench app, not just declared required apps, so
-        cross-app python dependency conflicts surface during validation instead
-        of failing the real install later.
+    def _on_disk_resolver(app: "App") -> ModuleResolver:
+        """Resolve against what the bench already has: the app's own package, the
+        other apps' source trees (installed editable, so site-packages has no
+        directory for them), and the bench env's third-party packages.
         """
+        env_site_packages = next(app.bench.env_path.glob("lib/python*/site-packages"), None)
+        roots = [app.path, *(installed.path for installed in app.bench.apps())]
+        return ModuleResolver(*roots, *([env_site_packages] if env_site_packages else []))
+
+    @staticmethod
+    def _dependency_paths(app: "App") -> list[Path]:
+        """Paths of the apps this one declares, to install alongside it.
+
+        Installing every bench app instead would be both slow and wrong: apps that
+        pin conflicting versions of a shared package coexist fine when installed
+        one at a time, as the real environment does, but cannot be resolved
+        together - so an unrelated pair of apps would fail this app's validation.
+        """
+        from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
         from pilot.exceptions import BenchError
 
+        declared = DependencyDeclarationsCheck().get_frappe_dependencies(app)
         paths = []
-        seen = {app.config.name}
-        for installed in app.bench.apps():
-            if installed.config.name in seen:
-                continue
-            seen.add(installed.config.name)
+        for name in declared:
+            if name in ("frappe", app.config.name):
+                continue  # frappe is installed first; the app itself comes last
             try:
-                paths.append(installed.path)
+                paths.append(app.bench.app(name).path)
             except BenchError:
                 continue  # not installed - surfaces as an unresolved import instead
         return paths
 
-    def _check_imports(self, app: "App") -> None:
-        # Stat first; find_spec confirms misses in the tmp env.
-        locations = self._imported_module_locations(app)
-        resolver = ModuleResolver(self.tmp_env.path)
-        unresolved = resolver.unresolved(locations)
-        if not unresolved:
-            return
-
+    def _check_imports(self, app: "App", locations: dict[str, list[str]], unresolved: list[str]) -> None:
         reasons = self.tmp_env.resolve_modules(unresolved)
         if not reasons:
             return  # find_spec disagrees with the stat check - nothing's actually missing
