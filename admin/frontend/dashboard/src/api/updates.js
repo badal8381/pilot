@@ -1,6 +1,6 @@
 import { request } from './client'
 
-export const migrationsApi = {
+export const updatesApi = {
   list: (params = {}) => request.get('migrations', { searchParams: params }).json(),
   current: () => request.get('migrations/current').json(),
   detail: (id) => request.get(`migrations/${id}`).json(),

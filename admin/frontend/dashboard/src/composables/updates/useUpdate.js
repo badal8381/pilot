@@ -1,20 +1,20 @@
 import { computed, onUnmounted, ref } from 'vue'
-import { migrationsApi, isActive, needsAttention } from '@/api/migrations'
+import { updatesApi, isActive, needsAttention } from '@/api/updates'
 import { useAppUpdates } from '@/composables/apps/useAppUpdates'
-import { stateLabel } from '@/utils/migrationFormat'
+import { stateLabel } from '@/utils/updateFormat'
 
 const current = ref(null)
 const loaded = ref(false)
 const POLL_INTERVAL_MS = 3000
 let timer = null
 
-export function useMigration() {
+export function useUpdate() {
   const { updatesAvailable, checked, check } = useAppUpdates()
 
   async function load() {
     const wasActive = isActive(current.value)
     try {
-      current.value = await migrationsApi.current()
+      current.value = await updatesApi.current()
     } catch {
       current.value = null
     } finally {

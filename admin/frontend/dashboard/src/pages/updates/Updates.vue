@@ -3,7 +3,7 @@
     <!-- Header -->
     <div class="flex justify-between items-center gap-3">
       <div>
-        <h1 class="font-semibold text-ink-gray-9 text-xl">Migrations</h1>
+        <h1 class="font-semibold text-ink-gray-9 text-xl">Updates</h1>
         <p class="mt-1 text-ink-gray-5 text-p-base hidden sm:block">
           App updates across your sites, with backup and recovery.
         </p>
@@ -33,7 +33,7 @@
       <RouterLink
         v-for="op in operations"
         :key="op.id"
-        :to="{ name: 'MigrationDetail', params: { operationId: op.id } }"
+        :to="{ name: 'UpdateDetail', params: { operationId: op.id } }"
         class="flex items-center gap-3 py-3 no-underline transition-colors"
       >
         <!-- Status icon -->
@@ -53,15 +53,15 @@
       </RouterLink>
     </div>
 
-    <p v-else class="mt-16 text-ink-gray-5 text-sm text-center">No migrations yet.</p>
+    <p v-else class="mt-16 text-ink-gray-5 text-sm text-center">No updates yet.</p>
   </div>
 </template>
 
 <script setup>
 import { onMounted, ref } from 'vue'
 import { Button, ErrorMessage, LoadingText } from 'frappe-ui'
-import { migrationsApi } from '@/api/migrations'
-import { appsSummary, opTitle, stateIcon, stateLabel } from '@/utils/migrationFormat'
+import { updatesApi } from '@/api/updates'
+import { appsSummary, opTitle, stateIcon, stateLabel } from '@/utils/updateFormat'
 import { fmtDuration, relativeTime } from '@/utils/taskFormat'
 
 const operations = ref([])
@@ -87,14 +87,14 @@ async function load() {
   error.value = ''
   try {
     const [current, history] = await Promise.all([
-      migrationsApi.current().catch(() => null),
-      migrationsApi.list({ limit: 50 }),
+      updatesApi.current().catch(() => null),
+      updatesApi.list({ limit: 50 }),
     ])
     const rows = history.data || []
     // Pin the active/unresolved operation at the top (it is also in history).
     operations.value = current ? [current, ...rows.filter((op) => op.id !== current.id)] : rows
   } catch (e) {
-    error.value = e?.message || 'Could not load migrations.'
+    error.value = e?.message || 'Could not load updates.'
   } finally {
     loading.value = false
   }
