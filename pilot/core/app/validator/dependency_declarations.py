@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import ast
-import tomllib
 import typing
 
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 
-from pilot.core.app.validator.base import module_path
+from pilot.core.app.validator.base import module_path, read_pyproject
 from pilot.exceptions import AppValidationError
 
 if typing.TYPE_CHECKING:
@@ -64,8 +63,12 @@ class DependencyDeclarationsCheck:
 
     def get_frappe_dependencies(self, app: "App") -> dict[str, str]:
         """The `[tool.bench.frappe-dependencies]` table as {app: version specifier}."""
-        with open(app.path / "pyproject.toml", "rb") as f:
-            pyproject_data = tomllib.load(f)
+        pyproject_data = read_pyproject(app)
+        if pyproject_data is None:
+            raise AppValidationError(
+                f"'{app.config.name}' has no pyproject.toml, so it can't declare the frappe "
+                "versions it supports. Scaffold one with 'bench new-app'."
+            )
 
         declared = pyproject_data.get("tool", {}).get("bench", {}).get("frappe-dependencies", {})
         if not isinstance(declared, dict):

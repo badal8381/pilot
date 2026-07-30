@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import tomllib
 import typing
 
-from pilot.core.app.validator.base import module_path
+from pilot.core.app.validator.base import module_path, read_pyproject
 from pilot.exceptions import AppValidationError
 
 if typing.TYPE_CHECKING:
@@ -20,11 +19,7 @@ class RepoStructureCheck:
                 "Scaffold one with 'bench new-app'."
             )
 
-        try:
-            with open((app.path / "pyproject.toml"), "rb") as f:
-                tomllib.load(f)
-        except tomllib.TOMLDecodeError as exc:
-            raise AppValidationError(f"'{app.config.name}' has an invalid pyproject.toml: {exc}") from exc
+        read_pyproject(app)  # rejects broken TOML before any check reads it
 
         path = module_path(app)
         if not path.is_dir():

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import tomllib
 import typing
 
 from packaging.requirements import InvalidRequirement, Requirement
 from packaging.specifiers import InvalidSpecifier, SpecifierSet
 
+from pilot.core.app.validator.base import read_pyproject
 from pilot.exceptions import AppValidationError
 
 if typing.TYPE_CHECKING:
@@ -20,11 +20,9 @@ class VersionSpecifiersCheck:
     """
 
     def run(self, app: "App") -> None:
-        pyproject_path = app.path / "pyproject.toml"
-        if not pyproject_path.is_file():
-            return  # RepoStructureCheck owns this when it runs; updates skip it
-        with open(pyproject_path, "rb") as f:
-            data = tomllib.load(f)
+        data = read_pyproject(app)
+        if data is None:
+            return  # an app without pyproject.toml has no specifiers to check
         project = data.get("project", {})
         if not isinstance(project, dict):
             return  # RepoStructureCheck owns pyproject shape; nothing to read here

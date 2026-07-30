@@ -240,6 +240,29 @@ def test_dependency_declarations_rejects_a_list_of_apps_without_versions(tmp_pat
         DependencyDeclarationsCheck().get_frappe_dependencies(app)
 
 
+def test_frappe_dependencies_fails_cleanly_without_a_pyproject(tmp_path: Path) -> None:
+    """The dependency installer calls this before RepoStructureCheck has run, so
+    a missing file has to be a validation error, not a FileNotFoundError."""
+    app_path = tmp_path / "apps" / "myapp"
+    (app_path / "myapp").mkdir(parents=True)
+    bench = _FakeBench(apps_path=tmp_path / "apps", env_path=tmp_path / "env")
+    app = App(AppConfig(name="myapp", repo="https://example.com/myapp.git", branch="main"), bench)
+
+    with pytest.raises(AppValidationError, match=r"has no pyproject\.toml"):
+        DependencyDeclarationsCheck().get_frappe_dependencies(app)
+
+
+def test_checks_report_broken_toml_instead_of_raising_tomllib(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project\nname = "myapp"\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+    with pytest.raises(AppValidationError, match=r"invalid pyproject\.toml"):
+        VersionSpecifiersCheck().run(app)
+
+
 def test_version_specifiers_fails_on_invalid_requires_python(tmp_path: Path) -> None:
     app = _make_app(
         tmp_path,
