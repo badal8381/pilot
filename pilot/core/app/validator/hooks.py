@@ -192,13 +192,30 @@ def _package_init(package: Path) -> Path | None:
     return init if init.is_file() else None
 
 
+def _reachable_statements(body: list[ast.stmt]) -> list[ast.stmt]:
+    """Module-level statements, plus those inside any if/try guarding them.
+
+    A name defined in an `except ImportError:` fallback or behind a version
+    check is as importable as one defined at the top level.
+    """
+    statements = []
+    for node in body:
+        statements.append(node)
+        if isinstance(node, ast.If):
+            statements += _reachable_statements(node.body + node.orelse)
+        elif isinstance(node, ast.Try):
+            handled = [statement for handler in node.handlers for statement in handler.body]
+            statements += _reachable_statements(node.body + node.orelse + node.finalbody + handled)
+    return statements
+
+
 def _top_level_symbols(module_file: Path) -> set[str] | None:
     """Names a module defines or imports - everything frappe's get_attr() could find.
 
     None means a `from x import *` hides them, so nothing can be concluded.
     """
     symbols = set()
-    for node in ast.parse(module_file.read_text()).body:
+    for node in _reachable_statements(ast.parse(module_file.read_text()).body):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
             symbols.add(node.name)
         elif isinstance(node, (ast.Import, ast.ImportFrom)):

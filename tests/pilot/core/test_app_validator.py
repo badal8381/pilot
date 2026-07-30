@@ -370,6 +370,29 @@ def test_hooks_skips_attribute_check_when_module_has_a_star_import(tmp_path: Pat
     HooksCheck().run(app)
 
 
+def test_hooks_resolves_symbol_defined_in_an_import_fallback(tmp_path: Path) -> None:
+    """A hook target defined in an `except ImportError:` branch still imports."""
+    app = _make_hooks_app(
+        tmp_path,
+        'after_migrate = "myapp.setup.after_migrate"\n',
+        setup="try:\n"
+        "    from vendor import after_migrate\n"
+        "except ImportError:\n"
+        "    def after_migrate():\n"
+        "        pass\n",
+    )
+    HooksCheck().run(app)
+
+
+def test_hooks_resolves_symbol_defined_behind_a_version_check(tmp_path: Path) -> None:
+    app = _make_hooks_app(
+        tmp_path,
+        'on_login = "myapp.compat.on_login"\n',
+        compat="import sys\n\nif sys.version_info >= (3, 11):\n    def on_login():\n        pass\n",
+    )
+    HooksCheck().run(app)
+
+
 def test_hooks_reads_jenv_style_alias_paths(tmp_path: Path) -> None:
     app = _make_hooks_app(
         tmp_path, 'jinja = {"methods": ["shout:myapp.utils.shout"]}\n', utils="def whisper():\n    pass\n"
