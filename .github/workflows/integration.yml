@@ -25,13 +25,20 @@ jobs:
           node-version: "24"
 
       - name: Install system dependencies
+        env:
+          MARIADB_REPO_SETUP_URL: https://r.mariadb.com/downloads/mariadb_repo_setup
+          MARIADB_VERSION: "11.8"
         run: |
+          curl -LsSf "$MARIADB_REPO_SETUP_URL" -o /tmp/mariadb_repo_setup
+          sudo bash /tmp/mariadb_repo_setup \
+            --mariadb-server-version="mariadb-$MARIADB_VERSION"
           sudo apt-get update -y
-          sudo apt-get install -y mariadb-server libmariadb-dev redis-server git nginx openssl
+          sudo apt-get install -y mariadb-server mariadb-client libmariadb-dev redis-server git nginx openssl
+          mariadbd --version
           sudo systemctl start redis-server
           # bench runs its own rootless, per-user MariaDB server (see
           # MariaDBManager) — disable the system service so it doesn't hold
-          # port 3306 the wizard provisions a fresh server on.
+          # the port where the wizard provisions a fresh server.
           sudo systemctl disable --now mariadb
 
       - name: Install uv
