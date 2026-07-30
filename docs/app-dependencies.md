@@ -52,8 +52,11 @@ touches the changed API. With them, uv refuses instead.
 A constraints file only binds packages the resolve actually touches, so an app that never mentions
 `markdown` is unaffected by a `markdown` conflict elsewhere on the bench.
 
-URL requirements, extras, and marker-conditional requirements are left out of the constraints file:
-constraints files reject the first two, and the third would over-constrain.
+Only requirements carrying extras are left out, because a constraints file may not name them.
+URL requirements stay in, and this matters: uv refuses to resolve any tree containing a URL
+requirement unless it is pinned as a direct requirement or a constraint, and frappe pins two
+(`pypika` and `gunicorn`). Leaving them out failed every app that depends on frappe. Environment
+markers stay in too, and travel with the line they belong to.
 
 ### Imports
 
