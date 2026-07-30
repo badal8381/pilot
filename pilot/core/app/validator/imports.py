@@ -24,6 +24,7 @@ class ImportCheck:
     def run(self, app: "App") -> None:
         locations = self._imported_module_locations(app)
         unresolved = self._on_disk_resolver(app).unresolved(locations)
+        unresolved = self._not_in_bench_env(app, unresolved)
         if not unresolved:
             return  # everything imported is already on the bench - nothing to install
 
@@ -45,6 +46,26 @@ class ImportCheck:
         env_site_packages = next(app.bench.env_path.glob("lib/python*/site-packages"), None)
         roots = [app.path, *(installed.path for installed in app.bench.apps())]
         return ModuleResolver(*roots, *([env_site_packages] if env_site_packages else []))
+
+    @staticmethod
+    def _not_in_bench_env(app: "App", unresolved: list[str]) -> list[str]:
+        """Ask the bench's python about third-party modules stat couldn't find.
+
+        A package can register submodules when it is imported, so they have no file
+        to stat - `apiclient.discovery` is an alias for a googleapiclient module.
+        App modules are left out: their files are right there, so stat is the last
+        word, and find_spec would import the app being validated.
+        """
+        from pilot.core.app.validator.utils.tmp_env import unimportable_modules
+
+        app_modules = {app.module_name, *(installed.config.name for installed in app.bench.apps())}
+        candidates = [name for name in unresolved if name.split(".", 1)[0] not in app_modules]
+        python = app.bench.env_path / "bin" / "python"
+        if not candidates or not python.exists():
+            return unresolved
+
+        missing = unimportable_modules(python, candidates)
+        return [name for name in unresolved if name not in candidates or name in missing]
 
     @staticmethod
     def _dependency_paths(app: "App") -> list[Path]:

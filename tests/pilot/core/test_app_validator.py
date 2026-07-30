@@ -618,6 +618,66 @@ def test_dependency_paths_covers_declared_apps_only(tmp_path: Path) -> None:
     assert paths == {"erpnext"}  # frappe is installed first, the app itself last
 
 
+def test_import_check_trusts_the_bench_python_over_stat(monkeypatch, tmp_path: Path) -> None:
+    """A package can bind submodules when imported (apiclient.discovery aliases a
+    googleapiclient module), so no file exists to stat - asking the bench env
+    keeps that from being reported as missing."""
+    _make_fake_frappe(tmp_path)
+    (tmp_path / "env" / "bin").mkdir(parents=True)
+    (tmp_path / "env" / "bin" / "python").write_text("")
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n',
+        {
+            "myapp/hooks.py": "app_name = 'myapp'\n",
+            "myapp/video.py": "from apiclient.discovery import build\n",
+        },
+    )
+
+    probed: list[list[str]] = []
+    monkeypatch.setattr(
+        "pilot.core.app.validator.utils.tmp_env.unimportable_modules",
+        lambda python, names: probed.append(names) or {},
+    )
+    monkeypatch.setattr(
+        "pilot.core.app.validator.utils.tmp_env.TmpEnv.create",
+        lambda *args, **kwargs: pytest.fail("the venv is not needed when the bench env has the module"),
+    )
+
+    ImportCheck().run(app)
+
+    assert probed == [["apiclient.discovery"]]
+
+
+def test_import_check_never_imports_the_app_it_is_validating(monkeypatch, tmp_path: Path) -> None:
+    """Only third-party names go to the bench python; app modules stay stat-only."""
+    _make_fake_frappe(tmp_path)
+    (tmp_path / "env" / "bin").mkdir(parents=True)
+    (tmp_path / "env" / "bin" / "python").write_text("")
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n", "myapp/utils.py": "from myapp.gone import helper\n"},
+    )
+
+    probed: list[list[str]] = []
+    monkeypatch.setattr(
+        "pilot.core.app.validator.utils.tmp_env.unimportable_modules",
+        lambda python, names: probed.append(names) or {},
+    )
+    monkeypatch.setattr(
+        "pilot.core.app.validator.utils.tmp_env.TmpEnv.create",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("venv path reached")),
+    )
+
+    with pytest.raises(RuntimeError, match="venv path reached"):
+        ImportCheck().run(app)
+
+    assert probed == []  # myapp.gone is the app's own module - never imported to check
+
+
 def test_import_check_skips_the_throwaway_venv_when_everything_resolves(monkeypatch, tmp_path) -> None:
     """The expensive path only runs when the bench can't already satisfy an import."""
     _make_fake_frappe(tmp_path)

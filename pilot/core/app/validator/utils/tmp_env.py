@@ -55,29 +55,8 @@ class TmpEnv:
             raise AppValidationError(f"'{app.config.name}' failed to install:\n{exc.message}") from exc
 
     def resolve_modules(self, module_names: list[str]) -> dict[str, str]:
-        """Return {module: reason} for names that don't resolve via find_spec
-        (no code runs - this just confirms what the stat-based check found)."""
-        try:
-            result = run_command(
-                [str(self.path / "bin" / "python"), "-c", self._resolve_check_script(module_names)]
-            )
-        except CommandError as exc:
-            raise AppValidationError(f"Failed to check imports:\n{exc.message}") from exc
-        return json.loads(result.stdout)
-
-    @staticmethod
-    def _resolve_check_script(module_names: list[str]) -> str:
-        return (
-            "import importlib.util, json\n"
-            "errors = {}\n"
-            f"for name in {module_names!r}:\n"
-            "    try:\n"
-            "        if importlib.util.find_spec(name) is None:\n"
-            "            raise ModuleNotFoundError(f'No module named {name!r}')\n"
-            "    except Exception as exc:\n"
-            "        errors[name] = str(exc)\n"
-            "print(json.dumps(errors))\n"
-        )
+        """{module: reason} for names this env can't provide."""
+        return missing_modules(self.path / "bin" / "python", module_names)
 
     def _pip_install(self, paths: list[Path]) -> None:
         python = str(self.path / "bin" / "python")
@@ -89,3 +68,51 @@ class TmpEnv:
         if self._dir is not None:
             shutil.rmtree(self._dir, ignore_errors=True)
             self._dir = None
+
+
+_FIND_SPEC_SCRIPT = """
+import importlib.util, json
+errors = {}
+for name in NAMES:
+    try:
+        if importlib.util.find_spec(name) is None:
+            raise ModuleNotFoundError(f'No module named {name!r}')
+    except Exception as exc:
+        errors[name] = str(exc)
+print(json.dumps(errors))
+"""
+
+_IMPORT_SCRIPT = """
+import importlib, json
+errors = {}
+for name in NAMES:
+    try:
+        importlib.import_module(name)
+    except Exception as exc:
+        errors[name] = str(exc)
+print(json.dumps(errors))
+"""
+
+
+def missing_modules(python: Path, module_names: list[str]) -> dict[str, str]:
+    """{module: reason} for names `python` can't resolve, without importing them."""
+    return _probe(python, module_names, _FIND_SPEC_SCRIPT)
+
+
+def unimportable_modules(python: Path, module_names: list[str]) -> dict[str, str]:
+    """{module: reason} for names `python` can't import.
+
+    This one imports, so keep it to third-party packages the bench already has:
+    a package can bind submodules as attributes when imported - `apiclient.discovery`
+    aliases a googleapiclient module - and find_spec reports those as missing even
+    though the import works.
+    """
+    return _probe(python, module_names, _IMPORT_SCRIPT)
+
+
+def _probe(python: Path, module_names: list[str], script: str) -> dict[str, str]:
+    try:
+        result = run_command([str(python), "-c", script.replace("NAMES", repr(module_names))])
+    except CommandError as exc:
+        raise AppValidationError(f"Failed to check imports:\n{exc.message}") from exc
+    return json.loads(result.stdout)
