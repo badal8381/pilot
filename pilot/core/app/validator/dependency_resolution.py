@@ -1,8 +1,14 @@
 from __future__ import annotations
 
 import os
+import re
+import tempfile
 import typing
+from pathlib import Path
 
+from packaging.requirements import InvalidRequirement, Requirement
+
+from pilot.core.app.validator.base import read_pyproject
 from pilot.exceptions import AppValidationError, CommandError
 from pilot.managers.environment import ensure_uv
 from pilot.managers.platform import add_mysqlclient_flags
@@ -13,12 +19,12 @@ if typing.TYPE_CHECKING:
 
 
 class DependencyResolutionCheck:
-    """Resolve the app's dependencies against the bench environment, without
-    installing anything.
+    """Resolve the app's dependencies against the bench, without installing.
 
-    Runs the same command the real install runs, with --dry-run, so a set that
-    uv cannot resolve - a URL dependency it refuses, a version no release
-    satisfies - fails here instead of halfway through the install.
+    Runs the install command with --dry-run, constrained by what every other app
+    on the bench requires. Apps share one environment, so a package can only be
+    installed at one version: without the constraints uv is free to move a shared
+    package and silently break an app that pinned it.
     """
 
     def run(self, app: "App") -> None:
@@ -26,16 +32,71 @@ class DependencyResolutionCheck:
         if not python.exists():
             return  # no environment to resolve against yet
 
-        env = os.environ.copy()
-        add_mysqlclient_flags(env)
+        environment = os.environ.copy()
+        add_mysqlclient_flags(environment)
+        with tempfile.TemporaryDirectory(prefix="pilot-constraints-") as directory:
+            constraints = self._write_constraints(app, Path(directory))
+            argv = [ensure_uv(), "pip", "install", "--dry-run", "--python", str(python)]
+            if constraints:
+                argv += ["--constraint", str(constraints)]
+            try:
+                run_command([*argv, "-e", str(app.path)], env=environment)
+            except CommandError as exc:
+                raise AppValidationError(self._failure(app, constraints, exc)) from exc
+
+    @staticmethod
+    def _write_constraints(app: "App", directory: Path) -> Path | None:
+        """The other apps' requirements as a constraints file, one app per comment."""
+        lines = []
+        for installed in app.bench.apps():
+            if installed.config.name == app.config.name:
+                continue
+            for requirement in _declared_requirements(installed):
+                lines.append(f"{requirement}  # {installed.config.name}")
+        if not lines:
+            return None
+        path = directory / "constraints.txt"
+        path.write_text("\n".join(sorted(set(lines))) + "\n")
+        return path
+
+    @staticmethod
+    def _failure(app: "App", constraints: Path | None, exc: CommandError) -> str:
+        """uv's explanation, plus which app asked for the packages it named."""
+        blamed = []
+        if constraints:
+            blamed = [
+                line
+                for line in constraints.read_text().splitlines()
+                if _names(_package_of(line), exc.message)
+            ]
+        message = (
+            f"'{app.config.name}' has dependencies that can't be resolved against this bench:\n"
+            f"{exc.message}\n"
+        )
+        if blamed:
+            message += "Already required by:\n" + "\n".join(f"  {line}" for line in blamed) + "\n"
+        return message + "Widen the requirement in pyproject.toml, or update the app that pinned it."
+
+
+def _declared_requirements(app: "App") -> list[str]:
+    """`[project].dependencies` that make sense as constraints - no URLs, no extras."""
+    data = read_pyproject(app) or {}
+    requirements = []
+    for entry in data.get("project", {}).get("dependencies", []):
         try:
-            run_command(
-                [ensure_uv(), "pip", "install", "--dry-run", "--python", str(python), "-e", str(app.path)],
-                env=env,
-            )
-        except CommandError as exc:
-            raise AppValidationError(
-                f"'{app.config.name}' has dependencies that can't be resolved against this bench:\n"
-                f"{exc.message}\n"
-                "Fix the requirements in pyproject.toml, or install what they need first."
-            ) from exc
+            requirement = Requirement(entry)
+        except (InvalidRequirement, TypeError):
+            continue
+        if requirement.url or requirement.extras or requirement.marker or not str(requirement.specifier):
+            continue
+        requirements.append(f"{requirement.name}{requirement.specifier}")
+    return requirements
+
+
+def _package_of(constraint_line: str) -> str:
+    return Requirement(constraint_line.split("#", 1)[0].strip()).name
+
+
+def _names(package: str, message: str) -> bool:
+    """Whether uv's message is about this package, and not a word containing it."""
+    return re.search(rf"(?<![\w.-]){re.escape(package)}(?![\w.-])", message, re.IGNORECASE) is not None
