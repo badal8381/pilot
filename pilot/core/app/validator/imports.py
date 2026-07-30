@@ -31,15 +31,22 @@ class ImportCheck:
 
     @staticmethod
     def _dependency_paths(app: "App") -> list[Path]:
-        """Return installed required-app paths for import resolution."""
-        from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
+        """Installed app paths to resolve alongside the new app in the tmp env.
+
+        Includes every installed bench app, not just declared required apps, so
+        cross-app python dependency conflicts surface during validation instead
+        of failing the real install later.
+        """
         from pilot.exceptions import BenchError
 
-        required = DependencyDeclarationsCheck()._get_pyproject_required_apps(app)
         paths = []
-        for name in required:
+        seen = {app.config.name}
+        for installed in app.bench.apps():
+            if installed.config.name in seen:
+                continue
+            seen.add(installed.config.name)
             try:
-                paths.append(app.bench.app(name).path)
+                paths.append(installed.path)
             except BenchError:
                 continue  # not installed - surfaces as an unresolved import instead
         return paths

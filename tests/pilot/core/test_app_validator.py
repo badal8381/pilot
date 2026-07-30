@@ -22,6 +22,20 @@ class _FakeBench:
     apps_path: Path
     env_path: Path
 
+    def apps(self) -> list[App]:
+        apps = []
+        for child in self.apps_path.iterdir():
+            if child.is_dir() and (child / "pyproject.toml").exists():
+                apps.append(
+                    App(
+                        AppConfig(
+                            name=child.name, repo=f"https://example.com/{child.name}.git", branch="main"
+                        ),
+                        self,
+                    )
+                )
+        return apps
+
 
 def _make_app(bench_root: Path, name: str, pyproject: str, files: dict[str, str]) -> App:
     app_path = bench_root / "apps" / name
@@ -334,6 +348,30 @@ def test_import_check_skips_test_files(tmp_path: Path) -> None:
     )
     check = ImportCheck()
     assert check._imported_module_locations(app) == {}
+
+
+def test_dependency_paths_includes_all_installed_apps(tmp_path: Path) -> None:
+    """Cross-app conflict detection: the tmp env resolves against every
+    installed bench app, not just the new app's declared required apps."""
+    _make_fake_frappe(tmp_path)
+    _make_app(
+        tmp_path,
+        "erpnext",
+        '[project]\nname = "erpnext"\nversion = "0.0.1"\n',
+        {"erpnext/hooks.py": "app_name = 'erpnext'\n"},
+    )
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\nversion = "0.0.1"\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+
+    paths = {p.name for p in ImportCheck._dependency_paths(app)}
+
+    assert "frappe" in paths
+    assert "erpnext" in paths
+    assert "myapp" not in paths  # the app being validated is excluded
 
 
 def test_validation_env_installs_with_mysqlclient_build_flags(monkeypatch, tmp_path: Path) -> None:
