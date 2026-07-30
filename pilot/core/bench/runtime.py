@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 _DEV_RESTART_MESSAGE = (
     "Restart is available only for production benches managed by\n"
     "systemd or Supervisor.\n\n"
-    "For development, stop the runner and execute `bench start` again."
+    "For development, stop the runner and execute `pilot start` again."
 )
 
 
@@ -154,7 +154,7 @@ class BenchRuntime:
 
         if not (dist / "assets").exists() and not can_build:
             raise BenchError(
-                "Admin UI is missing from this release. Reinstall bench-cli, "
+                "Admin UI is missing from this release. Reinstall Pilot, "
                 "or run it from a source checkout."
             )
         if can_build:
@@ -203,7 +203,7 @@ class BenchRuntime:
         )
 
         if self._is_initialized():
-            on_progress("\nSetup complete. Run 'bench start' to start your bench.\n")
+            on_progress("\nSetup complete. Run 'pilot start' to start your bench.\n")
 
     def _admin_port(self) -> int:
         import tomllib
@@ -250,5 +250,5 @@ def incomplete_production_message(bench: "Bench") -> str:
         f"Bench {bench.config.name} is configured for production, but its {pm}\n"
         f"deployment is incomplete.\n\n"
         f"Repair it with:\n"
-        f"  bench -b {bench.config.name} setup production"
+        f"  pilot -b {bench.config.name} setup production"
     )

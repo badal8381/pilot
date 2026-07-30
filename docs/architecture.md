@@ -1,6 +1,6 @@
 # Architecture
 
-Bench CLI is organized around a few domain objects. External surfaces should delegate to those objects instead of doing orchestration directly.
+Pilot is organized around a few domain objects. External surfaces should delegate to those objects instead of doing orchestration directly.
 
 ## Directory Map
 

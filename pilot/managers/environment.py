@@ -63,7 +63,7 @@ class AdminEnvManager:
     def uv(self) -> str:
         uv = shutil.which("uv")
         if not uv:
-            raise RuntimeError("uv not found - run the bench-cli install script to set it up")
+            raise RuntimeError("uv not found - run the Pilot install script to set it up")
         return uv
 
     def ensure(self) -> None:

@@ -37,7 +37,7 @@ class AppDependencyInstaller:
                 raise BenchError(
                     f"'{self.app.config.name}' isn't in the marketplace registry, so its "
                     f"dependencies can't be installed automatically. It requires {missing} "
-                    "- run 'bench get-app <repo>' for each of them first, then retry."
+                    "- run 'pilot get-app <repo>' for each of them first, then retry."
                 ) from exc
             return None
 
