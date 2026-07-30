@@ -641,6 +641,17 @@ def test_dependency_paths_covers_declared_apps_only(tmp_path: Path) -> None:
     assert paths == {"erpnext"}  # frappe is installed first, the app itself last
 
 
+def test_dependency_paths_tolerate_an_app_with_no_pyproject(tmp_path: Path) -> None:
+    """ImportCheck also runs on update, where an app may predate pyproject.toml -
+    it must not raise the declaration error that path deliberately skips."""
+    app_path = tmp_path / "apps" / "oldapp"
+    (app_path / "oldapp").mkdir(parents=True)
+    (app_path / "oldapp" / "hooks.py").write_text("app_name = 'oldapp'\n")
+    bench = _FakeBench(apps_path=tmp_path / "apps", env_path=tmp_path / "env")
+
+    assert ImportCheck._dependency_paths(bench.app("oldapp")) == []
+
+
 def test_import_check_trusts_the_bench_python_over_stat(monkeypatch, tmp_path: Path) -> None:
     """A package can bind submodules when imported (apiclient.discovery aliases a
     googleapiclient module), so no file exists to stat - asking the bench env
