@@ -106,6 +106,29 @@ def test_resolution_names_the_app_that_pinned_the_package(monkeypatch, tmp_path:
         DependencyResolutionCheck().run(app)
 
 
+def test_resolution_drops_the_lines_that_explain_nothing(monkeypatch, tmp_path: Path) -> None:
+    """Which uv binary ran and which env it used are plumbing, not a reason."""
+    bench = _make_bench(tmp_path)
+    app = bench.add_app("myapp")
+    noisy = (
+        "Command '/home/frappe/.local/bin/uv' failed with exit code 1.\n"
+        "Using Python 3.14.6 environment at: /benches/bench1/env\n"
+        "  × No solution found when resolving dependencies:"
+    )
+
+    monkeypatch.setattr(dependency_resolution, "ensure_uv", lambda: "/bin/uv")
+    monkeypatch.setattr(
+        dependency_resolution, "run_command", lambda argv, **kw: (_ for _ in ()).throw(CommandError(noisy))
+    )
+
+    with pytest.raises(AppValidationError) as excinfo:
+        DependencyResolutionCheck().run(app)
+
+    assert "No solution found" in str(excinfo.value)
+    assert "exit code" not in str(excinfo.value)
+    assert "Using Python" not in str(excinfo.value)
+
+
 def test_resolution_leaves_out_requirements_that_cannot_be_constraints(monkeypatch, tmp_path) -> None:
     """Constraints files reject extras, and an unbounded name constrains nothing."""
     bench = _make_bench(tmp_path)

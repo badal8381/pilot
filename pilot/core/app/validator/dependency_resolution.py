@@ -71,11 +71,14 @@ class DependencyResolutionCheck:
             ]
         message = (
             f"'{app.config.name}' has dependencies that can't be resolved against this bench:\n"
-            f"{exc.message}\n"
+            f"{_explanation(exc.message)}\n"
         )
         if blamed:
             message += "Already required by:\n" + "\n".join(f"  {line}" for line in blamed) + "\n"
-        return message + "Widen the requirement in pyproject.toml, or update the app that pinned it."
+        return message + (
+            f"Widen the requirement in {app.config.name}'s pyproject.toml, or update the app "
+            "that pinned the version it clashes with."
+        )
 
 
 def _declared_requirements(app: "App") -> list[str]:
@@ -105,6 +108,14 @@ def _declared_requirements(app: "App") -> list[str]:
         elif str(requirement.specifier):
             requirements.append(f"{requirement.name}{requirement.specifier}{marker}")
     return requirements
+
+
+def _explanation(command_error: str) -> str:
+    """uv's reasoning, without the two lines that explain nothing: our own
+    subprocess wrapper's preamble, and uv naming the environment it used.
+    """
+    noise = ("Command ", "Using Python ")
+    return "\n".join(line for line in command_error.splitlines() if not line.startswith(noise)).strip()
 
 
 def _package_of(constraint_line: str) -> str:
