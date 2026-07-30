@@ -145,8 +145,8 @@ class App:
     def update_target(self, marketplace_entry: dict | None) -> RevisionPin | None:
         return self._repository.update_target(marketplace_entry)
 
-    def matching_release(self, marketplace_entry: dict | None) -> dict | None:
-        return self._repository.matching_release(marketplace_entry)
+    def is_marketplace_app(self, marketplace_entry: dict | None) -> bool:
+        return self._repository.is_marketplace_app(marketplace_entry)
 
     def has_remote_update(self) -> bool:
         return self._repository.has_remote_update()
