@@ -1266,9 +1266,8 @@ def test_build_admin_errors_when_node_missing(monkeypatch: pytest.MonkeyPatch) -
 
 def test_build_admin_errors_when_node_exits_nonzero(monkeypatch: pytest.MonkeyPatch) -> None:
     """run_command raises on a failing exit code rather than returning it."""
-    from pilot.exceptions import CommandError
-
     from admin.backend.frontend import _check_node_version
+    from pilot.exceptions import CommandError
 
     def _failing(*a, **k):
         raise CommandError("Command 'node' failed with exit code 1.", returncode=1)
