@@ -150,6 +150,35 @@ def test_resolution_constrains_url_dependencies_too(monkeypatch, tmp_path) -> No
     assert captured["constraints"] == "pypika @ git+https://github.com/frappe/pypika@2c50e61  # frappe\n"
 
 
+def test_resolution_keeps_a_requirement_that_carries_a_marker(monkeypatch, tmp_path) -> None:
+    """A marker is legal in a constraints file. Dropping the whole line instead
+    left a URL dependency unpinned, which is the one thing uv won't resolve."""
+    bench = _make_bench(tmp_path)
+    bench.add_app(
+        "frappe",
+        'dependencies = ["pypika @ git+https://github.com/frappe/pypika ; python_version >= \'3.10\'", '
+        '"backports-zoneinfo>=0.2 ; python_version < \'3.9\'"]\n',
+    )
+    app = bench.add_app("myapp", 'dependencies = ["frappe>=14.0.0"]\n')
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(dependency_resolution, "ensure_uv", lambda: "/bin/uv")
+    monkeypatch.setattr(
+        dependency_resolution,
+        "run_command",
+        lambda argv, **kw: captured.update(
+            constraints=Path(argv[argv.index("--constraint") + 1]).read_text()
+        ),
+    )
+
+    DependencyResolutionCheck().run(app)
+
+    assert captured["constraints"] == (
+        'backports-zoneinfo>=0.2 ; python_version < "3.9"  # frappe\n'
+        'pypika @ git+https://github.com/frappe/pypika ; python_version >= "3.10"  # frappe\n'
+    )
+
+
 def test_resolution_blames_the_app_that_pinned_a_url_dependency(monkeypatch, tmp_path) -> None:
     """A '#egg=' fragment must not be mistaken for the trailing app-name comment."""
     bench = _make_bench(tmp_path)

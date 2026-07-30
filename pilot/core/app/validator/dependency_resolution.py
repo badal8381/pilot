@@ -97,12 +97,13 @@ def _declared_requirements(app: "App") -> list[str]:
             requirement = Requirement(entry)
         except (InvalidRequirement, TypeError):
             continue
-        if requirement.extras or requirement.marker:
-            continue
+        if requirement.extras:
+            continue  # a constraints file may not carry extras
+        marker = f" ; {requirement.marker}" if requirement.marker else ""
         if requirement.url:
-            requirements.append(f"{requirement.name} @ {requirement.url}")
+            requirements.append(f"{requirement.name} @ {requirement.url}{marker}")
         elif str(requirement.specifier):
-            requirements.append(f"{requirement.name}{requirement.specifier}")
+            requirements.append(f"{requirement.name}{requirement.specifier}{marker}")
     return requirements
 
 
