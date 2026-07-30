@@ -678,7 +678,7 @@ def test_import_check_trusts_the_bench_python_over_stat(monkeypatch, tmp_path: P
 
     probed: list[list[str]] = []
     monkeypatch.setattr(
-        "pilot.core.app.validator.utils.tmp_env.unimportable_modules",
+        "pilot.core.app.validator.imports.unimportable_modules",
         lambda python, names: probed.append(names) or {},
     )
     monkeypatch.setattr(
@@ -705,7 +705,7 @@ def test_import_check_never_imports_the_app_it_is_validating(monkeypatch, tmp_pa
 
     probed: list[list[str]] = []
     monkeypatch.setattr(
-        "pilot.core.app.validator.utils.tmp_env.unimportable_modules",
+        "pilot.core.app.validator.imports.unimportable_modules",
         lambda python, names: probed.append(names) or {},
     )
     monkeypatch.setattr(

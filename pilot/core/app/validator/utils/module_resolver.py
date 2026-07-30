@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
-from pilot.exceptions import BenchError
-
 
 class ModuleResolver:
     """Resolves imported modules by stat'ing files under one or more roots,
@@ -14,13 +12,6 @@ class ModuleResolver:
 
     def __init__(self, *roots: Path) -> None:
         self.roots = [root for root in roots if root.is_dir()]
-
-    @classmethod
-    def for_env(cls, env_path: Path) -> "ModuleResolver":
-        site_packages = next(env_path.glob("lib/python*/site-packages"), None)
-        if site_packages is None:
-            raise BenchError(f"No site-packages found in {env_path}.")
-        return cls(site_packages)
 
     def unresolved(self, modules: Iterable[str]) -> list[str]:
         """Modules that none of the roots provide."""

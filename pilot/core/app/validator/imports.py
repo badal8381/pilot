@@ -8,8 +8,12 @@ from pathlib import Path
 
 from pilot.core.app.validator.base import python_files, read_pyproject
 from pilot.core.app.validator.utils.module_resolver import ModuleResolver
-from pilot.core.app.validator.utils.tmp_env import TmpEnv
-from pilot.exceptions import AppValidationError
+from pilot.core.app.validator.utils.tmp_env import (
+    TmpEnv,
+    missing_modules,
+    unimportable_modules,
+)
+from pilot.exceptions import AppValidationError, BenchError
 
 if typing.TYPE_CHECKING:
     from pilot.core.app import App
@@ -23,8 +27,8 @@ class ImportCheck:
 
     def run(self, app: "App") -> None:
         locations = self._imported_module_locations(app)
-        unresolved = self._on_disk_resolver(app).unresolved(locations)
-        unresolved = self._not_in_bench_env(app, unresolved)
+        unresolved = self._get_on_disk_resolver(app).unresolved(locations)
+        unresolved = self._get_missing_from_bench_env(app, unresolved)
         if not unresolved:
             return  # everything imported is already on the bench - nothing to install
 
@@ -38,7 +42,7 @@ class ImportCheck:
             self.tmp_env.delete()
 
     @staticmethod
-    def _on_disk_resolver(app: "App") -> ModuleResolver:
+    def _get_on_disk_resolver(app: "App") -> ModuleResolver:
         """Resolve against what the bench already has: the app's own package, the
         other apps' source trees (installed editable, so site-packages has no
         directory for them), and the bench env's third-party packages.
@@ -48,7 +52,7 @@ class ImportCheck:
         return ModuleResolver(*roots, *([env_site_packages] if env_site_packages else []))
 
     @staticmethod
-    def _not_in_bench_env(app: "App", unresolved: list[str]) -> list[str]:
+    def _get_missing_from_bench_env(app: "App", unresolved: list[str]) -> list[str]:
         """Ask the bench's python about third-party modules stat couldn't find.
 
         A package can register submodules when it is imported, so they have no file
@@ -56,8 +60,6 @@ class ImportCheck:
         App modules are left out: their files are right there, so stat is the last
         word, and find_spec would import the app being validated.
         """
-        from pilot.core.app.validator.utils.tmp_env import unimportable_modules
-
         app_modules = {app.module_name, *(installed.config.name for installed in app.bench.apps())}
         candidates = [name for name in unresolved if name.split(".", 1)[0] not in app_modules]
         python = app.bench.env_path / "bin" / "python"
@@ -76,8 +78,6 @@ class ImportCheck:
         one at a time, as the real environment does, but cannot be resolved
         together - so an unrelated pair of apps would fail this app's validation.
         """
-        from pilot.exceptions import BenchError
-
         # Read the table directly rather than through DependencyDeclarationsCheck,
         # which rejects an app that has no pyproject.toml. This check also runs on
         # update, where an app is allowed to predate that rule.
@@ -96,7 +96,7 @@ class ImportCheck:
         return paths
 
     def _check_imports(self, app: "App", locations: dict[str, list[str]], unresolved: list[str]) -> None:
-        reasons = self.tmp_env.resolve_modules(unresolved)
+        reasons = missing_modules(self.tmp_env.python, unresolved)
         if not reasons:
             return  # find_spec disagrees with the stat check - nothing's actually missing
 

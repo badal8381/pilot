@@ -67,7 +67,7 @@ class DependencyResolutionCheck:
             blamed = [
                 line
                 for line in constraints.read_text().splitlines()
-                if _names(_package_of(line), exc.message)
+                if _is_about(_package_of(line), exc.message)
             ]
         message = (
             f"'{app.config.name}' has dependencies that can't be resolved against this bench:\n"
@@ -113,6 +113,6 @@ def _package_of(constraint_line: str) -> str:
     return Requirement(constraint_line.rsplit("  # ", 1)[0].strip()).name
 
 
-def _names(package: str, message: str) -> bool:
+def _is_about(package: str, message: str) -> bool:
     """Whether uv's message is about this package, and not a word containing it."""
     return re.search(rf"(?<![\w.-]){re.escape(package)}(?![\w.-])", message, re.IGNORECASE) is not None

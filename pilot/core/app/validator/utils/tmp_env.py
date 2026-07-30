@@ -54,12 +54,12 @@ class TmpEnv:
         except CommandError as exc:
             raise AppValidationError(f"'{app.config.name}' failed to install:\n{exc.message}") from exc
 
-    def resolve_modules(self, module_names: list[str]) -> dict[str, str]:
-        """{module: reason} for names this env can't provide."""
-        return missing_modules(self.path / "bin" / "python", module_names)
+    @property
+    def python(self) -> Path:
+        return self.path / "bin" / "python"
 
     def _pip_install(self, paths: list[Path]) -> None:
-        python = str(self.path / "bin" / "python")
+        python = str(self.python)
         env = os.environ.copy()
         add_mysqlclient_flags(env)
         run_command([ensure_uv(), "pip", "install", "--python", python, *map(str, paths)], env=env)
