@@ -85,7 +85,12 @@ def _declared_requirements(app: "App") -> list[str]:
     unless it is pinned as a direct requirement or a constraint, and frappe pins
     two. Dropping them fails every app that depends on frappe.
     """
-    data = read_pyproject(app) or {}
+    try:
+        data = read_pyproject(app) or {}
+    except AppValidationError:
+        # Only ever called on the other apps, whose broken pyproject.toml is
+        # their own checks' business - it must not block this install.
+        return []
     requirements = []
     for entry in data.get("project", {}).get("dependencies", []):
         try:

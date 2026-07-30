@@ -166,6 +166,31 @@ def test_resolution_blames_the_app_that_pinned_a_url_dependency(monkeypatch, tmp
         DependencyResolutionCheck().run(app)
 
 
+def test_resolution_ignores_another_apps_broken_pyproject(monkeypatch, tmp_path) -> None:
+    """A malformed pyproject.toml belongs to that app's own checks - it must not
+    block an unrelated install, least of all under the other app's name."""
+    bench = _make_bench(tmp_path)
+    bench.add_app("lms", 'dependencies = ["markdown~=3.5.1"]\n')
+    (bench.apps_path / "broken").mkdir()
+    (bench.apps_path / "broken" / "pyproject.toml").write_text("[project\nnot valid toml\n")
+    bench._apps.append(_FakeApp(bench, "broken"))
+    app = bench.add_app("myapp")
+    captured: dict[str, str] = {}
+
+    monkeypatch.setattr(dependency_resolution, "ensure_uv", lambda: "/bin/uv")
+    monkeypatch.setattr(
+        dependency_resolution,
+        "run_command",
+        lambda argv, **kw: captured.update(
+            constraints=Path(argv[argv.index("--constraint") + 1]).read_text()
+        ),
+    )
+
+    DependencyResolutionCheck().run(app)
+
+    assert captured["constraints"] == "markdown~=3.5.1  # lms\n"
+
+
 def test_resolution_is_skipped_before_the_bench_has_an_environment(monkeypatch, tmp_path: Path) -> None:
     bench = _make_bench(tmp_path, with_env=False)
     app = bench.add_app("myapp")
