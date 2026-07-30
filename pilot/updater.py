@@ -23,7 +23,7 @@ def latest_release() -> dict | None:
     """Newest release as {tag, asset_url, body}, or None. Uses the releases list (prereleases included)."""
     request = urllib.request.Request(
         _RELEASES_API,
-        headers={"Accept": "application/vnd.github+json", "User-Agent": "bench-cli"},
+        headers={"Accept": "application/vnd.github+json", "User-Agent": "pilot"},
     )
     with urllib.request.urlopen(request, timeout=30) as response:
         releases = json.load(response)
@@ -46,7 +46,7 @@ def update_available() -> tuple[bool, str | None]:
 
 
 def perform_upgrade(on_progress: Progress = lambda message: None) -> None:
-    """Update the bench-cli code in place. Restarting the admin service is the caller's job."""
+    """Update the Pilot code in place. Restarting the admin service is the caller's job."""
     from pilot.internal.patch_runner import run_patches
 
     run_patches("pre_update", on_progress=on_progress)
@@ -63,7 +63,7 @@ def _upgrade_dev(on_progress: Progress) -> None:
     from pilot.utils import run_command
 
     root = cli_root()
-    on_progress("Pulling latest bench-cli (dev install)...")
+    on_progress("Pulling latest Pilot (dev install)...")
     run_command(["git", "-C", str(root), "pull"], stream_output=True)
     on_progress("Installing admin Python dependencies...")
     AdminEnvManager(root).install_python_deps()
