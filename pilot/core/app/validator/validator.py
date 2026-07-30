@@ -5,6 +5,7 @@ import typing
 from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
 from pilot.core.app.validator.dependency_resolution import DependencyResolutionCheck
 from pilot.core.app.validator.fixtures import FixturesCheck
+from pilot.core.app.validator.frappe_compatibility import FrappeCompatibilityCheck
 from pilot.core.app.validator.hooks import HooksCheck
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
@@ -44,17 +45,20 @@ def _install_checks() -> list["ValidationCheck"]:
         HooksCheck(),
         FixturesCheck(),
         DependencyDeclarationsCheck(),
+        FrappeCompatibilityCheck(),
         DependencyResolutionCheck(),
         ImportCheck(),
     ]
 
 
 def _update_checks() -> list["ValidationCheck"]:
-    """Leaves out the repo-structure and dependency-declaration checks: an app
-    already on the bench predates those rules, and an update is the wrong moment
-    to start enforcing them. Resolution is left out because the pip install that
-    follows resolves the same dependencies against the real environment - but
-    nothing there reads the new revision's imports, so ImportCheck stays in.
+    """Leaves out repo-structure and dependency-declarations, which demand a
+    layout and a pyproject.toml table an app already on the bench predates.
+
+    Everything a new revision can change is still checked. The reinstall that
+    follows an update runs `uv pip install` with no constraints, so it resolves
+    the app's own requirements and will happily move a package another app
+    pinned - resolution here is the only thing that sees that.
     """
     return [
         VersionSpecifiersCheck(),
@@ -62,5 +66,7 @@ def _update_checks() -> list["ValidationCheck"]:
         SyntaxCheck(),
         HooksCheck(),
         FixturesCheck(),
+        FrappeCompatibilityCheck(),
+        DependencyResolutionCheck(),
         ImportCheck(),
     ]

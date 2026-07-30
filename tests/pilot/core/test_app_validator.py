@@ -12,6 +12,7 @@ from pilot.core.app import App
 from pilot.core.app.validator import Validator
 from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
 from pilot.core.app.validator.fixtures import FixturesCheck
+from pilot.core.app.validator.frappe_compatibility import FrappeCompatibilityCheck
 from pilot.core.app.validator.hooks import HooksCheck
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
@@ -408,6 +409,69 @@ def test_hooks_reads_jenv_style_alias_paths(tmp_path: Path) -> None:
         HooksCheck().run(app)
     (app.path / "myapp" / "utils.py").write_text("def shout():\n    pass\n")
     HooksCheck().run(app)
+
+
+def _make_frappe_at(bench_root: Path, version: str) -> None:
+    frappe_path = bench_root / "apps" / "frappe" / "frappe"
+    frappe_path.mkdir(parents=True)
+    (bench_root / "apps" / "frappe" / "pyproject.toml").write_text('[project]\nname = "frappe"\n')
+    (frappe_path / "__init__.py").write_text(f'__version__ = "{version}"\n')
+
+
+def _make_app_needing_frappe(bench_root: Path, specifier: str | None, name: str = "myapp") -> App:
+    table = f"\n[tool.bench.frappe-dependencies]\nfrappe = {specifier!r}\n" if specifier else ""
+    return _make_app(
+        bench_root,
+        name,
+        f'[project]\nname = "{name}"\n{table}',
+        {f"{name}/hooks.py": f"app_name = '{name}'\n"},
+    )
+
+
+def test_frappe_compatibility_passes_when_the_bench_is_in_range(tmp_path: Path) -> None:
+    _make_frappe_at(tmp_path, "16.5.0")
+    FrappeCompatibilityCheck().run(_make_app_needing_frappe(tmp_path, ">=16.0.0,<17.0.0"))
+
+
+def test_frappe_compatibility_fails_when_the_bench_is_too_old(tmp_path: Path) -> None:
+    """The migration break this catches: a new revision needs a newer frappe."""
+    _make_frappe_at(tmp_path, "16.5.0")
+    app = _make_app_needing_frappe(tmp_path, ">=17.0.0,<18.0.0")
+
+    with pytest.raises(AppValidationError, match=r"needs frappe >=17\.0\.0,<18\.0\.0, but 16\.5\.0"):
+        FrappeCompatibilityCheck().run(app)
+
+
+def test_frappe_compatibility_counts_a_dev_build_as_a_prerelease(tmp_path: Path) -> None:
+    """A bench on frappe develop reports 17.0.0-dev, which PEP 440 keeps out of
+    '<17.0.0' - an app that says it stops at 16 does not silently run on 17."""
+    _make_frappe_at(tmp_path, "17.0.0-dev")
+
+    FrappeCompatibilityCheck().run(_make_app_needing_frappe(tmp_path, ">=16.0.0,<=17.0.0-dev"))
+
+    stops_at_16 = _make_app_needing_frappe(tmp_path, ">=16.0.0,<17.0.0", name="otherapp")
+    with pytest.raises(AppValidationError, match="17.0.0.dev0 is installed"):
+        FrappeCompatibilityCheck().run(stops_at_16)
+
+
+def test_frappe_compatibility_leaves_an_app_that_declares_nothing_alone(tmp_path: Path) -> None:
+    """This check runs on update, where an app may predate the table entirely."""
+    _make_frappe_at(tmp_path, "16.5.0")
+    FrappeCompatibilityCheck().run(_make_app_needing_frappe(tmp_path, None))
+
+
+def test_frappe_compatibility_ignores_an_app_that_is_not_installed(tmp_path: Path) -> None:
+    """A missing required app is the dependency installer's error, not this one's."""
+    _make_frappe_at(tmp_path, "16.5.0")
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        '[project]\nname = "myapp"\n\n[tool.bench.frappe-dependencies]\n'
+        'frappe = ">=16.0.0,<17.0.0"\nerpnext = ">=16.0.0,<17.0.0"\n',
+        {"myapp/hooks.py": "app_name = 'myapp'\n"},
+    )
+
+    FrappeCompatibilityCheck().run(app)
 
 
 def test_fixtures_pass_when_every_file_parses(tmp_path: Path) -> None:

@@ -108,10 +108,13 @@ def test_update_apps_leaves_alone_an_app_that_is_not_moving(tmp_path: Path) -> N
     assert mock_update.call_count == 1
 
 
-def test_update_apps_checks_imports_of_the_new_revision(tmp_path: Path) -> None:
-    """Nothing else on the update path reads the new revision's imports: the pip
-    install resolves declared dependencies, not what the code actually imports."""
+def test_update_re_checks_everything_a_new_revision_can_change(tmp_path: Path) -> None:
+    """A revision can add an import, bump the frappe it needs, or pin a package
+    another app already pinned. The reinstall that follows an update catches
+    none of those: it resolves the app's own requirements, unconstrained."""
     from pilot.core.app.validator import Validator
+    from pilot.core.app.validator.dependency_resolution import DependencyResolutionCheck
+    from pilot.core.app.validator.frappe_compatibility import FrappeCompatibilityCheck
     from pilot.core.app.validator.imports import ImportCheck
 
     bench = make_bench(tmp_path)
@@ -120,4 +123,22 @@ def test_update_apps_checks_imports_of_the_new_revision(tmp_path: Path) -> None:
 
     checks = Validator.for_update(bench.app("myapp")).checks
 
-    assert any(isinstance(check, ImportCheck) for check in checks)
+    for expected in (ImportCheck, FrappeCompatibilityCheck, DependencyResolutionCheck):
+        assert any(isinstance(check, expected) for check in checks), expected.__name__
+
+
+def test_update_still_spares_an_app_that_predates_the_declaration_rules(tmp_path: Path) -> None:
+    """Adding checks to the update gate must not start demanding a pyproject.toml
+    table from an app that has been on the bench since before it existed."""
+    from pilot.core.app.validator import Validator
+    from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
+    from pilot.core.app.validator.repo_structure import RepoStructureCheck
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _write_app(bench, "myapp")
+
+    checks = Validator.for_update(bench.app("myapp")).checks
+
+    for unwanted in (DependencyDeclarationsCheck, RepoStructureCheck):
+        assert not any(isinstance(check, unwanted) for check in checks), unwanted.__name__

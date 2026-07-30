@@ -28,14 +28,26 @@ different version - which is a claim about other people's apps, not just your ow
 
 ## What Pilot checks, and when
 
-| Path | Declarations | Resolution | Imports |
-|---|---|---|---|
-| `get-app` (install) | yes | yes | yes |
-| `update` / migration | no | no, the reinstall resolves for real | yes |
-| `switch-branch` | no | no | yes |
+| Path | Declarations required | Frappe compatibility | Resolution | Imports |
+|---|---|---|---|---|
+| `get-app` (install) | yes | yes | yes | yes |
+| `update` / migration | no | yes, if declared | yes | yes |
+| `switch-branch` | no | yes, if declared | yes | yes |
 
-Declarations are not enforced on update: an app already on the bench predates the rule, and an
-update is the wrong moment to start applying it.
+Declarations are not *required* on update: an app already on the bench predates the rule, and an
+update is the wrong moment to start applying it. But everything a new revision can change is
+re-checked - a revision can bump the frappe it needs, or pin a package another app already pinned.
+The reinstall that follows an update sees neither: it runs `uv pip install` with no constraints, so
+it resolves only that app's own requirements and will move a shared package without complaint.
+
+### Frappe compatibility
+
+`[tool.bench.frappe-dependencies]` is compared against the versions actually installed. An app that
+declares nothing is skipped, so a legacy app still updates.
+
+Version comparison follows PEP 440, which excludes pre-releases from an exclusive upper bound: a
+bench running frappe `develop` reports `17.0.0-dev`, and that does **not** satisfy `<17.0.0`. An app
+that declares it stops at 16 is held to it rather than silently running on 17.
 
 ### Resolution
 
@@ -97,8 +109,7 @@ the failure to runtime.
 
 ## Limits
 
-- Only the install path is constrained. An `update` resolves through the real pip install, which can
-  still move a shared package.
 - An app that declares no requirements constrains nothing, and cannot be protected.
+- Compatibility is only as good as what apps declare. A range nobody maintains says nothing.
 - Imports inside functions and inside `try` blocks are skipped: they are lazy and often deliberately
   optional.
