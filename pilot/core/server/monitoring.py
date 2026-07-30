@@ -49,7 +49,7 @@ class Monitor:
         self._network: dict[str, float] = {}
         self._disk_io: dict[str, float] = {}
         self._targets: dict[str, int] | None = None
-        self._cpu_before: tuple[dict[str, int], dict[int, int]] | None = None
+        self._cpu_before: tuple[dict[str, float], dict[int, float]] | None = None
         self._io_before: tuple[dict[str, int], dict[str, int]] | None = None
 
     def monitored_targets(self) -> dict[str, int]:

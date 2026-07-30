@@ -56,10 +56,10 @@ class ProcMetricsReader:
         """Proportional set size where the platform reports it, unique set size
         otherwise - both charge shared pages more honestly than RSS."""
         info = psutil.Process(pid).memory_full_info()
-        shared_aware = getattr(info, "pss", None)
+        shared_aware: int | None = getattr(info, "pss", None)
         if shared_aware is None:
-            shared_aware = getattr(info, "uss", 0)
-        return int(shared_aware / 1024)
+            shared_aware = int(getattr(info, "uss", 0))
+        return shared_aware // 1024
 
     def io_bytes(self, pid: int) -> tuple[int, int]:
         process = psutil.Process(pid)
