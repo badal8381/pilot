@@ -85,3 +85,12 @@ def test_update_apps_skips_checks_an_installed_app_may_predate(tmp_path: Path) -
 
     with patch.object(App, "update"):
         BenchUpdater(bench).update_apps(None, lambda message: None, pins={})
+
+
+def test_update_apps_checks_imports_of_the_new_revision(tmp_path: Path) -> None:
+    """Nothing else on the update path reads the new revision's imports: the pip
+    install resolves declared dependencies, not what the code actually imports."""
+    from pilot.core.app.validator import update_checks
+    from pilot.core.app.validator.imports import ImportCheck
+
+    assert any(isinstance(check, ImportCheck) for check in update_checks())

@@ -46,10 +46,18 @@ def update_checks() -> list["ValidationCheck"]:
 
     Leaves out the repo-structure and dependency-declaration checks: an app
     already on the bench predates those rules, and an update is the wrong moment
-    to start enforcing them. The import check is left out too - the pip install
-    that follows resolves the same dependencies against the real environment.
+    to start enforcing them. Resolution is left out because the pip install that
+    follows resolves the same dependencies against the real environment - but
+    nothing there reads the new revision's imports, so ImportCheck stays in.
     """
-    return [VersionSpecifiersCheck(), SymlinkCheck(), SyntaxCheck(), HooksCheck(), FixturesCheck()]
+    return [
+        VersionSpecifiersCheck(),
+        SymlinkCheck(),
+        SyntaxCheck(),
+        HooksCheck(),
+        FixturesCheck(),
+        ImportCheck(),
+    ]
 
 
 def validate_updated_apps(apps: list["App"], on_progress: "Callable[[str], None]") -> None:
