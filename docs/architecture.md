@@ -51,6 +51,10 @@ admin/frontend/in-app-embed/  Desk Cloud Settings IIFE (served at /embed/cloud-s
 
 `App` represents one app repository. It owns cloning, dependency install, validation, revision pins, and app metadata.
 
+`App.install` clones into `.staging`, validates there, then moves the app into `apps/` under its importable name. A
+failed install is undone, so a half-installed app never reaches a site. `pilot.core.app.validator` holds one class per
+check, each raising `AppValidationError` with the fix.
+
 Database objects are created from `bench.db_type`. A bench uses one engine for its sites: `mariadb`, `postgres`, or `sqlite`.
 
 ## Control Flow
@@ -81,6 +85,7 @@ Inside a bench:
 
 ```text
 apps/       cloned apps
+.staging/   apps being cloned and validated, before they enter apps/
 sites/      Frappe sites and assets
 env/        Python virtualenv
 logs/       process and task logs

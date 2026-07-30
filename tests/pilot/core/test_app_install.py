@@ -9,7 +9,7 @@ import pytest
 
 from pilot.config import AppConfig
 from pilot.core.app import App
-from pilot.exceptions import AppValidationError
+from pilot.exceptions import AppValidationError, BenchError
 from tests.pilot.commands.test_commands import make_bench
 
 
@@ -118,9 +118,62 @@ def test_install_discards_a_staged_clone_left_by_an_interrupted_run(tmp_path: Pa
     assert not (bench.apps_path / "myapp" / "leftover.txt").exists()
 
 
-def test_promote_refuses_to_overwrite_an_existing_app(tmp_path: Path) -> None:
-    from pilot.exceptions import BenchError
+def test_install_undoes_itself_when_the_asset_build_fails(tmp_path: Path) -> None:
+    """A registered app whose assets never built takes the site down with
+    '<app> is not installed on site' - so a failure has to leave no trace."""
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    (bench.sites_path / "apps.txt").write_text("frappe\n")
 
+    with (
+        patch.object(App, "clone", _cloner("myapp", [])),
+        patch.object(App, "_install_into_environment"),
+        patch.object(App, "_pip_uninstall") as mock_uninstall,
+        patch.object(App, "_build_assets_via_env_manager", side_effect=BenchError("yarn build failed")),
+        pytest.raises(BenchError, match="yarn build failed"),
+    ):
+        _make_app(bench, "myapp").install(skip_validations=True)
+
+    assert (bench.sites_path / "apps.txt").read_text() == "frappe\n"
+    assert not (bench.apps_path / "myapp").exists()
+    mock_uninstall.assert_called_once()
+
+
+def test_install_failure_keeps_a_clone_that_predates_the_run(tmp_path: Path) -> None:
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _write_app_tree(bench.apps_path / "myapp", "myapp")
+
+    with (
+        patch.object(App, "_install_into_environment"),
+        patch.object(App, "_pip_uninstall"),
+        patch.object(App, "_build_assets_via_env_manager", side_effect=BenchError("yarn build failed")),
+        pytest.raises(BenchError),
+    ):
+        _make_app(bench, "myapp").install(skip_validations=True)
+
+    assert (bench.apps_path / "myapp" / "pyproject.toml").exists()
+    assert "myapp" not in (bench.sites_path / "apps.txt").read_text()
+
+
+def test_install_records_the_branch_only_once_it_succeeds(tmp_path: Path) -> None:
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    bench.config.write(bench.path)
+
+    with (
+        patch.object(App, "clone", _cloner("myapp", [])),
+        patch.object(App, "_install_into_environment"),
+        patch.object(App, "_pip_uninstall"),
+        patch.object(App, "_build_assets_via_env_manager", side_effect=BenchError("yarn build failed")),
+        pytest.raises(BenchError),
+    ):
+        _make_app(bench, "myapp").install(skip_validations=True)
+
+    assert "myapp" not in (bench.path / "bench.toml").read_text()
+
+
+def test_promote_refuses_to_overwrite_an_existing_app(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
     bench.create_directories()
     (bench.apps_path / "myapp").mkdir()

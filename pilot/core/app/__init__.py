@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import re
 import shutil
 from collections.abc import Callable
@@ -231,13 +232,17 @@ class App:
             if staging_path:
                 shutil.rmtree(staging_path, ignore_errors=True)
             raise
-        app.record_branch()
         on_progress(f"'{app.config.name}' validated successfully installing.")
         on_progress(f"Installing {app.config.name}...")
-        app._install_into_environment()
-        app._register()
-        on_progress(f"\nSetting up assets for {app.config.name}...")
-        app._build_assets_via_env_manager()
+        try:
+            app._install_into_environment()
+            app._register()
+            on_progress(f"\nSetting up assets for {app.config.name}...")
+            app._build_assets_via_env_manager()
+        except Exception:
+            app._roll_back_install(delete_clone=staging_path is not None, on_progress=on_progress)
+            raise
+        app.record_branch()
         on_progress(f"\n'{app.config.name}' installed successfully.")
         return AppInstallResult(app, already_installed=False, installed_dependencies=dependencies)
 
@@ -279,6 +284,17 @@ class App:
     def _as_installed(self, module: str) -> "App":
         config = AppConfig(name=module, repo=self.config.repo, branch=self.config.branch)
         return App(config, self.bench)
+
+    def _roll_back_install(self, *, delete_clone: bool, on_progress: Callable[[str], None]) -> None:
+        """Undo a half-finished install - a registered but broken app takes the site
+        down. Best effort: the caller re-raises the failure that got us here."""
+        on_progress(f"\nInstall of '{self.config.name}' failed - undoing it...")
+        with contextlib.suppress(Exception):
+            self._deregister()
+        with contextlib.suppress(Exception):
+            self._pip_uninstall()
+        if delete_clone:
+            shutil.rmtree(self.path, ignore_errors=True)
 
     def _install_dependencies(self, on_progress: Callable[[str], None]) -> list["App"]:
         from pilot.core.app.dependency_installer import AppDependencyInstaller
