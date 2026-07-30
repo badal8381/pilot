@@ -3,9 +3,12 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
+
+import psutil
 
 if TYPE_CHECKING:
     from pilot.managers.processes.supervisor import SupervisorProcessManager
@@ -172,82 +175,41 @@ class ProcessProvider:
 
     @classmethod
     def _get_process_stats(cls, pid: int) -> tuple[float | None, float | None, float | None]:
-        """CPU%, RSS and PSS (MB) summed across the process subtree, via `ps`."""
-        pids = cls._get_subtree_pids(pid)
+        """CPU%, RSS and PSS (MB) summed across the process subtree."""
         try:
-            result = subprocess.run(
-                ["ps", "-o", "%cpu=,rss=", "-p", ",".join(map(str, pids))],
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return None, None, None
-        if result.returncode != 0:
+            root = psutil.Process(pid)
+            subtree = [root, *root.children(recursive=True)]
+        except psutil.Error:
             return None, None, None
 
-        cpu_total, rss_kb = 0.0, 0
-        for line in result.stdout.splitlines():
-            parts = line.split()
-            if len(parts) >= 2:
-                cpu_total += float(parts[0])
-                rss_kb += int(parts[1])
+        cpu_total, rss_kb, pss_kb = 0.0, 0, []
+        for process in subtree:
+            try:
+                cpu_total += cls._lifetime_cpu_percent(process)
+                rss_kb += process.memory_info().rss // 1024
+                if (pss := getattr(process.memory_full_info(), "pss", None)) is not None:
+                    pss_kb.append(pss // 1024)
+            except psutil.Error:
+                continue
 
-        pss_vals = [v for p in pids if (v := cls._get_pss_kb(p)) is not None]
-        pss_mb = round(sum(pss_vals) / 1024.0, 1) if pss_vals else None
+        pss_mb = round(sum(pss_kb) / 1024.0, 1) if pss_kb else None
         return round(cpu_total, 1), round(rss_kb / 1024.0, 1), pss_mb
 
     @staticmethod
-    def _get_subtree_pids(pid: int) -> list[int]:
-        """Return pid plus descendants for a service's real footprint."""
-        children: dict[int, list[int]] = {}
-        try:
-            proc_entries = os.listdir("/proc")
-        except OSError:
-            return [pid]
-        for entry in proc_entries:
-            if not entry.isdigit():
-                continue
-            try:
-                with open(f"/proc/{entry}/stat") as f:
-                    data = f.read()
-                # ppid is 2 fields after comm's closing ')' (comm may contain "( )").
-                ppid = int(data[data.rindex(")") + 2 :].split()[1])
-            except (OSError, ValueError, IndexError):
-                continue
-            children.setdefault(ppid, []).append(int(entry))
-
-        tree, stack = [], [pid]
-        while stack:
-            cur = stack.pop()
-            tree.append(cur)
-            stack.extend(children.get(cur, []))
-        return tree
-
-    @staticmethod
-    def _get_pss_kb(pid: int) -> int | None:
-        """Return PSS in KB from /proc/<pid>/smaps_rollup, if readable."""
-        try:
-            with open(f"/proc/{pid}/smaps_rollup") as f:
-                for line in f:
-                    if line.startswith("Pss:"):
-                        return int(line.split()[1])
-        except (OSError, ValueError, IndexError):
-            pass
-        return None
+    def _lifetime_cpu_percent(process: psutil.Process) -> float:
+        """CPU averaged over the process's whole life, matching what `ps %cpu`
+        reports. psutil's own cpu_percent() needs two samples and would read 0
+        on a one-shot request."""
+        cpu_times = process.cpu_times()
+        elapsed = time.time() - process.create_time()
+        if elapsed <= 0:
+            return 0.0
+        return (cpu_times.user + cpu_times.system) / elapsed * 100
 
     @staticmethod
     def _get_proc_uptime(pid: int) -> str | None:
-        """Return wall-clock uptime from /proc/<pid>/stat, if readable."""
         try:
-            with open("/proc/uptime") as f:
-                system_uptime = float(f.read().split()[0])
-            with open(f"/proc/{pid}/stat") as f:
-                data = f.read()
-            # Start time is field 22 (clock ticks since boot); fields after comm
-            # ')' start at field 3, so it's index 19 in the post-comm split.
-            starttime_ticks = int(data[data.rindex(")") + 2 :].split()[19])
-            elapsed = system_uptime - starttime_ticks / os.sysconf("SC_CLK_TCK")
-            return _format_duration(elapsed) if elapsed >= 0 else None
-        except (OSError, ValueError, IndexError):
+            elapsed = time.time() - psutil.Process(pid).create_time()
+        except psutil.Error:
             return None
+        return _format_duration(elapsed) if elapsed >= 0 else None

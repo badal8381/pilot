@@ -140,6 +140,11 @@
         </ChartCard>
       </div>
 
+      <!-- Live mode collecting its first points, with the stat bar already up -->
+      <div v-else-if="!isHistorical" class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
+        <Skeleton v-for="i in 6" :key="i" class="rounded-lg h-[340px]" />
+      </div>
+
       <!-- WAF analytics (only renders when the WAF has logged activity) -->
       <WafAnalytics :window="activeWindow" />
     </template>
@@ -156,6 +161,7 @@ import DatabaseInsights from '@/components/dashboard/DatabaseInsights.vue'
 import SiteInsights from '@/components/dashboard/SiteInsights.vue'
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
+import { livePollDelayMs } from '@/utils/livePolling'
 import { useSites } from '@/composables/sites/useSites'
 
 const WINDOWS = [
@@ -326,13 +332,14 @@ function humanizeSince(earliest) {
 
 // Data loading
 
-function setWindow(key) {
+async function setWindow(key) {
   activeWindow.value = key
   if (key === 'live') {
     liveHistory.value = []
     application.value = { earliest: null, services: [], cpu: [], memory: [] }
-    seedLiveHistory()
-    loadStats()
+    await seedLiveHistory()
+    await loadStats()
+    scheduleStats()
   } else {
     loadHistory(key)
   }
@@ -442,9 +449,8 @@ const allEmpty = computed(
     systemEmpty.value &&
     appEmpty.value,
 )
-const pageLoading = computed(() =>
-  isHistorical.value ? historyLoading.value : !stats.value || liveHistory.value.length < 2,
-)
+// Live mode only waits on the stat bar's own data; the charts wait on showCharts.
+const pageLoading = computed(() => (isHistorical.value ? historyLoading.value : !stats.value))
 const showCharts = computed(() =>
   isHistorical.value
     ? !historyLoading.value && !historyError.value && !systemEmpty.value
@@ -665,15 +671,29 @@ function formatBytes(bytes) {
 // Lifecycle
 
 let statsTimer
-onMounted(() => {
+function scheduleStats() {
+  clearTimeout(statsTimer)
+  const delay = livePollDelayMs({
+    isLive: view.value === 'system' && !isHistorical.value,
+    pointCount: liveHistory.value.length,
+  })
+  statsTimer = setTimeout(async () => {
+    await loadStats()
+    scheduleStats()
+  }, delay)
+}
+
+onMounted(async () => {
   if (view.value === 'system') {
     if (isHistorical.value) loadHistory(activeWindow.value)
     else {
-      seedLiveHistory()
-      loadStats()
+      // Seed first: a bench with monitor history reaches a drawable chart in one
+      // shot and never enters the warm-up cadence.
+      await seedLiveHistory()
+      await loadStats()
     }
   }
-  statsTimer = setInterval(loadStats, 10000)
+  scheduleStats()
 })
-onUnmounted(() => clearInterval(statsTimer))
+onUnmounted(() => clearTimeout(statsTimer))
 </script>
