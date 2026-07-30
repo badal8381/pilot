@@ -67,8 +67,6 @@ Useful env vars:
 | `E2E_DB_TYPE` | `mariadb` | Bench database engine: `mariadb` or `postgres`. |
 | `E2E_MARIADB_PASSWORD` | `admin` | Root password the wizard sets on bench's own rootless MariaDB server. |
 | `E2E_POSTGRES_PASSWORD` | `admin` | Superuser password the wizard sets on bench's own rootless PostgreSQL server (used when `E2E_DB_TYPE=postgres`). |
-| `E2E_EXTRA_APP` | `1` | `0` skips the install/uninstall app steps (keeps a run quick). |
-| `E2E_EXTRA_APP_NAME` / `_REPO` / `_BRANCH` | `blog` / `frappe/blog` / `develop` | The extra app installed/uninstalled. Point at `erpnext`, `india-compliance`, etc. to widen coverage. |
 | `E2E_KEEP_ON_FAILURE` | (set) | On failure the bench is kept for inspection; set to `0` to always clean up. |
 | `E2E_BUILD_ADMIN` | off | `1` builds the admin UI from source (wizard + full bench) so the run exercises *this branch's* frontend. Off (default) = the harness never builds and `pilot start` serves the prebuilt bundle (faster). |
 
@@ -82,10 +80,10 @@ anything else).
 The lifecycle is one env-driven spec; CI (`.github/workflows/e2e.yml`) runs it as
 a **matrix** of parallel jobs:
 
-| Variant | `E2E_DB_TYPE` | `E2E_EXTRA_APP` |
-|---------|---------------|----------------|
-| `mariadb` | `mariadb` | `1` |
-| `postgres` | `postgres` | `1` |
+| Variant | `E2E_DB_TYPE` |
+|---------|---------------|
+| `mariadb` | `mariadb` |
+| `postgres` | `postgres` |
 
 To add another variant, add a row to the matrix `include` (and any system deps
 its `if:` step needs). To widen what a variant exercises, flip the env knobs

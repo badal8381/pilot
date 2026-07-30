@@ -145,6 +145,9 @@ class App:
     def update_target(self, marketplace_entry: dict | None) -> RevisionPin | None:
         return self._repository.update_target(marketplace_entry)
 
+    def is_marketplace_app(self, marketplace_entry: dict | None) -> bool:
+        return self._repository.is_marketplace_app(marketplace_entry)
+
     def has_remote_update(self) -> bool:
         return self._repository.has_remote_update()
 
@@ -208,9 +211,10 @@ class App:
         *,
         install_dependencies: bool = False,
         skip_validations: bool = False,
+        commit: str = "",
         on_progress: Callable[[str], None] = lambda message: None,
     ) -> AppInstallResult:
-        """Clone, validate, install, register, and build app assets."""
+        """Pinned commit based Clone, validate, install, register, and build app assets."""
         if self.bench.is_app_installed(self.config.name):
             app = self.bench.app(self.module_name)
             dependencies = app._install_dependencies(on_progress) if install_dependencies else []
@@ -220,6 +224,9 @@ class App:
         app, cloned_this_run = self._clone_and_normalize(on_progress)
         app.record_branch()
         try:
+            if commit and app.installed_hash != commit:
+                on_progress(f"Checking out {app.config.name} at {commit[:8]}...")
+                app.checkout_commit(commit)
             dependencies = app._install_dependencies(on_progress) if install_dependencies else []
             if not skip_validations:
                 app._validate()

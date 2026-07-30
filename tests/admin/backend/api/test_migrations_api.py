@@ -49,7 +49,11 @@ def test_post_updates_creates_operation(tmp_path: Path) -> None:
     (bench_root / "sites" / "site1.localhost" / "site_config.json").write_text("{}")
     client = _client(bench_root)
 
-    with patch("pilot.tasks.migration_backup.MigrationBackupTask.queue", return_value="task-99"):
+    with (
+        # Never read the machine's real marketplace cache from a test.
+        patch("pilot.integrations.marketplace.Marketplace.registry", return_value=[]),
+        patch("pilot.tasks.migration_backup.MigrationBackupTask.queue", return_value="task-99"),
+    ):
         resp = client.post("/api/v1/updates", json={})
 
     assert resp.status_code == 202
@@ -72,7 +76,10 @@ def test_post_updates_rejects_when_one_is_already_unresolved(tmp_path: Path) -> 
     (bench_root / "sites" / "site1.localhost" / "site_config.json").write_text("{}")
     client = _client(bench_root)
 
-    with patch("pilot.tasks.migration_backup.MigrationBackupTask.queue", return_value="task-99"):
+    with (
+        patch("pilot.integrations.marketplace.Marketplace.registry", return_value=[]),
+        patch("pilot.tasks.migration_backup.MigrationBackupTask.queue", return_value="task-99"),
+    ):
         first = client.post("/api/v1/updates", json={})
         assert first.status_code == 202
 
@@ -89,7 +96,10 @@ def test_standalone_migrate_returns_operation_and_task_ids(tmp_path: Path) -> No
     (site_dir / "site_config.json").write_text("{}")
     client = _client(bench_root)
 
-    with patch("pilot.tasks.migration_backup.MigrationBackupTask.queue", return_value="task-99"):
+    with (
+        patch("pilot.integrations.marketplace.Marketplace.registry", return_value=[]),
+        patch("pilot.tasks.migration_backup.MigrationBackupTask.queue", return_value="task-99"),
+    ):
         response = client.post("/api/v1/sites/site1.localhost/actions/migrate", json={})
 
     assert response.status_code == 202
