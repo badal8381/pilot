@@ -48,7 +48,7 @@ class AppRepository:
 
     def update_target(self, marketplace_entry: dict | None) -> RevisionPin | None:
         """The fixed revision this app would update to, or None when there is none. (forward only)"""
-        if self.is_marketplace_app(marketplace_entry):
+        if marketplace_entry and self.is_marketplace_app(marketplace_entry):
             release = self.forward_release(marketplace_entry)
             return RevisionPin.from_marketplace_release(release) if release else None
         if not self.app.config.branch:
