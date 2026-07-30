@@ -6,6 +6,7 @@ from pilot.core.app.validator.dependency_declarations import DependencyDeclarati
 from pilot.core.app.validator.hooks import HooksCheck
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
+from pilot.core.app.validator.symlinks import SymlinkCheck
 from pilot.core.app.validator.syntax import SyntaxCheck
 from pilot.core.app.validator.version_specifiers import VersionSpecifiersCheck
 
@@ -22,6 +23,7 @@ class Validator:
         self.checks = checks or [
             RepoStructureCheck(),
             VersionSpecifiersCheck(),
+            SymlinkCheck(),
             SyntaxCheck(),
             HooksCheck(),
             DependencyDeclarationsCheck(),

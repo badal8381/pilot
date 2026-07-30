@@ -14,6 +14,7 @@ from pilot.core.app.validator.dependency_declarations import DependencyDeclarati
 from pilot.core.app.validator.hooks import HooksCheck
 from pilot.core.app.validator.imports import ImportCheck
 from pilot.core.app.validator.repo_structure import RepoStructureCheck
+from pilot.core.app.validator.symlinks import SymlinkCheck
 from pilot.core.app.validator.syntax import SyntaxCheck
 from pilot.core.app.validator.version_specifiers import VersionSpecifiersCheck
 from pilot.exceptions import AppValidationError
@@ -581,3 +582,110 @@ def test_validation_env_installs_with_mysqlclient_build_flags(monkeypatch, tmp_p
 
     assert captured["env"]["MYSQLCLIENT_CFLAGS"] == "-I/opt/mariadb/include"
     assert "PATH" in captured["env"]
+
+
+def _app_with_symlink(tmp_path: Path, link_name: str, target: str) -> App:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        f'[project]\nname = "myapp"\nversion = "0.0.1"\n\n{_SETUPTOOLS_BUILD}',
+        {"myapp/__init__.py": "", "myapp/hooks.py": "app_name = 'myapp'"},
+    )
+    link = app.path / link_name
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(target)
+    return app
+
+
+def test_symlink_check_rejects_a_broken_symlink(tmp_path: Path) -> None:
+    """The frappe/wiki shape: an absolute link into another machine's home."""
+    app = _app_with_symlink(
+        tmp_path, "myapp/public/node_modules", "/Users/someone/benches/dec/apps/myapp/node_modules"
+    )
+
+    with pytest.raises(AppValidationError, match=r"do not resolve inside the app"):
+        SymlinkCheck().run(app)
+
+
+def test_symlink_check_reports_the_path_target_and_reason(tmp_path: Path) -> None:
+    app = _app_with_symlink(tmp_path, "myapp/public/node_modules", "/nowhere/node_modules")
+
+    with pytest.raises(AppValidationError) as exc:
+        SymlinkCheck().run(app)
+
+    message = str(exc.value)
+    assert "myapp/public/node_modules -> /nowhere/node_modules (broken)" in message
+    assert "myapp" in message
+
+
+def test_symlink_check_allows_a_relative_link_inside_the_app(tmp_path: Path) -> None:
+    """An in-repo link travels with the clone, so packaging it is fine."""
+    app = _app_with_symlink(tmp_path, "myapp/public/shared", "../templates")
+    (app.path / "myapp" / "templates").mkdir(parents=True)
+
+    SymlinkCheck().run(app)  # no raise
+    assert SymlinkCheck.get_invalid_symlinks(app.path) == []
+
+
+def test_symlink_check_allows_an_absolute_link_inside_the_app(tmp_path: Path) -> None:
+    app = _app_with_symlink(tmp_path, "myapp/vendor", str(tmp_path / "apps" / "myapp" / "myapp"))
+
+    SymlinkCheck().run(app)  # no raise
+
+
+def test_symlink_check_rejects_a_link_that_resolves_outside_the_app(tmp_path: Path) -> None:
+    """It resolves here and would vanish on any other machine."""
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    app = _app_with_symlink(tmp_path, "myapp/vendor", str(outside))
+
+    with pytest.raises(AppValidationError, match="points outside the app"):
+        SymlinkCheck().run(app)
+
+
+def test_symlink_check_rejects_an_in_app_link_that_hops_outside(tmp_path: Path) -> None:
+    """Resolution follows the whole chain, not just the first hop."""
+    outside = tmp_path / "elsewhere"
+    outside.mkdir()
+    app = _app_with_symlink(tmp_path, "myapp/vendor", "./hop")
+    (app.path / "myapp" / "hop").symlink_to(outside)
+
+    with pytest.raises(AppValidationError, match="points outside the app"):
+        SymlinkCheck().run(app)
+
+
+def test_symlink_check_passes_for_an_app_without_symlinks(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        f'[project]\nname = "myapp"\nversion = "0.0.1"\n\n{_SETUPTOOLS_BUILD}',
+        {"myapp/__init__.py": "", "myapp/hooks.py": "app_name = 'myapp'"},
+    )
+
+    SymlinkCheck().run(app)  # no raise
+
+
+def test_symlink_check_ignores_git_and_node_modules_internals(tmp_path: Path) -> None:
+    """Links npm and git create locally are not the app's committed content."""
+    app = _make_app(
+        tmp_path,
+        "myapp",
+        f'[project]\nname = "myapp"\nversion = "0.0.1"\n\n{_SETUPTOOLS_BUILD}',
+        {"myapp/__init__.py": "", "myapp/hooks.py": "app_name = 'myapp'"},
+    )
+    for skipped in ("node_modules/.bin", ".git/annex"):
+        directory = app.path / skipped
+        directory.mkdir(parents=True)
+        (directory / "linked").symlink_to("/nowhere")
+
+    SymlinkCheck().run(app)  # no raise
+
+
+def test_symlink_check_does_not_walk_through_an_allowed_symlinked_dir(tmp_path: Path) -> None:
+    """An allowed link must not fall through to the directory branch: is_dir()
+    follows links, so a link to its own parent would recurse until the OS
+    refused and then report the valid link as broken."""
+    app = _app_with_symlink(tmp_path, "myapp/loop", ".")
+
+    SymlinkCheck().run(app)  # no raise, and terminates
+    assert SymlinkCheck.get_invalid_symlinks(app.path) == []
