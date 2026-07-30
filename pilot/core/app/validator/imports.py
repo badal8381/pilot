@@ -67,7 +67,11 @@ class ImportCheck:
             f"{module}: {reason}\n    imported at: {', '.join(locations[module])}"
             for module, reason in reasons.items()
         ]
-        raise AppValidationError("Import errors:\n" + "\n".join(lines))
+        raise AppValidationError(
+            f"'{app.config.name}' has imports that don't resolve:\n"
+            + "\n".join(lines)
+            + "\nAdd the missing packages to pyproject.toml's dependencies, or fix the import path."
+        )
 
     def _imported_module_locations(self, app: "App") -> dict[str, list[str]]:
         stdlib = sys.stdlib_module_names
