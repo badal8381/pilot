@@ -45,9 +45,10 @@ class NewAppOptions:
 
 
 class App:
-    def __init__(self, config: AppConfig, bench: "Bench") -> None:
+    def __init__(self, config: AppConfig, bench: "Bench", *, staged: bool = False) -> None:
         self.config = config
         self.bench = bench
+        self.is_staged = staged  # cloned outside apps/, pending validation
 
     @classmethod
     def from_repo(cls, bench: "Bench", repo: str, branch: str = "") -> "App":
@@ -117,7 +118,8 @@ class App:
 
     @property
     def path(self) -> Path:
-        return self.bench.apps_path / self.config.name
+        root = self.bench.staging_path if self.is_staged else self.bench.apps_path
+        return root / self.config.name
 
     @property
     def installed_version(self) -> str:
@@ -217,16 +219,19 @@ class App:
             on_progress(f"'{app.config.name}' already installed, skipping.")
             return AppInstallResult(app, already_installed=True, installed_dependencies=dependencies)
 
-        app, cloned_this_run = self._clone_and_normalize(on_progress)
-        app.record_branch()
+        app = self._clone_for_install(on_progress)
+        staging_path = app.path if app.is_staged else None
         try:
             dependencies = app._install_dependencies(on_progress) if install_dependencies else []
             if not skip_validations:
                 app._validate()
+            if app.is_staged:
+                app = app.promote()
         except BenchError:
-            if cloned_this_run:
-                shutil.rmtree(app.path, ignore_errors=True)
+            if staging_path:
+                shutil.rmtree(staging_path, ignore_errors=True)
             raise
+        app.record_branch()
         on_progress(f"'{app.config.name}' validated successfully installing.")
         on_progress(f"Installing {app.config.name}...")
         app._install_into_environment()
@@ -236,24 +241,44 @@ class App:
         on_progress(f"\n'{app.config.name}' installed successfully.")
         return AppInstallResult(app, already_installed=False, installed_dependencies=dependencies)
 
-    def _clone_and_normalize(self, on_progress: Callable[[str], None]) -> tuple["App", bool]:
-        """Clone if needed and rename the folder to the importable module name."""
-        cloned_this_run = False
+    def _clone_for_install(self, on_progress: Callable[[str], None]) -> "App":
+        """Clone into staging, so an unvalidated app never sits in apps/ where
+        the running site would pick it up. Already-cloned apps stay put."""
         if self.is_cloned:
             on_progress(f"'{self.config.name}' already cloned, skipping clone.")
-        else:
-            on_progress(f"Cloning {self.config.name}...")
-            self.clone()
-            cloned_this_run = True
+            return self._rename_to_module_name()
 
+        on_progress(f"Cloning {self.config.name}...")
+        staged = App(self.config, self.bench, staged=True)
+        shutil.rmtree(staged.path, ignore_errors=True)  # leftovers from an interrupted run
+        staged.path.parent.mkdir(parents=True, exist_ok=True)
+        staged.clone()
+        return staged
+
+    def promote(self) -> "App":
+        """Move a validated staged clone into apps/ under its importable name."""
+        if not self.path.is_dir():
+            raise BenchError(f"'{self.config.name}' was never cloned into {self.path} - nothing to install.")
+        target = self.bench.apps_path / self.module_name
+        if target.exists():
+            raise BenchError(f"'{target}' already exists - remove it before installing this app.")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(self.path), str(target))  # a rename, unless apps/ is another filesystem
+        return self._as_installed(self.module_name)
+
+    def _rename_to_module_name(self) -> "App":
+        """Rename an app already in apps/ to its importable name, as get-app does."""
         module = self.module_name
         if module == self.config.name:
-            return self, cloned_this_run
+            return self
         target = self.bench.apps_path / module
         if not target.exists():
             self.path.rename(target)
-        renamed = App(AppConfig(name=module, repo=self.config.repo, branch=self.config.branch), self.bench)
-        return renamed, cloned_this_run
+        return self._as_installed(module)
+
+    def _as_installed(self, module: str) -> "App":
+        config = AppConfig(name=module, repo=self.config.repo, branch=self.config.branch)
+        return App(config, self.bench)
 
     def _install_dependencies(self, on_progress: Callable[[str], None]) -> list["App"]:
         from pilot.core.app.dependency_installer import AppDependencyInstaller
