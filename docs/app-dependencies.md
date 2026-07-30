@@ -1,0 +1,101 @@
+# App Dependencies
+
+Every app on a bench shares one Python environment and one process. Frappe imports all installed
+apps into the same interpreter, so a package like `markdown` exists there at exactly one version, no
+matter how many apps want it.
+
+That single fact drives everything below. An app cannot get its own copy of a library, so two apps
+demanding different versions is not a packaging problem to route around - it is a conflict someone
+has to resolve.
+
+## What an app must declare
+
+```toml
+[project]
+dependencies = ["markdown>=3.5,<4"]        # PyPI packages
+
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<17.0.0"                # frappe apps, with the versions supported
+erpnext = ">=16.0.0,<17.0.0"
+```
+
+`[tool.bench.frappe-dependencies]` is required for every app except frappe itself, and every entry
+needs a real version range. An empty or missing range is rejected: pilot cannot tell whether the app
+fits the bench without one.
+
+Prefer ranges over exact pins. `markdown==3.8.2` says no other app on the bench may ever need a
+different version - which is a claim about other people's apps, not just your own.
+
+## What Pilot checks, and when
+
+| Path | Declarations | Resolution | Imports |
+|---|---|---|---|
+| `get-app` (install) | yes | yes | yes |
+| `update` / migration | no | no, the reinstall resolves for real | yes |
+| `switch-branch` | no | no | yes |
+
+Declarations are not enforced on update: an app already on the bench predates the rule, and an
+update is the wrong moment to start applying it.
+
+### Resolution
+
+Pilot runs the real install command with `--dry-run`, carrying every other app's declared
+requirements as a constraints file. uv then answers two questions at once:
+
+- can this app's own requirements be satisfied at all?
+- can they be satisfied **without moving a package another app pinned**?
+
+Without the constraints, `uv pip install -e app` reports success while quietly replacing
+`markdown 3.5.2` with `3.8.2`, and the app that required the old one keeps running until something
+touches the changed API. With them, uv refuses instead.
+
+A constraints file only binds packages the resolve actually touches, so an app that never mentions
+`markdown` is unaffected by a `markdown` conflict elsewhere on the bench.
+
+URL requirements, extras, and marker-conditional requirements are left out of the constraints file:
+constraints files reject the first two, and the third would over-constrain.
+
+### Imports
+
+Imports are resolved without running the app's code, in three stages, stopping at the first answer:
+
+1. **Stat what the bench already has** - the app's own package, the other apps' source trees, and
+   the environment's `site-packages`. Sub-second, and enough for almost every app.
+2. **Ask the bench's Python** about third-party names with no file to stat. A package can bind
+   submodules when it is imported: `apiclient.discovery` is an alias for a `googleapiclient` module
+   and has no file of its own. App modules never reach this stage - their files are right there, and
+   importing them would run the code being validated.
+3. **Install into a throwaway venv** when something is still missing, which is the case that
+   genuinely needs installing - a dependency the bench does not have yet.
+
+## Reading a failure
+
+```
+'wiki' has dependencies that can't be resolved against this bench:
+  × No solution found when resolving dependencies:
+  ╰─▶ Because wiki==3.0.0 depends on markdown==3.8.2 and markdown>=3.5.1,<3.6.dev0,
+      we can conclude that your requirements are unsatisfiable.
+Already required by:
+  markdown~=3.5.1  # lms
+Widen the requirement in pyproject.toml, or update the app that pinned it.
+```
+
+uv explains the arithmetic; the `Already required by` block names which app asked for what. Three
+ways out, in order of preference:
+
+1. **Widen the range** in whichever app is stricter than it needs to be. Usually the pin was written
+   by `pip freeze` and reflects the version the author tested with, not a real incompatibility.
+2. **Update the other app**, if a newer release already relaxed its requirement.
+3. **Separate benches**, when the two apps genuinely need incompatible versions. No tooling can put
+   two versions of one package in one interpreter.
+
+`bench get-app --skip-validations` installs anyway. It does not make the conflict go away; it moves
+the failure to runtime.
+
+## Limits
+
+- Only the install path is constrained. An `update` resolves through the real pip install, which can
+  still move a shared package.
+- An app that declares no requirements constrains nothing, and cannot be protected.
+- Imports inside functions and inside `try` blocks are skipped: they are lazy and often deliberately
+  optional.
