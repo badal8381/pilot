@@ -96,10 +96,7 @@ def test_switch_branch_rolls_back_when_a_check_itself_fails(tmp_path: Path) -> N
         patch.object(App, "head_sha", "abc1234"),
         patch.object(App, "current_branch", "main"),
         patch.object(App, "switch_branch") as mock_switch,
-        patch(
-            "pilot.core.app.validator.validate_updated_apps",
-            side_effect=CommandError("uv exploded"),
-        ),
+        patch.object(App, "validate_update", side_effect=CommandError("uv exploded")),
         patch.object(PythonEnvManager, "install_app") as mock_install,
         pytest.raises(CommandError),
     ):

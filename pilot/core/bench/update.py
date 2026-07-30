@@ -21,7 +21,6 @@ class BenchUpdater:
         """Update each app to its pin, or resolve marketplace/branch targets live when `pins` is None (direct CLI update)."""
         import sys
 
-        from pilot.core.app.validator import validate_updated_apps
         from pilot.exceptions import CommandError, MigrateError
 
         live_lookup = pins is None
@@ -49,7 +48,9 @@ class BenchUpdater:
         # Every app is on its target revision now, so the checks see the tree
         # migrate will actually run against. Failing here means nothing has been
         # installed or built yet, and reverting is a checkout.
-        validate_updated_apps(updated, on_progress)
+        for app in updated:
+            on_progress(f"Validating {app.config.name}...")
+            app.validate_update()
 
     @staticmethod
     def _follows_its_branch(app: "App", marketplace_by_name: dict, live_lookup: bool) -> bool:

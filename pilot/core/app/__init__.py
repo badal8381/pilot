@@ -245,7 +245,7 @@ class App:
                 app.checkout_commit(commit)
             dependencies = app._install_dependencies(on_progress) if install_dependencies else []
             if not skip_validations:
-                app._validate()
+                app.validate()
             if app.is_staged:
                 app = app.promote()
         except BenchError:
@@ -324,10 +324,17 @@ class App:
 
         return AppDependencyInstaller(self.bench, self).install(on_progress)
 
-    def _validate(self) -> None:
+    def validate(self) -> None:
+        """Every check a new app must pass before it is installed."""
         from pilot.core.app.validator import Validator
 
         Validator(self).validate()
+
+    def validate_update(self) -> None:
+        """The checks an app must pass once it has moved to a new revision."""
+        from pilot.core.app.validator import Validator
+
+        Validator.for_update(self).validate()
 
     def _install_into_environment(self) -> None:
         from pilot.managers.environment import PythonEnvManager

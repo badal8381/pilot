@@ -111,7 +111,13 @@ def test_update_apps_leaves_alone_an_app_that_is_not_moving(tmp_path: Path) -> N
 def test_update_apps_checks_imports_of_the_new_revision(tmp_path: Path) -> None:
     """Nothing else on the update path reads the new revision's imports: the pip
     install resolves declared dependencies, not what the code actually imports."""
-    from pilot.core.app.validator import update_checks
+    from pilot.core.app.validator import Validator
     from pilot.core.app.validator.imports import ImportCheck
 
-    assert any(isinstance(check, ImportCheck) for check in update_checks())
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _write_app(bench, "myapp")
+
+    checks = Validator.for_update(bench.app("myapp")).checks
+
+    assert any(isinstance(check, ImportCheck) for check in checks)

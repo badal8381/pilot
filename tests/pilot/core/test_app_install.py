@@ -57,7 +57,7 @@ def test_install_leaves_apps_empty_when_validation_fails(tmp_path: Path) -> None
 
     with (
         patch.object(App, "clone", _cloner("myapp", [])),
-        patch.object(App, "_validate", side_effect=AppValidationError("broken app")),
+        patch.object(App, "validate", side_effect=AppValidationError("broken app")),
         pytest.raises(AppValidationError, match="broken app"),
     ):
         _make_app(bench, "myapp").install()
@@ -95,7 +95,7 @@ def test_install_stages_an_already_cloned_app_instead_of_re_cloning(tmp_path: Pa
     validated_at = []
     with (
         patch.object(App, "clone", unexpected_clone),
-        patch.object(App, "_validate", lambda self: validated_at.append(self.path)),
+        patch.object(App, "validate", lambda self: validated_at.append(self.path)),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
@@ -117,7 +117,7 @@ def test_install_puts_an_already_cloned_app_back_when_it_fails_validation(tmp_pa
         raise AppValidationError("nope")
 
     with (
-        patch.object(App, "_validate", reject),
+        patch.object(App, "validate", reject),
         pytest.raises(AppValidationError),
     ):
         _make_app(bench, "myapp").install()

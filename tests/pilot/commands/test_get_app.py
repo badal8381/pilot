@@ -38,7 +38,7 @@ def test_full_flow_runs_when_app_not_registered(tmp_path: Path) -> None:
             autospec=True,
             side_effect=lambda app: app.path.mkdir(parents=True, exist_ok=True),
         ) as mock_clone,
-        patch.object(App, "_validate") as mock_validate,
+        patch.object(App, "validate") as mock_validate,
         patch.object(App, "_install_into_environment") as mock_install,
         patch.object(App, "_build_assets_via_env_manager") as mock_build,
     ):
@@ -59,7 +59,7 @@ def test_run_short_circuits_when_app_already_registered(tmp_path: Path) -> None:
 
     with (
         patch.object(App, "clone") as mock_clone,
-        patch.object(App, "_validate") as mock_validate,
+        patch.object(App, "validate") as mock_validate,
         patch.object(App, "_install_into_environment") as mock_install,
         patch.object(App, "_build_assets_via_env_manager") as mock_build,
     ):
@@ -132,7 +132,7 @@ def test_still_installs_missing_dependency_when_parent_already_installed(tmp_pat
             side_effect=lambda app: app.path.mkdir(parents=True, exist_ok=True),
         ) as mock_clone,
         patch.object(App, "checkout_commit"),
-        patch.object(App, "_validate"),
+        patch.object(App, "validate"),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
@@ -157,7 +157,7 @@ def test_skip_validations_flag_still_skips_validate(tmp_path: Path) -> None:
             autospec=True,
             side_effect=lambda app: app.path.mkdir(parents=True, exist_ok=True),
         ),
-        patch.object(App, "_validate") as mock_validate,
+        patch.object(App, "validate") as mock_validate,
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):

@@ -52,11 +52,10 @@ class SwitchBranchTask(Task):
         with the branch bench.toml records. Any BenchError rolls back, not just a
         validation failure - uv falling over leaves the same live bad branch.
         """
-        from pilot.core.app.validator import validate_updated_apps
         from pilot.exceptions import BenchError
 
         try:
-            validate_updated_apps([app], print)
+            app.validate_update()
         except BenchError:
             if previous_branch:
                 app.switch_branch(previous_branch)
