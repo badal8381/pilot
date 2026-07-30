@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from pilot.core.app import App
+from pilot.core.app.revisions import RevisionPin
 from pilot.core.bench.update import BenchUpdater
 from pilot.exceptions import AppValidationError
 from tests.pilot.commands.test_commands import make_bench
@@ -26,6 +27,12 @@ def _write_app(bench, name: str, hooks: str = "app_name = 'x'\n", fixture: str |
     return app_path
 
 
+def _pins(*names: str) -> dict[str, RevisionPin]:
+    """A revision to move each app to. Without one an app is left where it is,
+    and an app that never moved has nothing to re-validate."""
+    return {name: RevisionPin(kind="commit", ref="abc1234") for name in names}
+
+
 def test_update_apps_validates_every_updated_app(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
     bench.create_directories()
@@ -33,7 +40,7 @@ def test_update_apps_validates_every_updated_app(tmp_path: Path) -> None:
     _write_app(bench, "otherapp")
 
     with patch.object(App, "update") as mock_update:
-        BenchUpdater(bench).update_apps(None, lambda message: None, pins={})
+        BenchUpdater(bench).update_apps(None, lambda message: None, pins=_pins("myapp", "otherapp"))
 
     assert mock_update.call_count == 2
 
@@ -47,7 +54,7 @@ def test_update_apps_rejects_a_corrupt_fixture_before_installing(tmp_path: Path)
         patch.object(App, "update"),
         pytest.raises(AppValidationError, match=r"fixtures/role\.json"),
     ):
-        BenchUpdater(bench).update_apps(None, lambda message: None, pins={})
+        BenchUpdater(bench).update_apps(None, lambda message: None, pins=_pins("myapp"))
 
 
 def test_update_apps_rejects_a_hook_pointing_at_deleted_code(tmp_path: Path) -> None:
@@ -60,7 +67,7 @@ def test_update_apps_rejects_a_hook_pointing_at_deleted_code(tmp_path: Path) -> 
         patch.object(App, "update"),
         pytest.raises(AppValidationError, match="has no 'setup'"),
     ):
-        BenchUpdater(bench).update_apps(None, lambda message: None, pins={})
+        BenchUpdater(bench).update_apps(None, lambda message: None, pins=_pins("myapp"))
 
 
 def test_update_apps_only_validates_the_filtered_apps(tmp_path: Path) -> None:
@@ -70,7 +77,7 @@ def test_update_apps_only_validates_the_filtered_apps(tmp_path: Path) -> None:
     _write_app(bench, "brokenapp", fixture="{oops\n")
 
     with patch.object(App, "update"):
-        BenchUpdater(bench).update_apps({"myapp"}, lambda message: None, pins={})
+        BenchUpdater(bench).update_apps({"myapp"}, lambda message: None, pins=_pins("myapp", "brokenapp"))
 
 
 def test_update_apps_skips_checks_an_installed_app_may_predate(tmp_path: Path) -> None:
@@ -84,7 +91,21 @@ def test_update_apps_skips_checks_an_installed_app_may_predate(tmp_path: Path) -
     (app_path / "setup.py").write_text("from setuptools import setup; setup()\n")
 
     with patch.object(App, "update"):
-        BenchUpdater(bench).update_apps(None, lambda message: None, pins={})
+        BenchUpdater(bench).update_apps(None, lambda message: None, pins=_pins("oldapp"))
+
+
+def test_update_apps_leaves_alone_an_app_that_is_not_moving(tmp_path: Path) -> None:
+    """An app with no pin stays on its revision, so there is nothing to re-check -
+    a defect it already had must not block an update of the apps around it."""
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _write_app(bench, "myapp")
+    _write_app(bench, "brokenapp", fixture="{oops\n")
+
+    with patch.object(App, "update") as mock_update:
+        BenchUpdater(bench).update_apps(None, lambda message: None, pins=_pins("myapp"))
+
+    assert mock_update.call_count == 1
 
 
 def test_update_apps_checks_imports_of_the_new_revision(tmp_path: Path) -> None:
