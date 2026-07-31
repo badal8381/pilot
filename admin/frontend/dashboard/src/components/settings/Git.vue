@@ -24,7 +24,7 @@
       class="flex sm:flex-row sm:justify-between sm:items-center flex-col gap-3"
     >
       <div>
-        <p class="font-medium text-ink-gray-8 text-sm">Connected as {{ username }}</p>
+        <p class="font-medium text-ink-gray-8 text-base">Connected as {{ username }}</p>
         <p class="text-ink-gray-5 text-p-sm">GitHub · Personal access token</p>
       </div>
       <div class="flex items-center gap-2">

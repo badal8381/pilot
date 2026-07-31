@@ -6,28 +6,28 @@
 
   <Dialog v-model="dialogOpen" :options="{ title: 'Update', size: 'md' }">
     <div v-if="isDev" class="flex flex-col gap-3">
-      <p class="text-ink-gray-7 text-sm">
+      <p class="text-ink-gray-7 text-p-base">
         This is a development install. Update it from a terminal:
       </p>
-      <pre class="p-3 bg-surface-gray-2 rounded overflow-x-auto text-ink-gray-8 text-xs">git pull
+      <pre class="p-3 bg-surface-gray-2 rounded overflow-x-auto text-ink-gray-8 text-sm">git pull
 pilot admin build
 pilot admin upgrade</pre>
       <p class="text-ink-gray-5 text-p-sm">The last step restarts the admin service.</p>
     </div>
 
     <div v-else-if="updating" class="flex flex-col gap-3">
-      <p class="text-ink-gray-7 text-sm">Updating to {{ latestVersion }}…</p>
+      <p class="text-ink-gray-7 text-base">Updating to {{ latestVersion }}…</p>
       <div v-if="!log" class="flex justify-center items-center py-8">
         <Spinner size="lg" class="text-ink-gray-4" />
       </div>
       <pre
         v-else
-        class="p-3 bg-surface-gray-2 rounded max-h-64 overflow-auto text-ink-gray-7 text-xs whitespace-pre-wrap"
+        class="p-3 bg-surface-gray-2 rounded max-h-64 overflow-auto text-ink-gray-7 text-sm whitespace-pre-wrap"
       >{{ log }}</pre>
     </div>
 
     <div v-else-if="updateAvailable" class="flex flex-col gap-3">
-      <p class="text-ink-gray-7 text-sm">
+      <p class="text-ink-gray-7 text-p-base">
         Version <strong>{{ latestVersion }}</strong> is available. You are on
         {{ status.current_version || 'an unknown version' }}.
       </p>
