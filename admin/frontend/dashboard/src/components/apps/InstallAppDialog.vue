@@ -1,7 +1,7 @@
 <template>
   <ActionDialog
     v-model:open="open"
-    title="Install App"
+    title="Install app"
     :subject="{ name: app?.name, label: appLabel, badge: app?.label, description: app?.description, logo: app?.logo_url }"
     :error="error"
     confirm-label="Install"
@@ -10,7 +10,7 @@
     @confirm="confirmInstall"
   >
     <div class="space-y-2">
-      <p class="font-medium text-ink-gray-5 text-p-xs uppercase tracking-wide">Install on</p>
+      <p class="font-medium text-ink-gray-5 text-sm">Install on</p>
 
       <SiteRow
         v-if="presetSite"
@@ -43,7 +43,7 @@
           @click="selection = s.name"
         />
 
-        <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-sm text-center">
+        <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-p-sm text-center">
           No sites available on this bench.
         </p>
       </div>

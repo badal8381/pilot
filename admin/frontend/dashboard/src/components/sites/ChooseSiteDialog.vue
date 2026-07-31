@@ -1,19 +1,15 @@
 <template>
-  <Dialog v-model="open" :options="{ title: 'Which site are you browsing for?', size: 'md' }">
+  <Dialog v-model="open" :options="{ title: 'Choose site', size: 'md' }">
     <template #body-content>
-      <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-sm text-center">
+      <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-p-sm text-center">
         No sites on this bench yet. Create a site to install apps.
       </p>
 
       <template v-else>
-        <p class="mb-4 text-ink-gray-6 text-p-sm">
-          Installed apps are marked, and installs target this site.
-        </p>
-
-        <div class="gap-2 grid max-h-96 overflow-y-auto">
+        <div class="gap-0.5 grid max-h-96 overflow-y-auto">
           <SiteRow
             label="All sites"
-            subtitle="Browse every available app"
+            subtitle="Every available app"
             icon="lucide-layout-grid"
             :selected="!site"
             @click="choose('')"

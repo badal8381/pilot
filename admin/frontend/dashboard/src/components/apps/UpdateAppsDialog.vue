@@ -15,29 +15,40 @@
               {{ selected.size === appNames.length ? 'Unselect all' : 'Select all' }}
             </Button>
           </div>
-          <div class="flex flex-col gap-1 max-h-80 overflow-y-auto">
+          <!-- The row is the control (role=checkbox + aria-checked), so the inner
+               Checkbox is inert decoration: tabindex/aria-hidden reach the real
+               <input> via Checkbox's attr passthrough, so it is neither tabbable
+               nor announced twice. -->
+          <div class="flex flex-col gap-0.5 max-h-80 overflow-y-auto">
             <button
               v-for="name in appNames"
               :key="name"
               type="button"
-              class="flex items-center gap-3 hover:bg-surface-gray-1 p-2 rounded-lg text-left transition-colors"
+              role="checkbox"
+              :aria-checked="selected.has(name)"
+              class="flex items-center gap-2.5 hover:bg-surface-gray-2 p-2 rounded text-left transition-colors"
               @click="toggle(name)"
             >
-              <AppIcon :name="name" class="rounded-lg size-8 shrink-0" />
+              <AppIcon :name="name" class="rounded size-8 shrink-0" />
               <span class="flex-1 min-w-0">
                 <p class="font-medium text-ink-gray-8 text-sm truncate">
                   {{ titleMap[name] || name }}
                 </p>
                 <p
                   v-if="updates[name]"
-                  class="mt-1 flex items-center gap-1 font-mono text-ink-gray-5 text-xs truncate"
+                  class="flex items-center gap-1 font-mono text-ink-gray-5 text-xs truncate"
                 >
                   {{ updates[name].current }}
                   <span class="lucide-arrow-right size-3 shrink-0 text-ink-gray-4" />
                   <span class="text-ink-green-7">{{ updates[name].target }}</span>
                 </p>
               </span>
-              <Checkbox :model-value="selected.has(name)" class="pointer-events-none shrink-0" />
+              <Checkbox
+                :model-value="selected.has(name)"
+                class="pointer-events-none shrink-0"
+                tabindex="-1"
+                aria-hidden="true"
+              />
             </button>
           </div>
 
@@ -51,7 +62,7 @@
 
         <ErrorMessage v-if="error" :message="error" />
 
-        <div class="flex justify-end gap-2 pt-4 border-t border-outline-gray-1">
+        <div class="flex justify-end gap-2 pt-2">
           <Button variant="ghost" @click="open = false">Cancel</Button>
           <Button
             v-if="appNames.length"
