@@ -323,12 +323,11 @@ def test_app_update_with_commit_target_stays_on_configured_branch(tmp_path: Path
     assert app.installed_hash == target_sha
 
 
-def _publish(monkeypatch: pytest.MonkeyPatch, entry: dict | None) -> None:
+def _publish(entry: dict | None) -> None:
     """Make the marketplace registry advertise `entry`, and nothing else."""
-    from pilot.integrations.marketplace import Marketplace
+    from tests.pilot.marketplace_registry import publish
 
-    registry = [entry] if entry else []
-    monkeypatch.setattr(Marketplace, "registry", staticmethod(lambda: registry))
+    publish([entry] if entry else [])
 
 
 def test_app_has_marketplace_update_false_when_advertised_commit_is_checked_out(
@@ -336,14 +335,13 @@ def test_app_has_marketplace_update_false_when_advertised_commit_is_checked_out(
 ) -> None:
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
     monkeypatch.setattr("pilot.core.app.installed_app_version", lambda *_: "1.0.0")
-    _publish(
-        monkeypatch,
-        {
-            "name": "myapp",
-            "repo": "https://github.com/frappe/myapp",
-            "releases": [{"version": "1.0.0", "branch": "main", "commit": app.installed_hash}],
-        },
-    )
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": app.installed_hash}],
+    }
+
+    _publish(entry)
 
     assert app.has_marketplace_update() is False
 
@@ -355,44 +353,39 @@ def test_app_has_marketplace_update_true_when_advertised_commit_is_unrelated(
     advertised release wins - the registry only ever advertises newer code."""
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
     monkeypatch.setattr("pilot.core.app.installed_app_version", lambda *_: "1.0.0")
-    _publish(
-        monkeypatch,
-        {
-            "name": "myapp",
-            "repo": "https://github.com/frappe/myapp",
-            "releases": [{"version": "1.0.0", "branch": "main", "commit": "0" * 40}],
-        },
-    )
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": "0" * 40}],
+    }
+
+    _publish(entry)
 
     assert app.has_marketplace_update() is True
 
 
-def test_app_is_marketplace_matches_the_registry_entry_for_its_repository(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_app_is_marketplace_matches_the_registry_entry_for_its_repository(tmp_path: Path) -> None:
     app = _app_on_branch(tmp_path, "https://token:x@github.com/frappe/myapp.git")
-    entry = {"name": "myapp", "repo": "https://github.com/frappe/myapp", "releases": []}
-    _publish(monkeypatch, entry)
+
+    _publish({"name": "myapp", "repo": "https://github.com/frappe/myapp", "releases": []})
 
     assert app.is_marketplace is True
-    assert app.marketplace_entry == entry
+    assert app.marketplace_entry == {"name": "myapp", "repo": "https://github.com/frappe/myapp"}
 
 
-def test_app_is_marketplace_false_for_a_fork_of_a_listed_app(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_app_is_marketplace_false_for_a_fork_of_a_listed_app(tmp_path: Path) -> None:
     app = _app_on_branch(tmp_path, "https://github.com/someone/fork")
-    _publish(monkeypatch, {"name": "myapp", "repo": "https://github.com/frappe/myapp", "releases": []})
+
+    _publish({"name": "myapp", "repo": "https://github.com/frappe/myapp", "releases": []})
 
     assert app.is_marketplace is False
     assert app.marketplace_entry is None
 
 
-def test_app_is_marketplace_false_when_unlisted(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_app_is_marketplace_false_when_unlisted(tmp_path: Path) -> None:
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
-    _publish(monkeypatch, None)
+
+    _publish(None)
 
     assert app.is_marketplace is False
 
@@ -402,17 +395,16 @@ def test_app_update_target_prefers_the_release_on_the_apps_branch(
 ) -> None:
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp", branch="version-15")
     monkeypatch.setattr("pilot.core.app.installed_app_version", lambda *_: "1.0.0")
-    _publish(
-        monkeypatch,
-        {
-            "name": "myapp",
-            "repo": "https://github.com/frappe/myapp",
-            "releases": [
-                {"version": "1.0.0", "branch": "main", "commit": "a" * 40},
-                {"version": "1.0.0", "branch": "version-15", "commit": "b" * 40},
-            ],
-        },
-    )
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [
+            {"version": "1.0.0", "branch": "main", "commit": "a" * 40},
+            {"version": "1.0.0", "branch": "version-15", "commit": "b" * 40},
+        ],
+    }
+
+    _publish(entry)
 
     assert app.update_target() == RevisionPin(kind="commit", ref="b" * 40)
 
@@ -434,7 +426,11 @@ def test_app_install_checks_out_the_pinned_commit_before_validating(tmp_path: Pa
     seen_at_validation = {}
 
     with (
-        patch.object(App, "validate", lambda self: seen_at_validation.update(sha=self.installed_hash)),
+        patch.object(
+            App,
+            "validate",
+            lambda self, checks=None: seen_at_validation.update(sha=self.installed_hash),
+        ),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
@@ -472,14 +468,13 @@ def test_app_has_marketplace_update_falls_back_to_branch_tip_on_repo_mismatch(
     # falls through to comparing the branch tip.
     app = _app_on_branch(tmp_path, "https://github.com/someone/fork")
     monkeypatch.setattr("pilot.internal.git.GitRepo.remote_branch_sha", lambda self, branch: "0" * 40)
-    _publish(
-        monkeypatch,
-        {
-            "name": "myapp",
-            "repo": "https://github.com/frappe/myapp",
-            "releases": [{"version": "1.0.0", "branch": "main", "commit": "a" * 40}],
-        },
-    )
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": "a" * 40}],
+    }
+
+    _publish(entry)
 
     assert app.has_marketplace_update() is True
 
@@ -491,7 +486,7 @@ def test_app_has_marketplace_update_false_when_branch_tip_matches(
     monkeypatch.setattr(
         "pilot.internal.git.GitRepo.remote_branch_sha", lambda self, branch: app.installed_hash
     )
-    _publish(monkeypatch, None)
+    _publish(None)
 
     assert app.has_marketplace_update() is False
 
@@ -502,14 +497,13 @@ def test_app_update_target_offers_a_release_ahead_of_head(
     """git decides, not the version label: HEAD is behind the advertised commit."""
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
     ahead = _commit_ahead_of_head(app)
-    _publish(
-        monkeypatch,
-        {
-            "name": "myapp",
-            "repo": "https://github.com/frappe/myapp",
-            "releases": [{"version": "1.1.0", "branch": "main", "commit": ahead}],
-        },
-    )
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [{"version": "1.1.0", "branch": "main", "commit": ahead}],
+    }
+
+    _publish(entry)
 
     assert app.update_target() == RevisionPin(kind="commit", ref=ahead)
 
@@ -522,14 +516,13 @@ def test_app_update_target_ignores_a_release_behind_head(
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
     behind = app.installed_hash
     _commit(app.path, "c2")  # HEAD moves past the advertised release
-    _publish(
-        monkeypatch,
-        {
-            "name": "myapp",
-            "repo": "https://github.com/frappe/myapp",
-            "releases": [{"version": "1.0.0", "branch": "main", "commit": behind}],
-        },
-    )
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": behind}],
+    }
+
+    _publish(entry)
 
     assert app.update_target() is None
     assert app.has_marketplace_update() is False
@@ -539,17 +532,16 @@ def test_app_update_target_ignores_a_newer_release_on_another_branch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp", branch="version-15")
-    _publish(
-        monkeypatch,
-        {
-            "name": "myapp",
-            "repo": "https://github.com/frappe/myapp",
-            "releases": [
-                {"version": "16.0.0", "branch": "version-16", "commit": _commit_ahead_of_head(app)},
-                {"version": "15.1.0", "branch": "version-15", "commit": app.installed_hash},
-            ],
-        },
-    )
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [
+            {"version": "16.0.0", "branch": "version-16", "commit": _commit_ahead_of_head(app)},
+            {"version": "15.1.0", "branch": "version-15", "commit": app.installed_hash},
+        ],
+    }
+
+    _publish(entry)
 
     assert app.update_target() is None
 
@@ -560,7 +552,7 @@ def test_app_update_target_follows_the_branch_tip_outside_the_registry(
     """A non-marketplace app updates branch-wide, to whatever the tip is."""
     app = _app_on_branch(tmp_path, "https://github.com/someone/private-app")
     monkeypatch.setattr("pilot.internal.git.GitRepo.remote_branch_sha", lambda self, branch: "e" * 40)
-    _publish(monkeypatch, None)
+    _publish(None)
 
     assert app.update_target() == RevisionPin(kind="commit", ref="e" * 40)
 
