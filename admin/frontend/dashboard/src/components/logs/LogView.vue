@@ -1,15 +1,26 @@
 <template>
+  <!-- text-p-sm always, wrapping or not: a log body is stacked copy either way,
+       and text-sm's 1.15 line-height packed the lines solid.
+
+       gray-2, not gray-3: the solid ramp steps much harder in dark mode (0.136
+       in lightness off the page, against 0.054 in light), so the panel read as
+       a slab there and a tint here. Not the alpha token - over surface-base the
+       two ramps composite to the same byte, so it would only buy an
+       arbitrary-value class. Alpha earns its keep when a surface sits on a
+       tinted parent, which this one does not. -->
   <div
     ref="el"
-    class="bg-surface-gray-3 overflow-auto font-mono text-ink-gray-8 text-sm"
-    :class="[wrap ? 'whitespace-pre-wrap' : 'whitespace-pre', rounded ? 'rounded-sm sm:rounded-lg' : '', fill ? 'flex-1 h-0' : 'max-h-[50vh]', divided ? '' : 'px-2.5 py-2']"
+    class="bg-surface-gray-2 overflow-auto font-mono text-ink-gray-8 text-p-sm"
+    :class="[wrap ? 'whitespace-pre-wrap' : 'whitespace-pre', rounded ? 'rounded' : '', fill ? 'flex-1 h-0' : 'max-h-[50vh]', rows ? '' : 'px-4 py-3']"
   >
-    <p v-if="!lines.length" class="px-2.5 py-2.5 text-ink-gray-4">{{ emptyText }}</p>
+    <p v-if="!lines.length" class="text-ink-gray-4" :class="rows ? 'px-4 py-3' : ''">
+      {{ emptyText }}
+    </p>
     <div
       v-for="(line, index) in lines"
       :key="index"
       class="flex gap-3"
-      :class="divided ? 'border-b border-outline-gray-2 px-2 py-1.5 last:border-0 sm:px-4' : ''"
+      :class="rows ? 'px-2 py-1.5 sm:px-4 hover:bg-surface-gray-3' : ''"
     >
       <span
         v-if="lineNumbers"
@@ -18,12 +29,12 @@
       >
         {{ index + 1 }}
       </span>
-      <span class="flex-1" :class="wrap ? 'break-all' : ''" v-html="line || '&nbsp;'" />
+      <span class="flex-1" :class="wrap ? 'break-words' : ''" v-html="line || '&nbsp;'" />
     </div>
     <span
       v-if="streaming"
       class="inline-block animate-pulse"
-      :class="divided ? 'px-3 py-1 sm:px-4' : ''"
+      :class="rows ? 'px-3 py-1 sm:px-4' : ''"
       >█</span
     >
   </div>
@@ -39,7 +50,7 @@ const props = defineProps({
   wrap: { type: Boolean, default: false },
   rounded: { type: Boolean, default: true },
   fill: { type: Boolean, default: false },
-  divided: { type: Boolean, default: false },
+  rows: { type: Boolean, default: false },
   emptyText: { type: String, default: 'No output.' },
 })
 

@@ -1,21 +1,26 @@
-// Catppuccin Mocha palette for ANSI colours
+// ANSI colours resolved through the ink ramps rather than fixed hex. The old
+// palette was Catppuccin Mocha - built for a dark terminal, so on the light
+// theme's near-white log surface the pastels had almost no contrast. These
+// tokens flip with the theme, so a red stack trace stays red and readable in
+// both. "Bright" maps to a stronger step, not a lighter one: in light mode
+// lighter would mean less legible.
 const ANSI_FG = {
-  30: '#45475a',
-  31: '#f38ba8',
-  32: '#a6e3a1',
-  33: '#f9e2af',
-  34: '#89b4fa',
-  35: '#cba6f7',
-  36: '#89dceb',
-  37: '#cdd6f4',
-  90: '#585b70',
-  91: '#f38ba8',
-  92: '#a6e3a1',
-  93: '#f9e2af',
-  94: '#89b4fa',
-  95: '#cba6f7',
-  96: '#89dceb',
-  97: '#ffffff',
+  30: 'var(--ink-gray-5)',
+  31: 'var(--ink-red-7)',
+  32: 'var(--ink-green-7)',
+  33: 'var(--ink-amber-7)',
+  34: 'var(--ink-blue-7)',
+  35: 'var(--ink-purple-7)',
+  36: 'var(--ink-cyan-7)',
+  37: 'var(--ink-gray-8)',
+  90: 'var(--ink-gray-5)',
+  91: 'var(--ink-red-8)',
+  92: 'var(--ink-green-8)',
+  93: 'var(--ink-amber-8)',
+  94: 'var(--ink-blue-8)',
+  95: 'var(--ink-purple-8)',
+  96: 'var(--ink-cyan-8)',
+  97: 'var(--ink-gray-9)',
 }
 
 export function escapeHtml(text) {
