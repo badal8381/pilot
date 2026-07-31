@@ -15,7 +15,7 @@
           <span v-if="app.label" class="text-ink-gray-5 text-xs shrink-0">{{ app.label }}</span>
           <Badge v-if="app.nightly" theme="orange" variant="subtle" label="Nightly" size="sm" />
         </div>
-        <div class="text-ink-gray-5 text-sm truncate">
+        <div class="mt-0.5 text-ink-gray-5 text-p-sm truncate">
           {{ app.description }}
         </div>
       </div>
@@ -23,7 +23,7 @@
       <slot name="actions">
         <Tooltip v-if="app.installed" text="Installed">
           <span class="place-items-center grid size-7 shrink-0" role="img" aria-label="Installed">
-            <span class="size-4 text-ink-green-6 lucide-check"></span>
+            <span class="size-4 text-ink-gray-9 lucide-check"></span>
           </span>
         </Tooltip>
         <Tooltip v-else-if="!app.compatible" :text="requirementLabel">

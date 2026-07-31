@@ -45,7 +45,7 @@
     <!-- Marketplace Apps -->
 
     <template v-else-if="isFiltered">
-      <section v-if="filteredApps.length" class="mt-6">
+      <section v-if="filteredApps.length" class="mt-12">
         <h2 class="font-medium text-ink-gray-9 text-base">
           {{ filteredHeading }}
         </h2>
@@ -62,7 +62,7 @@
     </template>
 
     <template v-else>
-      <section v-if="otherBenchApps.length" class="mt-6">
+      <section v-if="otherBenchApps.length" class="mt-12">
         <h2 class="font-medium text-ink-gray-9 text-base">Your custom apps</h2>
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
@@ -74,7 +74,7 @@
         </div>
       </section>
 
-      <section v-if="frappeApps.length" class="mt-6">
+      <section v-if="frappeApps.length" :class="otherBenchApps.length ? 'mt-10' : 'mt-12'">
         <h2 class="font-medium text-ink-gray-9 text-base">From Frappe</h2>
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
@@ -86,7 +86,7 @@
         </div>
       </section>
 
-      <section v-if="communityApps.length" class="mt-6">
+      <section v-if="communityApps.length" class="mt-10">
         <h2 class="font-medium text-ink-gray-9 text-base">Community</h2>
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
