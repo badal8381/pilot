@@ -6,16 +6,15 @@
       </p>
 
       <template v-else>
-        <div class="gap-0.5 grid max-h-96 overflow-y-auto">
+        <div class="gap-1.5 grid max-h-96 overflow-y-auto">
           <SiteRow
             label="All sites"
-            subtitle="Every available app"
             icon="lucide-layout-grid"
             :selected="!site"
             @click="choose('')"
           >
             <template #suffix>
-              <span v-if="!site" class="size-4 text-ink-gray-8 shrink-0 lucide-check" />
+              <span v-if="!site" class="size-4 text-ink-gray-9 shrink-0 lucide-check" />
             </template>
           </SiteRow>
 
@@ -23,12 +22,17 @@
             v-for="s in sites"
             :key="s.name"
             :label="s.name"
-            :subtitle="siteSubtitle(s)"
             :selected="s.name === site"
             @click="choose(s.name)"
           >
             <template #suffix>
-              <span v-if="s.name === site" class="size-4 text-ink-gray-8 shrink-0 lucide-check" />
+              <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
+                {{ siteMeta(s) }}
+              </span>
+              <span
+                v-if="s.name === site"
+                class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+              />
             </template>
           </SiteRow>
         </div>
@@ -47,11 +51,9 @@ defineProps({
 const open = defineModel('open')
 const site = defineModel('site')
 
-function siteSubtitle(s) {
+function siteMeta(s) {
   const count = s.installed_apps?.length || 0
-  const match = /^version-(\d+)/.exec(s.framework_branch || '')
-  const version = match ? ` · Version ${match[1]}` : ''
-  return `${count} app${count === 1 ? '' : 's'}${version}`
+  return `${count} app${count === 1 ? '' : 's'}`
 }
 
 function choose(name) {
