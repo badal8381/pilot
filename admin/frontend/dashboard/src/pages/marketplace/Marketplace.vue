@@ -122,7 +122,7 @@
     :sites="sites"
     :site-name="currentSiteName"
   />
-  <AddAppFromGithubDialog v-model:open="showAddFromGithub" />
+  <AddAppFromGithubDialog v-model:open="showAddFromGithub" :site-name="currentSiteName" />
 </template>
 
 <script setup>

@@ -27,7 +27,9 @@
                 label="Branch"
                 v-model="branch"
                 :options="branchOptions"
-                placeholder="Search branches…"
+                allowCustomValue
+                placeholder="Search or type a branch…"
+                emptyText="No matching branch. Type one to use it."
                 class="w-40 shrink-0"
               />
               <Button
@@ -96,16 +98,16 @@
         <p v-if="resolving" class="text-ink-gray-5 text-sm">Checking repository…</p>
         <p v-else-if="foundName" class="flex items-center gap-1.5 text-ink-green-6 text-sm">
           <span class="size-4 lucide-circle-check"></span>
-          Found {{ foundName }}
+          Found {{ foundName }}<template v-if="siteName">, will be installed on {{ siteName }}</template>
         </p>
 
         <ErrorMessage v-if="error" :message="error" />
 
         <div class="flex justify-end gap-2">
           <Button variant="subtle" @click="open = false">Cancel</Button>
-          <Button variant="solid" :disabled="!canSubmit" :loading="adding" @click="submit"
-            >Import app</Button
-          >
+          <Button variant="solid" :disabled="!canSubmit" :loading="adding" @click="submit">
+            {{ siteName ? 'Import and install' : 'Import app' }}
+          </Button>
         </div>
       </div>
     </template>
@@ -130,6 +132,11 @@ import { appsApi } from '@/api/apps'
 import { gitApi } from '@/api/git'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
+const props = defineProps({
+  // Set when the marketplace is scoped to one site: the app is installed on it
+  // right after it is fetched, rather than only added to the bench.
+  siteName: { type: String, default: '' },
+})
 const open = defineModel('open')
 const router = useRouter()
 
@@ -256,6 +263,7 @@ async function submit() {
       name: foundName.value,
       repo: repo.value.trim(),
       branch: branch.value.trim(),
+      sites: props.siteName ? [props.siteName] : [],
     })
     if (!result.task_id) throw new Error(apiErrorMessage(result, 'Could not import app.'))
     open.value = false
