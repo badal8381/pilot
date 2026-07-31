@@ -1,16 +1,17 @@
 <template>
   <div class="mx-auto max-w-3xl">
-    <!-- Header -->
-    <div class="flex justify-between items-center">
-      <h1 class="font-medium text-ink-gray-8 text-base">
-        Your sites <span class="font-normal text-ink-gray-5">({{ filteredSites.length }})</span>
-      </h1>
-    </div>
-
+    <!-- The breadcrumb already names the page and now carries the count, so the
+         heading was saying it twice. -->
     <!-- Bar -->
-    <div class="flex items-center gap-2 mt-4">
+    <StickyToolbar class="flex items-center gap-2">
       <!-- Search text bar -->
-      <FormControl v-model="search" type="text" placeholder="Search" class="flex-1">
+      <FormControl
+        v-model="search"
+        type="text"
+        placeholder="Search"
+        :size="isMobile ? 'md' : 'sm'"
+        class="flex-1"
+      >
         <template #prefix>
           <span class="size-4 text-ink-gray-5 lucide-search" />
         </template>
@@ -20,14 +21,24 @@
         v-model="statusFilter"
         type="select"
         :options="statusOptions"
+        :size="isMobile ? 'md' : 'sm'"
         class="max-w-24 sm:max-w-32"
       />
       <!-- List view type -->
-      <TabButtons v-model="view" :options="viewOptions" class="hidden sm:block" />
-    </div>
+      <TabButtons
+        v-model="view"
+        :options="viewOptions"
+        :size="isMobile ? 'md' : 'sm'"
+        class="hidden sm:block"
+      />
+    </StickyToolbar>
 
-    <div v-if="loading" class="flex justify-center mt-16">
-      <LoadingText />
+    <!-- Shaped like the grid it becomes, so the page settles instead of jumping
+         from a centred spinner to a grid of cards. Always the grid shape: `view`
+         is component state, so it is back to 'grid' on every mount - and a mount
+         is the only time this is loading. -->
+    <div v-if="loading" class="gap-3 grid grid-cols-1 md:grid-cols-2 mt-4">
+      <SiteSkeleton v-for="index in 4" :key="index" :index="index - 1" />
     </div>
     <div v-else-if="error" class="mt-16">
       <ErrorMessage :message="error" />
@@ -40,7 +51,7 @@
         <div
           v-for="site in filteredSites"
           :key="site.name"
-          class="flex items-center gap-3 bg-surface-elevation-1 hover:bg-surface-gray-1 p-2 sm:p-4 border rounded-xl border-outline-gray-2 hover:border-outline-gray-3 transition-colors"
+          class="flex items-center gap-3 bg-surface-base p-2 sm:px-3 sm:py-2 border rounded-lg border-outline-gray-2 hover:border-outline-gray-3 transition-colors"
         >
           <RouterLink
             :to="{ name: 'SiteDetail', params: { name: site.name } }"
@@ -48,9 +59,9 @@
           >
             <!-- Icon -->
             <div
-              class="place-items-center grid bg-surface-elevation-1 rounded-lg size-10 text-ink-gray-6 shrink-0"
+              class="place-items-center grid bg-surface-gray-2 rounded size-8 text-ink-gray-6 shrink-0"
             >
-              <span class="size-5 lucide-globe"></span>
+              <span class="size-4 lucide-globe"></span>
             </div>
             <div class="flex-1 min-w-0">
               <!-- First Line -->
@@ -101,16 +112,12 @@
         :options="{ selectable: false, showTooltip: false }"
       >
         <template #cell="{ column, row, item }">
-          <div v-if="column.key === 'site'" class="flex items-center gap-3">
-            <!-- Icon -->
-            <div
-              class="place-items-center grid bg-surface-elevation-1 rounded-lg size-10 text-ink-gray-6 shrink-0"
-            >
-              <span class="size-5 lucide-globe" />
-            </div>
+          <!-- No icon: it is the same globe on every row, so it identified
+               nothing and only pushed the names off the column edge. -->
+          <div v-if="column.key === 'site'" class="flex items-center min-w-0">
             <RouterLink
               :to="{ name: 'SiteDetail', params: { name: row.site.name } }"
-              class="font-medium text-ink-gray-9 text-sm no-underline truncate"
+              class="font-medium text-ink-gray-9 text-base no-underline truncate"
             >
               {{ row.site.name }}
             </RouterLink>
@@ -139,8 +146,17 @@
       </ListView>
     </div>
 
-    <!-- No s -->
-    <p v-else class="mt-16 text-ink-gray-5 text-sm text-center">No sites found.</p>
+    <EmptyState
+      v-else
+      class="mt-4"
+      icon="lucide-globe"
+      :title="isFiltered ? 'No matching sites' : 'No sites yet'"
+      :description="
+        isFiltered
+          ? 'No sites match your search or status filter.'
+          : 'Create a site to get started on this bench.'
+      "
+    />
   </div>
 
   <!-- New Site Button -->
@@ -161,7 +177,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Badge,
@@ -170,12 +186,15 @@ import {
   ErrorMessage,
   FormControl,
   ListView,
-  LoadingText,
   TabButtons,
   toast,
 } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
 import NewSiteDialog from '@/components/sites/NewSiteDialog.vue'
+import SiteSkeleton from '@/components/sites/SiteSkeleton.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSites } from '@/composables/sites/useSites'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
@@ -183,10 +202,9 @@ import { openTaskDetailPage } from '@/utils/taskRoute'
 import { openSiteLogin } from '@/utils/siteLogin'
 
 const router = useRouter()
+const isMobile = useIsMobile()
 const { setBreadcrumbs } = useBreadcrumbs()
 const { sites, loading, error, load } = useSites()
-
-setBreadcrumbs([{ label: 'Sites', route: { name: 'Sites' } }])
 
 const search = ref('')
 const statusFilter = ref('all')
@@ -197,8 +215,11 @@ const viewOptions = [
   { value: 'list', icon: 'lucide-list' },
 ]
 
+// Active is gray: on a healthy bench nearly every site is active, so tinting
+// them spends the colour budget on "normal" and leaves nothing for the broken
+// one you are scanning for.
 const SITE_STATUS = {
-  online: { label: 'Active', theme: 'green' },
+  online: { label: 'Active', theme: 'gray' },
   broken: { label: 'Broken', theme: 'red' },
   offline: { label: 'Paused', theme: 'orange' },
   provisioning: { label: 'Creating', theme: 'blue' },
@@ -229,6 +250,10 @@ function appsLabel(site) {
   return count === 1 ? '1 app' : `${count} apps`
 }
 
+// An empty list means something different when a filter is on - saying "no sites
+// yet" there would be a lie.
+const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
+
 const filteredSites = computed(() => {
   const query = search.value.toLowerCase().trim()
   return sites.value.filter((site) => {
@@ -236,6 +261,15 @@ const filteredSites = computed(() => {
     const matchesStatus = statusFilter.value === 'all' || siteStatus(site) === statusFilter.value
     return matchesSearch && matchesStatus
   })
+})
+
+// Declared after filteredSites: watchEffect runs immediately, so the computed
+// has to exist first. The count follows the filters, so the crumb reports what
+// is actually on screen - held back until the first load lands, since
+// "Sites (0)" while fetching reads as an empty bench.
+watchEffect(() => {
+  const counted = !loading.value || sites.value.length
+  setBreadcrumbs([{ label: counted ? `Sites (${filteredSites.value.length})` : 'Sites' }])
 })
 
 const listColumns = [
@@ -279,6 +313,12 @@ function siteMenuOptions(site) {
   return [
     { label: 'Open site', icon: 'lucide-external-link', onClick: () => openSite(site) },
     { label: 'Back up now', icon: 'lucide-archive', onClick: () => backupNow(site) },
+    {
+      label: 'View analytics',
+      icon: 'lucide-chart-line',
+      onClick: () =>
+        router.push({ name: 'Analytics', query: { view: 'site', site: site.name } }),
+    },
     {
       label: 'View jobs',
       icon: 'lucide-list-checks',

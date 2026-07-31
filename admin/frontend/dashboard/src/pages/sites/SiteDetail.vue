@@ -1,6 +1,31 @@
 <template>
-  <div v-if="loading" class="flex justify-center py-12">
-    <LoadingText />
+  <!-- The hero's own frame, dot field and all, so the page does not lurch when
+       the site arrives - only the text inside it resolves. -->
+  <div v-if="loading" class="mx-auto w-full max-w-3xl">
+    <div class="relative -mx-4 sm:-mx-6 -mt-6 px-4 sm:px-6 pt-6 pb-7 overflow-hidden">
+      <div class="absolute inset-0 pointer-events-none dot-field" aria-hidden="true" />
+      <div
+        class="relative flex justify-between items-center gap-3 mt-2 bg-surface-base p-2 sm:p-4 border rounded-xl border-outline-gray-2"
+      >
+        <div class="flex items-center gap-3 min-w-0">
+          <Skeleton class="rounded-lg size-9 sm:size-10 shrink-0" />
+          <div>
+            <div class="flex items-center gap-2 h-7">
+              <Skeleton class="rounded w-40 h-4" />
+              <Skeleton class="rounded-full w-14 h-4 shrink-0" />
+            </div>
+            <div class="hidden sm:flex items-center mt-1 h-5">
+              <Skeleton class="rounded w-24 h-3" />
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <Skeleton class="hidden sm:block rounded w-24 h-7" />
+          <Skeleton class="rounded w-9 h-7" />
+        </div>
+      </div>
+    </div>
+    <Skeleton class="rounded w-64 h-7" />
   </div>
   <div v-else-if="error" class="py-12">
     <ErrorMessage :message="error" />
@@ -54,7 +79,9 @@
     </div>
 
     <!-- Tabs -->
-    <TabButtons v-model="activeTab" :options="tabs" />
+    <StickyToolbar>
+      <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
+    </StickyToolbar>
 
     <!-- Sections -->
     <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
@@ -88,12 +115,13 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, ErrorMessage, LoadingText, TabButtons, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, ErrorMessage, Skeleton, TabButtons, toast } from 'frappe-ui'
 import SiteApps from '@/components/sites/Apps.vue'
 import SiteBackups from '@/components/sites/Backups.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
 import AppActionDialog from '@/components/sites/AppActionDialog.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
