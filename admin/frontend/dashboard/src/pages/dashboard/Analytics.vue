@@ -7,7 +7,13 @@
       <!-- On mobile these read as form controls, not toolbar buttons: md size,
            label flush left with the chevron at the far edge, and the scope
            filter taking whatever width the window filter leaves. -->
-      <StickyToolbar class="flex items-center gap-2 mb-4 sm:mb-0 w-full sm:w-auto">
+      <!-- Sticky only when it renders in place. On desktop these ride into the
+           header, which is already pinned - and a sticky bar in there paints its
+           background over the header's own actions. -->
+      <StickyToolbar
+        :disabled="!isMobile"
+        class="flex items-center gap-2 mb-4 sm:mb-0 w-full sm:w-auto"
+      >
         <div class="shrink-0">
           <Dropdown :options="windowOptions" placement="bottom-end">
             <template #default="{ open }">

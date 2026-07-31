@@ -8,10 +8,24 @@
        padding (p-3 on mobile, p-4 on desktop) so rows do not show in the gutters
        as they pass underneath. pb keeps the list from touching the bar once it
        starts sliding under; the page's own top margin is on a sibling, so it
-       scrolls away and cannot do that job. -->
+       scrolls away and cannot do that job.
+
+       `disabled` is for the toolbars that get teleported into the header on one
+       breakpoint and rendered in place on the other: inside the header there is
+       nothing to pin against, and the opaque background plus negative margins
+       paint straight over whatever else the header is holding. The root stays
+       either way, so a class passed by the caller lands in the same place. -->
   <div
-    class="top-12 z-10 sticky bg-surface-base -mx-3 sm:-mx-4 px-3 sm:px-4 pt-1 sm:pt-0 pb-2"
+    :class="
+      disabled
+        ? ''
+        : 'top-12 z-10 sticky bg-surface-base -mx-3 sm:-mx-4 px-3 sm:px-4 pt-1 sm:pt-0 pb-2'
+    "
   >
     <slot />
   </div>
 </template>
+
+<script setup>
+defineProps({ disabled: { type: Boolean, default: false } })
+</script>
