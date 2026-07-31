@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -177,3 +178,37 @@ def test_migration_detail_includes_retained_task_logs(tmp_path: Path) -> None:
     ]
     # Pruned task logs are omitted; the operation stays readable.
     assert all("tasks" not in site for site in data["sites"])
+
+
+def test_detail_reports_a_queued_action_while_the_operation_is_paused(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    site_dir = bench_root / "sites" / "site1.localhost"
+    site_dir.mkdir(parents=True)
+    (site_dir / "site_config.json").write_text("{}")
+    client = _client(bench_root)
+    operation = Bench(bench_root).migrations.create_site_migrate("site1.localhost")
+    operation.state = get_state("needs_attention")
+    operation.task_ids = {"retry": "20260101-000000-abc123"}
+    operation.store.save(operation)
+    task_dir = bench_root / "tasks" / "20260101-000000-abc123"
+    task_dir.mkdir(parents=True)
+    (task_dir / "meta.json").write_text(
+        json.dumps(
+            {
+                "task_id": "20260101-000000-abc123",
+                "command": "retry-update",
+                "args": {},
+                "queued_at": "2026-01-01T00:00:00+00:00",
+            }
+        )
+    )
+    (task_dir / "status").write_text("queued")
+
+    pending = client.get(f"/api/v1/migrations/{operation.id}").get_json()["pending_action"]
+    assert pending["role"] == "retry"
+    assert pending["task_id"] == "20260101-000000-abc123"
+    assert pending["status"] == "queued"
+
+    # Once the worker is done, the operation state alone drives the UI again.
+    (task_dir / "status").write_text("success")
+    assert client.get(f"/api/v1/migrations/{operation.id}").get_json()["pending_action"] is None
