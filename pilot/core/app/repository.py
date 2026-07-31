@@ -100,13 +100,6 @@ class AppRepository:
             repo.fetch(commit, timeout=_FETCH_TIMEOUT_SECONDS)
         return not repo.is_ancestor(commit, installed)
 
-    def has_remote_update(self) -> bool:
-        """Check the remote branch tip without downloading objects."""
-        if not self.app.config.branch:
-            return False
-        remote_sha = self.repo.remote_branch_sha(self.app.config.branch)
-        return bool(remote_sha and self.installed_hash and remote_sha != self.installed_hash)
-
     @property
     def remote_url(self) -> str:
         """The clone URL to use, token-embedded when the repo is private."""
