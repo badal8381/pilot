@@ -1,26 +1,17 @@
-import sys
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pilot.tasks import Task
+from pilot.tasks.migration_chain import MigrationChainTask
 
 
 @dataclass(kw_only=True)
-class UpdateTask(Task):
+class UpdateTask(MigrationChainTask):
     """Chain link: update/reinstall/rebuild apps, then queue the first site migration."""
 
     command: ClassVar[str] = "update"
 
-    operation_id: str
-
-    def run(self) -> None:
-        operation = self.bench.migrations.get(self.operation_id)
-        try:
-            operation.update_apps(on_step=self.step, on_progress=self.report)
-        except Exception:
-            self.step_failed()
-            sys.exit(1)
-        operation.enqueue_next(handoff_from=operation.chain[-1]["task_id"])
+    def run_step(self, operation) -> None:
+        operation.update_apps(on_step=self.step, on_progress=self.report)
 
 
 if __name__ == "__main__":

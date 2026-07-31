@@ -1,26 +1,17 @@
-import sys
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pilot.tasks import Task
+from pilot.tasks.migration_chain import MigrationChainTask
 
 
 @dataclass(kw_only=True)
-class RestartServicesTask(Task):
+class RestartServicesTask(MigrationChainTask):
     """Chain link: restart services to finish a restore, then mark the operation reverted."""
 
     command: ClassVar[str] = "restart-services"
 
-    operation_id: str
-
-    def run(self) -> None:
-        operation = self.bench.migrations.get(self.operation_id)
-        try:
-            operation.restart(on_step=self.step)
-        except Exception:
-            self.step_failed()
-            sys.exit(1)
-        operation.enqueue_next(handoff_from=operation.chain[-1]["task_id"])
+    def run_step(self, operation) -> None:
+        operation.restart(on_step=self.step)
 
 
 if __name__ == "__main__":

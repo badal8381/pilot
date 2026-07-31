@@ -246,6 +246,30 @@ class MigrationOperation:
         if self.next_migrate_site() is None:
             self._complete(on_step)
 
+    def strand(self, reason: str) -> None:
+        """Park a chain whose task died without unwinding: a kill, an OOM, a reboot.
+
+        Every other write to this record happens inside the task process, so a
+        task that never raises leaves the operation spinning in a working state
+        forever - no retry, no restore, and no new update allowed past it.
+        """
+        target = self.state.failure_target
+        if target is None:
+            return
+        self.diagnosis = {"phase": self.state.name, "message": reason, "output_excerpt": ""}
+        if target == "revert_failed":
+            self._transition(target)
+            return
+        self._enter_needs_attention(self.state.name, self._interrupted_site())
+
+    def _interrupted_site(self) -> str | None:
+        """The site whose per-site work was in flight when the chain died."""
+        if self.state == "backing_up":
+            return next((site.name for site in self.sites if site.backup_status == "backing_up"), None)
+        if self.state == "migrating":
+            return next((site.name for site in self.sites if site.migration_status == "running"), None)
+        return None
+
     def retry(self) -> None:
         """Resume the chain from needs_attention so the failed unit runs again."""
         if self.state != "needs_attention":

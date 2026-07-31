@@ -665,3 +665,129 @@ def test_bypass_patch_auto_resumes_migration(tmp_path: Path) -> None:
     assert operation.state == "migrating"
     assert operation.failed_site is None
     assert operation.sites[0].migration_status == "pending"
+
+
+def _write_task_status(bench_root: Path, task_id: str, status: str) -> None:
+    task_dir = bench_root / "tasks" / task_id
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "status").write_text(status, encoding="utf-8")
+
+
+def test_strand_parks_a_working_operation_for_the_user(tmp_path: Path) -> None:
+    """A killed chain link never raises, so nothing else would ever move this record."""
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    operation = MigrationStore(mock_bench).create_site_migrate("site1.localhost")
+    operation.state = get_state("updating")
+
+    operation.strand("The update was killed")
+
+    assert operation.state == "needs_attention"
+    assert operation.return_state == "updating"
+    assert operation.diagnosis["message"] == "The update was killed"
+    assert operation.diagnosis["phase"] == "updating"
+
+
+def test_strand_blames_the_site_that_was_in_flight(tmp_path: Path) -> None:
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    store = MigrationStore(mock_bench)
+    operation = store._create("update", apps=[], apps_filter=None, sites=["one.local", "two.local"])
+    operation.state = get_state("migrating")
+    operation.sites[0].migration_status = "success"
+    operation.sites[1].migration_status = "running"
+
+    operation.strand("The migration was killed")
+
+    assert operation.state == "needs_attention"
+    assert operation.failed_site == "two.local"
+
+    operation.retry()
+
+    assert operation.state == "migrating"
+    assert operation.sites[1].migration_status == "pending"
+
+
+def test_strand_sends_a_dying_revert_to_revert_failed(tmp_path: Path) -> None:
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    operation = MigrationStore(mock_bench).create_site_migrate("site1.localhost")
+    operation.state = get_state("reverting_sites")
+
+    operation.strand("The restore was killed")
+
+    assert operation.state == "revert_failed"
+
+
+def test_strand_leaves_a_settled_operation_alone(tmp_path: Path) -> None:
+    """Every failed link fires the callback, including one that already reported."""
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    operation = MigrationStore(mock_bench).create_site_migrate("site1.localhost")
+    operation.state = get_state("needs_attention")
+    operation.diagnosis = {"patch": "frappe.patches.expected"}
+
+    operation.strand("The migration was killed")
+
+    assert operation.state == "needs_attention"
+    assert operation.diagnosis == {"patch": "frappe.patches.expected"}
+
+
+def test_reading_an_operation_parks_it_when_its_chain_task_is_dead(tmp_path: Path) -> None:
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    store = MigrationStore(mock_bench)
+    operation = store.create_site_migrate("site1.localhost")
+    operation.state = get_state("updating")
+    operation.chain.append({"command": "update", "task_id": "20260731-120000-abc123"})
+    store.save(operation)
+    _write_task_status(tmp_path, "20260731-120000-abc123", "failed")
+
+    assert store.get(operation.id).state == "needs_attention"
+    assert store.current() is not None
+
+
+def test_reading_an_operation_leaves_a_live_chain_task_running(tmp_path: Path) -> None:
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    store = MigrationStore(mock_bench)
+    operation = store.create_site_migrate("site1.localhost")
+    operation.state = get_state("updating")
+    operation.chain.append({"command": "update", "task_id": "20260731-120000-abc123"})
+    store.save(operation)
+    _write_task_status(tmp_path, "20260731-120000-abc123", "running")
+
+    assert store.get(operation.id).state == "updating"
+
+
+def test_reading_an_operation_survives_a_pruned_task_record(tmp_path: Path) -> None:
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    store = MigrationStore(mock_bench)
+    operation = store.create_site_migrate("site1.localhost")
+    operation.state = get_state("updating")
+    operation.chain.append({"command": "update", "task_id": "20260731-120000-dead99"})
+    store.save(operation)
+
+    assert store.get(operation.id).state == "updating"

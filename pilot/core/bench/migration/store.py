@@ -7,8 +7,14 @@ from typing import TYPE_CHECKING
 
 from pilot.core.bench.migration.operation import AppRevision, MigrationOperation, SiteProgress
 from pilot.core.bench.migration.state import get_state
-from pilot.exceptions import BenchError, MigrationConflictError, MigrationNotFoundError
+from pilot.exceptions import (
+    BenchError,
+    MigrationConflictError,
+    MigrationNotFoundError,
+    TaskNotFoundError,
+)
 from pilot.internal.atomic_file import atomic_write_private_text
+from pilot.internal.tasks.store import TaskStore
 from pilot.utils import make_private_directory
 
 if TYPE_CHECKING:
@@ -74,9 +80,30 @@ class MigrationStore:
             raise MigrationNotFoundError(f"Migration operation not found: {operation_id}")
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-            return MigrationOperation.from_dict(data, self.bench, self)
+            operation = MigrationOperation.from_dict(data, self.bench, self)
         except (OSError, ValueError, KeyError, TypeError) as error:
             raise BenchError(f"Could not load migration operation {path.name}: {error}") from error
+        self._strand_if_abandoned(operation)
+        return operation
+
+    def _strand_if_abandoned(self, operation: MigrationOperation) -> None:
+        """Park an operation whose chain ended without anything advancing the record.
+
+        The task callback covers a killed link. This covers the runs where the
+        callback never got to fire either - a host reboot, or the task wrapper
+        itself being killed - so the operation still heals on the next read.
+        """
+        if operation.state.failure_target is None or not operation.chain:
+            return
+        task_id = operation.chain[-1].get("task_id")
+        if not isinstance(task_id, str):
+            return
+        try:
+            status = TaskStore(self.bench.path).read_status(task_id)
+        except (OSError, ValueError, TaskNotFoundError):
+            return
+        if status.is_terminal:
+            operation.strand(f"The {operation.state.label.lower()} step stopped without reporting back.")
 
     def get_all(self) -> list[MigrationOperation]:
         if not self.root.exists():

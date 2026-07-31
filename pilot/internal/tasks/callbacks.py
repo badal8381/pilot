@@ -93,11 +93,25 @@ def _reload_workers(meta: dict, args: dict) -> None:
     Bench(Path(meta["bench_root"])).reload_workers(web_only=args.get("web_only", False))
 
 
+def _strand_migration(meta: dict, args: dict) -> None:
+    """Park a migration whose chain link died. Runs for every failed link, so it is
+    a no-op once the link already reported the failure from inside its own process."""
+    from pilot.core.bench import Bench
+    from pilot.exceptions import MigrationNotFoundError
+
+    try:
+        operation = Bench(Path(meta["bench_root"])).migrations.get(args["operation_id"])
+    except MigrationNotFoundError:
+        return
+    operation.strand(f"The {operation.state.label.lower()} step stopped before it could report back.")
+
+
 _OPERATIONS: dict[str, CallbackOperation] = {
     "cleanup-site-restore": _cleanup_site_restore,
     "remove-failed-site": _remove_failed_site,
     "disable-site-ssl": _disable_site_ssl,
     "reload-workers": _reload_workers,
+    "strand-migration": _strand_migration,
 }
 
 

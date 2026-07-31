@@ -1,27 +1,19 @@
-import sys
 from dataclasses import dataclass
 from typing import ClassVar
 
-from pilot.tasks import Task
+from pilot.tasks.migration_chain import MigrationChainTask
 
 
 @dataclass(kw_only=True)
-class MigrateTask(Task):
+class MigrateTask(MigrationChainTask):
     """Chain link: migrate one site, then queue the next site (or complete)."""
 
     command: ClassVar[str] = "migrate"
 
-    operation_id: str
     site: str
 
-    def run(self) -> None:
-        operation = self.bench.migrations.get(self.operation_id)
-        try:
-            operation.migrate_site(self.site, on_step=self.step, on_progress=self.report)
-        except Exception:
-            self.step_failed()
-            sys.exit(1)
-        operation.enqueue_next(handoff_from=operation.chain[-1]["task_id"])
+    def run_step(self, operation) -> None:
+        operation.migrate_site(self.site, on_step=self.step, on_progress=self.report)
 
 
 if __name__ == "__main__":

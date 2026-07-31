@@ -186,3 +186,63 @@ def test_cleanup_site_restore_refuses_symlinked_upload_root(tmp_path: Path) -> N
         )
 
     assert upload_dir.exists()
+
+
+def _bench_root(tmp_path: Path) -> Path:
+    (tmp_path / "bench.toml").write_text('[bench]\nname = "test-bench"\npython = "3.14"\n')
+    return tmp_path
+
+
+def test_strand_migration_operation_parks_the_operation(tmp_path: Path) -> None:
+    from unittest.mock import MagicMock
+
+    from pilot.core.bench.migration.state import get_state
+    from pilot.core.bench.migration.store import MigrationStore
+
+    bench_root = _bench_root(tmp_path)
+    mock_bench = MagicMock()
+    mock_bench.path = bench_root
+    store = MigrationStore(mock_bench)
+    operation = store.create_site_migrate("site1.localhost")
+    operation.state = get_state("updating")
+    store.save(operation)
+
+    callbacks.run_callback(
+        {"operation": "strand-migration", "args": {"operation_id": operation.id}},
+        {"bench_root": str(bench_root)},
+    )
+
+    assert store.get(operation.id).state == "needs_attention"
+
+
+def test_strand_migration_operation_ignores_a_deleted_operation(tmp_path: Path) -> None:
+    callbacks.run_callback(
+        {"operation": "strand-migration", "args": {"operation_id": "20260731-120000-abc123"}},
+        {"bench_root": str(_bench_root(tmp_path))},
+    )
+
+
+def test_every_migration_chain_task_declares_the_strand_callback() -> None:
+    from unittest.mock import MagicMock
+
+    from pilot.internal.tasks.runner import discover_tasks
+    from pilot.tasks.callbacks import task_callbacks_for
+    from pilot.tasks.migration_chain import MigrationChainTask
+
+    chain_tasks = [task for task in discover_tasks() if issubclass(task, MigrationChainTask)]
+    assert {task.command for task in chain_tasks} == {
+        "migration-backup",
+        "update",
+        "migrate",
+        "revert-apps",
+        "revert-site",
+        "restart-services",
+    }
+
+    expected = {"operation": "strand-migration", "args": {"operation_id": "op-1"}}
+    for task_class in chain_tasks:
+        args = {"site": "site1.localhost"} if "site" in task_class.__dataclass_fields__ else {}
+        task = task_class(bench=MagicMock(), bench_root=Path("/bench"), operation_id="op-1", **args)
+        declared = task_callbacks_for(task)
+        assert declared["on_failure"] == expected
+        assert declared["on_cancel"] == expected

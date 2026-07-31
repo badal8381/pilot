@@ -20,6 +20,7 @@ class MigrationState:
     is_terminal: ClassVar[bool] = False
     is_failure: ClassVar[bool] = False  # paused on a failure, waiting for the user
     starts_work: ClassVar[bool] = False
+    failure_target: ClassVar[str | None] = None  # where work parks when its task dies
     allowed: ClassVar[frozenset[str]] = frozenset()
 
     def next_step(self, operation: "MigrationOperation") -> ChainStep | None:
@@ -51,6 +52,7 @@ class BackingUp(MigrationState):
     name = "backing_up"
     label = "Backing up"
     starts_work = True
+    failure_target = "needs_attention"
     allowed = frozenset({"updating", "migrating", "needs_attention"})
 
     def next_step(self, operation: "MigrationOperation") -> ChainStep | None:
@@ -62,6 +64,7 @@ class Updating(MigrationState):
     name = "updating"
     label = "Updating apps"
     starts_work = True
+    failure_target = "needs_attention"
     allowed = frozenset({"migrating", "needs_attention"})
 
     def next_step(self, operation: "MigrationOperation") -> ChainStep | None:
@@ -72,6 +75,7 @@ class Migrating(MigrationState):
     name = "migrating"
     label = "Migrating"
     starts_work = True
+    failure_target = "needs_attention"
     allowed = frozenset({"completed", "needs_attention"})
 
     def next_step(self, operation: "MigrationOperation") -> ChainStep | None:
@@ -96,6 +100,7 @@ class RevertingApps(MigrationState):
     name = "reverting_apps"
     label = "Reverting app revisions"
     starts_work = True
+    failure_target = "revert_failed"
     allowed = frozenset({"reverting_sites", "restarting", "revert_failed"})
 
     def next_step(self, operation: "MigrationOperation") -> ChainStep | None:
@@ -106,6 +111,7 @@ class RevertingSites(MigrationState):
     name = "reverting_sites"
     label = "Recovering sites"
     starts_work = True
+    failure_target = "revert_failed"
     allowed = frozenset({"restarting", "revert_failed"})
 
     def next_step(self, operation: "MigrationOperation") -> ChainStep | None:
@@ -117,6 +123,7 @@ class Restarting(MigrationState):
     name = "restarting"
     label = "Restarting services"
     starts_work = True
+    failure_target = "revert_failed"
     allowed = frozenset({"reverted", "revert_failed"})
 
     def next_step(self, operation: "MigrationOperation") -> ChainStep | None:
