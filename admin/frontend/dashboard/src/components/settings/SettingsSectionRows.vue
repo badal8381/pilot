@@ -10,9 +10,14 @@
       :label="section.label"
       :description="section.description"
     >
-      <Button size="sm" variant="subtle" @click="openSection = section">
-        {{ section.action || 'Manage' }}
-      </Button>
+      <!-- Icon-only, so the row's action still needs an accessible name. -->
+      <Button
+        size="sm"
+        variant="ghost"
+        icon="lucide-chevron-right"
+        :aria-label="`${section.action || 'Manage'} ${section.label}`"
+        @click="openSection = section"
+      />
     </SettingsRow>
   </div>
 </template>
