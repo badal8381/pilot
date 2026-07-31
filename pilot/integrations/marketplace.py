@@ -176,7 +176,9 @@ class Marketplace:
         """An unparseable or absent frappe_core never matches - a release that
         doesn't say what it supports isn't offered as installable."""
         spec = Marketplace._safe_spec(release.get("frappe_core"))
-        return bool(spec) and frappe_version in spec
+        if not spec:
+            return False
+        return frappe_version in spec
 
     @staticmethod
     @cache
