@@ -21,6 +21,7 @@ def _app(pin: RevisionPin | None, *, on_revision: bool = False, head: str = "111
     app.update_target.return_value = pin
     app.is_on_revision.return_value = on_revision
     app.installed_hash = head
+    app.marketplace_entry = None
     return app
 
 
@@ -33,7 +34,7 @@ def test_run_reports_current_and_target_for_pending_update(tmp_path: Path, capsy
     with patch.object(Marketplace, "registry", return_value=REGISTRY):
         FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
-    app.update_target.assert_called_once_with(REGISTRY[0])
+    app.update_target.assert_called_once_with()
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert result == {"helpdesk": {"current": "1111111111", "target": "2222222222"}}
 
@@ -47,7 +48,7 @@ def test_run_omits_apps_that_are_up_to_date(tmp_path: Path, capsys) -> None:
     with patch.object(Marketplace, "registry", return_value=[]):
         FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
-    app.update_target.assert_called_once_with(None)
+    app.update_target.assert_called_once_with()
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert result == {}
 
@@ -71,6 +72,7 @@ def _marketplace_app(name: str, repo: str, branch: str, version: str) -> MagicMo
     app.config.repo = repo
     app.config.branch = branch
     app.installed_version = version
+    app.marketplace_entry = next((e for e in ERP_NEXT_REGISTRY if e["name"] == name), None)
     return app
 
 
