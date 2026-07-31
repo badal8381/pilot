@@ -4,7 +4,7 @@
   </div>
   <div v-else class="space-y-5">
     <div class="flex justify-between items-center">
-      <p class="font-medium text-ink-gray-8 text-sm">
+      <p class="font-medium text-ink-gray-8 text-base">
         Devices
         <span class="font-normal text-ink-gray-5">
           ({{ devices.length }} of {{ status.max_devices }})
@@ -27,19 +27,12 @@
       an existing device's setup key to add another authenticator app.
     </div>
 
-    <div
+    <EmptyState
       v-if="!devices.length"
-      class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
-    >
-      <div class="flex justify-center items-center bg-surface-gray-2 rounded-full size-11">
-        <span class="size-5 text-ink-gray-5 lucide-shield"></span>
-      </div>
-      <p class="font-medium text-ink-gray-7 text-sm">No devices enrolled</p>
-      <p class="max-w-xs text-ink-gray-5 text-xs">
-        Sign-in needs only the admin password. Add a device to require a code from an
-        authenticator app as well.
-      </p>
-    </div>
+      icon="lucide-shield"
+      title="No devices enrolled"
+      description="Sign-in needs only the admin password. Add a device to require a code from an authenticator app as well."
+    />
 
     <ListView
       v-else
@@ -51,19 +44,27 @@
       <template #cell="{ column, row, item }">
         <span
           v-if="column.key === 'name'"
-          class="block min-w-0 max-w-full text-ink-gray-7 text-sm truncate"
+          class="block min-w-0 max-w-full text-ink-gray-7 text-base truncate"
           :title="row.name"
         >
           {{ row.name }}
         </span>
-        <span v-else-if="column.key === 'confirmed_at'" class="text-ink-gray-6 text-xs">
+        <span v-else-if="column.key === 'confirmed_at'" class="text-ink-gray-6 text-sm">
           {{ fmtTimestamp(row.confirmed_at) }}
         </span>
-        <span v-else-if="column.key === 'last_used_at'" class="text-ink-gray-6 text-xs">
+        <span v-else-if="column.key === 'last_used_at'" class="text-ink-gray-6 text-sm">
           {{ fmtTimestamp(row.last_used_at) }}
         </span>
         <div v-else-if="column.key === 'actions'" class="flex justify-end">
-          <Button variant="ghost" size="sm" theme="red" icon="lucide-trash-2" @click="promptRemove(row)" />
+          <Button
+            variant="ghost"
+            size="sm"
+            theme="red"
+            icon="lucide-trash-2"
+            label="Remove device"
+            tooltip="Remove device"
+            @click="promptRemove(row)"
+          />
         </div>
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
@@ -92,7 +93,7 @@
         />
 
         <template v-if="enrollment">
-          <p class="text-ink-gray-6 text-p-sm">
+          <p class="text-ink-gray-6 text-p-base">
             Scan with Authy, Bitwarden, Microsoft Authenticator or any TOTP app.
           </p>
           <div class="flex justify-center bg-surface-white p-4 rounded-lg">
@@ -100,7 +101,7 @@
           </div>
           <details class="group">
             <summary
-              class="flex items-center gap-1.5 text-ink-gray-6 text-sm cursor-pointer select-none"
+              class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
             >
               <span
                 class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
@@ -108,8 +109,8 @@
               Can't scan? Enter the key by hand
             </summary>
             <div class="bg-surface-gray-2 mt-2 p-3 rounded-lg">
-              <p class="font-mono text-ink-gray-8 text-sm break-all">{{ enrollment.secret }}</p>
-              <button class="mt-1 text-ink-blue-3 text-xs" @click="copy(enrollment.secret)">
+              <p class="font-mono text-ink-gray-8 text-base break-all">{{ enrollment.secret }}</p>
+              <button class="mt-1 text-ink-blue-3 text-sm" @click="copy(enrollment.secret)">
                 Copy key
               </button>
             </div>
@@ -138,7 +139,7 @@
 
   <Dialog v-model="showCodes" :options="{ title: 'Save your recovery codes', size: 'md' }">
     <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
+      <p class="text-ink-gray-7 text-p-base">
         These are shown once. Store them somewhere safe — each one signs you in when no device
         is available, and works only once.
       </p>
@@ -146,7 +147,7 @@
         <span
           v-for="code in codes"
           :key="code"
-          class="font-mono text-ink-gray-8 text-xs text-center"
+          class="font-mono text-ink-gray-8 text-sm text-center"
         >
           {{ code }}
         </span>
@@ -162,7 +163,7 @@
 
   <Dialog v-model="showRemove" :options="{ title: 'Remove device', size: 'md' }">
     <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
+      <p class="text-ink-gray-7 text-p-base">
         Remove <strong>{{ removing?.name }}</strong
         >? Its codes stop working. Removing the last device turns two-factor off.
       </p>
@@ -176,7 +177,7 @@
 
   <Dialog v-model="showRegenerate" :options="{ title: 'Regenerate recovery codes', size: 'md' }">
     <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
+      <p class="text-ink-gray-7 text-p-base">
         This replaces all existing codes, including unused ones. Anything you saved earlier stops
         working.
       </p>
@@ -193,6 +194,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
 import QrcodeVue from 'qrcode.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { twoFactorApi } from '@/api/twoFactor'
 import { fmtDateTime } from '@/utils/taskFormat'

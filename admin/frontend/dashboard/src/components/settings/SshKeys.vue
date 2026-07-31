@@ -12,12 +12,12 @@
     >
       {{ loadError }}
     </div>
-    <div
+    <EmptyState
       v-else-if="!rows.length"
-      class="py-12 border border-dashed rounded-xl border-outline-gray-2 text-ink-gray-5 text-p-sm text-center"
-    >
-      No SSH keys.
-    </div>
+      icon="lucide-key-round"
+      title="No SSH keys"
+      description="Add a public key to give its holder SSH access to this server."
+    />
     <ListView
       v-else
       :columns="columns"
@@ -32,6 +32,8 @@
             size="sm"
             theme="red"
             icon="lucide-trash-2"
+            label="Remove SSH key"
+            tooltip="Remove SSH key"
             @click="promptRemove(row)"
           />
         </div>
@@ -59,11 +61,11 @@
 
   <Dialog v-model="showRemove" :options="{ title: 'Remove SSH key', size: 'md' }">
     <template #body-content>
-      <p v-if="isLastKey" class="text-ink-gray-7 text-p-sm">
+      <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
         This is the last authorized key. It can't be removed, or you'd lose SSH access to this
         server.
       </p>
-      <p v-else class="text-ink-gray-7 text-p-sm">
+      <p v-else class="text-ink-gray-7 text-p-base">
         Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
         Whoever holds the matching private key loses SSH access.
       </p>
@@ -80,6 +82,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sshKeysApi } from '@/api/sshKeys'
 

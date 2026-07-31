@@ -13,14 +13,14 @@
       </template>
     </Alert>
 
-    <Switch
+    <SettingsSwitch
       label="Enable firewall"
       description="Restrict who can reach Pilot and deployed sites; off means open."
       :model-value="enabled"
       @update:model-value="(v) => (enabled = v)"
     />
 
-    <Switch
+    <SettingsSwitch
       label="Block by default"
       description="Only allowed IPs below can reach the server; off allows all except blocked ones."
       :model-value="defaultPolicy === 'deny'"
@@ -45,36 +45,38 @@
         <Button variant="subtle" icon-left="plus" @click="addRule">Add rule</Button>
       </div>
 
-      <div
+      <EmptyState
         v-if="!rules.length"
-        class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
-      >
-        <div class="flex justify-center items-center bg-surface-gray-2 rounded-full size-11">
-          <span class="size-5 text-ink-gray-5 lucide-shield"></span>
-        </div>
-        <p class="font-medium text-ink-gray-7 text-sm">No firewall rules</p>
-        <p class="max-w-xs text-ink-gray-5 text-xs">
-          {{ defaultPolicy === 'allow'
+        icon="lucide-shield"
+        title="No firewall rules"
+        :description="
+          defaultPolicy === 'allow'
             ? 'Everyone can reach the server. Add a rule to block specific IPs or ranges.'
-            : 'No one can reach the server. Add an Allow rule for the IPs that should have access.' }}
-        </p>
-      </div>
+            : 'No one can reach the server. Add an Allow rule for the IPs that should have access.'
+        "
+      />
 
       <div v-else class="space-y-3">
         <div v-for="(rule, index) in rules" :key="index" class="flex items-end gap-2">
           <div class="space-y-1.5 w-28 shrink-0">
-            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-sm">Action</p>
+            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Action</p>
             <Select v-model="rule.action" :options="ACTION_OPTIONS" class="w-full" />
           </div>
           <div class="flex-1 space-y-1.5">
-            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-sm">IP / CIDR</p>
+            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">IP / CIDR</p>
             <TextInput v-model="rule.ip" placeholder="203.0.113.4 or 10.0.0.0/8" class="w-full" />
           </div>
           <div class="flex-1 space-y-1.5">
-            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-sm">Note</p>
+            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Note</p>
             <TextInput v-model="rule.description" placeholder="optional" class="w-full" />
           </div>
-          <Button variant="subtle" icon="lucide-x" @click="removeRule(index)" />
+          <Button
+            variant="subtle"
+            icon="lucide-x"
+            label="Remove rule"
+            tooltip="Remove rule"
+            @click="removeRule(index)"
+          />
         </div>
       </div>
     </div>
@@ -89,7 +91,9 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Alert, Button, ErrorMessage, Select, Spinner, Switch, TextInput, toast } from 'frappe-ui'
+import { Alert, Button, ErrorMessage, Select, Spinner, TextInput, toast } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
+import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 
