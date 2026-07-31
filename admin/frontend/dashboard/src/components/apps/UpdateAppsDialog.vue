@@ -9,47 +9,53 @@
           Your bench is up to date.
         </p>
         <template v-else>
-          <div class="flex items-center justify-between">
-            <span class="text-ink-gray-5 text-sm">{{ selected.size }} of {{ appNames.length }} selected</span>
-            <Button variant="ghost" size="sm" @click="toggleAll">
-              {{ selected.size === appNames.length ? 'Unselect all' : 'Select all' }}
-            </Button>
-          </div>
-          <!-- The row is the control (role=checkbox + aria-checked), so the inner
-               Checkbox is inert decoration: tabindex/aria-hidden reach the real
-               <input> via Checkbox's attr passthrough, so it is neither tabbable
-               nor announced twice. -->
-          <div class="flex flex-col gap-0.5 max-h-80 overflow-y-auto">
-            <button
-              v-for="name in appNames"
-              :key="name"
-              type="button"
-              role="checkbox"
-              :aria-checked="selected.has(name)"
-              class="flex items-center gap-2.5 hover:bg-surface-gray-2 p-2 rounded text-left transition-colors"
-              @click="toggle(name)"
-            >
-              <AppIcon :name="name" class="rounded size-8 shrink-0" />
-              <span class="flex-1 min-w-0">
-                <p class="font-medium text-ink-gray-8 text-sm truncate">
-                  {{ titleMap[name] || name }}
-                </p>
-                <p
-                  v-if="updates[name]"
-                  class="flex items-center gap-1 font-mono text-ink-gray-5 text-xs truncate"
-                >
-                  {{ updates[name].current }}
-                  <span class="lucide-arrow-right size-3 shrink-0 text-ink-gray-4" />
-                  <span class="text-ink-green-7">{{ updates[name].target }}</span>
-                </p>
+          <!-- Counter and list are one group, so they sit closer than the dialog's
+               gap-4 between blocks. -->
+          <div class="flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+              <span class="text-ink-gray-5 text-sm">
+                {{ selected.size }} of {{ appNames.length }} selected
               </span>
-              <Checkbox
-                :model-value="selected.has(name)"
-                class="pointer-events-none shrink-0"
-                tabindex="-1"
-                aria-hidden="true"
-              />
-            </button>
+              <Button variant="ghost" size="sm" @click="toggleAll">
+                {{ selected.size === appNames.length ? 'Unselect all' : 'Select all' }}
+              </Button>
+            </div>
+            <!-- The row is the control (role=checkbox + aria-checked), so the inner
+                 Checkbox is inert decoration: tabindex/aria-hidden reach the real
+                 <input> via Checkbox's attr passthrough, so it is neither tabbable
+                 nor announced twice. Clicking the name still toggles. -->
+            <div class="flex flex-col gap-3 max-h-80 overflow-y-auto">
+              <button
+                v-for="name in appNames"
+                :key="name"
+                type="button"
+                role="checkbox"
+                :aria-checked="selected.has(name)"
+                class="flex items-center gap-2.5 pr-2 text-left"
+                @click="toggle(name)"
+              >
+                <AppIcon :name="name" class="rounded-md size-8 shrink-0" />
+                <span class="flex-1 min-w-0">
+                  <p class="font-medium text-ink-gray-8 text-base truncate">
+                    {{ titleMap[name] || name }}
+                  </p>
+                  <p
+                    v-if="updates[name]"
+                    class="flex items-center gap-1 mt-0.5 font-mono text-ink-gray-5 text-p-xs truncate"
+                  >
+                    {{ updates[name].current }}
+                    <span class="lucide-arrow-right size-3 shrink-0 text-ink-gray-4" />
+                    <span class="text-ink-green-7">{{ updates[name].target }}</span>
+                  </p>
+                </span>
+                <Checkbox
+                  :model-value="selected.has(name)"
+                  class="pointer-events-none shrink-0"
+                  tabindex="-1"
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
           </div>
 
           <div class="flex flex-col gap-2 pt-2">
