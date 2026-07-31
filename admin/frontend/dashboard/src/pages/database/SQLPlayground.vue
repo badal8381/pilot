@@ -1,6 +1,7 @@
 <template>
-  <!-- Site selector on the right of the header -->
-  <Teleport defer to="#header-actions">
+  <!-- Only once a site is chosen: with nothing selected there is nothing else
+       on screen, so the picker belongs beside the sentence asking for it. -->
+  <Teleport v-if="selectedSite" defer to="#header-actions">
     <FormControl
       type="select"
       v-model="selectedSite"
@@ -9,14 +10,29 @@
     />
   </Teleport>
 
-  <!-- No site selected -->
+  <!-- Not an empty state - nothing is missing, the page is waiting on a choice
+       - so it borrows the icon tile without the dashed box. -->
   <div
     v-if="!selectedSite"
-    class="flex flex-col justify-center items-center gap-2 text-center"
+    class="flex flex-col justify-center items-center gap-4 text-center"
     style="height: 75vh;"
   >
-    <span class="size-8 text-ink-gray-3 lucide-database" />
-    <p class="text-ink-gray-5 text-sm">Select a site from the dropdown to get started.</p>
+    <span
+      class="place-items-center grid bg-surface-gray-2 rounded-lg size-10 text-ink-gray-5 shrink-0"
+    >
+      <span class="size-5 lucide-database" />
+    </span>
+    <div>
+      <p class="font-medium text-ink-gray-7 text-base">Select a site to get started</p>
+      <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
+        Queries run against that site's database.
+      </p>
+    </div>
+    <!-- Wrapped, not classed: FormControl's own w-full beats a width utility
+         passed down to it. -->
+    <div class="w-56">
+      <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
+    </div>
   </div>
 
   <div v-else class="flex flex-col gap-3">

@@ -20,7 +20,7 @@
         <AxisChart
           v-else
           :config="chart.config"
-          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 py-2"
+          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
         />
       </ChartCard>
     </template>

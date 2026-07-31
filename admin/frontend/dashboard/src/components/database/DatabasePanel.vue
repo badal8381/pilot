@@ -21,12 +21,12 @@
         <Button
           variant="subtle"
           size="sm"
-          iconLeft="lucide-refresh-cw"
+          icon="lucide-refresh-cw"
+          label="Refresh"
+          tooltip="Refresh"
           :loading="loading"
           @click="$emit('refresh')"
-        >
-          Refresh
-        </Button>
+        />
       </div>
     </div>
     <div class="border-t border-outline-gray-2">
