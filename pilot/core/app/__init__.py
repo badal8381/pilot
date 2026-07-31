@@ -154,14 +154,19 @@ class App:
     def is_on_revision(self, pin: RevisionPin) -> bool:
         return self._repository.is_on_revision(pin)
 
-    def has_marketplace_update(self, marketplace_entry: dict | None) -> bool:
-        return self._repository.has_marketplace_update(marketplace_entry)
+    def has_marketplace_update(self) -> bool:
+        return self._repository.has_marketplace_update()
 
-    def update_target(self, marketplace_entry: dict | None) -> RevisionPin | None:
-        return self._repository.update_target(marketplace_entry)
+    def update_target(self) -> RevisionPin | None:
+        return self._repository.update_target()
 
-    def is_marketplace_app(self, marketplace_entry: dict | None) -> bool:
-        return self._repository.is_marketplace_app(marketplace_entry)
+    @property
+    def marketplace_entry(self) -> dict | None:
+        return self._repository.marketplace_entry
+
+    @property
+    def is_marketplace(self) -> bool:
+        return self.marketplace_entry is not None
 
     def has_remote_update(self) -> bool:
         return self._repository.has_remote_update()
@@ -243,7 +248,8 @@ class App:
                 on_progress(f"Checking out {app.config.name} at {commit[:8]}...")
                 app.checkout_commit(commit)
             dependencies = app._install_dependencies(on_progress) if install_dependencies else []
-            app.validate()
+            # If the app is a marketplace app ignore all checks as they are already validated by the marketplace.
+            app.validate(checks=[] if app.is_marketplace else None)
             if app.is_staged:
                 app = app.promote()
         except BenchError:
@@ -322,11 +328,11 @@ class App:
 
         return AppDependencyInstaller(self.bench, self).install(on_progress)
 
-    def validate(self) -> None:
+    def validate(self, checks: list[type] | None = None) -> None:
         """Every check this app must pass, installing or after moving revision."""
         from pilot.core.app.validator import Validator
 
-        Validator(self).validate()
+        Validator(self, checks).validate()
 
     def _install_into_environment(self) -> None:
         from pilot.managers.environment import PythonEnvManager

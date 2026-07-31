@@ -146,6 +146,12 @@ class Marketplace:
         return Marketplace._parse_registry(Marketplace._load_registry())
 
     @staticmethod
+    def registry_by_name() -> dict[str, dict]:
+        """The registry indexed by app name. Built over the cached registry, so
+        callers can look an app up without indexing it themselves."""
+        return {entry["name"]: entry for entry in Marketplace.registry()}
+
+    @staticmethod
     def _parse_registry(raw: list[dict]) -> list[dict]:
         for app in raw:
             releases = app.get("releases") or []
