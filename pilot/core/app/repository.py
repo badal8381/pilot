@@ -72,8 +72,15 @@ class AppRepository:
     def forward_release(self, marketplace_entry: dict) -> dict | None:
         """The newest release advertised for this app's branch, when git says it
         is ahead of the checked-out commit. Releases arrive newest-first."""
+        from pilot.integrations.marketplace import Marketplace
+
         newest = next(
-            (r for r in marketplace_entry["releases"] if r.get("branch") == self.app.config.branch), None
+            (
+                r
+                for r in Marketplace.releases(marketplace_entry["name"])
+                if r.get("branch") == self.app.config.branch
+            ),
+            None,
         )
         if newest is None or not newest.get("commit"):
             return None

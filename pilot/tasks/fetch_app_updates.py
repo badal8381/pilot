@@ -44,13 +44,15 @@ class FetchAppUpdatesTask(Task):
 
     def _marketplace_target_version(self, app) -> str:
         """The newest version the marketplace advertises for this app's branch line."""
+        from pilot.integrations.marketplace import Marketplace
+
         entry = app.marketplace_entry
         if not entry:
             return ""
         return next(
             (
                 release["version"]
-                for release in entry.get("releases") or []
+                for release in Marketplace.releases(entry["name"])
                 if release.get("branch") == app.config.branch
             ),
             "",
