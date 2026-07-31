@@ -38,19 +38,14 @@
 
           <template v-else>
             <p v-if="!gitStatus" class="text-ink-gray-5 text-sm">Loading…</p>
+            <!-- No description: the Connect GitHub button below is the fix, so the
+                 alert only has to name the state. -->
             <Alert
               v-else-if="!gitConnected"
               theme="yellow"
               title="No GitHub account connected"
               :dismissible="false"
-            >
-              <template #description>
-                <p class="text-ink-gray-6 text-p-sm">
-                  Connect a personal access token from Settings → GitHub to browse your
-                  repositories.
-                </p>
-              </template>
-            </Alert>
+            />
             <template v-else>
               <div
                 class="flex items-center gap-2 bg-surface-gray-1 px-3 py-2 border rounded-lg border-outline-gray-2"
