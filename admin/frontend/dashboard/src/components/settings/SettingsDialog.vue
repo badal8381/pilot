@@ -2,12 +2,17 @@
   <Dialog v-model="open" bare size="4xl">
     <template #default="{ close }">
       <div class="relative flex sm:h-[70vh] max-h-[85vh]">
+        <!-- Sizing, padding and tokens taken from frappe-ui's own SettingsDialog
+             (SettingsSidebar: bg-surface-sidebar, p-2, 220px, outline-gray-1).
+             surface-sidebar is theme-aware by design - a light gray against the
+             panel in light mode, transparent in dark, where the panel is already
+             raised off the backdrop. -->
         <div
-          class="flex-col p-4 sm:border-r border-outline-gray-2 w-full sm:w-52 shrink-0"
+          class="flex-col bg-surface-sidebar p-2 sm:border-r border-outline-gray-1 w-full sm:w-[220px] shrink-0"
           :class="activeSection ? 'hidden sm:flex' : 'flex'"
         >
           <h3
-            class="mb-1 p-2 pb-3 border-b sm:border-b-0 border-outline-gray-2 font-semibold text-ink-gray-9 text-base"
+            class="mb-1 p-2 pb-3 border-b sm:border-b-0 border-outline-gray-1 font-semibold text-ink-gray-9 text-base"
           >
             Settings
           </h3>
@@ -16,6 +21,8 @@
             class="sm:hidden top-3 right-3 absolute"
             variant="ghost"
             icon="lucide-x"
+            label="Close settings"
+            tooltip="Close"
             @click="close"
           />
           <div class="flex flex-col gap-2 sm:gap-0.5 pt-2 sm:pt-0">
@@ -25,8 +32,12 @@
               :variant="isMobile ? 'subtle' : 'ghost'"
               :size="isMobile ? 'md' : 'sm'"
               class="!justify-start border sm:border-0 w-full"
-              :class="currentSection === section.id ? 'sm:!bg-surface-gray-3 sm:!text-ink-gray-9 !text-ink-gray-6' : '!text-ink-gray-6'"
-              @click="activeSection = section.id"
+              :class="
+                currentSection === section.id
+                  ? 'sm:!bg-surface-elevation-3 sm:!shadow-sm sm:!text-ink-gray-9 !text-ink-gray-6'
+                  : '!text-ink-gray-6'
+              "
+              @click="guarded(() => (activeSection = section.id))"
             >
               <template #prefix>
                 <span :class="section.icon" class="size-4"></span>
@@ -35,8 +46,11 @@
             </Button>
           </div>
         </div>
+        <!-- px-[4.4rem] pt-10 pb-16 is frappe-ui's SettingsHeader/SettingsBody
+             padding. Kept off below sm, where 70px a side would leave a column
+             barely wider than the words in it. -->
         <div
-          class="flex-col flex-1 p-6 overflow-y-auto"
+          class="flex-col flex-1 px-6 sm:px-[4.4rem] pt-6 sm:pt-10 pb-10 sm:pb-16 overflow-y-auto"
           :class="activeSection ? 'flex' : 'hidden sm:flex'"
         >
           <div class="flex justify-between items-center pb-4">
@@ -47,14 +61,19 @@
                 class="-ml-2"
                 variant="subtle"
                 icon="lucide-arrow-left"
+                label="Back"
+                tooltip="Back"
                 @click="goBack"
               />
               <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
             </div>
             <div id="settings-header-actions" class="contents"></div>
           </div>
-          <General v-if="currentSection === 'general'" v-model:open-section="subSection" />
-          <Security v-else-if="currentSection === 'security'" v-model:open-section="subSection" />
+          <General v-if="currentSection === 'general'" v-model:open-section="guardedSubSection" />
+          <Security
+            v-else-if="currentSection === 'security'"
+            v-model:open-section="guardedSubSection"
+          />
           <Sessions
             v-else-if="currentSection === 'sessions'"
             v-model:nested-view="nestedView"
@@ -65,12 +84,25 @@
       </div>
     </template>
   </Dialog>
+
+  <Dialog v-model="showDiscard" :options="{ title: 'Unsaved changes', size: 'sm' }">
+    <template #body-content>
+      <p class="text-ink-gray-7 text-p-base">
+        You have changes here that have not been saved. Leaving loses them.
+      </p>
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="subtle" @click="showDiscard = false">Keep editing</Button>
+        <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>
+      </div>
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Button } from 'frappe-ui'
+import { hasUnsavedChanges } from '@/composables/common/useUnsavedChanges'
 import General from '@/components/settings/General.vue'
 import Security from '@/components/settings/Security.vue'
 import Sessions from '@/components/settings/Sessions.vue'
@@ -78,11 +110,47 @@ import SystemInfo from '@/components/settings/SystemInfo.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { GENERAL_SECTIONS, SECURITY_SECTIONS } from '@/components/settings/sections'
 
-const open = defineModel()
+const openModel = defineModel()
 
 const isMobile = useIsMobile()
 const route = useRoute()
 const router = useRouter()
+
+// Every way out of a panel funnels through here: the sidebar, the back arrow,
+// opening a sub-section, and dismissing the dialog. Moving between panels is a
+// route *param* change on the one Settings record, so a component-level
+// onBeforeRouteLeave never sees it - the gate has to sit at the call sites.
+//
+// When nothing is dirty this runs the action straight through, so the ordinary
+// case is unchanged.
+const showDiscard = ref(false)
+let pendingNav = null
+function guarded(action) {
+  if (!hasUnsavedChanges()) return action()
+  pendingNav = action
+  showDiscard.value = true
+}
+function discardAndGo() {
+  // Taken before the dialog closes: closing trips the watcher below, and relying
+  // on that landing after this line would make the whole thing depend on watcher
+  // flush timing.
+  const action = pendingNav
+  pendingNav = null
+  showDiscard.value = false
+  action?.()
+}
+watch(showDiscard, (shown) => {
+  if (!shown) pendingNav = null
+})
+
+// Closing is guarded; opening never is.
+const open = computed({
+  get: () => openModel.value,
+  set: (value) => {
+    if (value) openModel.value = true
+    else guarded(() => (openModel.value = false))
+  },
+})
 
 const sections = computed(() => [
   { id: 'general', label: 'General', icon: 'lucide-settings' },
@@ -115,6 +183,12 @@ const subSection = computed({
       params: { section: currentSection.value, subSection: section?.id },
     }),
 })
+// What General and Security bind to. Guarded here rather than in `subSection`
+// itself so goBack() and discardAndGo() can still move without re-asking.
+const guardedSubSection = computed({
+  get: () => subSection.value,
+  set: (section) => guarded(() => (subSection.value = section)),
+})
 
 // Sessions doesn't use the sub-section registry (its "sub-pages" are individual,
 // dynamically-fetched sessions, not a fixed list) - the same :subSection route slot
@@ -137,8 +211,10 @@ const headerTitle = computed(() => {
 })
 
 function goBack() {
-  if (sessionJti.value) sessionJti.value = null
-  else if (subSection.value) subSection.value = null
-  else activeSection.value = null
+  guarded(() => {
+    if (sessionJti.value) sessionJti.value = null
+    else if (subSection.value) subSection.value = null
+    else activeSection.value = null
+  })
 }
 </script>
