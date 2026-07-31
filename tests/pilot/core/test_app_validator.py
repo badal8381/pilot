@@ -90,6 +90,32 @@ def test_validate_passes_for_well_formed_app(tmp_path: Path) -> None:
     Validator(app, checks=_static_checks()).validate()
 
 
+def test_app_validate_skips_the_checks_for_a_marketplace_app(tmp_path: Path) -> None:
+    """The registry validated the release before publishing it."""
+    from tests.pilot.marketplace_registry import publish
+
+    app_path = tmp_path / "apps" / "myapp"
+    app_path.mkdir(parents=True)  # no pyproject.toml - RepoStructureCheck would fail
+    app = _FakeBench(tmp_path / "apps", tmp_path / "env").app("myapp")
+
+    publish([{"name": "myapp", "repo": "https://example.com/myapp.git", "releases": []}])
+
+    app.validate()
+
+
+def test_app_validate_runs_the_checks_for_an_unlisted_app(tmp_path: Path) -> None:
+    from tests.pilot.marketplace_registry import publish
+
+    app_path = tmp_path / "apps" / "myapp"
+    app_path.mkdir(parents=True)
+    app = _FakeBench(tmp_path / "apps", tmp_path / "env").app("myapp")
+
+    publish([])
+
+    with pytest.raises(AppValidationError):
+        app.validate()
+
+
 def test_validate_includes_import_check_by_default(tmp_path: Path) -> None:
     app = _make_app(tmp_path, "myapp", '[project]\nname = "myapp"\n', {"myapp/hooks.py": ""})
     assert any(isinstance(check, ImportCheck) for check in Validator(app).checks)

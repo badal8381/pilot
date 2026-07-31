@@ -97,7 +97,7 @@ def test_install_stages_an_already_cloned_app_instead_of_re_cloning(tmp_path: Pa
     validated_at = []
     with (
         patch.object(App, "clone", unexpected_clone),
-        patch.object(App, "validate", lambda self, checks=None: validated_at.append(self.path)),
+        patch.object(App, "validate", lambda self: validated_at.append(self.path)),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
@@ -115,7 +115,7 @@ def test_install_puts_an_already_cloned_app_back_when_it_fails_validation(tmp_pa
     _write_app_tree(bench.apps_path / "myapp", "myapp")
     (bench.apps_path / "myapp" / "local_work.txt").write_text("not ours\n")
 
-    def reject(self: App, checks: list | None = None) -> None:
+    def reject(self: App) -> None:
         raise AppValidationError("nope")
 
     with (

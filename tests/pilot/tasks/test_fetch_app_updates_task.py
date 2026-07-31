@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from pilot.core.app import RevisionPin
-from pilot.integrations.marketplace import Marketplace
 from pilot.tasks.fetch_app_updates import FetchAppUpdatesTask
+from tests.pilot.marketplace_registry import publish
 
 REGISTRY = [{"name": "helpdesk", "repo": "r", "releases": []}]
 
@@ -31,8 +31,9 @@ def test_run_reports_current_and_target_for_pending_update(tmp_path: Path, capsy
     bench = MagicMock()
     bench.app.side_effect = lambda n: app
 
-    with patch.object(Marketplace, "registry", return_value=REGISTRY):
-        FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
+    publish(REGISTRY)
+
+    FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
     app.update_target.assert_called_once_with()
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
@@ -45,8 +46,9 @@ def test_run_omits_apps_that_are_up_to_date(tmp_path: Path, capsys) -> None:
     bench = MagicMock()
     bench.app.side_effect = lambda n: app
 
-    with patch.object(Marketplace, "registry", return_value=[]):
-        FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
+    publish([])
+
+    FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
     app.update_target.assert_called_once_with()
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
@@ -59,8 +61,9 @@ def test_run_shows_tag_ref_when_target_is_a_tag(tmp_path: Path, capsys) -> None:
     bench = MagicMock()
     bench.app.side_effect = lambda n: app
 
-    with patch.object(Marketplace, "registry", return_value=REGISTRY):
-        FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
+    publish(REGISTRY)
+
+    FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert result["helpdesk"]["target"] == "v15.1.0"
@@ -97,8 +100,9 @@ def test_run_uses_marketplace_versions_for_marketplace_apps(tmp_path: Path, caps
     bench = MagicMock()
     bench.app.side_effect = lambda n: app
 
-    with patch.object(Marketplace, "registry", return_value=ERP_NEXT_REGISTRY):
-        FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
+    publish(ERP_NEXT_REGISTRY)
+
+    FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert result == {"erpnext": {"current": "15.116.0", "target": "15.117.0"}}
@@ -112,8 +116,9 @@ def test_run_keeps_commit_labels_without_a_matching_marketplace_line(tmp_path: P
     bench = MagicMock()
     bench.app.side_effect = lambda n: app
 
-    with patch.object(Marketplace, "registry", return_value=ERP_NEXT_REGISTRY):
-        FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
+    publish(ERP_NEXT_REGISTRY)
+
+    FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert result == {"erpnext": {"current": "1111111111", "target": "2222222222"}}
@@ -126,8 +131,9 @@ def test_run_ignores_non_git_dirs(tmp_path: Path) -> None:
     bench = MagicMock()
     bench.app.side_effect = lambda n: app
 
-    with patch.object(Marketplace, "registry", return_value=[]):
-        FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
+    publish([])
+
+    FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
     bench.app.assert_called_once_with("erpnext")
 
@@ -141,8 +147,9 @@ def test_run_mixed_apps_combine_results(tmp_path: Path, capsys) -> None:
     bench = MagicMock()
     bench.app.side_effect = lambda n: apps[n]
 
-    with patch.object(Marketplace, "registry", return_value=[]):
-        FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
+    publish([])
+
+    FetchAppUpdatesTask(bench=bench, bench_root=tmp_path).run()
 
     result = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
     assert result == {"hrms": {"current": "1111111111", "target": "2222222222"}}

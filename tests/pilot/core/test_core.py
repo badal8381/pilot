@@ -192,16 +192,18 @@ def test_app_is_on_revision_commit_mismatch(tmp_path: Path) -> None:
     assert app.is_on_revision(RevisionPin(kind="commit", ref="0" * 40)) is False
 
 
-def test_app_has_remote_update_false_without_tracked_branch(tmp_path: Path) -> None:
+def test_app_update_target_is_none_without_tracked_branch(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
     app = App(AppConfig(name="myapp", repo="r", branch=""), bench)
     app.path.mkdir(parents=True)
     _init_git_repo(app.path)
     _commit(app.path, "c1")
 
-    # No configured remote at all - must not crash, and detached HEAD has
-    # no branch tip to compare against.
-    assert app.has_remote_update() is False
+    # No configured remote at all - must not crash, and an app with no branch
+    # has no tip to compare against.
+    _publish(None)
+
+    assert app.update_target() is None
 
 
 def _clone_at_tag(remote: Path, clone_dir: Path, tag: str, shallow: bool = True) -> None:
@@ -426,11 +428,7 @@ def test_app_install_checks_out_the_pinned_commit_before_validating(tmp_path: Pa
     seen_at_validation = {}
 
     with (
-        patch.object(
-            App,
-            "validate",
-            lambda self, checks=None: seen_at_validation.update(sha=self.installed_hash),
-        ),
+        patch.object(App, "validate", lambda self: seen_at_validation.update(sha=self.installed_hash)),
         patch.object(App, "_install_into_environment"),
         patch.object(App, "_build_assets_via_env_manager"),
     ):
