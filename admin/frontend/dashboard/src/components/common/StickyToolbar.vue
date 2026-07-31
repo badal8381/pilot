@@ -6,9 +6,13 @@
 
        The negative margin lets the background bleed through the shell's own
        padding (p-3 on mobile, p-4 on desktop) so rows do not show in the gutters
-       as they pass underneath. pb keeps the list from touching the bar once it
-       starts sliding under; the page's own top margin is on a sibling, so it
-       scrolls away and cannot do that job.
+       as they pass underneath.
+
+       The padding is symmetric because the bar has to carry its own breathing
+       room in both directions once it pins: the shell's gutter above it and the
+       list's top margin below it are both on siblings, so both scroll away and
+       the controls end up flush against the header on one side and the first
+       row on the other.
 
        `disabled` is for the toolbars that get teleported into the header on one
        breakpoint and rendered in place on the other: inside the header there is
@@ -19,7 +23,7 @@
     :class="
       disabled
         ? ''
-        : 'top-12 z-10 sticky bg-surface-base -mx-3 sm:-mx-4 px-3 sm:px-4 pt-1 sm:pt-0 pb-2'
+        : 'top-12 z-10 sticky bg-surface-base -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 sm:py-3'
     "
   >
     <slot />
