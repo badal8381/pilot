@@ -14,6 +14,8 @@
             variant="subtle"
             size="sm"
             icon="lucide-arrow-left"
+            label="Back to updates"
+            tooltip="Back to updates"
             @click="router.push({ name: 'Updates' })"
           />
           <h1 class="flex-1 min-w-0 font-semibold text-ink-gray-9 text-xl truncate">{{ title }}</h1>
@@ -31,6 +33,8 @@
           variant="subtle"
           size="sm"
           icon="lucide-refresh-cw"
+          label="Refresh"
+          tooltip="Refresh"
           :loading="refreshing"
           @click="refresh"
         />
@@ -135,7 +139,7 @@
 
         <details
           v-if="op.diagnosis?.output_excerpt"
-          class="border-t border-outline-red-2 bg-surface-elevation-1"
+          class="border-t border-outline-red-2 bg-surface-base"
         >
           <summary
             class="cursor-pointer px-4 py-3 text-p-sm font-medium text-ink-gray-7 hover:bg-surface-gray-1 sm:px-5"
