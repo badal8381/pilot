@@ -61,8 +61,10 @@ const breadcrumbs = computed(() => {
   return isMobile.value ? all.slice(-1) : all
 })
 
-function breadcrumbsFromRouteMeta({ title = '', group }) {
-  return group ? [{ label: group }, { label: title }] : [{ label: title }]
+// The group is only a sidebar section heading - it has no route of its own, so
+// rendering it as a crumb gives a dead link that leads nowhere.
+function breadcrumbsFromRouteMeta({ title = '' }) {
+  return title ? [{ label: title }] : []
 }
 </script>
 
