@@ -1,16 +1,16 @@
 <template>
-  <Dialog v-model="open" title="Import app from GitHub" size="lg">
+  <Dialog v-model="open" title="Import app from GitHub" size="md">
     <template #default>
       <div class="space-y-4">
-        <div class="border-b border-outline-gray-1">
-          <TabButtons
-            v-model="tab"
-            :options="tabOptions"
-            type="underline"
-            size="md"
-            class="[&>div]:!border-b-0"
-          />
-        </div>
+        <!-- flex-1 stretches each tab's wrapper; the inner span carries the pill
+             background and has no data-slot of its own, so it needs w-full too or
+             the highlight stays content-width inside a stretched slot. -->
+        <TabButtons
+          v-model="tab"
+          :options="tabOptions"
+          size="md"
+          class="w-full [&>div]:w-full [&_[data-slot=tab-button]>span]:w-full"
+        />
 
         <div>
           <template v-if="tab === 'public'">
@@ -27,21 +27,12 @@
                 label="Branch"
                 v-model="branch"
                 :options="branchOptions"
+                :loading="fetching"
                 allowCustomValue
                 placeholder="Search or type a branch…"
                 emptyText="No matching branch. Type one to use it."
                 class="w-40 shrink-0"
               />
-              <Button
-                v-else
-                variant="subtle"
-                class="shrink-0"
-                :loading="fetching"
-                :disabled="!repo.trim()"
-                @click="fetchBranches"
-              >
-                Fetch branches
-              </Button>
             </div>
           </template>
 
@@ -64,7 +55,7 @@
               <div
                 class="flex items-center gap-2 bg-surface-gray-1 px-3 py-2 border rounded-lg border-outline-gray-2"
               >
-                <span class="text-ink-gray-7 text-p-sm">
+                <span class="text-ink-gray-7 text-sm">
                   Connected as
                   <span class="font-medium text-ink-gray-9">{{ gitStatus.username }}</span>
                 </span>
@@ -93,19 +84,29 @@
               </div>
             </template>
           </template>
+
+          <!-- All three states share one slot inside the field wrapper, so progress,
+               success and error land in the same place as a hint under the input
+               instead of a space-y-4 sibling 16px below it. -->
+          <ErrorMessage v-if="error" :message="error" class="mt-1.5" />
+          <p v-else-if="fetching" class="mt-1.5 text-ink-gray-5 text-sm">Loading branches…</p>
+          <p v-else-if="resolving" class="mt-1.5 text-ink-gray-5 text-sm">Checking repository…</p>
+          <p
+            v-else-if="foundName"
+            class="mt-1.5 flex items-center gap-1 text-ink-green-8 text-sm"
+          >
+            <span class="size-3.5 shrink-0 lucide-check"></span>
+            Found {{ foundName
+            }}<template v-if="siteName">, will be installed on {{ siteName }}</template>
+          </p>
         </div>
-
-        <p v-if="resolving" class="text-ink-gray-5 text-sm">Checking repository…</p>
-        <p v-else-if="foundName" class="flex items-center gap-1.5 text-ink-green-6 text-sm">
-          <span class="size-4 lucide-circle-check"></span>
-          Found {{ foundName }}<template v-if="siteName">, will be installed on {{ siteName }}</template>
-        </p>
-
-        <ErrorMessage v-if="error" :message="error" />
 
         <div class="flex justify-end gap-2">
           <Button variant="subtle" @click="open = false">Cancel</Button>
-          <Button variant="solid" :disabled="!canSubmit" :loading="adding" @click="submit">
+          <Button v-if="needsGithubConnection" variant="solid" @click="goToGithubSettings"
+            >Connect GitHub</Button
+          >
+          <Button v-else variant="solid" :disabled="!canSubmit" :loading="adding" @click="submit">
             {{ siteName ? 'Import and install' : 'Import app' }}
           </Button>
         </div>
@@ -141,9 +142,10 @@ const open = defineModel('open')
 const router = useRouter()
 
 const tab = ref('public')
+// flex-1 per option so the subtle rail divides the dialog width evenly.
 const tabOptions = [
-  { label: 'Public repository', value: 'public' },
-  { label: 'Your GitHub account', value: 'private' },
+  { label: 'Public repository', value: 'public', class: 'flex-1' },
+  { label: 'Your GitHub account', value: 'private', class: 'flex-1' },
 ]
 const repo = ref('')
 const branch = ref('')
@@ -165,6 +167,17 @@ const repoOptions = computed(() =>
 const adding = ref(false)
 const error = ref('')
 
+// Nothing can be imported from an unconnected account, so the primary action
+// becomes the fix instead of a disabled button.
+const needsGithubConnection = computed(
+  () => tab.value === 'private' && Boolean(gitStatus.value) && !gitConnected.value,
+)
+
+function goToGithubSettings() {
+  open.value = false
+  router.push({ name: 'Settings', params: { section: 'general', subSection: 'github' } })
+}
+
 const resolving = ref(false)
 const foundName = ref('')
 const canSubmit = computed(() =>
@@ -175,13 +188,34 @@ watch(open, (isOpen) => {
   if (isOpen) reset()
 })
 watch(tab, reset)
-watch(repo, () => {
+// The field accepts "github.com/frappe/crm" as well as a full URL; every call to
+// the API goes through normalizedRepo so the scheme is always present.
+const normalizedRepo = computed(() => {
+  const url = repo.value.trim().replace(/\/+$/, '')
+  if (!url) return ''
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`
+})
+
+// host/owner/repo, with or without a scheme — enough to know the user has
+// finished typing something fetchable.
+const REPO_PATTERN = /^(https?:\/\/)?[^/\s]+\.[^/\s]+\/[^/\s]+\/[^/\s]+$/
+
+// Auto-fetches once the URL looks complete, matching the private tab instead of
+// making the user press a button.
+let repoDebounce
+watch(repo, (value) => {
   fetched.value = false
   branches.value = []
   foundName.value = ''
+  if (tab.value !== 'public') return
+  clearTimeout(repoDebounce)
+  if (!REPO_PATTERN.test(value.trim().replace(/\/+$/, ''))) return
+  const url = normalizedRepo.value
+  repoDebounce = setTimeout(() => loadBranchesFor(url), 600)
 })
 
 function reset() {
+  clearTimeout(repoDebounce)
   repo.value = ''
   branch.value = ''
   fetched.value = false
@@ -208,11 +242,6 @@ async function loadBranchesFor(url) {
   } finally {
     fetching.value = false
   }
-}
-
-function fetchBranches() {
-  const url = repo.value.trim()
-  if (url) loadBranchesFor(url)
 }
 
 async function loadGitStatus() {
@@ -244,7 +273,7 @@ async function resolveApp() {
   foundName.value = ''
   error.value = ''
   try {
-    const d = await gitApi.resolve(repo.value.trim(), branch.value.trim())
+    const d = await gitApi.resolve(normalizedRepo.value, branch.value.trim())
     if (d.name) foundName.value = d.name
     else error.value = apiErrorMessage(d, 'Could not find a Frappe app in this repository.')
   } catch (e) {
@@ -261,7 +290,7 @@ async function submit() {
   try {
     const result = await appsApi.add({
       name: foundName.value,
-      repo: repo.value.trim(),
+      repo: normalizedRepo.value,
       branch: branch.value.trim(),
       sites: props.siteName ? [props.siteName] : [],
     })
