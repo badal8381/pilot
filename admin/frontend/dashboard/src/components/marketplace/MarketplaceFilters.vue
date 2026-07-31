@@ -1,28 +1,43 @@
 <template>
-  <div class="mt-6">
+  <StickyToolbar class="mt-6">
     <div class="flex sm:flex-row flex-col gap-2">
       <FormControl
         v-model="searchModel"
         class="flex-1"
         type="text"
         placeholder="Search for any app"
+        :size="isMobile ? 'md' : 'sm'"
       >
         <template #prefix>
           <LucideSearch class="size-4 text-ink-gray-5" />
         </template>
       </FormControl>
 
-      <div class="flex gap-2">
-        <Dropdown :options="worksWithMenu" placement="bottom-end">
-          <template #default="{ open }">
-            <Button class="[&>.truncate]:flex-1 [&>.truncate]:text-left" :active="open">
-              <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-              {{ worksWithLabel }}
-            </Button>
-          </template>
-        </Dropdown>
+      <!-- The row is width-bound and only the dropdown grows: without that the
+           flex-1 resolved against the content and pushed Import app off a
+           phone's screen entirely. -->
+      <div class="flex gap-2 w-full sm:w-auto">
+        <div class="flex-1 sm:flex-none min-w-0">
+          <Dropdown :options="worksWithMenu" placement="bottom-end">
+            <template #default="{ open }">
+              <Button
+                class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto"
+                :size="isMobile ? 'md' : 'sm'"
+                :active="open"
+              >
+                <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
+                {{ worksWithLabel }}
+              </Button>
+            </template>
+          </Dropdown>
+        </div>
 
-        <Button variant="subtle" @click="$emit('add-from-github')">
+        <Button
+          variant="subtle"
+          class="text-base"
+          :size="isMobile ? 'md' : 'sm'"
+          @click="$emit('add-from-github')"
+        >
           <template #prefix><GithubMark class="size-4" /></template>
           Import app
         </Button>
@@ -31,17 +46,26 @@
 
     <!-- Scrolls rather than clips: TabButtons' rail is overflow-hidden and does not wrap. -->
     <div class="mt-3 overflow-x-auto">
-      <TabButtons v-model="pillModel" :options="pillOptions" type="ghost" />
+      <TabButtons
+        v-model="pillModel"
+        :options="pillOptions"
+        type="ghost"
+        :size="isMobile ? 'md' : 'sm'"
+      />
     </div>
-  </div>
+  </StickyToolbar>
 </template>
 
 <script setup>
 import { computed, h } from 'vue'
 import { Button, Dropdown, FormControl, TabButtons } from 'frappe-ui'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import LucideSearch from '~icons/lucide/search'
 import GithubMark from '@/components/icons/GithubMark.vue'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 import { PILLS } from '@/utils/marketplaceCategories'
+
+const isMobile = useIsMobile()
 
 const props = defineProps({
   worksWithOptions: { type: Array, default: () => [] },
