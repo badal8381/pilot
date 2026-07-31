@@ -169,15 +169,20 @@ class App:
         return self.marketplace_entry is not None
 
     @property
+    def existing_clone_path(self) -> Path | None:
+        by_config_name = self.bench.apps_path / self.config.name
+        if (by_config_name / ".git").exists():
+            return by_config_name
+        by_module_name = self.bench.apps_path / self.module_name
+        if by_module_name != by_config_name and (by_module_name / ".git").exists():
+            return by_module_name
+        return None
+
+    @property
     def is_cloned(self) -> bool:
-        # The clone may live under the configured name or, after get-app
-        # normalised it, under the importable module name (e.g. india-compliance
-        # -> india_compliance). Check the cheap config-name path first and only
-        # resolve module_name (which reads pyproject) when that misses.
         if (self.path / ".git").exists():
             return True
-        module_path = self.bench.apps_path / self.module_name
-        return module_path != self.path and (module_path / ".git").exists()
+        return self.existing_clone_path is not None
 
     def is_commit_hash(self, ref: str) -> bool:
         return AppRepository.is_commit_hash(ref)
@@ -193,8 +198,8 @@ class App:
 
         shutil.rmtree(self.path, ignore_errors=True)  # leftovers from an interrupted run
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        apps_clone = self.bench.apps_path / self.config.name
-        if (apps_clone / ".git").exists():
+        apps_clone = self.existing_clone_path
+        if apps_clone is not None:
             on_progress(f"'{self.config.name}' already cloned, moving it out of apps/ to validate.")
             shutil.move(str(apps_clone), str(self.path))
             return
@@ -259,9 +264,10 @@ class App:
         if self.bench.is_app_installed(self.config.name):
             return self._skip_already_installed(on_progress, install_dependencies)
 
-        existing_clone = self.path if self.is_cloned else None
+        existing_clone = self.existing_clone_path
         self.is_staged = not self.is_marketplace
-        self.clone(on_progress)
+        if self.is_staged or existing_clone is None:
+            self.clone(on_progress)
 
         try:
             if commit and self.installed_hash != commit:
@@ -273,8 +279,7 @@ class App:
                 self.promote()
 
         except BenchError:
-            if self.is_staged:
-                self._unstage(self.path, existing_clone)
+            self._undo_clone(existing_clone)
             raise
 
         on_progress(f"Installing {self.config.name}...")
@@ -292,17 +297,14 @@ class App:
         on_progress(f"\n'{self.config.name}' installed successfully.")
         return AppInstallResult(self, already_installed=False, installed_dependencies=dependencies)
 
-    @staticmethod
-    def _unstage(staging_path: Path | None, existing_clone: Path | None) -> None:
-        """Undo staging after a failure: put a tree that was already in apps/ back
-        where it was, and delete one this run cloned. A working tree we did not
+    def _undo_clone(self, existing_clone: Path | None) -> None:
+        """Undo the clone after a failure: delete a tree this run created, and put
+        one that was already in apps/ back where it was. A working tree we did not
         create is not ours to remove."""
-        if staging_path is None:
-            return
         if existing_clone is None:
-            shutil.rmtree(staging_path, ignore_errors=True)
-        else:
-            shutil.move(str(staging_path), str(existing_clone))
+            shutil.rmtree(self.path, ignore_errors=True)
+        elif self.is_staged:
+            shutil.move(str(self.path), str(existing_clone))
 
     def promote(self) -> "App":
         """Move a validated staged clone into apps/ under its importable name."""
