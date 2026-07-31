@@ -23,6 +23,7 @@
         <span
           v-if="targetInstalled"
           class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+          role="img"
           aria-label="Already installed"
         />
       </template>
@@ -58,6 +59,7 @@
           <span
             v-if="isInstalled(s)"
             class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+            role="img"
             aria-label="Already installed"
           />
         </template>
