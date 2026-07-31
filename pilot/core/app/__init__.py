@@ -276,8 +276,7 @@ class App:
             dependencies = self._install_dependencies(on_progress) if install_dependencies else []
             if self.is_staged:
                 self.validate()
-                self.promote()
-
+            self.promote()
         except BenchError:
             self._undo_clone(existing_clone)
             raise
@@ -307,11 +306,12 @@ class App:
             shutil.move(str(self.path), str(existing_clone))
 
     def promote(self) -> "App":
-        """Move a validated staged clone into apps/ under its importable name."""
         if not self.path.is_dir():
             raise BenchError(f"'{self.config.name}' was never cloned into {self.path} - nothing to install.")
         module = self.module_name
         target = self.bench.apps_path / module
+        if target == self.path:
+            return self
         if target.exists():
             raise BenchError(f"'{target}' already exists - remove it before installing this app.")
         target.parent.mkdir(parents=True, exist_ok=True)
