@@ -122,6 +122,7 @@
             <Button
               v-if="op.state === 'needs_attention' && op.diagnosis?.patch && !patchAlreadySkipped"
               variant="subtle"
+              theme="red"
               :loading="acting"
               @click="confirmSkip = true"
             >
@@ -237,13 +238,22 @@
 
           <div>
             <div v-for="site in op.sites" :key="site.name">
-              <div class="flex items-center gap-3 px-2.5 py-2">
-                <RouterLink
-                  :to="{ name: 'SiteDetail', params: { name: site.name } }"
-                  class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base truncate no-underline hover:text-ink-gray-7"
-                >
+              <div
+                class="flex items-center gap-2 px-2.5 py-2 rounded transition-colors"
+                :class="siteJobs(site.name).length ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
+                @click="toggleSiteJobs(site.name)"
+              >
+                <!-- Hidden, not omitted: keeps job-less rows aligned. -->
+                <span
+                  class="size-4 text-ink-gray-5 transition-transform shrink-0 lucide-chevron-right"
+                  :class="[
+                    siteJobs(site.name).length ? '' : 'invisible',
+                    expandedSites.has(site.name) ? 'rotate-90' : '',
+                  ]"
+                />
+                <p class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base truncate">
                   {{ site.name }}
-                </RouterLink>
+                </p>
                 <span
                   v-if="siteCaption(site)"
                   class="flex items-center gap-1.5 text-sm shrink-0"
@@ -252,18 +262,6 @@
                   <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-7" />
                   {{ siteCaption(site) }}
                 </span>
-                <Button
-                  v-if="siteJobs(site.name).length"
-                  variant="ghost"
-                  size="sm"
-                  tooltip="Site jobs"
-                  @click="toggleSiteJobs(site.name)"
-                >
-                  <span
-                    class="size-4 text-ink-gray-5 transition-transform lucide-chevron-down"
-                    :class="expandedSites.has(site.name) ? 'rotate-180' : ''"
-                  />
-                </Button>
               </div>
               <div
                 v-if="expandedSites.has(site.name)"
@@ -444,6 +442,7 @@ const openTaskLog = (log) => router.push({ name: 'TaskDetail', params: { taskId:
 const expandedSites = ref(new Set())
 
 function toggleSiteJobs(siteName) {
+  if (!siteJobs(siteName).length) return
   const expanded = new Set(expandedSites.value)
   if (!expanded.delete(siteName)) expanded.add(siteName)
   expandedSites.value = expanded
