@@ -11,6 +11,7 @@ from pilot.core.database.base import (
     LockWaitRow,
     LockWaitStatus,
     QueryResult,
+    StorageComponent,
     TableSize,
 )
 from pilot.core.database.engines.helpers import (
@@ -323,14 +324,46 @@ class MariaDB(Database):
             raise DatabaseError(f"Unknown binlog file: {up_to}")
         self.execute(f"PURGE BINARY LOGS TO '{up_to}'", read_only=False)
 
+    def get_data_directory(self) -> str | None:
+        if not is_local_host(self._host, self._socket):
+            return None
+        return str(self.get_scalar("SELECT @@datadir"))
+
+    def get_storage_components(self) -> list[StorageComponent]:
+        data_dir = Path(self.get_data_directory() or ".")
+        return [
+            StorageComponent("binlog", "binary log", self.get_binlog_status().size_bytes),
+            StorageComponent(
+                "error_log", "error log", self._variable_file_size("@@log_error", data_dir)
+            ),
+            StorageComponent(
+                "slow_log",
+                "slow query log",
+                self._variable_file_size("@@slow_query_log_file", data_dir),
+            ),
+            StorageComponent(
+                "binlog_index",
+                "binary log index",
+                self._variable_file_size("@@log_bin_index", data_dir),
+            ),
+        ]
+
+    def _variable_file_size(self, variable: str, data_dir: Path) -> int:
+        """Size of the file a system variable points at. Unset variables and
+        unreadable paths both mean "nothing to count here"."""
+        value = str(self.get_scalar(f"SELECT {variable}") or "")
+        if not value:
+            return 0
+        path = Path(value)
+        if not path.is_absolute():
+            path = data_dir / path
+        try:
+            return path.stat().st_size
+        except OSError:
+            return 0
+
     def get_status_value(self, variable: str) -> int:
         result = self.execute(f"SHOW GLOBAL STATUS LIKE '{variable}'")
         if not result.rows:
             raise DatabaseError(f"Unknown status variable: {variable}")
         return int(result.rows[0][1])
-
-    def get_scalar(self, query: str):
-        result = self.execute(query)
-        if not result.rows:
-            raise DatabaseError(f"Query returned no rows: {query}")
-        return result.rows[0][0]

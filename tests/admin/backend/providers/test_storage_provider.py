@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 from pilot.config import BenchConfig
-from pilot.core.database.base import BinlogStatus, QueryResult
+from pilot.core.database.base import QueryResult, StorageComponent
 
 
 def _write_bench(bench_root: Path, db_type: str = "mariadb") -> None:
@@ -85,39 +85,14 @@ def test_site_storage_splits_private_public_and_backups(tmp_path: Path) -> None:
     assert "backups" not in other_names
 
 
-def test_mariadb_variable_file_size_reads_relative_path(tmp_path: Path) -> None:
-    from admin.backend.providers.storage import _mariadb_variable_file_size
-
-    (tmp_path / "mariadb.err").write_bytes(b"x" * 777)
+def _mock_database(rows: list[list], components: list[StorageComponent], data_dir: str) -> Mock:
     db = Mock()
-    db.get_scalar.return_value = "mariadb.err"
-
-    size = _mariadb_variable_file_size(db, "@@log_error", tmp_path)
-
-    assert size == 777
-    db.get_scalar.assert_called_once_with("SELECT @@log_error")
-
-
-def test_mariadb_variable_file_size_reads_absolute_path(tmp_path: Path) -> None:
-    from admin.backend.providers.storage import _mariadb_variable_file_size
-
-    log_file = tmp_path / "elsewhere.log"
-    log_file.write_bytes(b"x" * 42)
-    db = Mock()
-    db.get_scalar.return_value = str(log_file)
-
-    assert _mariadb_variable_file_size(db, "@@slow_query_log_file", tmp_path) == 42
-
-
-def test_mariadb_variable_file_size_is_zero_when_unset_or_missing(tmp_path: Path) -> None:
-    from admin.backend.providers.storage import _mariadb_variable_file_size
-
-    db = Mock()
-    db.get_scalar.return_value = ""
-    assert _mariadb_variable_file_size(db, "@@slow_query_log_file", tmp_path) == 0
-
-    db.get_scalar.return_value = "does-not-exist.log"
-    assert _mariadb_variable_file_size(db, "@@log_bin_index", tmp_path) == 0
+    db.execute.return_value = QueryResult(
+        columns=["schema", "bytes"], rows=rows, duration_ms=1.0
+    )
+    db.get_storage_components.return_value = components
+    db.get_data_directory.return_value = data_dir
+    return db
 
 
 def test_mariadb_breakdown_shapes_schemas_and_reconciles_core(tmp_path: Path) -> None:
@@ -125,36 +100,96 @@ def test_mariadb_breakdown_shapes_schemas_and_reconciles_core(tmp_path: Path) ->
 
     _write_bench(tmp_path)
     _make_site(tmp_path, "site1.local", "site1_db")
-
-    db = Mock()
-    db.execute.return_value = QueryResult(
-        columns=["table_schema", "bytes"],
-        rows=[["site1_db", 500], ["mysql", 100]],
-        duration_ms=1.0,
-    )
-    db.get_binlog_status.return_value = BinlogStatus(enabled=True, file_count=1, size_bytes=50)
-    db.get_scalar.return_value = ""
+    components = [
+        StorageComponent("binlog", "binary log", 50),
+        StorageComponent("error_log", "error log", 20),
+        StorageComponent("slow_log", "slow query log", 0),
+        StorageComponent("binlog_index", "binary log index", 0),
+    ]
+    db = _mock_database([["site1_db", 500], ["mysql", 100]], components, str(tmp_path))
 
     with (
         patch("admin.backend.providers.storage.make_database", return_value=db),
         patch("admin.backend.providers.storage.directory_size_bytes", return_value=1000),
     ):
-        breakdown = StorageProvider(tmp_path)._mariadb_breakdown()
+        breakdown = StorageProvider(tmp_path)._database_breakdown()
 
     assert breakdown == DatabaseBreakdown(
         engine="mariadb",
         supported=True,
         used_bytes=1000,
         binlog_bytes=50,
-        core_bytes=350,  # 1000 - 50 - (500 + 100)
-        error_log_bytes=0,
-        slow_log_bytes=0,
-        binlog_index_bytes=0,
+        core_bytes=330,  # 1000 - (500 + 100) - (50 + 20)
+        components=components,
         databases=[
             DatabaseRow(schema="site1_db", site="site1.local", system=False, bytes=500),
             DatabaseRow(schema="mysql", site=None, system=True, bytes=100),
         ],
     )
+
+
+def test_postgres_breakdown_reports_wal_and_server_log(tmp_path: Path) -> None:
+    """The engine names its own artifacts; postgres has no binlog, so
+    binlog_bytes stays 0 and the purge alert has nothing to act on."""
+    from admin.backend.providers.storage import StorageProvider
+
+    _write_bench(tmp_path, db_type="postgres")
+    _make_site(tmp_path, "site1.local", "site1_db")
+    components = [
+        StorageComponent("wal", "write-ahead log", 300),
+        StorageComponent("server_log", "server log", 100),
+    ]
+    db = _mock_database([["site1_db", 500], ["postgres", 60]], components, "/pg/data")
+
+    with (
+        patch("admin.backend.providers.storage.make_database", return_value=db),
+        patch("admin.backend.providers.storage.directory_size_bytes", return_value=2000),
+    ):
+        breakdown = StorageProvider(tmp_path)._database_breakdown()
+
+    assert breakdown.engine == "postgres"
+    assert breakdown.supported is True
+    assert breakdown.used_bytes == 2000
+    assert breakdown.binlog_bytes == 0
+    assert breakdown.core_bytes == 1040  # 2000 - (500 + 60) - (300 + 100)
+    assert breakdown.components == components
+    assert [row.site for row in breakdown.databases] == ["site1.local", None]
+
+
+def test_core_bytes_is_unknown_when_the_data_directory_cannot_be_read(tmp_path: Path) -> None:
+    """An unreadable data directory is not an empty one - core_bytes goes None
+    and used_bytes falls back to what was actually measured."""
+    from admin.backend.providers.storage import StorageProvider
+    from pilot.exceptions import CommandError
+
+    _write_bench(tmp_path, db_type="postgres")
+    components = [StorageComponent("wal", "write-ahead log", 300)]
+    db = _mock_database([["postgres", 60]], components, "/pg/data")
+
+    with (
+        patch("admin.backend.providers.storage.make_database", return_value=db),
+        patch(
+            "admin.backend.providers.storage.directory_size_bytes",
+            side_effect=CommandError("Permission denied"),
+        ),
+    ):
+        breakdown = StorageProvider(tmp_path)._database_breakdown()
+
+    assert breakdown.core_bytes is None
+    assert breakdown.used_bytes == 360
+
+
+def test_core_bytes_is_unknown_for_a_remote_database_server(tmp_path: Path) -> None:
+    from admin.backend.providers.storage import StorageProvider
+
+    _write_bench(tmp_path)
+    db = _mock_database([["site1_db", 500]], [StorageComponent("binlog", "binary log", 50)], None)
+
+    with patch("admin.backend.providers.storage.make_database", return_value=db):
+        breakdown = StorageProvider(tmp_path)._database_breakdown()
+
+    assert breakdown.core_bytes is None
+    assert breakdown.used_bytes == 550
 
 
 def test_sqlite_engine_is_not_supported(tmp_path: Path) -> None:
@@ -165,5 +200,16 @@ def test_sqlite_engine_is_not_supported(tmp_path: Path) -> None:
     breakdown = StorageProvider(tmp_path)._database_breakdown()
 
     assert breakdown == DatabaseBreakdown(
-        engine="sqlite", supported=False, used_bytes=0, binlog_bytes=0, core_bytes=0
+        engine="sqlite", supported=False, used_bytes=0, binlog_bytes=0
     )
+
+
+def test_directory_size_bytes_measures_a_real_tree(tmp_path: Path) -> None:
+    """Guards the du flags: GNU-only `-b` fails outright on BSD/macOS, which
+    used to be swallowed into a silent 0."""
+    from admin.backend.providers.storage import directory_size_bytes
+
+    (tmp_path / "payload.bin").write_bytes(b"x" * 40960)
+
+    assert directory_size_bytes(str(tmp_path)) >= 40960
+    assert directory_size_bytes(str(tmp_path / "missing")) == 0

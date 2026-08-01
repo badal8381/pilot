@@ -8,6 +8,7 @@ from pilot.core.database.base import (
     LockWaitRow,
     LockWaitStatus,
     QueryResult,
+    StorageComponent,
     TableSize,
 )
 from pilot.core.database.engines.helpers import (
@@ -214,12 +215,31 @@ class PostgreSQL(Database):
         ]
 
     def _free_disk_bytes(self) -> int | None:
+        data_directory = self.get_data_directory()
+        return disk_free(data_directory) if data_directory else None
+
+    def get_data_directory(self) -> str | None:
         if not is_local_host(self._host):
             return None
         result = self.execute("SELECT setting FROM pg_settings WHERE name = 'data_directory'")
-        if not result.rows:
-            return None
-        return disk_free(str(result.rows[0][0]))
+        return str(result.rows[0][0]) if result.rows else None
 
-    # No binary log: WAL archiving is configured server-side. Falls back to
-    # Database's default get_binlog_status/get_binlog_files/purge_binlogs.
+    def get_storage_components(self) -> list[StorageComponent]:
+        """PostgreSQL's counterpart to the binary log is the WAL, and it has no
+        separate slow-query log - slow statements go to the server log."""
+        return [
+            StorageComponent("wal", "write-ahead log", self._directory_listing_bytes("waldir")),
+            StorageComponent("server_log", "server log", self._server_log_bytes()),
+        ]
+
+    def _server_log_bytes(self) -> int:
+        """With logging_collector off the server logs to stderr, so there is no
+        log directory of its own to measure."""
+        if str(self.get_scalar("SHOW logging_collector")).lower() not in ("on", "true"):
+            return 0
+        return self._directory_listing_bytes("logdir")
+
+    def _directory_listing_bytes(self, directory: str) -> int:
+        """pg_ls_waldir/pg_ls_logdir report sizes server-side, so they work for
+        a remote host and need no filesystem access from here."""
+        return int(self.get_scalar(f"SELECT COALESCE(SUM(size), 0) FROM pg_ls_{directory}()"))

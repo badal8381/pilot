@@ -14,49 +14,34 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{ purged: [] }>()
 
-const COLORS = {
+const COLORS: Record<string, string> = {
   binlog: 'amber-7',
+  wal: 'amber-7',
   databases: 'violet-7',
   core: 'cyan-7',
-  errorLog: 'amber-7',
-  slowLog: 'cyan-7',
-  binlogIndex: 'blue-7',
+  error_log: 'orange-7',
+  server_log: 'orange-7',
+  slow_log: 'pink-7',
+  binlog_index: 'blue-7',
 }
 
 const GROUP_SHOWN_COUNT = 3
 
-const groupParts = computed(() => {
-  const schemaBytes = props.data.databases.reduce((sum, row) => sum + row.bytes, 0)
-
-  return [
-    {
-      label: `${props.data.engine} binary log`,
-      bytes: props.data.binlog_bytes,
-      color: COLORS.binlog,
-    },
+const groupParts = computed(() =>
+  [
     {
       label: `${props.data.databases.length} databases`,
-      bytes: schemaBytes,
+      bytes: props.data.databases.reduce((sum, row) => sum + row.bytes, 0),
       color: COLORS.databases,
     },
+    ...props.data.components.map((component) => ({
+      label: `${props.data.engine} ${component.label}`,
+      bytes: component.bytes,
+      color: COLORS[component.key] ?? 'gray-7',
+    })),
     { label: `${props.data.engine} core files`, bytes: props.data.core_bytes, color: COLORS.core },
-    {
-      label: `${props.data.engine} error log`,
-      bytes: props.data.error_log_bytes,
-      color: COLORS.errorLog,
-    },
-    {
-      label: `${props.data.engine} slow log`,
-      bytes: props.data.slow_log_bytes,
-      color: COLORS.slowLog,
-    },
-    {
-      label: `${props.data.engine} binlog indexes`,
-      bytes: props.data.binlog_index_bytes,
-      color: COLORS.binlogIndex,
-    },
-  ].sort((a, b) => b.bytes - a.bytes)
-})
+  ].sort((a, b) => (b.bytes ?? -1) - (a.bytes ?? -1)),
+)
 
 const sortedDatabases = computed(() => [...props.data.databases].sort((a, b) => b.bytes - a.bytes))
 
@@ -72,6 +57,11 @@ const visibleDatabases = computed(() =>
 
 const hiddenCount = computed(() =>
   showAllDatabases.value ? 0 : Math.max(sortedDatabases.value.length - VISIBLE_DATABASE_COUNT, 0),
+)
+
+// Not hiddenCount > 0: that goes to 0 once expanded, taking "Show less" with it.
+const isDatabaseListExpandable = computed(
+  () => sortedDatabases.value.length > VISIBLE_DATABASE_COUNT,
 )
 </script>
 
@@ -134,6 +124,7 @@ const hiddenCount = computed(() =>
       </div>
 
       <button
+        v-if="isDatabaseListExpandable"
         type="button"
         @click="showAllDatabases = !showAllDatabases"
         class="flex items-center gap-2 text-sm text-ink-gray-6 hover:text-ink-gray-8 mt-2"
@@ -146,6 +137,7 @@ const hiddenCount = computed(() =>
       </button>
 
       <BinlogPurgeAlert
+        v-if="data.engine === 'mariadb'"
         :bytes="data.binlog_bytes"
         @purged="emit('purged')"
       />

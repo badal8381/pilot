@@ -4,6 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any
 
+from pilot.exceptions import DatabaseError
+
 
 @dataclass
 class QueryResult:
@@ -73,6 +75,16 @@ class BinlogFile:
     modified_ms: int | None  # None when the binlog directory is remote or unreadable
 
 
+@dataclass
+class StorageComponent:
+    """One on-disk artifact the engine keeps alongside the databases. `key`
+    identifies it across engines; `label` names it in the engine's own terms."""
+
+    key: str
+    label: str
+    bytes: int
+
+
 class Database(ABC):
     @abstractmethod
     def execute(self, query: str, read_only: bool = True) -> QueryResult: ...
@@ -120,3 +132,18 @@ class Database(ABC):
 
     def purge_binlogs(self, up_to: str) -> None:
         raise NotImplementedError
+
+    def get_storage_components(self) -> list[StorageComponent]:
+        """Sizes of the engine's own files, excluding the databases."""
+        raise NotImplementedError
+
+    def get_data_directory(self) -> str | None:
+        """Server data directory, or None when the server is not on this host
+        and the path would therefore be meaningless locally."""
+        raise NotImplementedError
+
+    def get_scalar(self, query: str):
+        result = self.execute(query)
+        if not result.rows:
+            raise DatabaseError(f"Query returned no rows: {query}")
+        return result.rows[0][0]
