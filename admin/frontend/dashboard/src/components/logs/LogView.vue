@@ -4,6 +4,7 @@
   <div
     ref="el"
     class="bg-surface-gray-2 overflow-auto font-mono text-ink-gray-8 text-p-sm"
+    @scroll="onScroll"
     :class="[wrap ? 'whitespace-pre-wrap' : 'whitespace-pre', rounded ? 'rounded' : '', fill ? 'flex-1 h-0' : 'max-h-[50vh]', rows ? '' : 'px-4 py-3']"
   >
     <p v-if="!lines.length" class="text-ink-gray-4" :class="rows ? 'px-4 py-3' : ''">
@@ -34,7 +35,7 @@
 </template>
 
 <script setup>
-import { nextTick, ref, computed } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 
 const props = defineProps({
   lines: { type: Array, default: () => [] },
@@ -54,6 +55,33 @@ function scrollToBottom() {
     if (el.value) el.value.scrollTop = el.value.scrollHeight
   })
 }
+
+// Follow the tail while streaming; scrolling up pauses it, returning to the
+// bottom resumes it.
+const follow = ref(true)
+
+function onScroll() {
+  const box = el.value
+  if (!box) return
+  follow.value = box.scrollHeight - box.scrollTop - box.clientHeight < 8
+}
+
+watch(
+  () => props.streaming,
+  (on) => {
+    if (!on) return
+    follow.value = true
+    scrollToBottom()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.lines.length,
+  () => {
+    if (props.streaming && follow.value) scrollToBottom()
+  },
+)
 
 defineExpose({ scrollToBottom })
 </script>

@@ -387,7 +387,6 @@ function startLive() {
     const data = JSON.parse(event.data)
     rawLines.value.push(data.error ? `ERROR: ${data.error}` : data.line)
     if (rawLines.value.length > 2000) rawLines.value.shift()
-    terminal.value?.scrollToBottom()
   }
   eventSource.onerror = () => stopLive()
 }
