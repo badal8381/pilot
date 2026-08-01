@@ -2,32 +2,22 @@ export const STATUS_CONFIG = {
   queued: {
     label: 'Queued',
     theme: 'blue',
-    icon: 'lucide-clock-3',
-    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
   success: {
     label: 'Success',
     theme: 'green',
-    icon: 'lucide-check',
-    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
   failed: {
     label: 'Failed',
     theme: 'red',
-    icon: 'lucide-x',
-    iconBg: 'bg-surface-red-2 text-ink-red-8',
   },
   running: {
     label: 'Running',
     theme: 'amber',
-    icon: 'lucide-loader-circle animate-spin',
-    iconBg: 'bg-surface-amber-2 text-ink-amber-8',
   },
   killed: {
     label: 'Killed',
     theme: 'gray',
-    icon: 'lucide-square',
-    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
 }
 

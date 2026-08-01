@@ -65,16 +65,9 @@
         v-for="task in visibleTasks"
         :key="task.task_id"
         :to="taskDetailRoute(task.task_id)"
-        class="flex items-center gap-3 hover:bg-surface-gray-1 px-3 py-2.5 rounded no-underline transition-colors"
+        class="items-center gap-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] hover:bg-surface-gray-1 px-3 py-2.5 rounded no-underline transition-colors"
       >
-        <span
-          class="place-items-center grid rounded size-6 shrink-0"
-          :class="statusConfig(task).iconBg"
-        >
-          <span class="size-3.5" :class="statusConfig(task).icon" />
-        </span>
-
-        <div class="flex-1 min-w-0">
+        <div class="min-w-0">
           <!-- truncate is inert on inline boxes. -->
           <p class="font-medium text-ink-gray-9 text-base truncate">
             {{ commandLabel(task.command) }}
@@ -87,12 +80,22 @@
           </p>
         </div>
 
-        <span class="text-ink-gray-6 text-sm shrink-0">
-          <template v-if="task.status !== 'queued' && fmtDuration(task.duration_seconds)"
-            >took {{ fmtDuration(task.duration_seconds) }} · </template
-          >{{ relativeTime(task.started_at || task.queued_at) }}
-        </span>
-        <span class="lucide-chevron-right size-4 text-ink-gray-6 shrink-0" />
+        <!-- Success is the norm; only exceptional states get a badge. -->
+        <Badge
+          v-if="task.status !== 'success'"
+          :label="statusConfig(task).label"
+          :theme="statusConfig(task).theme"
+          variant="subtle"
+        />
+        <span v-else />
+        <div class="flex justify-end items-center gap-3 min-w-0">
+          <span class="text-ink-gray-6 text-sm truncate">
+            <template v-if="task.status !== 'queued' && fmtDuration(task.duration_seconds)"
+              >took {{ fmtDuration(task.duration_seconds) }} · </template
+            >{{ relativeTime(task.started_at || task.queued_at) }}
+          </span>
+          <span class="lucide-chevron-right size-4 text-ink-gray-6 shrink-0" />
+        </div>
       </RouterLink>
     </div>
 
@@ -113,7 +116,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
+import { Badge, Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'

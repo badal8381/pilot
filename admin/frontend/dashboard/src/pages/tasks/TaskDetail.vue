@@ -51,24 +51,21 @@
 
     <TaskDebugDialog v-model="showDebug" :task-id="taskId" />
 
-    <div
-      class="gap-4 grid grid-cols-2"
-      :class="metadata.length > 3 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'"
-    >
-      <div v-for="item in metadata" :key="item.label" class="min-w-0">
-        <p class="text-ink-gray-5 text-sm">{{ item.label }}</p>
-        <RouterLink
-          v-if="item.route"
-          :to="item.route"
-          class="group flex items-center gap-1 mt-1 min-w-0 text-ink-gray-8 text-base no-underline"
-        >
-          <span class="truncate">{{ item.value }}</span>
-          <span
-            class="opacity-0 group-hover:opacity-100 size-3.5 text-ink-gray-5 transition-opacity shrink-0 lucide-arrow-up-right"
-          />
-        </RouterLink>
-        <p v-else class="mt-1 text-ink-gray-8 text-base truncate">{{ item.value }}</p>
-      </div>
+    <div class="flex justify-between items-center gap-4 px-2 min-w-0">
+      <RouterLink
+        v-if="site?.route"
+        :to="site.route"
+        class="group flex items-center gap-1 min-w-0 font-medium text-ink-gray-9 text-lg no-underline"
+      >
+        <span class="truncate">{{ site.label }}</span>
+        <span
+          class="opacity-0 group-hover:opacity-100 size-4 text-ink-gray-5 transition-opacity shrink-0 lucide-arrow-up-right"
+        />
+      </RouterLink>
+      <p v-else-if="site" class="min-w-0 font-medium text-ink-gray-9 text-lg truncate">
+        {{ site.label }}
+      </p>
+      <p class="text-ink-gray-8 text-base shrink-0">{{ metaLine }}</p>
     </div>
 
     <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
@@ -146,23 +143,20 @@ async function loadAiStatus() {
   }
 }
 
-const metadata = computed(() => {
-  const items = [
-    { label: 'Started', value: fmtDateTime(task.value.started_at) },
-    {
-      label: 'Finished',
-      value: task.value.finished_at ? fmtDateTime(task.value.finished_at) : '-',
-    },
-    { label: 'Duration', value: fmtDuration(task.value.duration_seconds) || '-' },
-  ]
-  if (task.value.status === 'queued' && task.value.queue_position) {
-    items.unshift({ label: 'Queue position', value: `#${task.value.queue_position}` })
-  }
-  const site = siteLabel(task.value)
-  if (site !== 'Server-level') {
-    items.unshift({ label: 'Site', value: site, route: siteRoute(task.value) })
-  }
-  return items
+const site = computed(() => {
+  const label = siteLabel(task.value)
+  if (label === 'Server-level') return null
+  return { label, route: siteRoute(task.value) }
+})
+
+const metaLine = computed(() => {
+  const parts = []
+  if (task.value.status === 'queued' && task.value.queue_position)
+    parts.push(`#${task.value.queue_position} in queue`)
+  if (task.value.started_at) parts.push(`Started ${fmtDateTime(task.value.started_at)}`)
+  const duration = fmtDuration(task.value.duration_seconds)
+  if (duration) parts.push(`took ${duration}`)
+  return parts.join(' · ')
 })
 
 function updateStatus(event) {
