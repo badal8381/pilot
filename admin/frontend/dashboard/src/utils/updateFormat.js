@@ -1,13 +1,8 @@
 import { fmtDateTime } from './taskFormat.js'
 
-export function kindLabel(kind) {
-  return kind === 'update' ? 'App update' : 'Site migration'
-}
-
 export function opTitle(op) {
   if (op?.kind === 'site_migrate') return `Migrate ${op.sites?.[0]?.name || 'site'}`
-  // An update stores no name; name it by what it moves. Up to two picked apps read fine
-  // by name — beyond that, a count. Never "all apps": the bench's app list changes.
+  // Operations store no name; two picked apps read fine by name, more become a count.
   const picked = op?.apps_filter || []
   if (picked.length && picked.length <= 2) return `Update ${picked.join(', ')}`
   const count = picked.length || op?.apps?.length || 0
@@ -36,13 +31,6 @@ export function pendingActionLabel(pending) {
   if (!pending) return ''
   const action = ACTION_LABEL[pending.role] || 'Action'
   return pending.status === 'running' ? `${action} in progress` : `${action} queued`
-}
-
-export function appsSummary(op) {
-  const names = (op.apps || []).map((a) => a.name)
-  if (!names.length) return ''
-  if (names.length <= 2) return names.join(', ')
-  return `${names.slice(0, 2).join(', ')} +${names.length - 2}`
 }
 
 const STATE_TONE = {

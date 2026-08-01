@@ -2,8 +2,6 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  appsSummary,
-  kindLabel,
   opTitle,
   patchSkipped,
   pendingActionLabel,
@@ -12,11 +10,6 @@ import {
   stateTone,
 } from './updateFormat.js'
 import { fmtDateTime } from './taskFormat.js'
-
-test('kindLabel formats update and site_migrate', () => {
-  assert.equal(kindLabel('update'), 'App update')
-  assert.equal(kindLabel('site_migrate'), 'Site migration')
-})
 
 test('opTitle names the operation', () => {
   assert.equal(opTitle({ kind: 'update', apps_filter: ['erpnext'] }), 'Update erpnext')
@@ -37,16 +30,6 @@ test('opTitle names the operation', () => {
     'Migrate s1.localhost',
   )
   assert.equal(opTitle({ kind: 'site_migrate', sites: [] }), 'Migrate site')
-})
-
-test('appsSummary formats app list', () => {
-  assert.equal(appsSummary({ apps: [] }), '')
-  assert.equal(appsSummary({ apps: [{ name: 'erpnext' }] }), 'erpnext')
-  assert.equal(appsSummary({ apps: [{ name: 'erpnext' }, { name: 'hrms' }] }), 'erpnext, hrms')
-  assert.equal(
-    appsSummary({ apps: [{ name: 'erpnext' }, { name: 'hrms' }, { name: 'crm' }] }),
-    'erpnext, hrms +1',
-  )
 })
 
 test('stateTone and stateLabel format operation states', () => {

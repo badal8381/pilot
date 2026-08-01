@@ -133,7 +133,6 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
           <Breadcrumbs :items="breadcrumbs" />
           <div id="header-badge" class="flex items-center" />
           <div id="header-actions" class="flex items-center gap-2 ml-auto">
-            <!-- Its own page already states the update's status twice over. -->
             <UpdateStatusButton v-if="route.name !== 'UpdateDetail'" />
           </div>
         </div>
