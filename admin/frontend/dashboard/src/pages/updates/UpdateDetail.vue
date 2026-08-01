@@ -106,11 +106,27 @@
             </template>
           </p>
 
-          <p v-if="pending" class="mt-4 flex items-center gap-2 text-p-sm text-ink-gray-7">
+          <!-- Links to the running action task so the user can watch it. -->
+          <button
+            v-if="pending"
+            type="button"
+            class="mt-4 flex items-center gap-2 text-p-sm text-ink-gray-7 hover:text-ink-gray-9"
+            @click="openTaskLog({ id: pending.task_id })"
+          >
             <Spinner size="md" class="text-ink-amber-7" />
             {{ pendingLabel }}
-          </p>
+            <span class="lucide-square-terminal size-4" />
+          </button>
+          <!-- Skip patch leads: it is the cheapest recovery, ahead of a restore. -->
           <div v-else class="mt-4 flex flex-wrap gap-2">
+            <Button
+              v-if="op.state === 'needs_attention' && op.diagnosis?.patch && !patchAlreadySkipped"
+              variant="subtle"
+              :loading="acting"
+              @click="confirmSkip = true"
+            >
+              Skip patch
+            </Button>
             <Button
               v-if="op.state === 'needs_attention'"
               variant="subtle"
@@ -126,15 +142,6 @@
               @click="confirmRestore = true"
             >
               Restore backup
-            </Button>
-            <Button
-              v-if="op.state === 'needs_attention' && op.diagnosis?.patch && !patchAlreadySkipped"
-              variant="subtle"
-              theme="red"
-              :loading="acting"
-              @click="confirmSkip = true"
-            >
-              Skip patch
             </Button>
           </div>
         </div>
@@ -229,36 +236,50 @@
           </summary>
 
           <div>
-            <div
-              v-for="site in op.sites"
-              :key="site.name"
-              class="flex items-center gap-3 px-2.5 py-2"
-            >
-              <RouterLink
-                :to="{ name: 'SiteDetail', params: { name: site.name } }"
-                class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base truncate no-underline hover:text-ink-gray-7"
+            <div v-for="site in op.sites" :key="site.name">
+              <div class="flex items-center gap-3 px-2.5 py-2">
+                <RouterLink
+                  :to="{ name: 'SiteDetail', params: { name: site.name } }"
+                  class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base truncate no-underline hover:text-ink-gray-7"
+                >
+                  {{ site.name }}
+                </RouterLink>
+                <span
+                  v-if="siteCaption(site)"
+                  class="flex items-center gap-1.5 text-sm shrink-0"
+                  :class="siteStatus(site).value === 'failed' ? 'text-ink-red-7' : 'text-ink-gray-5'"
+                >
+                  <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-7" />
+                  {{ siteCaption(site) }}
+                </span>
+                <Button
+                  v-if="siteJobs(site.name).length"
+                  variant="ghost"
+                  size="sm"
+                  tooltip="Site jobs"
+                  @click="toggleSiteJobs(site.name)"
+                >
+                  <span
+                    class="size-4 text-ink-gray-5 transition-transform lucide-chevron-down"
+                    :class="expandedSites.has(site.name) ? 'rotate-180' : ''"
+                  />
+                </Button>
+              </div>
+              <div
+                v-if="expandedSites.has(site.name)"
+                class="mb-1 ml-4 pl-3 border-l border-outline-gray-2"
               >
-                {{ site.name }}
-              </RouterLink>
-              <span
-                v-if="siteCaption(site)"
-                class="flex items-center gap-1.5 text-sm shrink-0"
-                :class="siteStatus(site).value === 'failed' ? 'text-ink-red-7' : 'text-ink-gray-5'"
-              >
-                <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-7" />
-                {{ siteCaption(site) }}
-              </span>
-              <Dropdown
-                v-if="siteLogOptions(site.name).length"
-                :options="siteLogOptions(site.name)"
-                placement="bottom-end"
-              >
-                <template #default="{ open }">
-                  <Button variant="ghost" size="sm" :active="open" tooltip="Site jobs">
-                    <span class="lucide-list-checks size-4" />
-                  </Button>
-                </template>
-              </Dropdown>
+                <button
+                  v-for="job in siteJobs(site.name)"
+                  :key="job.id"
+                  type="button"
+                  class="flex items-center gap-1.5 px-1 py-1.5 rounded w-full text-ink-gray-7 hover:text-ink-gray-9 text-sm text-left"
+                  @click="openTaskLog(job)"
+                >
+                  <span class="lucide-square-terminal size-4 shrink-0" />
+                  {{ job.label }}
+                </button>
+              </div>
             </div>
           </div>
         </details>
@@ -341,7 +362,6 @@ import {
   Badge,
   Button,
   Dialog,
-  Dropdown,
   ErrorMessage,
   Skeleton,
   Spinner,
@@ -421,14 +441,16 @@ const metaLine = computed(() => {
 
 const openTaskLog = (log) => router.push({ name: 'TaskDetail', params: { taskId: log.id } })
 
-function siteLogOptions(siteName) {
-  return (op.value?.task_logs || [])
-    .filter((log) => log.site === siteName)
-    .map((log) => ({
-      label: log.label,
-      icon: 'lucide-square-terminal',
-      onClick: () => openTaskLog(log),
-    }))
+const expandedSites = ref(new Set())
+
+function toggleSiteJobs(siteName) {
+  const expanded = new Set(expandedSites.value)
+  if (!expanded.delete(siteName)) expanded.add(siteName)
+  expandedSites.value = expanded
+}
+
+function siteJobs(siteName) {
+  return (op.value?.task_logs || []).filter((log) => log.site === siteName)
 }
 
 async function load() {
