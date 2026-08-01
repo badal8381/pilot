@@ -1,9 +1,3 @@
-// ANSI colours resolved through the ink ramps rather than fixed hex. The old
-// palette was Catppuccin Mocha - built for a dark terminal, so on the light
-// theme's near-white log surface the pastels had almost no contrast. These
-// tokens flip with the theme, so a red stack trace stays red and readable in
-// both. "Bright" maps to a stronger step, not a lighter one: in light mode
-// lighter would mean less legible.
 const ANSI_FG = {
   30: 'var(--ink-gray-5)',
   31: 'var(--ink-red-7)',
@@ -13,6 +7,7 @@ const ANSI_FG = {
   35: 'var(--ink-purple-7)',
   36: 'var(--ink-cyan-7)',
   37: 'var(--ink-gray-8)',
+  // Bright maps to a stronger ink step, not a lighter one.
   90: 'var(--ink-gray-5)',
   91: 'var(--ink-red-8)',
   92: 'var(--ink-green-8)',

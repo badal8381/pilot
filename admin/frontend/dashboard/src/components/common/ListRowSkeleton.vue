@@ -3,9 +3,7 @@
     <Skeleton class="rounded size-6 shrink-0" />
 
     <div class="flex-1 min-w-0">
-      <!-- The wrappers carry the real row's line-box heights (title 16px,
-           subtitle 20px) so swapping in the loaded row shifts nothing; the bars
-           inside stay thinner than the box, the way text does. -->
+      <!-- Wrappers carry the real row's line-box heights so the swap shifts nothing. -->
       <div class="flex items-center h-4">
         <Skeleton class="rounded h-3" :class="titleWidth" />
       </div>
@@ -21,9 +19,7 @@ import { computed } from 'vue'
 import { Skeleton } from 'frappe-ui'
 
 const props = defineProps({
-  // Cycles the bar widths so a stack of these does not read as a pattern of
-  // identical bars. Index-based rather than random, so it stays stable across
-  // re-renders.
+  // Index-based width cycle: varied bars, stable across re-renders.
   index: { type: Number, default: 0 },
 })
 

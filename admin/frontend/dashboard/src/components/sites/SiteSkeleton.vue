@@ -1,6 +1,5 @@
 <template>
-  <!-- The card's own classes, so the outline and spacing are already in place
-       before the sites land and nothing reflows around them. -->
+  <!-- The real card's classes, so nothing reflows when sites land. -->
   <div
     class="flex items-center gap-3 bg-surface-base p-2 sm:px-3 sm:py-2 border rounded-lg border-outline-gray-2"
   >
@@ -23,9 +22,7 @@ import { computed } from 'vue'
 import { Skeleton } from 'frappe-ui'
 
 const props = defineProps({
-  // Cycles the name width so a page of these does not read as a pattern of
-  // identical bars. Index-based rather than random, so it stays stable across
-  // re-renders.
+  // Index-based width cycle: varied bars, stable across re-renders.
   index: { type: Number, default: 0 },
 })
 

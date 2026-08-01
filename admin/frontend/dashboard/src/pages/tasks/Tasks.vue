@@ -1,10 +1,5 @@
 <template>
   <div class="mx-auto max-w-3xl">
-    <!-- The controls that act on the list live with the list: status, site and
-         refresh in one row, instead of a banner announcing the site filter
-         after the fact. -->
-    <!-- Stacked below sm: the five status tabs already fill a phone's width, so
-         the site filter and refresh take a second row rather than being clipped. -->
     <StickyToolbar class="flex sm:flex-row flex-col sm:items-center gap-2">
       <TabButtons
         class="shrink-0"
@@ -13,8 +8,6 @@
         :modelValue="statusFilter"
         @update:modelValue="onFilterChange"
       />
-      <!-- Same treatment as the Analytics filters on mobile: md size, labels
-           flush left, and the site filter absorbing the spare width. -->
       <div class="flex flex-1 items-center gap-2 min-w-0">
         <Dropdown :options="typeMenu" placement="bottom-start">
           <template #default="{ open }">
@@ -57,8 +50,6 @@
       </div>
     </StickyToolbar>
 
-    <!-- A row-shaped skeleton, not a centred spinner: the loading state should
-         occupy the shape of the list that replaces it so the page does not jump. -->
     <div v-if="loading" class="-mx-3 mt-4">
       <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
     </div>
@@ -66,10 +57,6 @@
       <ErrorMessage :message="error" />
     </div>
 
-    <!-- No card: the elevation token is the same colour as the page, so the box
-         was only ever contributing an inset. Hairlines though: the rows run the
-         full page width with the timing far right, and without one nothing ties
-         a title to its numbers. -->
     <div
       v-else-if="visibleTasks.length"
       class="flex flex-col -mx-3 mt-4 divide-y divide-outline-gray-1"
@@ -80,8 +67,6 @@
         :to="taskDetailRoute(task.task_id)"
         class="flex items-center gap-3 hover:bg-surface-gray-2 px-3 py-2.5 rounded no-underline transition-colors"
       >
-        <!-- Same tile as a step in the task tree, so a row and the steps it
-             opens onto read as the same kind of thing. -->
         <span
           class="place-items-center grid rounded size-6 shrink-0"
           :class="statusConfig(task).iconBg"
@@ -90,8 +75,7 @@
         </span>
 
         <div class="flex-1 min-w-0">
-          <!-- A block, not a span: overflow/text-overflow do not apply to inline
-               boxes, so `truncate` on a span is inert. -->
+          <!-- truncate is inert on inline boxes. -->
           <p class="font-medium text-ink-gray-9 text-base truncate">
             {{ commandLabel(task.command) }}
           </p>
@@ -103,8 +87,6 @@
           </p>
         </div>
 
-        <!-- Timing is metadata about the row, not part of its subtitle - out
-             here it forms a column you can read down. -->
         <span class="text-ink-gray-6 text-sm shrink-0">
           <template v-if="task.status !== 'queued' && fmtDuration(task.duration_seconds)"
             >took {{ fmtDuration(task.duration_seconds) }} · </template
@@ -163,8 +145,7 @@ const filterOptions = [
   { label: 'Succeeded', value: 'success' },
 ]
 
-// Both filters live in the URL, so a link from a site page still lands here
-// pre-filtered and a filtered view stays shareable.
+// Both filters live in the URL so filtered views are shareable.
 const siteFilter = computed(() => (typeof route.query.site === 'string' ? route.query.site : ''))
 const typeFilter = computed(() => (typeof route.query.type === 'string' ? route.query.type : ''))
 
@@ -176,11 +157,7 @@ const visibleTasks = computed(() =>
   ),
 )
 
-// Every type, always - the set of things a bench can do does not change with
-// what happens to be on screen, and a menu that reshuffles between loads is
-// harder to use than one that occasionally lands on an empty state. "Other" is
-// the exception: it is a fallback for commands this build has not learned, so
-// it only appears once something has actually fallen into it.
+// "Other" is a fallback for unknown commands; listed only once one exists.
 const typeMenu = computed(() => {
   const present = new Set(tasks.value.map(taskType))
   return [
@@ -191,9 +168,8 @@ const typeMenu = computed(() => {
   ].map(({ value, label }) => ({ label, onClick: () => onTypeChange(value) }))
 })
 
-// Sites are the opposite case: the list is whatever this bench happens to have,
-// so it is built from the loaded tasks. A site arriving via the URL is kept
-// even when nothing matches, so the trigger still names what is filtering.
+// Built from the loaded tasks; a site arriving via the URL is kept even
+// when nothing matches, so the trigger still names what is filtering.
 const siteMenu = computed(() => {
   const sites = new Set(tasks.value.map(siteLabel))
   if (siteFilter.value) sites.add(siteFilter.value)
@@ -203,14 +179,12 @@ const siteMenu = computed(() => {
   ].map(({ value, label }) => ({ label, onClick: () => onSiteChange(value) }))
 })
 
-// The trigger carries the current value, which is what makes a check mark in
-// the menu unnecessary - the same call MarketplaceFilters makes.
 const typeLabel = computed(
   () => TASK_TYPES.find(({ value }) => value === typeFilter.value)?.label || 'All types',
 )
 const siteLabelText = computed(() => siteFilter.value || 'All sites')
 
-// Patch rather than replace: changing one filter must not clear the other.
+// Patch, not replace: changing one filter must not clear the other.
 function setFilterQuery(patch) {
   const query = { ...route.query, ...patch }
   for (const key of Object.keys(query)) if (!query[key]) delete query[key]

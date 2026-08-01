@@ -17,14 +17,11 @@
       >
         {{ label }}
       </span>
-      <!-- A fixed-width right-aligned slot, so the durations read as a column
-           instead of ending wherever the label happens to leave them. -->
       <span class="w-16 text-ink-gray-5 text-sm text-right tabular-nums shrink-0">
         <template v-if="duration">{{ duration }}</template>
         <span v-else-if="status === 'running'" class="animate-pulse">running</span>
       </span>
-      <!-- Hidden, not omitted: a step with no output must still reserve the
-           chevron's space or it drags the duration beside it 28px to the right. -->
+      <!-- Hidden, not omitted: keeps the chevron's space so durations stay aligned. -->
       <span
         class="size-4 text-ink-gray-4 transition-transform shrink-0 lucide-chevron-down"
         :class="[hasOutput ? '' : 'invisible', expanded ? 'rotate-180' : '']"
@@ -52,9 +49,7 @@ const props = defineProps({
   streaming: { type: Boolean, default: false },
 })
 
-// Open while running, and open when it failed - a failed step is the reason
-// the page was opened, so it should not need a click to reveal the error.
-// Anything else settles closed, unless the user has toggled it by hand.
+// Open while running or failed; anything else settles closed unless toggled.
 function shouldExpand(status) {
   return status === 'running' || status === 'failed'
 }
@@ -75,8 +70,6 @@ function toggle() {
   expanded.value = !expanded.value
 }
 
-// Done is gray, not green: in a finished sequence almost every step is done, so
-// green here only makes the one that failed harder to find.
 const STATUS_ICON_BG = {
   done: 'bg-surface-gray-2 text-ink-gray-6',
   running: 'bg-surface-amber-2 text-ink-amber-8',

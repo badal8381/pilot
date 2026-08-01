@@ -1,15 +1,9 @@
 <template>
   <div class="mx-auto">
-    <!-- The breadcrumb already names the page. The scope selectors move to the
-         header bar on desktop; below sm there is no room next to the breadcrumb,
-         so `disabled` renders them here instead of duplicating the markup. -->
+    <!-- Teleports to the header bar on desktop; renders here below sm. -->
     <Teleport defer to="#header-actions" :disabled="isMobile">
-      <!-- On mobile these read as form controls, not toolbar buttons: md size,
-           label flush left with the chevron at the far edge, and the scope
-           filter taking whatever width the window filter leaves. -->
-      <!-- Sticky only when it renders in place. On desktop these ride into the
-           header, which is already pinned - and a sticky bar in there paints its
-           background over the header's own actions. -->
+      <!-- Sticky only in place: inside the pinned header it paints over the
+           header's own actions. -->
       <StickyToolbar
         :disabled="!isMobile"
         class="flex items-center gap-2 mb-4 sm:mb-0 w-full sm:w-auto"
@@ -80,9 +74,6 @@
         v-if="liveStats"
         class="bg-surface-white mb-6 border rounded-lg border-outline-gray-2 overflow-hidden"
       >
-        <!-- Reading and label share a line above the bar: the number belongs to
-             the label, and the bar is then free to be the full width of the
-             column instead of a rule between two texts. -->
         <div class="flex sm:flex-row flex-col divide-outline-gray-2 sm:divide-x">
           <div
             v-for="meter in liveMeters"
@@ -426,8 +417,6 @@ async function loadHistory(window) {
 
 const liveStats = computed(() => (!isHistorical.value ? stats.value : null))
 
-// One shape for the three meters - they were three copies of the same markup
-// differing only in label, reading and fill.
 const liveMeters = computed(() => {
   const s = liveStats.value
   if (!s) return []
@@ -701,8 +690,7 @@ onMounted(async () => {
   if (view.value === 'system') {
     if (isHistorical.value) loadHistory(activeWindow.value)
     else {
-      // Seed first: a bench with monitor history reaches a drawable chart in one
-      // shot and never enters the warm-up cadence.
+      // Seed first: monitor history reaches a drawable chart in one shot.
       await seedLiveHistory()
       await loadStats()
     }

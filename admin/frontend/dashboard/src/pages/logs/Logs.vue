@@ -1,18 +1,12 @@
 <template>
   <!-- 5rem = 3rem sticky header + the shell's 2rem vertical page padding -->
   <div class="flex flex-col h-[calc(100dvh-5rem)]">
-    <!-- No enclosing box: the divider between list and viewer is the only rule
-         needed to show they are master and detail. -->
-    <!-- No rules at all: the viewer's own rounded surface separates it from the
-         list, so spacing carries the structure. -->
     <div class="flex flex-1 sm:gap-4 min-h-0 overflow-hidden">
       <!-- Sidebar: log list -->
       <div
         class="md:flex flex-col w-full md:w-64 overflow-hidden shrink-0"
         :class="selectedFile ? 'hidden' : 'flex'"
       >
-        <!-- No bottom padding: the list below supplies that gap, so the first row
-             lands level with the viewer without the scroll box clipping it. -->
         <div class="sm:px-2 pt-2 shrink-0">
           <FormControl
             type="text"
@@ -37,8 +31,6 @@
             :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-2'"
             @click="selectedFile = log.filename"
           >
-            <!-- Timestamp rides the filename line, not the size line, so the two
-                 pieces of metadata are not competing for the same row. -->
             <div class="flex items-center gap-2">
               <span class="flex-1 font-medium text-ink-gray-8 text-base truncate">
                 {{ log.filename }}
@@ -75,9 +67,7 @@
         </div>
 
         <template v-else>
-          <!-- Toolbar. px-2, not px-4: the controls carry 8px of their own
-               padding, so this is what puts their text on the same line as the
-               log text below. -->
+          <!-- px-2: the controls carry 8px of their own padding. -->
           <div
             class="flex flex-col sm:flex-row sm:items-center gap-2 sm:px-2 py-2 shrink-0"
           >
@@ -91,14 +81,10 @@
                 tooltip="Back to logs"
                 @click="selectedFile = ''"
               />
-              <!-- text-lg (16px): this row is md:hidden, so it is the filename's
-                   only appearance and it is carrying the page's identity here. -->
               <span class="flex-1 min-w-0 font-medium text-ink-gray-8 text-lg truncate">
                 {{ selectedFile }}
               </span>
             </div>
-            <!-- Search takes the row's spare width: it is the control you
-                 actually type into, and it was the narrowest thing here. -->
             <FormControl
               type="text"
               v-model="search"
@@ -135,9 +121,6 @@
               />
             </div>
 
-            <!-- Line count travels with the actions rather than the search: it
-                 configures what gets fetched, the same as they do. Below sm the
-                 whole group drops to its own row under the search. -->
             <div class="flex items-center gap-2 shrink-0">
               <div class="w-28 sm:w-32 min-w-0 shrink-0">
                 <FormControl
@@ -306,14 +289,12 @@ const matchTotal = ref(0)
 let eventSource = null
 let lastTerm = ''
 
-// Above md (768px) both panes show side by side, matching the `md:` classes
-// that switch the list/viewer layout.
+// Matches the `md:` classes that switch the list/viewer layout.
 const isSinglePane = useIsMobile(768)
 
 const isSearching = computed(() => search.value.trim().length > 0)
 
-// ANSI processing only depends on the fetched content; re-run it once per
-// fetch/live-tail update, not on every search keystroke.
+// Re-run ANSI processing per fetch, not per search keystroke.
 const processedLines = computed(() => rawLines.value.map(processLine))
 
 const searchPattern = computed(() => {
@@ -321,8 +302,7 @@ const searchPattern = computed(() => {
   return term ? new RegExp(escapeRegExp(escapeHtml(term)), 'gi') : null
 })
 
-// Keep every line for context; search only highlights matches in place. Each
-// match is tagged with data-mi so we can jump between them.
+// Search highlights in place; data-mi tags matches for jumping.
 const visibleLines = computed(() => {
   const pattern = searchPattern.value
   return pattern
@@ -420,10 +400,8 @@ function stopLive() {
   }
 }
 
-// Wrap matches of a precompiled `pattern` in already-rendered HTML, touching
-// only text between tags so the ANSI colour <span>s stay intact. Line text is
-// HTML-escaped, so the pattern is built from an HTML-escaped term (see
-// searchPattern) before matching.
+// Wrap matches in rendered HTML, touching only text between tags so ANSI
+// <span>s stay intact; the pattern is built from an HTML-escaped term.
 function highlight(html, pattern) {
   return html.replace(
     /(<[^>]+>)|([^<]+)/g,
@@ -452,8 +430,7 @@ onMounted(async () => {
 onUnmounted(() => stopLive())
 </script>
 
-<!-- Not scoped: these <mark>s are injected via v-html, so they never receive
-     the scope attribute a scoped block would key off. -->
+<!-- Unscoped: the <mark>s are injected via v-html and never get the scope attribute. -->
 <style>
 .log-match {
   background: var(--surface-amber-3);

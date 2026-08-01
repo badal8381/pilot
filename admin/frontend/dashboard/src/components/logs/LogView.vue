@@ -1,13 +1,6 @@
 <template>
-  <!-- text-p-sm always, wrapping or not: a log body is stacked copy either way,
-       and text-sm's 1.15 line-height packed the lines solid.
-
-       gray-2, not gray-3: the solid ramp steps much harder in dark mode (0.136
-       in lightness off the page, against 0.054 in light), so the panel read as
-       a slab there and a tint here. Not the alpha token - over surface-base the
-       two ramps composite to the same byte, so it would only buy an
-       arbitrary-value class. Alpha earns its keep when a surface sits on a
-       tinted parent, which this one does not. -->
+  <!-- text-p-sm: a log body is stacked copy; text-sm's 1.15 line-height packs
+       it solid. gray-2: the solid ramp steps much harder in dark mode. -->
   <div
     ref="el"
     class="bg-surface-gray-2 overflow-auto font-mono text-ink-gray-8 text-p-sm"

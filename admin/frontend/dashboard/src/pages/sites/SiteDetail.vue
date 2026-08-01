@@ -1,6 +1,5 @@
 <template>
-  <!-- The hero's own frame, dot field and all, so the page does not lurch when
-       the site arrives - only the text inside it resolves. -->
+  <!-- The real hero's frame; only the text inside it resolves. -->
   <div v-if="loading" class="mx-auto w-full max-w-3xl">
     <div class="relative -mx-4 sm:-mx-6 -mt-6 px-4 sm:px-6 pt-6 pb-7 overflow-hidden">
       <div class="absolute inset-0 pointer-events-none dot-field" aria-hidden="true" />

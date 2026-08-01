@@ -6,9 +6,6 @@
     <ErrorMessage :message="error" />
   </div>
   <div v-else-if="task" class="mx-auto max-w-3xl">
-    <!-- The breadcrumb carries the task's name and links back to the list, so
-         the page needs neither a duplicate heading nor a back arrow - both of
-         which were pushing the content off the column's left edge. -->
     <Teleport defer to="#header-badge">
       <Badge
         :label="statusConfig(task).label"
@@ -18,9 +15,7 @@
       />
     </Teleport>
 
-    <!-- Rendered in place on mobile: that header is already carrying the
-         breadcrumb, the badge and the update button, and Debug/Cancel would
-         push it past the edge. -->
+    <!-- In place on mobile; the header row has no room for these there. -->
     <Teleport defer to="#header-actions" :disabled="isMobile">
       <div class="flex items-center gap-2" :class="isMobile ? 'mb-4' : ''">
         <Button
@@ -56,16 +51,12 @@
 
     <TaskDebugDialog v-model="showDebug" :task-id="taskId" />
 
-    <!-- Metadata: no card. The elevation token is the same colour as the page,
-         so all the box did was inset these labels out of line with the steps. -->
     <div
       class="gap-4 grid grid-cols-2"
       :class="metadata.length > 3 ? 'sm:grid-cols-4' : 'sm:grid-cols-3'"
     >
       <div v-for="item in metadata" :key="item.label" class="min-w-0">
         <p class="text-ink-gray-5 text-sm">{{ item.label }}</p>
-        <!-- An arrow on hover, not an underline: the arrow says where the link
-             goes, and it appears in reserved space so nothing reflows. -->
         <RouterLink
           v-if="item.route"
           :to="item.route"
@@ -80,8 +71,6 @@
       </div>
     </div>
 
-    <!-- Inside the column, beside the action that raises it: a cancel failure
-         rendered full-width was out of line exactly when it mattered most. -->
     <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
 
     <!-- Steps -->
@@ -132,8 +121,6 @@ const isMobile = useIsMobile()
 const { setBreadcrumbs } = useBreadcrumbs()
 const { task, rawLines, loading, error, load } = useTaskDetail(taskId)
 
-// "Task" told you nothing you did not already know. The trail carries the list
-// and the task's own name, which is why the page can drop its heading.
 setBreadcrumbs([{ label: 'Tasks', route: { name: 'Tasks' } }])
 watch(
   () => task.value?.command,

@@ -1,7 +1,5 @@
 <template>
   <div class="mx-auto max-w-3xl">
-    <!-- The breadcrumb already names the page and now carries the count, so the
-         heading was saying it twice. -->
     <!-- Bar -->
     <StickyToolbar class="flex items-center gap-2">
       <!-- Search text bar -->
@@ -33,10 +31,8 @@
       />
     </StickyToolbar>
 
-    <!-- Shaped like the grid it becomes, so the page settles instead of jumping
-         from a centred spinner to a grid of cards. Always the grid shape: `view`
-         is component state, so it is back to 'grid' on every mount - and a mount
-         is the only time this is loading. -->
+    <!-- Always the grid shape: `view` resets to 'grid' on every mount, and a
+         mount is the only time this is loading. -->
     <div v-if="loading" class="gap-3 grid grid-cols-1 md:grid-cols-2 mt-4">
       <SiteSkeleton v-for="index in 4" :key="index" :index="index - 1" />
     </div>
@@ -45,8 +41,7 @@
     </div>
 
     <div v-else-if="filteredSites.length" class="mt-4">
-      <!-- Grid view. A single result keeps the full width - one card in a
-           two-column grid reads as half a page of nothing. -->
+      <!-- A single result keeps the full width. -->
       <div
         v-if="view === 'grid'"
         class="gap-3 grid grid-cols-1"
@@ -117,8 +112,6 @@
         :options="{ selectable: false, showTooltip: false }"
       >
         <template #cell="{ column, row, item }">
-          <!-- No icon: it is the same globe on every row, so it identified
-               nothing and only pushed the names off the column edge. -->
           <div v-if="column.key === 'site'" class="flex items-center min-w-0">
             <RouterLink
               :to="{ name: 'SiteDetail', params: { name: row.site.name } }"
@@ -220,9 +213,6 @@ const viewOptions = [
   { value: 'list', icon: 'lucide-list' },
 ]
 
-// Active is gray: on a healthy bench nearly every site is active, so tinting
-// them spends the colour budget on "normal" and leaves nothing for the broken
-// one you are scanning for.
 const SITE_STATUS = {
   online: { label: 'Active', theme: 'gray' },
   broken: { label: 'Broken', theme: 'red' },
@@ -255,8 +245,6 @@ function appsLabel(site) {
   return count === 1 ? '1 app' : `${count} apps`
 }
 
-// An empty list means something different when a filter is on - saying "no sites
-// yet" there would be a lie.
 const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
 
 const filteredSites = computed(() => {
@@ -268,10 +256,8 @@ const filteredSites = computed(() => {
   })
 })
 
-// Declared after filteredSites: watchEffect runs immediately, so the computed
-// has to exist first. The count follows the filters, so the crumb reports what
-// is actually on screen - held back until the first load lands, since
-// "Sites (0)" while fetching reads as an empty bench.
+// After filteredSites: watchEffect runs immediately, so the computed must
+// exist first. Count is held back until the first load lands.
 watchEffect(() => {
   const counted = !loading.value || sites.value.length
   setBreadcrumbs([{ label: counted ? `Sites (${filteredSites.value.length})` : 'Sites' }])

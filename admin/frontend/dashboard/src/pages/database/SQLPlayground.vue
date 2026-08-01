@@ -1,6 +1,4 @@
 <template>
-  <!-- Only once a site is chosen: with nothing selected there is nothing else
-       on screen, so the picker belongs beside the sentence asking for it. -->
   <Teleport v-if="selectedSite" defer to="#header-actions">
     <FormControl
       type="select"
@@ -10,8 +8,6 @@
     />
   </Teleport>
 
-  <!-- Not an empty state - nothing is missing, the page is waiting on a choice
-       - so it borrows the icon tile without the dashed box. -->
   <div
     v-if="!selectedSite"
     class="flex flex-col justify-center items-center gap-4 text-center"
@@ -28,8 +24,7 @@
         Queries run against that site's database.
       </p>
     </div>
-    <!-- Wrapped, not classed: FormControl's own w-full beats a width utility
-         passed down to it. -->
+    <!-- Wrapped: FormControl's own w-full beats a width utility passed to it. -->
     <div class="w-56">
       <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
     </div>

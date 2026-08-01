@@ -1,7 +1,3 @@
-// Only the states worth interrupting for keep their hue. On a healthy bench
-// nearly every row is a success, so tinting those spends the colour budget on
-// "normal" and leaves nothing for the one failure you are scanning for - the
-// glyph carries the meaning either way.
 export const STATUS_CONFIG = {
   queued: {
     label: 'Queued',
@@ -73,9 +69,7 @@ const COMMAND_LABELS = {
   'fetch-all-app-updates': 'Fetch App Updates',
 }
 
-// Broad buckets over the 28 task commands - the raw command list is far too
-// long to filter by, and what you actually want to narrow to is an area of the
-// bench. Ordered: the dropdown renders them in this order.
+// Ordered: the dropdown renders in this order.
 export const TASK_TYPES = [
   {
     value: 'sites',
@@ -127,9 +121,7 @@ export const TASK_TYPES = [
     label: 'Server',
     commands: ['setup-nginx', 'setup-letsencrypt', 'restart-services'],
   },
-  // Nothing maps here directly - it catches commands added upstream that this
-  // table has not learned yet, so a new task type never silently disappears
-  // from every filter.
+  // Catch-all for commands this table has not learned.
   { value: 'other', label: 'Other', commands: [] },
 ]
 

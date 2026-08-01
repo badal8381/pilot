@@ -18,15 +18,11 @@
 </template>
 
 <script setup>
-// The one empty state for panels and pages: dashed box, icon tile, title,
-// optional description and action. Inline "no results" text inside tables and
-// charts stays as it is - a box that size reads as a broken layout.
 defineProps({
   icon: { type: String, default: '' },
   title: { type: String, required: true },
   description: { type: String, default: '' },
-  // Off when the state already sits inside a bordered panel, so the dashed box
-  // is not drawn inside another box.
+  // Off when the state already sits inside a bordered panel.
   bordered: { type: Boolean, default: true },
 })
 </script>

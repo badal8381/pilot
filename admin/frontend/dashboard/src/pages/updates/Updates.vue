@@ -1,7 +1,5 @@
 <template>
   <div class="mx-auto max-w-3xl">
-    <!-- The breadcrumb already names the page; the description moved to the
-         empty state, where it is actually needed. -->
     <Teleport defer to="#header-actions">
       <Button
         variant="subtle"
@@ -21,8 +19,6 @@
       <ErrorMessage :message="error" />
     </div>
 
-    <!-- Same row as the task list, so it gets the same treatment: hairlines to
-         tie each title to its timing across the full-width row. -->
     <div
       v-else-if="operations.length"
       class="flex flex-col -mx-3 divide-y divide-outline-gray-1"

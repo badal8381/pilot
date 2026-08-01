@@ -1,6 +1,4 @@
 <template>
-  <!-- One container, not one box per step: the steps are a single sequence, and
-       three separate outlines made them read as three unrelated things. -->
   <div
     v-if="hasSteps"
     class="flex flex-col gap-1 p-1.5 border border-outline-gray-2 rounded-lg min-w-0"

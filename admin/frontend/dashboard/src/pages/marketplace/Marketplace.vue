@@ -1,8 +1,5 @@
 <template>
   <div class="mx-auto max-w-3xl pb-40">
-    <!-- Header. Stacked below sm: side by side, the site selector left the
-         title about half the width, so a four-word heading broke over two
-         cramped lines and the description over three. -->
     <div
       class="flex sm:flex-row flex-col sm:justify-between sm:items-start gap-3 sm:gap-4 pt-4 pb-2"
     >
@@ -44,8 +41,7 @@
       @add-from-github="showAddFromGithub = true"
     />
 
-    <!-- Loading: mirrors one section of the real grid - heading, then app rows -
-         so the apps land in place instead of the page jumping. -->
+    <!-- Mirrors one section of the real grid so apps land in place. -->
     <section v-if="loading" class="mt-12">
       <div class="flex items-center h-4">
         <Skeleton class="rounded w-32 h-3.5" />

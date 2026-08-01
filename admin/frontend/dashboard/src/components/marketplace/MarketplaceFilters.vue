@@ -13,9 +13,7 @@
         </template>
       </FormControl>
 
-      <!-- The row is width-bound and only the dropdown grows: without that the
-           flex-1 resolved against the content and pushed Import app off a
-           phone's screen entirely. -->
+      <!-- Width-bound row: flex-1 must resolve against the row, not content. -->
       <div class="flex gap-2 w-full sm:w-auto">
         <div class="flex-1 sm:flex-none min-w-0">
           <Dropdown :options="worksWithMenu" placement="bottom-end">
