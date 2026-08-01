@@ -6,7 +6,12 @@ export function kindLabel(kind) {
 
 export function opTitle(op) {
   if (op?.kind === 'site_migrate') return `Migrate ${op.sites?.[0]?.name || 'site'}`
-  // Updates all look the same; the run time is what tells them apart.
+  // An update stores no name; name it by what it moves. Up to two picked apps read fine
+  // by name — beyond that, a count. Never "all apps": the bench's app list changes.
+  const picked = op?.apps_filter || []
+  if (picked.length && picked.length <= 2) return `Update ${picked.join(', ')}`
+  const count = picked.length || op?.apps?.length || 0
+  if (count) return `Update ${count} app${count === 1 ? '' : 's'}`
   return fmtDateTime(op?.started_at || op?.created_at)
 }
 
@@ -68,23 +73,6 @@ const STATE_LABEL = {
   reverting_apps: 'Reverting apps',
   reverting_sites: 'Recovering sites',
   restarting: 'Restarting services',
-}
-
-// Gray unless the state is worth interrupting for - see STATUS_CONFIG in
-// taskFormat.js, which this row shares its shape with.
-const STATE_ICON = {
-  green: { icon: 'lucide-check', iconBg: 'bg-surface-gray-2 text-ink-gray-6' },
-  red: { icon: 'lucide-x', iconBg: 'bg-surface-red-2 text-ink-red-8' },
-  blue: { icon: 'lucide-rotate-ccw', iconBg: 'bg-surface-gray-2 text-ink-gray-6' },
-  orange: {
-    icon: 'lucide-loader-circle animate-spin',
-    iconBg: 'bg-surface-amber-2 text-ink-amber-8',
-  },
-  gray: { icon: 'lucide-clock-3', iconBg: 'bg-surface-gray-2 text-ink-gray-6' },
-}
-
-export function stateIcon(state) {
-  return STATE_ICON[stateTone(state)]
 }
 
 export function stateTone(state) {

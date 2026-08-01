@@ -19,7 +19,16 @@ test('kindLabel formats update and site_migrate', () => {
 })
 
 test('opTitle names the operation', () => {
-  const op = { kind: 'update', started_at: '2026-07-21T12:15:37+00:00' }
+  assert.equal(opTitle({ kind: 'update', apps_filter: ['erpnext'] }), 'Update erpnext')
+  assert.equal(opTitle({ kind: 'update', apps_filter: ['erpnext', 'hrms'] }), 'Update erpnext, hrms')
+  assert.equal(opTitle({ kind: 'update', apps_filter: ['a', 'b', 'c'] }), 'Update 3 apps')
+  // No filter means the whole bench; a count stays stable as apps come and go.
+  assert.equal(
+    opTitle({ kind: 'update', apps: [{ name: 'frappe' }, { name: 'central' }] }),
+    'Update 2 apps',
+  )
+  // Nothing resolved yet: fall back to the run time, the only thing that tells runs apart.
+  const op = { kind: 'update', apps: [], started_at: '2026-07-21T12:15:37+00:00' }
   assert.equal(opTitle(op), fmtDateTime(op.started_at))
   const queued = { kind: 'update', created_at: '2026-07-21T13:00:00+00:00' }
   assert.equal(opTitle(queued), fmtDateTime(queued.created_at))

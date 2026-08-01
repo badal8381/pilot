@@ -27,23 +27,26 @@
         v-for="op in operations"
         :key="op.id"
         :to="{ name: 'UpdateDetail', params: { operationId: op.id } }"
-        class="flex items-center gap-3 hover:bg-surface-gray-1 px-3 py-2.5 rounded no-underline transition-colors"
+        class="items-center gap-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] hover:bg-surface-gray-1 px-3 py-2.5 rounded no-underline transition-colors"
       >
-        <span
-          class="place-items-center grid rounded size-6 shrink-0"
-          :class="rowIcon(op).iconBg"
-        >
-          <span class="size-3.5" :class="rowIcon(op).icon" />
-        </span>
-
-        <div class="flex-1 min-w-0">
+        <div class="min-w-0">
           <!-- A block, not a span: `truncate` is inert on an inline box. -->
           <p class="font-medium text-ink-gray-9 text-base truncate">{{ opTitle(op) }}</p>
           <p class="mt-0.5 text-ink-gray-6 text-p-sm truncate">{{ subtitle(op) }}</p>
         </div>
 
-        <span class="text-ink-gray-6 text-sm shrink-0">{{ timing(op) }}</span>
-        <span class="lucide-chevron-right size-4 text-ink-gray-6 shrink-0" />
+        <!-- Completed is the norm; only exceptional states get a badge. -->
+        <Badge
+          v-if="badge(op)"
+          :label="badge(op).label"
+          :theme="badge(op).theme"
+          variant="subtle"
+        />
+        <span v-else />
+        <div class="flex justify-end items-center gap-3 min-w-0">
+          <span class="text-ink-gray-6 text-sm truncate">{{ timing(op) }}</span>
+          <span class="lucide-chevron-right size-4 text-ink-gray-6 shrink-0" />
+        </div>
       </RouterLink>
     </div>
 
@@ -58,30 +61,31 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { Button, ErrorMessage } from 'frappe-ui'
+import { Badge, Button, ErrorMessage } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
 import { updatesApi } from '@/api/updates'
-import { appsSummary, opTitle, pendingActionLabel, stateIcon, stateLabel } from '@/utils/updateFormat'
-import { fmtDuration, relativeTime } from '@/utils/taskFormat'
+import { opTitle, pendingActionLabel, stateLabel, stateTone } from '@/utils/updateFormat'
+import { fmtDateTime, fmtDuration, relativeTime } from '@/utils/taskFormat'
 
 const operations = ref([])
 const loading = ref(false)
 const error = ref('')
 
-const rowIcon = (op) => stateIcon(op.pending_action ? 'retrying' : op.state)
-
-function subtitle(op) {
-  const count = op.sites?.length || 0
-  const parts = [
-    op.pending_action ? pendingActionLabel(op.pending_action) : stateLabel(op.state),
-    `${count} site${count === 1 ? '' : 's'}`,
-    appsSummary(op),
-  ]
-  return parts.filter(Boolean).join(' · ')
+function badge(op) {
+  if (op.pending_action) return { label: pendingActionLabel(op.pending_action), theme: 'amber' }
+  if (op.state === 'completed') return null
+  const tone = stateTone(op.state)
+  return { label: stateLabel(op.state), theme: tone === 'orange' ? 'amber' : tone }
 }
 
-// Duration and age live together on the right, the way the task rows read them.
+// Two runs of the same apps share a title, so the run time stays on the row to tell them apart.
+function subtitle(op) {
+  const sites = op.sites || []
+  const where = sites.length === 1 ? sites[0].name : `${sites.length} sites`
+  return [where, fmtDateTime(op.started_at || op.created_at)].join(' · ')
+}
+
 function timing(op) {
   const parts = []
   if (op.finished_at && op.started_at) {
