@@ -1,7 +1,11 @@
 <template>
-  <Dialog v-model="open" bare size="4xl">
+  <Dialog v-model="open" bare size="5xl">
     <template #default="{ close }">
-      <div class="relative flex sm:h-[70vh] max-h-[85vh]">
+      <!-- Full viewport height, less the chrome the Dialog puts around the panel
+           itself: the overlay's scroll wrapper adds py-4 and DialogContent adds
+           my-8, so a literal 100vh overflows by exactly 96px and makes the
+           overlay scroll with the bottom corners off-screen. -->
+      <div class="relative flex sm:h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)]">
         <!-- Sizing, padding and tokens taken from frappe-ui's own SettingsDialog
              (SettingsSidebar: bg-surface-sidebar, p-2, 220px, outline-gray-1).
              surface-sidebar is theme-aware by design - a light gray against the
@@ -59,7 +63,7 @@
                 v-if="subSection || sessionJti || activeSection"
                 :class="{ 'sm:hidden': !subSection && !sessionJti }"
                 class="-ml-2"
-                variant="subtle"
+                variant="ghost"
                 icon="lucide-arrow-left"
                 label="Back"
                 tooltip="Back"
