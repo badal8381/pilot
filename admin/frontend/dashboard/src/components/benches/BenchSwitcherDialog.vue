@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Dialog, Button, Badge, ListView, ErrorMessage } from 'frappe-ui'
+import { Badge, Button, Dialog, ErrorMessage, ListView, Spinner } from 'frappe-ui'
 import { useBenches } from '@/composables/benches/useBenches'
 import ActionMenu from '@/components/common/ActionMenu.vue'
 import LucidePlus from '~icons/lucide/plus'
@@ -9,7 +9,6 @@ import LucideExternalLink from '~icons/lucide/external-link'
 import LucidePlay from '~icons/lucide/play'
 import LucideSquare from '~icons/lucide/square'
 import LucideRotateCw from '~icons/lucide/rotate-cw'
-import LucideLoader2 from '~icons/lucide/loader-2'
 import LucideTrash2 from '~icons/lucide/trash-2'
 
 const props = defineProps({ modelValue: Boolean })
@@ -239,7 +238,7 @@ watch(show, (open) => {
                 v-if="controlLoading === row.name"
                 class="flex justify-center items-center w-7 h-7"
               >
-                <LucideLoader2 class="w-4 h-4 text-ink-gray-5 animate-spin" />
+                <Spinner size="md" class="text-ink-gray-5" />
               </span>
               <ActionMenu
                 v-else-if="menuOptions(row.bench).length"

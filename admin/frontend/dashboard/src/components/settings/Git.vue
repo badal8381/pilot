@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <Alert v-if="!connected" theme="blue" title="Connect GitHub" :dismissible="false">
@@ -62,7 +62,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, toast } from 'frappe-ui'
+import { Alert, Button, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { gitApi } from '@/api/git'
 

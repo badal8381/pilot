@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <div>
@@ -38,6 +38,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { Spinner } from 'frappe-ui'
 import { monitorApi } from '@/api/monitor'
 import { formatBytes } from '@/utils/format'
 

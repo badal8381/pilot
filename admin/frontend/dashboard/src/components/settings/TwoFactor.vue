@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-5">
     <div class="flex justify-between items-center">
@@ -191,7 +191,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, ListView, ListRowItem, toast } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
 import QrcodeVue from 'qrcode.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { twoFactorApi } from '@/api/twoFactor'

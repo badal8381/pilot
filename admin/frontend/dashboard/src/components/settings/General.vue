@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else-if="openSection">
     <component :is="openSection.component" />
@@ -40,7 +40,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { Button, ErrorMessage, Switch, toast } from 'frappe-ui'
+import { Button, ErrorMessage, Spinner, Switch, toast } from 'frappe-ui'
 import { settingsApi } from '@/api/settings'
 import { useSession } from '@/composables/auth/useSession'
 import SettingsRow from '@/components/settings/SettingsRow.vue'

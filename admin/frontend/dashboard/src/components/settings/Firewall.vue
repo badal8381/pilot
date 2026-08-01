@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <Alert v-if="!production" title="Not enforced yet" theme="yellow" :dismissible="false">
@@ -89,7 +89,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Button, ErrorMessage, Select, Switch, TextInput, toast, Alert } from 'frappe-ui'
+import { Alert, Button, ErrorMessage, Select, Spinner, Switch, TextInput, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 

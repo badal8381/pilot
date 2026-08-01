@@ -1,10 +1,10 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else-if="jti">
     <div v-if="activityLoading" class="flex justify-center items-center h-40">
-      <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+      <Spinner size="lg" class="text-ink-gray-4" />
     </div>
     <div
       v-else-if="!activity.length"
@@ -98,7 +98,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, Dropdown, ListView, ListRowItem, toast } from 'frappe-ui'
+import { Button, Dialog, Dropdown, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
 import { sessionApi } from '@/api/session'
 import { auditApi } from '@/api/audit'
 import { commandLabel, fmtDateTime, relativeTime } from '@/utils/taskFormat'

@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <Alert v-if="!connected" theme="blue" title="Why connect object storage?" :dismissible="false">
@@ -63,7 +63,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, Select, toast } from 'frappe-ui'
+import { Alert, Button, ErrorMessage, FormControl, Select, Spinner, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 
