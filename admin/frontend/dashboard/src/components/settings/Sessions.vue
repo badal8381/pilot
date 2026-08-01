@@ -7,6 +7,7 @@
       <Spinner size="lg" class="text-ink-gray-4" />
     </div>
     <EmptyState
+      compact
       v-else-if="!activity.length"
       icon="lucide-history"
       title="No activity recorded"
@@ -43,6 +44,7 @@
     </div>
     <template v-else>
       <EmptyState
+        compact
         v-if="!activeTokens.length"
         icon="lucide-key-round"
         title="No active sessions"

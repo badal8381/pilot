@@ -46,6 +46,7 @@
       </div>
 
       <EmptyState
+        compact
         v-if="!rules.length"
         icon="lucide-shield"
         title="No firewall rules"

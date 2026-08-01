@@ -28,6 +28,7 @@
     </div>
 
     <EmptyState
+      compact
       v-if="!devices.length"
       icon="lucide-shield"
       title="No devices enrolled"

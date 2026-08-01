@@ -13,6 +13,7 @@
       {{ loadError }}
     </div>
     <EmptyState
+      compact
       v-else-if="!rows.length"
       icon="lucide-key-round"
       title="No SSH keys"

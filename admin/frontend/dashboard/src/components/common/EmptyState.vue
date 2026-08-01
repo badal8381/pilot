@@ -1,13 +1,17 @@
 <template>
   <div
-    class="flex flex-col items-center gap-4 px-6 py-12 text-center"
-    :class="bordered ? 'border border-outline-gray-2 border-dashed rounded-xl' : ''"
+    class="flex flex-col items-center px-6 text-center"
+    :class="[
+      bordered ? 'border border-outline-gray-2 border-dashed rounded-xl' : '',
+      compact ? 'gap-3 py-6' : 'gap-4 py-12',
+    ]"
   >
     <span
       v-if="icon"
-      class="place-items-center grid bg-surface-gray-2 rounded-lg size-10 text-ink-gray-5 shrink-0"
+      class="place-items-center grid bg-surface-gray-2 text-ink-gray-5 shrink-0"
+      :class="compact ? 'rounded-md size-8' : 'rounded-lg size-10'"
     >
-      <span class="size-5" :class="icon" />
+      <span :class="[compact ? 'size-4' : 'size-5', icon]" />
     </span>
     <div>
       <p class="font-medium text-ink-gray-7 text-base">{{ title }}</p>
@@ -24,5 +28,8 @@ defineProps({
   description: { type: String, default: '' },
   // Off when the state already sits inside a bordered panel.
   bordered: { type: Boolean, default: true },
+  // For empty states that sit among other content rather than filling a page:
+  // full height there makes the absence the tallest thing in view.
+  compact: { type: Boolean, default: false },
 })
 </script>
