@@ -45,8 +45,13 @@
     </div>
 
     <div v-else-if="filteredSites.length" class="mt-4">
-      <!-- Grid view -->
-      <div v-if="view === 'grid'" class="gap-3 grid grid-cols-1 md:grid-cols-2">
+      <!-- Grid view. A single result keeps the full width - one card in a
+           two-column grid reads as half a page of nothing. -->
+      <div
+        v-if="view === 'grid'"
+        class="gap-3 grid grid-cols-1"
+        :class="filteredSites.length > 1 ? 'md:grid-cols-2' : ''"
+      >
         <!-- Site Card -->
         <div
           v-for="site in filteredSites"
