@@ -66,10 +66,14 @@
       <ErrorMessage :message="error" />
     </div>
 
-    <!-- No card and no hairlines: the elevation token is the same colour as the
-         page, so the box was only ever contributing an inset. Space and a hover
-         state carry the grouping instead. -->
-    <div v-else-if="visibleTasks.length" class="flex flex-col gap-1 -mx-3 mt-4">
+    <!-- No card: the elevation token is the same colour as the page, so the box
+         was only ever contributing an inset. Hairlines though: the rows run the
+         full page width with the timing far right, and without one nothing ties
+         a title to its numbers. -->
+    <div
+      v-else-if="visibleTasks.length"
+      class="flex flex-col -mx-3 mt-4 divide-y divide-outline-gray-1"
+    >
       <RouterLink
         v-for="task in visibleTasks"
         :key="task.task_id"

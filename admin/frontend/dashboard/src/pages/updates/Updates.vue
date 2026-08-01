@@ -21,9 +21,12 @@
       <ErrorMessage :message="error" />
     </div>
 
-    <!-- Same row as the task list, so it gets the same treatment: no hairlines,
-         space and hover instead. -->
-    <div v-else-if="operations.length" class="flex flex-col gap-1 -mx-3">
+    <!-- Same row as the task list, so it gets the same treatment: hairlines to
+         tie each title to its timing across the full-width row. -->
+    <div
+      v-else-if="operations.length"
+      class="flex flex-col -mx-3 divide-y divide-outline-gray-1"
+    >
       <RouterLink
         v-for="op in operations"
         :key="op.id"
