@@ -11,6 +11,7 @@ from pilot.exceptions import BenchError
 from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
 
 _PROBE_CONNECT_TIMEOUT = 5
+_TRUE_SINGLES_VALUES = frozenset({"1", "true"})
 
 PROTECTED_CONFIG_KEYS = frozenset(
     {
@@ -82,7 +83,9 @@ def is_setup_complete(bench_root: Path, site_name: str) -> bool | None:
     )
     if rows is None:
         return None
-    return bool(rows) and str(rows[0][0]).strip() == "1"
+    if not rows:
+        return False
+    return str(rows[0][0]).strip().lower() in _TRUE_SINGLES_VALUES
 
 
 def _query_site_database(

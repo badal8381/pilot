@@ -77,6 +77,23 @@ def test_is_setup_complete_true_on_postgres(monkeypatch: pytest.MonkeyPatch) -> 
     assert "`" not in executed[0]
 
 
+@pytest.mark.parametrize("stored", ["true", "TRUE", " true "])
+def test_is_setup_complete_accepts_postgres_boolean_spelling(
+    monkeypatch: pytest.MonkeyPatch, stored: str
+) -> None:
+    """set_single_value writes a Python bool: psycopg2 renders it 'true', mysqlclient '1'."""
+    _stub_database(monkeypatch, _postgres(), [[stored]])
+
+    assert site_config.is_setup_complete(_BENCH_ROOT, "postgres.localhost") is True
+
+
+@pytest.mark.parametrize("stored", ["0", "false", "", "t", "yes"])
+def test_is_setup_complete_rejects_other_values(monkeypatch: pytest.MonkeyPatch, stored: str) -> None:
+    _stub_database(monkeypatch, _postgres(), [[stored]])
+
+    assert site_config.is_setup_complete(_BENCH_ROOT, "postgres.localhost") is False
+
+
 def test_is_setup_complete_false_when_setting_absent(monkeypatch: pytest.MonkeyPatch) -> None:
     _stub_database(monkeypatch, _postgres(), [])
 
