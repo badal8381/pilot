@@ -103,9 +103,11 @@
         </div>
       </details>
 
+      <!-- Server failures only - a missing required field disables the button
+           instead of narrating itself down here. -->
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="saving" :disabled="Boolean(apiBaseError)" @click="save">
+        <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
           {{ connected ? 'Update' : 'Connect' }}
         </Button>
       </div>
@@ -158,6 +160,16 @@ const apiBaseError = computed(() => {
   if (!provider.value || !needsApiBase.value || hasApiBase.value) return ''
   return `${providerLabel.value} needs the endpoint of your server, e.g. http://your-host:8000/v1`
 })
+
+// Every required field, so Connect stays dead until the form could succeed -
+// what used to be four "X is required." messages after the click.
+const canSave = computed(
+  () =>
+    Boolean(provider.value) &&
+    Boolean(model.value.trim()) &&
+    hasApiKey.value &&
+    (!needsApiBase.value || hasApiBase.value),
+)
 
 const modelPlaceholder = computed(() => {
   if (!provider.value) return 'Select a provider first'
@@ -228,22 +240,6 @@ async function load() {
 }
 
 async function save() {
-  if (!provider.value) {
-    error.value = 'Provider is required.'
-    return
-  }
-  if (!model.value.trim()) {
-    error.value = 'Model is required.'
-    return
-  }
-  if (needsApiBase.value && !apiBase.value.trim()) {
-    error.value = 'API base URL is required for a self-hosted provider.'
-    return
-  }
-  if (!apiKeySet.value && !apiKey.value.trim()) {
-    error.value = 'API key is required.'
-    return
-  }
   saving.value = true
   error.value = ''
   try {

@@ -52,7 +52,9 @@
       />
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="connecting" @click="verifyAndConnect">
+        <!-- The token is the one required field - the username can be inferred
+             from it. Enter on the field still hits the in-function guard. -->
+        <Button variant="solid" :loading="connecting" :disabled="!token.trim()" @click="verifyAndConnect">
           {{ connected ? 'Update Token' : 'Verify & Connect' }}
         </Button>
       </div>

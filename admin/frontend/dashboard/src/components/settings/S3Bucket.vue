@@ -51,9 +51,11 @@
           class="w-full"
         />
       </div>
+      <!-- Server failures only - a missing required field disables the button
+           instead of narrating itself down here. -->
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="saving" @click="save">
+        <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
           {{ connected ? 'Update' : 'Connect' }}
         </Button>
       </div>
@@ -99,6 +101,16 @@ watch(provider, () => {
   }
 })
 
+// Every required field, so Connect stays dead until the form could succeed.
+const canSave = computed(
+  () =>
+    Boolean(accessKey.value.trim()) &&
+    Boolean(bucket.value.trim()) &&
+    Boolean(provider.value) &&
+    Boolean(region.value) &&
+    (secretKeySet.value || Boolean(secretKey.value.trim())),
+)
+
 async function load() {
   loading.value = true
   try {
@@ -118,14 +130,6 @@ async function load() {
 }
 
 async function save() {
-  if (!accessKey.value.trim() || !bucket.value.trim() || !provider.value || !region.value) {
-    error.value = 'Access key, bucket, provider, and region are required.'
-    return
-  }
-  if (!secretKeySet.value && !secretKey.value.trim()) {
-    error.value = 'Secret key is required.'
-    return
-  }
   saving.value = true
   error.value = ''
   try {

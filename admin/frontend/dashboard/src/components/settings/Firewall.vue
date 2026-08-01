@@ -58,34 +58,42 @@
       />
 
       <div v-else class="space-y-3">
-        <div v-for="(rule, index) in rules" :key="index" class="flex items-end gap-2">
-          <div class="space-y-1.5 w-28 shrink-0">
-            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Action</p>
-            <Select v-model="rule.action" :options="ACTION_OPTIONS" class="w-full" />
+        <div v-for="(rule, index) in rules" :key="index">
+          <div class="flex items-end gap-2">
+            <div class="space-y-1.5 w-28 shrink-0">
+              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Action</p>
+              <Select v-model="rule.action" :options="ACTION_OPTIONS" class="w-full" />
+            </div>
+            <div class="flex-1 space-y-1.5">
+              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">IP / CIDR</p>
+              <TextInput v-model="rule.ip" placeholder="203.0.113.4 or 10.0.0.0/8" class="w-full" />
+            </div>
+            <div class="flex-1 space-y-1.5">
+              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Note</p>
+              <TextInput v-model="rule.description" placeholder="optional" class="w-full" />
+            </div>
+            <Button
+              variant="subtle"
+              icon="lucide-x"
+              label="Remove rule"
+              tooltip="Remove rule"
+              @click="removeRule(index)"
+            />
           </div>
-          <div class="flex-1 space-y-1.5">
-            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">IP / CIDR</p>
-            <TextInput v-model="rule.ip" placeholder="203.0.113.4 or 10.0.0.0/8" class="w-full" />
-          </div>
-          <div class="flex-1 space-y-1.5">
-            <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Note</p>
-            <TextInput v-model="rule.description" placeholder="optional" class="w-full" />
-          </div>
-          <Button
-            variant="subtle"
-            icon="lucide-x"
-            label="Remove rule"
-            tooltip="Remove rule"
-            @click="removeRule(index)"
-          />
+          <!-- Under the row it belongs to, not pooled at the bottom of the page. -->
+          <p v-if="ipError(rule)" class="mt-1.5 text-ink-red-6 text-p-sm">{{ ipError(rule) }}</p>
         </div>
       </div>
     </div>
 
+    <!-- Cross-field problems (lockout) and server failures; single-field
+         problems sit at their row and hold the button instead. -->
     <ErrorMessage v-if="error" :message="error" />
 
     <div v-if="rules.length" class="flex justify-end">
-      <Button variant="solid" :loading="saving" @click="save">Save changes</Button>
+      <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
+        Save changes
+      </Button>
     </div>
   </div>
 </template>
@@ -128,13 +136,19 @@ function removeRule(index) {
   rules.value.splice(index, 1)
 }
 
+// A wrong fill shows at its own row; empty or invalid IPs just hold the button.
+function ipError(rule) {
+  const ip = rule.ip.trim()
+  if (!ip || IP_PATTERN.test(ip)) return ''
+  return `'${rule.ip}' is not a valid IP or CIDR.`
+}
+const canSave = computed(() =>
+  rules.value.every((r) => r.ip.trim() && IP_PATTERN.test(r.ip.trim())),
+)
+
 function validate() {
-  for (const [index, rule] of rules.value.entries()) {
-    if (!rule.ip.trim()) return `Rule ${index + 1} needs an IP address or range.`
-    if (!IP_PATTERN.test(rule.ip.trim()))
-      return `Rule ${index + 1}: '${rule.ip}' is not a valid IP or CIDR.`
-  }
-  // Block-by-default with no Allow rule blocks everyone, including you.
+  // Block-by-default with no Allow rule blocks everyone, including you. Kept as
+  // a save-time message: it is a property of the whole ruleset, not one input.
   if (
     enabled.value &&
     defaultPolicy.value === 'deny' &&

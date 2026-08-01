@@ -55,7 +55,9 @@
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-        <Button variant="solid" :loading="adding" @click="add">Add key</Button>
+        <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
+          Add key
+        </Button>
       </div>
     </template>
   </Dialog>
@@ -130,10 +132,6 @@ function openAdd() {
 }
 
 async function add() {
-  if (!newKey.value.trim()) {
-    error.value = 'Paste a public key to add.'
-    return
-  }
   adding.value = true
   error.value = ''
   try {
