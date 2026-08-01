@@ -2,9 +2,7 @@
   <Dialog v-model="open" title="Import app from GitHub" size="md">
     <template #default>
       <div class="space-y-4">
-        <!-- flex-1 stretches each tab's wrapper; the inner span carries the pill
-             background and has no data-slot of its own, so it needs w-full too or
-             the highlight stays content-width inside a stretched slot. -->
+        <!-- The pill span has no data-slot; without w-full the highlight stays content-width. -->
         <TabButtons
           v-model="tab"
           :options="tabOptions"
@@ -38,8 +36,6 @@
 
           <template v-else>
             <p v-if="!gitStatus" class="text-ink-gray-5 text-sm">Loading…</p>
-            <!-- No description: the Connect GitHub button below is the fix, so the
-                 alert only has to name the state. -->
             <Alert
               v-else-if="!gitConnected"
               theme="yellow"
@@ -80,9 +76,7 @@
             </template>
           </template>
 
-          <!-- All three states share one slot inside the field wrapper, so progress,
-               success and error land in the same place as a hint under the input
-               instead of a space-y-4 sibling 16px below it. -->
+          <!-- Progress, success and error share one hint slot under the input. -->
           <ErrorMessage v-if="error" :message="error" class="mt-1.5" />
           <p v-else-if="fetching" class="mt-1.5 text-ink-gray-5 text-sm">Loading branches…</p>
           <p v-else-if="resolving" class="mt-1.5 text-ink-gray-5 text-sm">Checking repository…</p>
@@ -129,15 +123,13 @@ import { gitApi } from '@/api/git'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
 const props = defineProps({
-  // Set when the marketplace is scoped to one site: the app is installed on it
-  // right after it is fetched, rather than only added to the bench.
+  // When set, the fetched app is also installed on this site.
   siteName: { type: String, default: '' },
 })
 const open = defineModel('open')
 const router = useRouter()
 
 const tab = ref('public')
-// flex-1 per option so the subtle rail divides the dialog width evenly.
 const tabOptions = [
   { label: 'Public repository', value: 'public', class: 'flex-1' },
   { label: 'Your GitHub account', value: 'private', class: 'flex-1' },
@@ -162,8 +154,6 @@ const repoOptions = computed(() =>
 const adding = ref(false)
 const error = ref('')
 
-// Nothing can be imported from an unconnected account, so the primary action
-// becomes the fix instead of a disabled button.
 const needsGithubConnection = computed(
   () => tab.value === 'private' && Boolean(gitStatus.value) && !gitConnected.value,
 )
@@ -183,20 +173,17 @@ watch(open, (isOpen) => {
   if (isOpen) reset()
 })
 watch(tab, reset)
-// The field accepts "github.com/frappe/crm" as well as a full URL; every call to
-// the API goes through normalizedRepo so the scheme is always present.
+// Accepts scheme-less URLs; every API call goes through normalizedRepo.
 const normalizedRepo = computed(() => {
   const url = repo.value.trim().replace(/\/+$/, '')
   if (!url) return ''
   return /^https?:\/\//i.test(url) ? url : `https://${url}`
 })
 
-// host/owner/repo, with or without a scheme — enough to know the user has
-// finished typing something fetchable.
+// host/owner/repo, with or without a scheme.
 const REPO_PATTERN = /^(https?:\/\/)?[^/\s]+\.[^/\s]+\/[^/\s]+\/[^/\s]+$/
 
-// Auto-fetches once the URL looks complete, matching the private tab instead of
-// making the user press a button.
+// Auto-fetch once the URL looks complete.
 let repoDebounce
 watch(repo, (value) => {
   fetched.value = false

@@ -9,8 +9,6 @@
           Your bench is up to date.
         </p>
         <template v-else>
-          <!-- Counter and list are one group, so they sit closer than the dialog's
-               gap-4 between blocks. -->
           <div class="flex flex-col gap-2">
             <div class="flex items-center justify-between">
               <span class="text-ink-gray-5 text-sm">
@@ -20,10 +18,8 @@
                 {{ selected.size === appNames.length ? 'Unselect all' : 'Select all' }}
               </Button>
             </div>
-            <!-- The row is the control (role=checkbox + aria-checked), so the inner
-                 Checkbox is inert decoration: tabindex/aria-hidden reach the real
-                 <input> via Checkbox's attr passthrough, so it is neither tabbable
-                 nor announced twice. Clicking the name still toggles. -->
+            <!-- The row is the checkbox; the inner Checkbox is inert decoration
+                 (tabindex/aria-hidden reach its <input> via attr passthrough). -->
             <div class="flex flex-col gap-3 max-h-80 overflow-y-auto">
               <button
                 v-for="name in appNames"

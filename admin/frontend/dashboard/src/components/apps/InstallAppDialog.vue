@@ -8,18 +8,11 @@
     :disabled="!selection || targetInstalled"
     @confirm="confirmInstall"
   >
-    <!-- The title names the app, so the subject block and the 'Install on'
-         label it used to sit above are both redundant. Meta sits in a
-         fixed-width right column so long site names truncate instead of
-         crowding it. -->
-    <!-- Selected, not interactive: it is the confirmed target, just not a choice. -->
     <SiteRow v-if="targetSite" :label="targetSite.name" selected :interactive="false">
       <template #suffix>
         <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
           {{ siteMeta(targetSite) }}
         </span>
-        <!-- The check is what says "already installed" — it must not cost the row
-             its app count. -->
         <span
           v-if="targetInstalled"
           class="size-4 text-ink-gray-9 shrink-0 lucide-check"
@@ -96,8 +89,7 @@ const error = ref('')
 const appLabel = computed(() => props.app?.title || props.app?.name || '')
 
 const presetSite = computed(() => props.sites.find((s) => s.name === props.siteName) || null)
-// A bench with one site has nothing to choose between, so it behaves like a
-// preset: the row is shown for confirmation but never asks for a decision.
+// A single-site bench behaves like a preset: shown for confirmation, never asked.
 const soleSite = computed(() => (props.sites.length === 1 ? props.sites[0] : null))
 const targetSite = computed(() => presetSite.value || soleSite.value)
 const targetInstalled = computed(() => Boolean(targetSite.value && isInstalled(targetSite.value)))

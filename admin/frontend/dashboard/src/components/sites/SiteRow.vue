@@ -23,8 +23,6 @@ const props = defineProps({
   interactive: { type: Boolean, default: true },
 })
 
-// Borderless: hover and selection are carried by the surface step alone, so
-// selected sits one step above hover to stay readable.
 const stateClass = computed(() => {
   if (props.disabled) return 'opacity-60 cursor-not-allowed'
   if (props.selected) return 'bg-surface-gray-3'

@@ -72,8 +72,6 @@ const worksWithMenu = computed(() => [
   })),
 ])
 
-// Once an app is chosen the "Works with" prefix is redundant, and keeping it
-// overflowed the trigger.
 const worksWithLabel = computed(() => {
   const selected = props.worksWithOptions.find((option) => option.name === worksWithModel.value)
   return selected ? selected.title : 'Works with'
