@@ -80,7 +80,7 @@ export function siteStatus(site) {
   if (site.migration_status === 'success')
     return { label: 'Success', tone: 'green', value: 'success' }
   if (site.migration_status === 'running')
-    return { label: 'Running', tone: 'orange', busy: true, value: 'running' }
+    return { label: 'Migrating', tone: 'orange', busy: true, value: 'running' }
   if (site.migration_status === 'failed') return { label: 'Failed', tone: 'red', value: 'failed' }
   if (site.backup_status === 'backing_up')
     return { label: 'Backing up', tone: 'orange', busy: true, value: 'backing_up' }

@@ -79,7 +79,7 @@ test('siteStatus formats per-site lifecycle', () => {
   assert.equal(siteStatus({ migration_status: 'recovering' }).label, 'Recovering')
   assert.equal(siteStatus({ migration_status: 'recovered' }).label, 'Recovered')
   assert.equal(siteStatus({ migration_status: 'success' }).label, 'Success')
-  assert.equal(siteStatus({ migration_status: 'running' }).label, 'Running')
+  assert.equal(siteStatus({ migration_status: 'running' }).label, 'Migrating')
   assert.equal(siteStatus({ migration_status: 'failed' }).label, 'Failed')
   assert.equal(siteStatus({ backup_status: 'backing_up' }).label, 'Backing up')
   assert.equal(siteStatus({ backup_status: 'pending' }).label, 'Pending')
