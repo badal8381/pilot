@@ -103,8 +103,6 @@
         </div>
       </details>
 
-      <!-- Server failures only - a missing required field disables the button
-           instead of narrating itself down here. -->
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
         <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
@@ -161,8 +159,7 @@ const apiBaseError = computed(() => {
   return `${providerLabel.value} needs the endpoint of your server, e.g. http://your-host:8000/v1`
 })
 
-// Every required field, so Connect stays dead until the form could succeed -
-// what used to be four "X is required." messages after the click.
+// Connect stays dead until every required field is filled.
 const canSave = computed(
   () =>
     Boolean(provider.value) &&
@@ -177,9 +174,7 @@ const modelPlaceholder = computed(() => {
   if (!models.value.length && !hasApiKey.value) return 'Enter the API key to load models'
   return 'Search models…'
 })
-// An empty picklist with no key entered is a missing key, not a missing provider —
-// say so rather than leaving a silently empty dropdown. Self-hosted types the model
-// by hand, so it never reaches here.
+// An empty picklist with no key entered is a missing key - say so.
 const modelsHint = computed(() => {
   if (!provider.value || modelsLoading.value || models.value.length) return ''
   if (needsApiBase.value && !hasApiBase.value) return ''
@@ -191,8 +186,7 @@ async function fetchModels(providerValue) {
   models.value = []
   modelsError.value = ''
   if (!providerValue || freeTextModel.value) return
-  // Providers without a static catalog list models from their own API, so the key
-  // is sent along; the backend falls back to the key already saved in bench.toml.
+  // The key is sent along; the backend falls back to the saved one.
   if (modelsNeedApiKey.value && !hasApiKey.value) return
   if (needsApiBase.value && !hasApiBase.value) return
   modelsLoading.value = true

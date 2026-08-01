@@ -3,10 +3,6 @@
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-12">
-    <!-- Two groups - protection, then custom rules - carried by spacing
-         (space-y-12 between, space-y-4 within) rather than headings. The 3x
-         ratio against the in-group rhythm is what makes a seam read as a
-         section break rather than a wide row. -->
     <div class="space-y-4">
       <SettingsSwitch
         label="Enable WAF"
@@ -15,9 +11,6 @@
         @update:model-value="(v) => (enabled = v)"
       />
 
-      <!-- One inline line for the single most urgent deployment gap, replacing
-           two stacked Alert boxes. Only shown while the WAF is on - off, there
-           is nothing to enforce and nothing to warn about. -->
       <p v-if="setupNote" class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm">
         <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
         <span>{{ setupNote }}</span>
@@ -26,8 +19,6 @@
       <div class="items-start gap-4 grid grid-cols-1 sm:grid-cols-2">
         <div class="space-y-1.5">
           <FormControl type="select" label="Action" :options="ACTION_OPTIONS" v-model="mode" />
-          <!-- Each mode's consequence as a field hint, where the choice is made -
-               the Log-only case used to be a full Alert further down the page. -->
           <p v-if="mode === 'DetectionOnly'" class="text-ink-gray-5 text-p-sm">
             Matches are logged, not blocked. Review
             <RouterLink
@@ -39,20 +30,16 @@
           <p v-else class="text-ink-gray-5 text-p-sm">{{ ACTION_HINTS[mode] }}</p>
         </div>
         <div class="space-y-1.5">
-          <!-- Four fixed, ordered options: a segmented control shows the scale a
-               select was hiding. Label markup matches frappe-ui's InputLabel. -->
+          <!-- Label markup matches frappe-ui's InputLabel. -->
           <span class="block text-ink-gray-5 text-base">Sensitivity</span>
           <TabButtons :options="SENSITIVITY_OPTIONS" v-model="paranoia" />
-          <!-- Each step up trades false positives for coverage, which is the
-               whole decision. -->
           <p class="text-ink-gray-5 text-p-sm">{{ sensitivityHint }}</p>
         </div>
       </div>
     </div>
 
-    <!-- Stays visible with the WAF off: staging rules first and flipping the
-         switch last is the safe rollout order, and rules save independently of
-         `enabled`. The switch and the absent setup note carry the off state. -->
+    <!-- Visible with the WAF off: rules are staged first and save independently
+         of `enabled`. -->
     <WafCustomRules
       v-model="customRules"
       :fields="ruleFields"
@@ -61,10 +48,8 @@
     />
 
     <details class="group">
-      <!-- Chrome marks a *clicked* summary :focus-visible, so the tab-focus ring
-           was appearing on every pointer toggle - blur drops it for mouse users
-           while tabbing still shows the global ring. w-fit + rounded so that
-           ring hugs the word instead of drawing a panel-wide rectangle. -->
+      <!-- Chrome marks a clicked summary :focus-visible; blur keeps the focus
+           ring for keyboard only. w-fit so the ring hugs the word. -->
       <summary
         class="flex items-center gap-1.5 pr-1.5 rounded-sm w-fit text-ink-gray-6 text-base cursor-pointer select-none"
         @click="(e) => e.currentTarget.blur()"
@@ -73,9 +58,6 @@
           class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
         ></span>Advanced
       </summary>
-      <!-- Ordered tuning -> scope -> responses; the one thing that adds
-           inspection goes last. Examples live in hints, not placeholders -
-           a placeholder is gone at the first keystroke. -->
       <div class="space-y-4 mt-4">
         <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 items-start">
           <div class="space-y-1.5">
@@ -86,10 +68,6 @@
               v-model="inboundThreshold"
             />
             <p v-if="thresholdError" class="text-ink-red-6 text-p-sm">{{ thresholdError }}</p>
-            <!-- These two knobs multiply, and nothing said so: Sensitivity sets
-                 how much score a request accrues, this sets how much it takes to
-                 act. High sensitivity with a low threshold blocks ordinary
-                 traffic. -->
             <p v-else class="text-ink-gray-5 text-p-sm">
               Score needed before Action applies. Sensitivity raises scores, so the two compound.
             </p>
@@ -99,9 +77,6 @@
             <p class="text-ink-gray-5 text-p-sm">Number with a k, m or g suffix, e.g. 50m.</p>
           </div>
         </div>
-        <!-- Path-level scope before rule-level: plain English before SecLang.
-             Each hint names its level, since both fields read as "don't
-             inspect X" until you know the difference. -->
         <div class="space-y-1.5">
           <FormControl
             type="textarea"
@@ -135,12 +110,8 @@
       </div>
     </details>
 
-    <!-- Server failures only - field problems show at their fields (threshold
-         hint, Incomplete badges) and disable the button instead. -->
     <ErrorMessage v-if="error" :message="error" />
 
-    <!-- Surfaces only once something changed: a permanently visible disabled
-         button is chrome with nothing to say. -->
     <div v-if="dirty" class="flex justify-end">
       <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
         Save changes
@@ -159,11 +130,8 @@ import { settingsApi } from '@/api/settings'
 import { ruleProblem } from '@/utils/wafRules'
 import { useUnsavedChanges } from '@/composables/common/useUnsavedChanges'
 
-// "Paused", not "Off": this and the Enable switch both read as off but do
-// different things. The switch drops the module from the server config and
-// coming back costs a rebuild; this leaves it loaded with the engine idle, which
-// is the state you want when checking whether the WAF is behind a broken site.
-// The stored value stays "Off" - only the word the user reads changes.
+// "Paused" leaves the module loaded and idle; the Enable switch drops it from
+// the server config. The stored value stays "Off" - only the label differs.
 const ACTION_OPTIONS = [
   { label: 'Paused', value: 'Off' },
   { label: 'Log only', value: 'DetectionOnly' },
@@ -175,8 +143,7 @@ const SENSITIVITY_OPTIONS = [
   { label: 'High', value: 3 },
   { label: 'Very High', value: 4 },
 ]
-// CRS paranoia levels. Every step up widens coverage and widens false positives
-// with it - the tradeoff is the whole decision, so it is stated per level.
+// CRS paranoia levels.
 const SENSITIVITY_HINTS = {
   1: 'Very few false positives. Start here.',
   2: 'Admin tooling may start tripping it.',
@@ -210,8 +177,7 @@ const ruleActions = ref([])
 
 const sensitivityHint = computed(() => SENSITIVITY_HINTS[Number(paranoia.value)] || '')
 
-// The single most urgent deployment gap, or nothing. `installed` only means
-// anything in production, so these can't both apply at once.
+// `installed` only means anything in production, so at most one applies.
 const setupNote = computed(() => {
   if (!enabled.value) return ''
   if (!production.value)
@@ -242,22 +208,13 @@ function buildPayload() {
   }
 }
 
-// Compared against what the server last gave us, so Save is dead until something
-// actually changed - and so leaving with unsaved rules is something we can warn
-// about rather than discard silently.
 const savedPayload = ref('')
 const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
 
-// Both of these read `dirty`, so they have to be declared after it - a const is
-// in its temporal dead zone until then, and useUnsavedChanges() evaluates its
-// argument straight away.
-//
-// A half-built ruleset is real work. The Settings shell asks this before it
-// swaps the panel out: moving between panels is a route param change on the one
-// Settings record, so a component-level route guard here would never see it.
+// After `dirty`: useUnsavedChanges evaluates its argument immediately, and a
+// route-level guard never fires for the shell's param-only navigation.
 useUnsavedChanges(dirty)
 
-// Leaving the tab entirely is the browser's to warn about, not the shell's.
 function warnIfDirty(event) {
   if (!dirty.value) return
   event.preventDefault()
@@ -266,8 +223,6 @@ function warnIfDirty(event) {
 onMounted(() => window.addEventListener('beforeunload', warnIfDirty))
 onUnmounted(() => window.removeEventListener('beforeunload', warnIfDirty))
 
-// A wrong fill gets a red hint at the field; an empty required field or an
-// incomplete rule (already badged on its card) just holds the button.
 const thresholdError = computed(() => {
   const threshold = Number(inboundThreshold.value)
   if (Number.isInteger(threshold) && threshold >= 1) return ''
@@ -307,8 +262,7 @@ onMounted(async () => {
     enabled.value = !!waf.enabled
     installed.value = !!waf.installed
     mode.value = waf.mode || 'DetectionOnly'
-    // Cast: TabButtons matches by Object.is, so a stringy "2" would silently
-    // fall back to Low and emit a change - making the form dirty on open.
+    // TabButtons matches by Object.is; a stringy "2" would fall back to Low.
     paranoia.value = Number(waf.paranoia) || 1
     inboundThreshold.value = waf.inbound_threshold ?? 5
     bodyLimit.value = waf.body_limit || '50m'
@@ -319,9 +273,7 @@ onMounted(async () => {
     ruleFields.value = waf.rule_fields || []
     ruleOperators.value = waf.rule_operators || []
     ruleActions.value = waf.rule_actions || []
-    // The baseline `dirty` measures against. Built from the same function as the
-    // save payload so a normalisation (trimmed body limit, blank lines dropped
-    // from the textareas) does not read as an edit the moment the page loads.
+    // Same builder as the save payload, so normalisation is not an edit.
     savedPayload.value = JSON.stringify(buildPayload())
   } catch (e) {
     error.value = e.message || 'Could not load settings.'

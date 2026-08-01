@@ -3,15 +3,10 @@
     <div class="flex justify-between items-start gap-4">
       <div class="min-w-0">
         <p class="font-medium text-ink-gray-8 text-base">Custom rules</p>
-        <!-- max-w here and shrink-0 on the button: with neither, this paragraph
-             ran to the button's exact left edge and wrapped into it. -->
         <p class="mt-0.5 max-w-md text-ink-gray-5 text-p-sm">
           Checked before the managed rules, top to bottom.
         </p>
       </div>
-      <!-- Stays live while a rule is unfinished, and points at the offender
-           instead: a disabled button with no target leaves you hunting for which
-           card it meant. -->
       <Button class="shrink-0" variant="subtle" icon-left="lucide-plus" @click="addRule">
         Add rule
       </Button>
@@ -25,8 +20,6 @@
       description="Add a rule to block or log requests by path, IP, method, header, and more."
     />
 
-    <!-- One bordered list, not floating cards: quieter, and "checked top to
-         bottom" reads as an actual ordered list. -->
     <div
       v-if="rules.length"
       class="bg-surface-elevation-1 border border-outline-gray-2 rounded-lg divide-y divide-outline-gray-1"
@@ -37,19 +30,13 @@
         :data-rule-key="keyOf(rule)"
         class="first:rounded-t-lg last:rounded-b-lg ring-1 ring-inset transition-shadow"
         :class="[
-          // Two durations, not one: the flag has to arrive fast enough to read
-          // as a response to the click, and leave slowly enough to be watched
-          // rather than blink. An inset ring, since rows share the list's
-          // border - transition-shadow because a ring is box-shadow underneath.
+          // Fast in, slow out. transition-shadow: a ring is box-shadow underneath.
           flaggedKey === keyOf(rule) ? 'ring-outline-red-3 duration-75' : 'ring-transparent duration-1000',
           dragKey === keyOf(rule) ? 'opacity-50' : '',
         ]"
         @dragover.prevent="onDragOver(rule)"
       >
-        <!-- Summary: what the rule is, always visible. The builder below is the
-             editor for it, which is why it collapses and this does not. The
-             whole row toggles; interactive children stop the click so it only
-             lands on dead space. -->
+        <!-- The whole row toggles; interactive children stop the click. -->
         <div class="flex items-center gap-3 px-3 py-2.5 cursor-pointer" @click="toggleOpen(rule)">
           <button
             type="button"
@@ -76,15 +63,10 @@
             </p>
             <p class="mt-0.5 text-ink-gray-6 text-p-sm">{{ preview(rule) }}</p>
           </button>
-          <!-- A broken rule is silently dropped by the renderer - it must not
-               look as confident as a working one. -->
+          <!-- The nginx renderer silently drops broken rules. -->
           <Badge v-if="ruleProblem(rule)" class="shrink-0" theme="amber">Incomplete</Badge>
-          <!-- Labelled, then the label is hidden: a bare Switch has no accessible
-               name at all (attrs land on the wrapper, not the control), while
-               `label` gives the real <label for> association. sr-only keeps it
-               out of a header row that has no space for the word, and the gap
-               override stops the hidden node from reserving one. Small and on
-               the right: enabled is the norm, so it shouldn't lead the row. -->
+          <!-- A bare Switch has no accessible name (attrs land on the wrapper);
+               `label` gives the <label for> association, sr-only hides it. -->
           <Switch
             size="sm"
             class="shrink-0 [&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
@@ -104,9 +86,6 @@
           />
         </div>
 
-        <!-- No rule between the summary and the builder: only one rule can be
-             open at a time, so the row's own bounds already frame it and a line
-             was just cutting a single object in half. -->
         <div v-if="isOpen(rule)" class="space-y-4 px-3 pb-3">
         <FormControl
           type="text"
@@ -116,8 +95,7 @@
         />
 
         <div class="space-y-2">
-          <!-- All/Any only once there is something to combine: with a single
-               condition the choice has no meaning. -->
+          <!-- All/Any only once there is something to combine. -->
           <div class="flex flex-wrap items-center gap-2 text-ink-gray-7 text-base">
             <span>When</span>
             <Select
@@ -144,9 +122,7 @@
             :key="keyOf(cond)"
             class="gap-2 grid grid-cols-1 sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
           >
-            <!-- The header-name input stacks inside the field column rather than
-                 taking a column of its own: as a sibling it shoved this row's
-                 operator and value out of line with every other row. -->
+            <!-- Stacked inside the field column to keep rows aligned. -->
             <div class="space-y-1.5 min-w-0">
               <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
               <TextInput
@@ -162,8 +138,7 @@
               :placeholder="placeholder(cond.field)"
               class="w-full"
             />
-            <!-- A rule with no conditions is dropped silently by the renderer,
-                 so the last one cannot go. -->
+            <!-- Conditionless rules are dropped silently; the last one cannot go. -->
             <Button
               variant="ghost"
               icon="lucide-x"
@@ -184,8 +159,6 @@
             <span>Then</span>
             <Select v-model="rule.action" :options="actionOptions" class="w-48" />
           </div>
-          <!-- Skip is the one action that removes protection rather than adding
-               it, and as a plain option it looked like a peer of Block and Log. -->
           <p
             v-if="rule.action === 'skip'"
             class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm"
@@ -195,8 +168,6 @@
           </p>
         </div>
 
-        <!-- In the editor, not the row: delete is rare and destructive, and it
-             was a red icon on every row for the sake of the odd occasion. -->
         <div class="flex justify-end">
           <Button variant="ghost" theme="red" icon-left="lucide-trash-2" @click="promptRemove(ri)">
             Delete rule
@@ -279,11 +250,8 @@ function placeholder(field) {
   return PLACEHOLDERS[field] || 'value'
 }
 
-// Stable identity for :key. Rules and conditions arrive from the API with no id
-// of their own, and an index key means deleting the first of three re-keys the
-// rest - Vue then patches the inputs in place and a focused caret jumps to the
-// wrong row. Keyed off object identity so it survives a splice without adding a
-// field the API payload would have to carry.
+// Identity-based :key. Index keys re-key rows on delete and Vue patches the
+// inputs in place, jumping a focused caret to the wrong row.
 const keys = new WeakMap()
 let nextKey = 0
 function keyOf(object) {
@@ -291,13 +259,7 @@ function keyOf(object) {
   return keys.get(object)
 }
 
-// Collapsed by default: the summary line is the rule, and the builder is the
-// editor for it. A rule added here is empty, so there is nothing to summarise
-// and it opens straight away.
-//
-// One key, not a set: opening a rule closes the one before it. Editing is a
-// one-at-a-time job here, and a column of open builders is the wall of controls
-// collapsing was meant to get rid of.
+// One key, not a set: opening a rule closes the one before it.
 const openKey = ref('')
 const isOpen = (rule) => openKey.value === keyOf(rule)
 function toggleOpen(rule) {
@@ -305,9 +267,7 @@ function toggleOpen(rule) {
   openKey.value = openKey.value === key ? '' : key
 }
 
-// Flashing the unfinished rule rather than blocking the button. Same predicate
-// the save path uses, so what stops you adding and what stops you saving can
-// never disagree.
+// Same predicate as the save path, so add and save cannot disagree.
 const flaggedKey = ref('')
 const root = ref(null)
 let flagTimer = null
@@ -319,11 +279,7 @@ function flagUnfinished() {
   openKey.value = key
   flaggedKey.value = key
   clearTimeout(flagTimer)
-  // Held just under a second, then the class flips and the 1s transition takes
-  // the outline back to gray on its own.
   flagTimer = setTimeout(() => (flaggedKey.value = ''), 900)
-  // Looked up rather than held in a ref map: this is a one-off nudge, and the
-  // card carries its key already.
   root.value?.querySelector(`[data-rule-key="${key}"]`)?.scrollIntoView({
     block: 'nearest',
     behavior: 'smooth',
@@ -333,14 +289,10 @@ function flagUnfinished() {
 
 onUnmounted(() => clearTimeout(flagTimer))
 
-// Reorder by dragging the grip. Rules are checked top to bottom, so order is a
-// real setting - the move is done live on dragover (the list re-sorts under the
-// cursor) and identity keys keep every row's state attached through the splice.
+// Live reorder on dragover; identity keys keep row state through the splice.
 const dragKey = ref('')
 function onDragStart(rule, event) {
   dragKey.value = keyOf(rule)
-  // Closed while dragging: rows stay uniform, and the drop target is the list
-  // order itself, not a tall open editor.
   openKey.value = ''
   event.dataTransfer.effectAllowed = 'move'
 }
@@ -369,10 +321,7 @@ function addRule() {
     conditions: [newCondition()],
   }
   rules.value.push(rule)
-  // Read the pushed item back rather than keying off the local: `rules` is a
-  // reactive array, so what the template iterates is a proxy of this object, not
-  // this object. keyOf() is identity-based, so keying the raw one here would
-  // register a key the template never asks for and the card would open closed.
+  // Key the reactive proxy the template iterates, not the raw local object.
   openKey.value = keyOf(rules.value[rules.value.length - 1])
 }
 function addCondition(rule) {
@@ -382,8 +331,6 @@ function removeCondition(rule, index) {
   rule.conditions.splice(index, 1)
 }
 
-// Confirmed, like every other destructive action in Settings - a WAF rule is at
-// least as consequential as an SSH key, and this used to delete on one click.
 const showRemove = ref(false)
 const removingIndex = ref(-1)
 const removingLabel = computed(() => rules.value[removingIndex.value]?.name || 'this rule')

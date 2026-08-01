@@ -7,14 +7,9 @@
 </template>
 
 <script setup>
-// frappe-ui's Switch renders its label through InputLabel, which is regular
-// weight in ink-gray-5. That is right for a form field, but in this dialog a
-// Switch sits in the same list as SettingsRow, whose label is medium ink-gray-8
-// - side by side the library default reads as disabled text. The size is
-// already right (InputLabel is text-base), so only colour and weight move.
-//
-// Styled through the data-slot hooks the library documents rather than
-// `labelClasses`, which is deprecated and no longer applied.
+// Switch's default label (regular ink-gray-5) reads as disabled next to a
+// SettingsRow. Styled via data-slot hooks: `labelClasses` is deprecated and
+// no longer applied, so passing it only warns.
 import { Switch } from 'frappe-ui'
 
 defineOptions({ inheritAttrs: false })

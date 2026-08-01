@@ -51,8 +51,6 @@
           class="w-full"
         />
       </div>
-      <!-- Server failures only - a missing required field disables the button
-           instead of narrating itself down here. -->
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
         <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">

@@ -86,8 +86,6 @@
       </div>
     </div>
 
-    <!-- Cross-field problems (lockout) and server failures; single-field
-         problems sit at their row and hold the button instead. -->
     <ErrorMessage v-if="error" :message="error" />
 
     <div v-if="rules.length" class="flex justify-end">
@@ -147,8 +145,7 @@ const canSave = computed(() =>
 )
 
 function validate() {
-  // Block-by-default with no Allow rule blocks everyone, including you. Kept as
-  // a save-time message: it is a property of the whole ruleset, not one input.
+  // Block-by-default with no Allow rule blocks everyone, including you.
   if (
     enabled.value &&
     defaultPolicy.value === 'deny' &&

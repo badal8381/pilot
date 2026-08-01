@@ -1,12 +1,7 @@
-// One definition of "this rule would not do what you meant", shared by the two
-// places that need it: the rules editor, which refuses to stack another rule on
-// top of an unfinished one (and badges the offender), and the save path, which
-// holds the button. Two call sites, one rule - they must not drift apart.
-//
-// An empty condition value is the dangerous case, not the inert one: it matches
-// every request for that field, so a half-built Block rule blocks everything.
-// A rule with no conditions is dropped by the nginx renderer without a word.
 export function ruleProblem(rule) {
+  // Shared by the editor (Incomplete badge, Add refusal) and the save gate.
+  // An empty value matches every request for its field; a conditionless rule
+  // is dropped by the nginx renderer without a word.
   if (!rule.conditions?.length) return 'has no conditions, so it would never apply'
   for (const [index, condition] of rule.conditions.entries()) {
     if (!String(condition.value ?? '').trim())

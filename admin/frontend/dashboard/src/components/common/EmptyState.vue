@@ -28,8 +28,7 @@ defineProps({
   description: { type: String, default: '' },
   // Off when the state already sits inside a bordered panel.
   bordered: { type: Boolean, default: true },
-  // For empty states that sit among other content rather than filling a page:
-  // full height there makes the absence the tallest thing in view.
+  // For empty states that sit among other content rather than filling a page.
   compact: { type: Boolean, default: false },
 })
 </script>
