@@ -89,14 +89,6 @@
     <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
   </div>
 
-  <AppActionDialog
-    v-if="appAction"
-    v-model:open="showAppAction"
-    :app-name="appAction.app"
-    :action="appAction.action"
-    :site-name="siteName"
-  />
-
   <Teleport defer to="#header-actions">
     <Button
       :variant="site?.setup_complete ? 'subtle' : 'solid'"
@@ -119,12 +111,12 @@ import SiteApps from '@/components/sites/Apps.vue'
 import SiteBackups from '@/components/sites/Backups.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
-import AppActionDialog from '@/components/sites/AppActionDialog.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
 import { useBench } from '@/composables/benches/useBench'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
@@ -175,25 +167,25 @@ watchEffect(() => {
   if (site.value) document.title = `${site.value.name} | ${tabLabel.value}`
 })
 
-const APP_ACTIONS = ['install-app', 'uninstall-app']
+const APP_ACTIONS = { 'install-app': 'installed', 'uninstall-app': 'uninstalled' }
+const appRegistry = useAppRegistry()
 const appAction = computed(() => {
   const app = route.query.app
   const action = route.query.action
-  if (typeof app !== 'string' || !APP_ACTIONS.includes(action)) return null
+  if (typeof app !== 'string' || !(action in APP_ACTIONS)) return null
   return { app, action }
 })
-const showAppAction = ref(false)
 watch(
   appAction,
-  (value) => {
-    showAppAction.value = Boolean(value)
+  async (value) => {
+    if (!value) return
+    await appRegistry.load()
+    const title = appRegistry.titleMap.value[value.app] || value.app
+    toast.success(`${title} ${APP_ACTIONS[value.action]} on ${siteName}`)
+    router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
   },
   { immediate: true },
 )
-watch(showAppAction, (open) => {
-  if (open) return
-  router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
-})
 
 const isMobile = useIsMobile()
 
