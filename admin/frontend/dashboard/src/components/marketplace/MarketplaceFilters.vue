@@ -1,5 +1,5 @@
 <template>
-  <StickyToolbar class="mt-6">
+  <StickyToolbar class="mt-1">
     <div class="flex sm:flex-row flex-col gap-2">
       <FormControl
         v-model="searchModel"

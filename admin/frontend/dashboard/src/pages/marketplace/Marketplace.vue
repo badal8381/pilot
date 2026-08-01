@@ -1,7 +1,7 @@
 <template>
   <div class="mx-auto max-w-3xl pb-40">
     <div
-      class="flex sm:flex-row flex-col sm:justify-between sm:items-start gap-3 sm:gap-4 pt-4 pb-2"
+      class="flex sm:flex-row flex-col sm:justify-between sm:items-end gap-3 sm:gap-4 pt-4 pb-2"
     >
       <div class="flex flex-col items-start">
         <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -13,9 +13,6 @@
             <span class="size-3 lucide-box"></span> {{ benchVersionLabel }}
           </span>
         </div>
-        <p class="mt-2 max-w-lg text-ink-gray-6 text-p-base">
-          Open source apps built by developers worldwide for the Frappe ecosystem
-        </p>
       </div>
       <Button
         class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto shrink-0"
