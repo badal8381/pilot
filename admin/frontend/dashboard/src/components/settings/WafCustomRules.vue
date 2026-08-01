@@ -19,80 +19,95 @@
 
     <EmptyState
       v-if="!rules.length"
+      compact
       icon="lucide-list-filter"
       title="No custom rules"
       description="Add a rule to block or log requests by path, IP, method, header, and more."
     />
 
-    <!-- Two durations, not one: the flag has to arrive fast enough to read as a
-         response to the click, and leave slowly enough to be watched rather than
-         blink. Same class toggle, different transition on each side. -->
+    <!-- One bordered list, not floating cards: quieter, and "checked top to
+         bottom" reads as an actual ordered list. -->
     <div
-      v-for="(rule, ri) in rules"
-      :key="keyOf(rule)"
-      :data-rule-key="keyOf(rule)"
-      class="bg-surface-elevation-1 border rounded-lg transition-colors"
-      :class="
-        flaggedKey === keyOf(rule)
-          ? 'border-outline-red-3 duration-75'
-          : 'border-outline-gray-2 duration-1000'
-      "
+      v-if="rules.length"
+      class="bg-surface-elevation-1 border border-outline-gray-2 rounded-lg divide-y divide-outline-gray-1"
     >
-      <!-- Summary: what the rule is, always visible. The builder below is the
-           editor for it, which is why it collapses and this does not. -->
-      <div class="flex items-start gap-3 p-3">
-        <!-- Labelled, then the label is hidden: a bare Switch has no accessible
-             name at all (attrs land on the wrapper, not the control), while
-             `label` gives the real <label for> association. sr-only keeps it out
-             of a header row that has no space for the word, and the gap override
-             stops the hidden node from reserving one. -->
-        <Switch
-          class="shrink-0 mt-0.5 [&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
-          label="Rule enabled"
-          :model-value="rule.enabled"
-          @update:model-value="(v) => (rule.enabled = v)"
-        />
-        <button
-          type="button"
-          class="flex-1 min-w-0 text-left"
-          :aria-expanded="isOpen(rule)"
-          @click="toggleOpen(rule)"
-        >
-          <p
-            class="font-medium text-base truncate"
-            :class="rule.enabled ? 'text-ink-gray-8' : 'text-ink-gray-5'"
+      <div
+        v-for="(rule, ri) in rules"
+        :key="keyOf(rule)"
+        :data-rule-key="keyOf(rule)"
+        class="first:rounded-t-lg last:rounded-b-lg ring-1 ring-inset transition-shadow"
+        :class="[
+          // Two durations, not one: the flag has to arrive fast enough to read
+          // as a response to the click, and leave slowly enough to be watched
+          // rather than blink. An inset ring, since rows share the list's
+          // border - transition-shadow because a ring is box-shadow underneath.
+          flaggedKey === keyOf(rule) ? 'ring-outline-red-3 duration-75' : 'ring-transparent duration-1000',
+          dragKey === keyOf(rule) ? 'opacity-50' : '',
+        ]"
+        @dragover.prevent="onDragOver(rule)"
+      >
+        <!-- Summary: what the rule is, always visible. The builder below is the
+             editor for it, which is why it collapses and this does not. The
+             whole row toggles; interactive children stop the click so it only
+             lands on dead space. -->
+        <div class="flex items-center gap-3 px-3 py-2.5 cursor-pointer" @click="toggleOpen(rule)">
+          <button
+            type="button"
+            draggable="true"
+            class="text-ink-gray-4 hover:text-ink-gray-6 cursor-grab shrink-0"
+            aria-label="Drag to reorder"
+            @click.stop
+            @dragstart="onDragStart(rule, $event)"
+            @dragend="onDragEnd"
           >
-            {{ rule.name || 'Untitled rule' }}
-          </p>
-          <!-- The rule in plain English, promoted out of the card's footer. It
-               was the smallest, faintest line on the card while being the one
-               you actually read when auditing a list of them. -->
-          <p class="mt-0.5 text-ink-gray-6 text-p-sm">{{ preview(rule) }}</p>
-        </button>
-        <Button
-          class="shrink-0"
-          variant="ghost"
-          icon="lucide-chevron-down"
-          :label="isOpen(rule) ? 'Collapse rule' : 'Edit rule'"
-          :tooltip="isOpen(rule) ? 'Collapse' : 'Edit'"
-          :class="isOpen(rule) ? 'rotate-180' : ''"
-          @click="toggleOpen(rule)"
-        />
-        <Button
-          class="shrink-0"
-          variant="ghost"
-          theme="red"
-          icon="lucide-trash-2"
-          label="Delete rule"
-          tooltip="Delete rule"
-          @click="promptRemove(ri)"
-        />
-      </div>
+            <span class="block size-4 lucide-grip-vertical" />
+          </button>
+          <button
+            type="button"
+            class="flex-1 min-w-0 text-left"
+            :aria-expanded="isOpen(rule)"
+            @click.stop="toggleOpen(rule)"
+          >
+            <p
+              class="font-medium text-base truncate"
+              :class="rule.enabled ? 'text-ink-gray-8' : 'text-ink-gray-5'"
+            >
+              {{ rule.name || 'Untitled rule' }}
+            </p>
+            <p class="mt-0.5 text-ink-gray-6 text-p-sm">{{ preview(rule) }}</p>
+          </button>
+          <!-- A broken rule is silently dropped by the renderer - it must not
+               look as confident as a working one. -->
+          <Badge v-if="ruleProblem(rule)" class="shrink-0" theme="amber">Incomplete</Badge>
+          <!-- Labelled, then the label is hidden: a bare Switch has no accessible
+               name at all (attrs land on the wrapper, not the control), while
+               `label` gives the real <label for> association. sr-only keeps it
+               out of a header row that has no space for the word, and the gap
+               override stops the hidden node from reserving one. Small and on
+               the right: enabled is the norm, so it shouldn't lead the row. -->
+          <Switch
+            size="sm"
+            class="shrink-0 [&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
+            label="Rule enabled"
+            :model-value="rule.enabled"
+            @click.stop
+            @update:model-value="(v) => (rule.enabled = v)"
+          />
+          <Button
+            class="shrink-0"
+            variant="ghost"
+            icon="lucide-chevron-down"
+            :label="isOpen(rule) ? 'Collapse rule' : 'Edit rule'"
+            :tooltip="isOpen(rule) ? 'Collapse' : 'Edit'"
+            :class="isOpen(rule) ? 'rotate-180' : ''"
+            @click.stop="toggleOpen(rule)"
+          />
+        </div>
 
-      <!-- No rule between the summary and the builder: only one rule can be open
-           at a time, so the card's own border already bounds it and the line was
-           just cutting a single object in half. -->
-      <div v-if="isOpen(rule)" class="space-y-4 mx-3 mb-3">
+        <!-- No rule between the summary and the builder: only one rule can be
+             open at a time, so the row's own bounds already frame it and a line
+             was just cutting a single object in half. -->
+        <div v-if="isOpen(rule)" class="space-y-4 px-3 pb-3">
         <FormControl
           type="text"
           label="Rule name"
@@ -179,6 +194,15 @@
             Matching requests bypass the WAF entirely - no managed rules, no inspection.
           </p>
         </div>
+
+        <!-- In the editor, not the row: delete is rare and destructive, and it
+             was a red icon on every row for the sake of the odd occasion. -->
+        <div class="flex justify-end">
+          <Button variant="ghost" theme="red" icon-left="lucide-trash-2" @click="promptRemove(ri)">
+            Delete rule
+          </Button>
+        </div>
+        </div>
       </div>
     </div>
 
@@ -199,7 +223,7 @@
 
 <script setup>
 import { computed, onUnmounted, ref } from 'vue'
-import { Button, Dialog, FormControl, Select, Switch, TextInput } from 'frappe-ui'
+import { Badge, Button, Dialog, FormControl, Select, Switch, TextInput } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { ruleProblem } from '@/utils/wafRules'
 
@@ -308,6 +332,29 @@ function flagUnfinished() {
 }
 
 onUnmounted(() => clearTimeout(flagTimer))
+
+// Reorder by dragging the grip. Rules are checked top to bottom, so order is a
+// real setting - the move is done live on dragover (the list re-sorts under the
+// cursor) and identity keys keep every row's state attached through the splice.
+const dragKey = ref('')
+function onDragStart(rule, event) {
+  dragKey.value = keyOf(rule)
+  // Closed while dragging: rows stay uniform, and the drop target is the list
+  // order itself, not a tall open editor.
+  openKey.value = ''
+  event.dataTransfer.effectAllowed = 'move'
+}
+function onDragOver(rule) {
+  if (!dragKey.value || dragKey.value === keyOf(rule)) return
+  const from = rules.value.findIndex((r) => keyOf(r) === dragKey.value)
+  const to = rules.value.findIndex((r) => keyOf(r) === keyOf(rule))
+  if (from === -1 || to === -1) return
+  const [moved] = rules.value.splice(from, 1)
+  rules.value.splice(to, 0, moved)
+}
+function onDragEnd() {
+  dragKey.value = ''
+}
 
 function newCondition() {
   return { field: 'uri_path', operator: 'contains', value: '', header_name: '' }

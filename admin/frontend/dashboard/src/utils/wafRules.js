@@ -1,7 +1,7 @@
 // One definition of "this rule would not do what you meant", shared by the two
 // places that need it: the rules editor, which refuses to stack another rule on
-// top of an unfinished one, and the save path, which has to explain why. Two
-// call sites, one rule - they must not drift apart.
+// top of an unfinished one (and badges the offender), and the save path, which
+// holds the button. Two call sites, one rule - they must not drift apart.
 //
 // An empty condition value is the dangerous case, not the inert one: it matches
 // every request for that field, so a half-built Block rule blocks everything.
@@ -15,8 +15,4 @@ export function ruleProblem(rule) {
       return `does not name the request header in condition ${index + 1}`
   }
   return ''
-}
-
-export function ruleLabel(rule, index) {
-  return rule.name?.trim() || `Rule ${index + 1}`
 }
