@@ -165,7 +165,7 @@
           @toggle="appsOpen = $event.target.open"
         >
           <summary
-            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-2"
+            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
           >
             <h2 class="text-base font-medium text-ink-gray-8">
               Target apps ({{ op.apps.length }})
@@ -220,7 +220,7 @@
           @toggle="sitesOpen = $event.target.open"
         >
           <summary
-            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-2"
+            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
           >
             <h2 class="text-base font-medium text-ink-gray-8">Sites ({{ sitesCount }})</h2>
             <span
@@ -271,7 +271,7 @@
         class="group/decisions mt-2 rounded-lg border border-outline-gray-2 p-1.5"
       >
         <summary
-          class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-2"
+          class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
         >
           <h2 class="text-base font-medium text-ink-gray-8">
             Skipped patches ({{ op.decisions.length }})
