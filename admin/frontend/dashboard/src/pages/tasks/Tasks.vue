@@ -65,7 +65,7 @@
         v-for="task in visibleTasks"
         :key="task.task_id"
         :to="taskDetailRoute(task.task_id)"
-        class="flex items-center gap-3 hover:bg-surface-gray-2 px-3 py-2.5 rounded no-underline transition-colors"
+        class="flex items-center gap-3 hover:bg-surface-gray-1 px-3 py-2.5 rounded no-underline transition-colors"
       >
         <span
           class="place-items-center grid rounded size-6 shrink-0"

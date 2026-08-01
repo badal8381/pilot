@@ -28,7 +28,7 @@
             v-for="log in filteredLogs"
             :key="log.filename"
             class="sm:px-3 py-2.5 rounded w-full text-left transition-colors shrink-0"
-            :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-2'"
+            :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-1'"
             @click="selectedFile = log.filename"
           >
             <div class="flex items-center gap-2">

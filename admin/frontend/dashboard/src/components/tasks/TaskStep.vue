@@ -2,7 +2,7 @@
   <div>
     <div
       class="flex items-center gap-3 px-2.5 py-2 rounded transition-colors"
-      :class="hasOutput ? 'cursor-pointer hover:bg-surface-gray-2' : ''"
+      :class="hasOutput ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
       @click="toggle"
     >
       <span class="place-items-center grid rounded size-6 shrink-0" :class="iconBg">
