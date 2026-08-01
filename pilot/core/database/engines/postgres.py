@@ -11,6 +11,7 @@ from pilot.core.database.base import (
     TableSize,
 )
 from pilot.core.database.engines.helpers import (
+    DEFAULT_CONNECT_TIMEOUT,
     MAX_ROWS,
     disk_free,
     is_local_host,
@@ -21,12 +22,21 @@ from pilot.exceptions import DatabaseError
 
 
 class PostgreSQL(Database):
-    def __init__(self, host: str, port: int, user: str, password: str, database: str) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        user: str,
+        password: str,
+        database: str,
+        connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
+    ) -> None:
         self._host = host
         self._port = port
         self._user = user
         self._password = password
         self._database = database
+        self._connect_timeout = connect_timeout
 
     def _connect(self):
         try:
@@ -39,6 +49,7 @@ class PostgreSQL(Database):
             user=self._user,
             password=self._password,
             dbname=self._database,
+            connect_timeout=self._connect_timeout,
         )
 
     def execute(self, query: str, read_only: bool = True) -> QueryResult:
