@@ -511,6 +511,78 @@ def test_mariadb_get_binlog_files_empty_when_disabled() -> None:
         assert db.get_binlog_files() == []
 
 
+def test_mariadb_get_storage_components_measures_each_log(tmp_path: Path) -> None:
+    """@@log_error is relative to datadir, @@slow_query_log_file absolute, and
+    @@log_bin_index unset - all three resolve without special-casing."""
+    db = MariaDB(host="localhost", port=3306, user="u", password="p", database="")
+    (tmp_path / "mysql-bin.000001").write_bytes(b"x" * 1024)
+    (tmp_path / "mariadb.err").write_bytes(b"x" * 777)
+    (tmp_path / "slow.log").write_bytes(b"x" * 42)
+    responses = _binlog_responses(tmp_path) | {
+        "@@datadir": (["@@datadir"], [[str(tmp_path)]]),
+        "@@log_error": (["@@log_error"], [["mariadb.err"]]),
+        "@@slow_query_log_file": (["@@slow_query_log_file"], [[str(tmp_path / "slow.log")]]),
+        "@@log_bin_index": (["@@log_bin_index"], [[""]]),
+    }
+
+    with patch.object(MariaDB, "execute", _canned_execute(responses)):
+        components = db.get_storage_components()
+
+    assert {c.key: c.bytes for c in components} == {
+        "binlog": 3072,
+        "error_log": 777,
+        "slow_log": 42,
+        "binlog_index": 0,
+    }
+    assert [c.label for c in components] == [
+        "binary log",
+        "error log",
+        "slow query log",
+        "binary log index",
+    ]
+
+
+def test_mariadb_get_data_directory_is_none_for_a_remote_server() -> None:
+    db = MariaDB(host="db.example.com", port=3306, user="u", password="p", database="")
+    assert db.get_data_directory() is None
+
+
+def test_postgres_get_storage_components_reports_wal_and_server_log() -> None:
+    db = PostgreSQL(host="localhost", port=5432, user="u", password="p", database="d")
+    responses = {
+        "pg_ls_waldir": (["sum"], [[33554432]]),
+        "SHOW logging_collector": (["logging_collector"], [["on"]]),
+        "pg_ls_logdir": (["sum"], [[8192]]),
+    }
+
+    with patch.object(PostgreSQL, "execute", _canned_execute(responses)):
+        components = db.get_storage_components()
+
+    assert [(c.key, c.label, c.bytes) for c in components] == [
+        ("wal", "write-ahead log", 33554432),
+        ("server_log", "server log", 8192),
+    ]
+
+
+def test_postgres_server_log_is_zero_without_the_logging_collector() -> None:
+    """Logging to stderr leaves no log directory for pg_ls_logdir to size."""
+    db = PostgreSQL(host="localhost", port=5432, user="u", password="p", database="d")
+    responses = {
+        "pg_ls_waldir": (["sum"], [[16777216]]),
+        "SHOW logging_collector": (["logging_collector"], [["off"]]),
+    }
+
+    with patch.object(PostgreSQL, "execute", _canned_execute(responses)):
+        components = db.get_storage_components()
+
+    assert {c.key: c.bytes for c in components} == {"wal": 16777216, "server_log": 0}
+
+
+def test_postgres_get_data_directory_is_none_for_a_remote_server() -> None:
+    db = PostgreSQL(host="db.example.com", port=5432, user="u", password="p", database="d")
+    assert db.get_data_directory() is None
+
+
 def test_mariadb_purge_binlogs_issues_purge_for_known_file(tmp_path: Path) -> None:
     db = MariaDB(host="h", port=3306, user="u", password="p", database="")
     calls: list = []
