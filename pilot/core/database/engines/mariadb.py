@@ -15,6 +15,7 @@ from pilot.core.database.base import (
     TableSize,
 )
 from pilot.core.database.engines.helpers import (
+    DEFAULT_CONNECT_TIMEOUT,
     MAX_ROWS,
     disk_free,
     file_modified_ms,
@@ -34,6 +35,7 @@ class MariaDB(Database):
         password: str,
         database: str,
         socket: str | None = None,
+        connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
     ) -> None:
         self._host = host
         self._port = port
@@ -41,6 +43,7 @@ class MariaDB(Database):
         self._password = password
         self._database = database
         self._socket = socket
+        self._connect_timeout = connect_timeout
 
     def _connect(self):
         import pymysql
@@ -53,8 +56,12 @@ class MariaDB(Database):
             password=self._password,
             database=self._database or None,
             unix_socket=self._socket,
+            connect_timeout=self._connect_timeout,
             cursorclass=pymysql.cursors.DictCursor,
         )
+
+    def quote_identifier(self, name: str) -> str:
+        return "`{}`".format(name.replace("`", ""))
 
     def execute(self, query: str, read_only: bool = True) -> QueryResult:
         import pymysql
@@ -101,11 +108,10 @@ class MariaDB(Database):
             conn.close()
 
     def get_table_columns(self, table: str) -> list[dict]:
-        safe = table.replace("`", "")
         conn = self._connect()
         try:
             with conn.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{safe}`")
+                cursor.execute(f"SHOW COLUMNS FROM {self.quote_identifier(table)}")
                 return [{"name": r["Field"], "type": r["Type"]} for r in cursor.fetchall()]
         finally:
             conn.close()
