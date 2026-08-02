@@ -204,6 +204,24 @@ def test_sqlite_engine_is_not_supported(tmp_path: Path) -> None:
     )
 
 
+def test_get_breakdown_remeasures_instead_of_serving_the_cache(tmp_path: Path) -> None:
+    """directory_size_bytes is cached for the /metrics poll and never expires,
+    so a refresh would otherwise report the first reading forever."""
+    from admin.backend.providers.storage import StorageProvider
+
+    _write_bench(tmp_path)
+    _make_app(tmp_path, "frappe", b"a" * 4096)
+    db = _mock_database([["site1_db", 500]], [], str(tmp_path))
+
+    with patch("admin.backend.providers.storage.make_database", return_value=db):
+        provider = StorageProvider(tmp_path)
+        first = provider.get_breakdown(1000, 500).bench.apps_bytes
+        (tmp_path / "apps" / "frappe" / "grew.bin").write_bytes(b"a" * 200_000)
+        second = provider.get_breakdown(1000, 500).bench.apps_bytes
+
+    assert second > first
+
+
 def test_directory_size_bytes_measures_a_real_tree(tmp_path: Path) -> None:
     """Guards the du flags: GNU-only `-b` fails outright on BSD/macOS, which
     used to be swallowed into a silent 0."""

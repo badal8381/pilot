@@ -146,6 +146,10 @@ class StorageProvider:
         self._bench = Bench(self._config, bench_root)
 
     def get_breakdown(self, disk_total: int, disk_used: int) -> StorageBreakdown:
+        """Measures fresh. The cache exists for the 10s /metrics poll, and it
+        never expires, so leaving it in place pins every directory to its first
+        reading for the life of the process - including on an explicit refresh."""
+        directory_size_bytes.cache_clear()
         return StorageBreakdown(
             disk_total=disk_total,
             disk_used=disk_used,
