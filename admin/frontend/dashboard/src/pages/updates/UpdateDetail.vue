@@ -156,9 +156,12 @@
           <summary
             class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
           >
-            <h2 class="text-base font-medium text-ink-gray-8">
-              Target apps ({{ op.apps.length }})
-            </h2>
+            <div class="flex items-center gap-2">
+              <span class="size-4 text-ink-gray-5 shrink-0 lucide-box" />
+              <h2 class="text-base font-medium text-ink-gray-8">
+                Target apps ({{ op.apps.length }})
+              </h2>
+            </div>
             <span
               class="size-4 text-ink-gray-5 transition-transform group-open/apps:rotate-180 lucide-chevron-down"
             />
@@ -172,7 +175,7 @@
             >
               <div class="flex items-center gap-2 min-w-0 flex-1">
                 <AppIcon :name="app.name" class="!rounded-sm size-5" initial-class="text-xs" />
-                <p class="min-w-0 truncate font-medium text-ink-gray-9 text-base">
+                <p class="min-w-0 truncate text-ink-gray-9 text-base">
                   {{ app.name }}
                 </p>
               </div>
@@ -211,7 +214,12 @@
           <summary
             class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
           >
-            <h2 class="text-base font-medium text-ink-gray-8">Server ({{ serverJobs.length }})</h2>
+            <div class="flex items-center gap-2">
+              <span class="size-4 text-ink-gray-5 shrink-0 lucide-server" />
+              <h2 class="text-base font-medium text-ink-gray-8">
+                Server ({{ serverJobs.length }})
+              </h2>
+            </div>
             <span
               class="size-4 text-ink-gray-5 transition-transform group-open/server:rotate-180 lucide-chevron-down"
             />
@@ -237,7 +245,10 @@
           <summary
             class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
           >
-            <h2 class="text-base font-medium text-ink-gray-8">Sites ({{ sitesCount }})</h2>
+            <div class="flex items-center gap-2">
+              <span class="size-4 text-ink-gray-5 shrink-0 lucide-globe" />
+              <h2 class="text-base font-medium text-ink-gray-8">Sites ({{ sitesCount }})</h2>
+            </div>
             <span
               class="size-4 text-ink-gray-5 transition-transform group-open/sites:rotate-180 lucide-chevron-down"
             />
@@ -258,7 +269,7 @@
                     expandedSites.has(site.name) ? 'rotate-90' : '',
                   ]"
                 />
-                <p class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base truncate">
+                <p class="flex-1 min-w-0 text-ink-gray-9 text-base truncate">
                   {{ site.name }}
                 </p>
                 <span
@@ -295,9 +306,12 @@
         <summary
           class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
         >
-          <h2 class="text-base font-medium text-ink-gray-8">
-            Skipped patches ({{ op.decisions.length }})
-          </h2>
+          <div class="flex items-center gap-2">
+            <span class="size-4 text-ink-gray-5 shrink-0 lucide-skip-forward" />
+            <h2 class="text-base font-medium text-ink-gray-8">
+              Skipped patches ({{ op.decisions.length }})
+            </h2>
+          </div>
           <span
             class="size-4 text-ink-gray-5 transition-transform group-open/decisions:rotate-180 lucide-chevron-down"
           />
