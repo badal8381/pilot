@@ -67,10 +67,7 @@
         </div>
 
         <template v-else>
-          <!-- px-2: the controls carry 8px of their own padding. -->
-          <div
-            class="flex flex-col sm:flex-row sm:items-center gap-2 sm:px-2 py-2 shrink-0"
-          >
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 py-2 shrink-0">
             <!-- Mobile-only: back + filename, replacing the standalone filename bar -->
             <div class="md:hidden flex items-center gap-2">
               <Button
