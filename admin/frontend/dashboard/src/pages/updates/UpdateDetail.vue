@@ -43,25 +43,17 @@
 
       <div class="flex justify-between items-center gap-4 px-2 min-w-0">
         <p class="text-ink-gray-8 text-base truncate">{{ metaLine }}</p>
-        <div class="flex items-center gap-3 shrink-0">
-          <button
-            v-if="updateTaskId"
-            type="button"
-            class="flex items-center gap-1.5 text-ink-gray-7 hover:text-ink-gray-8 text-base"
-            @click="openTaskLog({ id: updateTaskId })"
+        <div class="flex flex-wrap justify-end items-center gap-1 shrink-0">
+          <Button
+            v-for="job in serverJobs"
+            :key="job.id"
+            variant="ghost"
+            size="sm"
+            icon-left="lucide-square-terminal"
+            @click="openTaskLog(job)"
           >
-            <span class="lucide-square-terminal size-4" />
-            Update task
-          </button>
-          <button
-            v-if="revertTaskId"
-            type="button"
-            class="flex items-center gap-1.5 text-ink-gray-7 hover:text-ink-gray-8 text-base"
-            @click="openTaskLog({ id: revertTaskId })"
-          >
-            <span class="lucide-square-terminal size-4" />
-            Revert task
-          </button>
+            {{ job.label }}
+          </Button>
         </div>
       </div>
 
@@ -110,7 +102,7 @@
           <button
             v-if="pending"
             type="button"
-            class="mt-4 flex items-center gap-2 text-p-sm text-ink-gray-7 hover:text-ink-gray-9"
+            class="mt-4 flex items-center gap-2 px-2 py-1 rounded transition-colors text-p-sm text-ink-gray-7 hover:bg-surface-gray-1"
             @click="openTaskLog({ id: pending.task_id })"
           >
             <Spinner size="md" class="text-ink-amber-7" />
@@ -271,7 +263,7 @@
                   v-for="job in siteJobs(site.name)"
                   :key="job.id"
                   type="button"
-                  class="flex items-center gap-1.5 px-1 py-1.5 rounded w-full text-ink-gray-7 hover:text-ink-gray-9 text-sm text-left"
+                  class="flex items-center gap-1.5 px-1.5 py-1.5 rounded transition-colors w-full text-ink-gray-7 hover:bg-surface-gray-1 text-sm text-left"
                   @click="openTaskLog(job)"
                 >
                   <span class="lucide-square-terminal size-4 shrink-0" />
@@ -402,12 +394,8 @@ const durationSeconds = computed(() => {
   return Math.max(0, (end - new Date(op.value.started_at).getTime()) / 1000)
 })
 
-// Retries append fresh 'update' chain entries; the latest attempt is the one worth opening.
-// 'restore' is the task_ids role the restore/revert action is queued under (api/updates.js).
-const updateTaskId = computed(
-  () => op.value?.chain?.findLast((entry) => entry.command === 'update')?.task_id,
-)
-const revertTaskId = computed(() => op.value?.task_ids?.restore)
+// Bench-wide chain tasks (update, revert apps, restart); site-bound ones live in the site tree.
+const serverJobs = computed(() => (op.value?.task_logs || []).filter((log) => !log.site))
 
 const alertTitle = computed(() =>
   op.value?.state === 'revert_failed' ? 'Restore failed' : 'This update needs attention',
