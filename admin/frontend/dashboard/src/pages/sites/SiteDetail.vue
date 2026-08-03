@@ -55,9 +55,12 @@
                 class="shrink-0"
               />
             </div>
-            <div class="hidden sm:flex items-center gap-1.5 mt-1 text-ink-gray-5 text-sm">
-              <span class="size-3.5 lucide-box" />
-              {{ version || 'Version -' }}
+            <div
+              v-if="storageUsed"
+              class="hidden sm:flex items-center gap-1.5 mt-1 text-ink-gray-5 text-sm"
+            >
+              <span class="size-3.5 lucide-hard-drive" />
+              {{ storageUsed }} used
             </div>
           </div>
         </div>
@@ -115,7 +118,7 @@ import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
-import { useBench } from '@/composables/benches/useBench'
+import { useSiteStorage } from '@/composables/sites/useSiteStorage'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { openTaskDetailPage } from '@/utils/taskRoute'
@@ -126,7 +129,9 @@ const siteName = route.params.name
 
 const { setBreadcrumbs } = useBreadcrumbs()
 const { site, loading, error, status, load, reload, login, backup } = useSite(siteName)
-const { version, load: loadBench } = useBench()
+
+const { load: loadStorage, storageLabel } = useSiteStorage()
+const storageUsed = computed(() => storageLabel(siteName))
 
 setBreadcrumbs([{ label: 'Sites', route: { name: 'Sites' } }, { label: siteName }])
 
@@ -280,7 +285,7 @@ onUnmounted(() => {
 
 onMounted(() => {
   load()
-  loadBench()
+  loadStorage()
 })
 </script>
 

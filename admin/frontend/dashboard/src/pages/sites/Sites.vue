@@ -96,7 +96,7 @@
 
               <!-- Second Line -->
               <p class="text-ink-gray-5 text-p-sm">
-                {{ appsLabel(site) }}
+                {{ metaLabel(site) }}
               </p>
             </div>
           </RouterLink>
@@ -128,7 +128,10 @@
               size="sm"
             />
           </div>
-          <div v-else-if="column.key === 'apps'" class="text-ink-gray-6 text-sm">
+          <div
+            v-else-if="column.key === 'storage' || column.key === 'apps'"
+            class="text-ink-gray-6 text-sm"
+          >
             {{ item }}
           </div>
           <div v-else-if="column.key === 'actions'" class="flex justify-end">
@@ -196,6 +199,7 @@ import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSites } from '@/composables/sites/useSites'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
+import { useSiteStorage } from '@/composables/sites/useSiteStorage'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 import { openSiteLogin } from '@/utils/siteLogin'
 
@@ -203,6 +207,7 @@ const router = useRouter()
 const isMobile = useIsMobile()
 const { setBreadcrumbs } = useBreadcrumbs()
 const { sites, loading, error, load } = useSites()
+const { load: loadStorage, storageLabel } = useSiteStorage()
 
 const search = ref('')
 const statusFilter = ref('all')
@@ -245,6 +250,12 @@ function appsLabel(site) {
   return count === 1 ? '1 app' : `${count} apps`
 }
 
+// Storage lands after the list, so a card shows its app count alone until then.
+function metaLabel(site) {
+  const used = storageLabel(site.name)
+  return used ? `${used} · ${appsLabel(site)}` : appsLabel(site)
+}
+
 const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
 
 const filteredSites = computed(() => {
@@ -266,6 +277,7 @@ watchEffect(() => {
 const listColumns = [
   { label: 'Site', key: 'site', align: 'left', width: 3 },
   { label: 'Status', key: 'status', align: 'left', width: 1.5 },
+  { label: 'Storage', key: 'storage', align: 'left', width: 1.5 },
   { label: 'Apps', key: 'apps', align: 'left', width: 1.5 },
   { label: '', key: 'actions', align: 'right', width: '3rem' },
 ]
@@ -274,6 +286,7 @@ const listRows = computed(() =>
   filteredSites.value.map((site) => ({
     name: site.name,
     site,
+    storage: storageLabel(site.name),
     apps: appsLabel(site),
   })),
 )
@@ -320,5 +333,8 @@ function siteMenuOptions(site) {
 
 const showCreate = ref(false)
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadStorage()
+})
 </script>
