@@ -19,7 +19,7 @@
               />
             </Tooltip>
             <div class="flex items-center gap-2 min-w-0">
-              <p class="font-medium text-ink-gray-8 text-sm truncate">{{ row.domain }}</p>
+              <p class="font-medium text-ink-gray-8 text-base truncate">{{ row.domain }}</p>
               <Badge
                 v-if="row.isPrimary"
                 label="Primary"

@@ -8,10 +8,8 @@
         class="flex justify-between items-start gap-x-2.5 py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
       >
         <div class="flex flex-col gap-1">
-          <p class="font-medium text-ink-gray-8 text-sm leading-normal">{{ row.label }}</p>
-          <div class="mt-0.5">
-            <p class="text-ink-gray-6 text-sm">{{ row.description }}</p>
-          </div>
+          <p class="font-medium text-ink-gray-8 text-base">{{ row.label }}</p>
+          <p class="text-ink-gray-6 text-p-sm">{{ row.description }}</p>
         </div>
         <Button
           size="sm"
