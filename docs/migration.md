@@ -255,7 +255,9 @@ Successful sites are not migrated again. If the retry succeeds, Pilot continues 
 
 This action is available only when Pilot identified a failing patch.
 
-The API and operation both verify that the requested patch exactly matches the current diagnosis. Pilot then runs Frappe's `bypass-patch` command and records the decision. It does not retry automatically; the user must still choose Retry.
+The API and operation both verify that the requested patch exactly matches the current diagnosis. Pilot then runs Frappe's `bypass-patch` command and records the decision.
+
+`bypass_patch` re-arms the chain before returning: the failed site goes back to pending and the operation returns to `migrating`, so `BypassPatchTask` queues the next step itself. The migration resumes on its own — the user does not choose Retry afterwards.
 
 The normal update form never enables broad `--skip-failing` behavior.
 

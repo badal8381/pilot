@@ -320,7 +320,7 @@
             <code class="rounded bg-surface-gray-2 px-1 font-mono">{{ op.diagnosis?.patch }}</code>
             as completed for
             <b class="text-ink-gray-9">{{ op.failed_site }}</b> without running it. This cannot be
-            undone. Retry the update afterwards to continue.
+            undone, and the migration carries on from where it stopped.
           </p>
         </template>
         <template #actions>
