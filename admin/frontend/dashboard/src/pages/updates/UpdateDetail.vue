@@ -6,7 +6,7 @@
         <Skeleton class="rounded w-44 h-4" />
         <Skeleton class="rounded w-24 h-4" />
       </div>
-      <div class="mt-6 p-1.5 border border-outline-gray-2 rounded-lg">
+      <div class="mt-6 p-1 border border-outline-gray-2 rounded-lg">
         <div class="flex justify-between items-center px-2.5 py-2">
           <Skeleton class="rounded w-24 h-4" />
           <Skeleton class="rounded w-12 h-3" />
@@ -169,7 +169,7 @@
         <details
           v-if="op.apps?.length"
           :open="appsOpen"
-          class="group/apps rounded-lg border border-outline-gray-2 p-1.5"
+          class="group/apps rounded-lg border border-outline-gray-2 p-1"
           @toggle="appsOpen = $event.target.open"
         >
           <summary
@@ -224,7 +224,7 @@
         <details
           v-if="op.sites?.length"
           :open="sitesOpen"
-          class="group/sites rounded-lg border border-outline-gray-2 p-1.5"
+          class="group/sites rounded-lg border border-outline-gray-2 p-1"
           @toggle="sitesOpen = $event.target.open"
         >
           <summary
@@ -287,7 +287,7 @@
       <details
         v-if="op.decisions?.length"
         open
-        class="group/decisions mt-2 rounded-lg border border-outline-gray-2 p-1.5"
+        class="group/decisions mt-2 rounded-lg border border-outline-gray-2 p-1"
       >
         <summary
           class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
