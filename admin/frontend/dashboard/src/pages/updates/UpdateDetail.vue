@@ -41,22 +41,7 @@
         />
       </Teleport>
 
-      <div class="flex justify-between items-center gap-4 px-2 min-w-0">
-        <p class="text-ink-gray-8 text-base truncate">{{ metaLine }}</p>
-        <div class="flex flex-wrap justify-end items-center gap-1 shrink-0">
-          <Button
-            v-for="job in serverJobs"
-            :key="job.id"
-            variant="ghost"
-            size="sm"
-            :theme="isJobFailed(job) ? 'red' : 'gray'"
-            :icon-left="isJobFailed(job) ? 'lucide-circle-x' : 'lucide-square-terminal'"
-            @click="openTaskLog(job)"
-          >
-            {{ job.label }}
-          </Button>
-        </div>
-      </div>
+      <p class="mt-5 px-2 font-medium text-ink-gray-8 text-base truncate">{{ metaLine }}</p>
 
       <ErrorMessage v-if="error" class="mt-4" :message="error" />
 
@@ -158,7 +143,10 @@
       </section>
 
       <!-- Run order: apps update first, then sites migrate. -->
-      <div v-if="op.sites?.length || op.apps?.length" class="mt-6 space-y-2">
+      <div
+        v-if="op.sites?.length || op.apps?.length || serverJobs.length"
+        class="mt-3 space-y-2"
+      >
         <details
           v-if="op.apps?.length"
           :open="appsOpen"
@@ -213,6 +201,32 @@
           </div>
         </details>
 
+        <!-- Bench-wide jobs, run before any site is touched. -->
+        <details
+          v-if="serverJobs.length"
+          :open="serverOpen"
+          class="group/server rounded-lg border border-outline-gray-2 p-1"
+          @toggle="serverOpen = $event.target.open"
+        >
+          <summary
+            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
+          >
+            <h2 class="text-base font-medium text-ink-gray-8">Server ({{ serverJobs.length }})</h2>
+            <span
+              class="size-4 text-ink-gray-5 transition-transform group-open/server:rotate-180 lucide-chevron-down"
+            />
+          </summary>
+
+          <div>
+            <JobRow
+              v-for="job in serverJobs"
+              :key="job.id"
+              :job="job"
+              @click="openTaskLog(job)"
+            />
+          </div>
+        </details>
+
         <!-- Sites -->
         <details
           v-if="op.sites?.length"
@@ -260,20 +274,12 @@
                 v-if="expandedSites.has(site.name)"
                 class="mb-1 ml-4 pl-3 border-l border-outline-gray-2"
               >
-                <button
+                <JobRow
                   v-for="job in siteJobs(site.name)"
                   :key="job.id"
-                  type="button"
-                  class="flex items-center gap-1.5 px-1.5 py-1.5 rounded transition-colors w-full hover:bg-surface-gray-1 text-sm text-left"
-                  :class="isJobFailed(job) ? 'text-ink-red-7' : 'text-ink-gray-7'"
+                  :job="job"
                   @click="openTaskLog(job)"
-                >
-                  <span
-                    class="size-4 shrink-0"
-                    :class="isJobFailed(job) ? 'lucide-circle-x' : 'lucide-square-terminal'"
-                  />
-                  {{ job.label }}
-                </button>
+                />
               </div>
             </div>
           </div>
@@ -363,6 +369,7 @@ import {
   Tooltip,
 } from 'frappe-ui'
 import AppIcon from '@/components/apps/AppIcon.vue'
+import JobRow from '@/components/updates/JobRow.vue'
 import LogView from '@/components/logs/LogView.vue'
 import UpdateStateBadge from '@/components/updates/UpdateStateBadge.vue'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
@@ -401,10 +408,6 @@ const durationSeconds = computed(() => {
 
 // Bench-wide chain tasks (update, revert apps, restart); site-bound ones live in the site tree.
 const serverJobs = computed(() => (op.value?.task_logs || []).filter((log) => !log.site))
-
-// A retried step leaves several jobs behind, so only the one that broke the chain
-// earns colour. Killing a migrate mid-run stops the update just as a crash does.
-const isJobFailed = (job) => job.status === 'failed' || job.status === 'killed'
 
 const alertTitle = computed(() =>
   op.value?.state === 'revert_failed' ? 'Restore failed' : 'This update needs attention',
@@ -508,19 +511,23 @@ function revisionHint(app) {
   return app.updated_sha ? `Updated to ${target}` : `Will update to ${target}`
 }
 
-const anySiteFailed = computed(() =>
-  (op.value?.sites || []).some((site) => siteStatus(site).value === 'failed'),
+const anythingFailed = computed(
+  () =>
+    (op.value?.sites || []).some((site) => siteStatus(site).value === 'failed') ||
+    serverJobs.value.some((job) => job.status === 'failed'),
 )
 
 // A settled run starts collapsed; anything unresolved or failed starts open.
 const sitesOpen = ref(true)
 const appsOpen = ref(true)
+const serverOpen = ref(true)
 let openDefaultsSet = false
 
 function applyOpenDefaults() {
   if (openDefaultsSet || !op.value) return
   openDefaultsSet = true
-  const settled = isResolved(op.value) && !anySiteFailed.value
+  const settled = isResolved(op.value) && !anythingFailed.value
+  serverOpen.value = !settled
   sitesOpen.value = !settled
   appsOpen.value = !settled
 }
