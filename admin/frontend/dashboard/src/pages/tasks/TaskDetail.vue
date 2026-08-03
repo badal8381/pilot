@@ -101,9 +101,8 @@ import {
   isTaskActive,
   isTaskCancellable,
   redirectRouteOnSuccess,
-  siteLabel,
-  siteRoute,
   statusConfig,
+  taskScope,
 } from '@/utils/taskFormat'
 
 const route = useRoute()
@@ -139,12 +138,7 @@ async function loadAiStatus() {
   }
 }
 
-// What the task ran against. A bench-level task has no site; it belongs to the server.
-const scope = computed(() => {
-  const label = siteLabel(task.value)
-  if (label === 'Server-level') return { label: 'Server', route: { name: 'Server' } }
-  return { label, route: siteRoute(task.value) }
-})
+const scope = computed(() => taskScope(task.value))
 
 const metaLine = computed(() => {
   const parts = []

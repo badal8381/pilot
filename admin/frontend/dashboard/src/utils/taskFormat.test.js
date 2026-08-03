@@ -8,6 +8,7 @@ import {
   relativeTime,
   siteRoute,
   statusConfig,
+  taskScope,
 } from './taskFormat.js'
 
 test('queued tasks have their own presentation', () => {
@@ -33,6 +34,17 @@ test('siteRoute links to the site behind a site-scoped task', () => {
     params: { name: 'a.local' },
   })
   assert.equal(siteRoute({ command: 'build', args: {} }), null)
+})
+
+test('taskScope names the server when a task is not bound to a site', () => {
+  assert.deepEqual(taskScope({ command: 'migrate', args: { site: 'a.local' } }), {
+    label: 'a.local',
+    route: { name: 'SiteDetail', params: { name: 'a.local' } },
+  })
+  assert.deepEqual(taskScope({ command: 'build', args: {} }), {
+    label: 'Server',
+    route: { name: 'Server' },
+  })
 })
 
 test('site-creating and app tasks redirect to the site page on success', () => {

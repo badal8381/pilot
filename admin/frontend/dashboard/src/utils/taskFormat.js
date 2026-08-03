@@ -155,6 +155,14 @@ export function siteRoute(task) {
   return { name: 'SiteDetail', params: { name: site } }
 }
 
+// What a task ran against, so a detail header reads the same either way. A
+// bench-level task has no site: it belongs to the server itself.
+export function taskScope(task) {
+  const label = siteLabel(task)
+  if (label === 'Server-level') return { label: 'Server', route: { name: 'Server' } }
+  return { label, route: siteRoute(task) }
+}
+
 const REDIRECT_ON_SUCCESS_COMMANDS = [
   'new-site',
   'install-app',
