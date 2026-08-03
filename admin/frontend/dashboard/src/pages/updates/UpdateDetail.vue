@@ -147,26 +147,12 @@
         v-if="op.sites?.length || op.apps?.length || serverJobs.length"
         class="mt-3 space-y-2"
       >
-        <details
+        <UpdateSection
           v-if="op.apps?.length"
-          :open="appsOpen"
-          class="group/apps rounded-lg border border-outline-gray-2 p-1"
-          @toggle="appsOpen = $event.target.open"
+          v-model:open="appsOpen"
+          icon="lucide-box"
+          :title="`Target apps (${op.apps.length})`"
         >
-          <summary
-            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
-          >
-            <div class="flex items-center gap-2">
-              <span class="size-4 text-ink-gray-5 shrink-0 lucide-box" />
-              <h2 class="text-base font-medium text-ink-gray-8">
-                Target apps ({{ op.apps.length }})
-              </h2>
-            </div>
-            <span
-              class="size-4 text-ink-gray-5 transition-transform group-open/apps:rotate-180 lucide-chevron-down"
-            />
-          </summary>
-
           <div>
             <div
               v-for="app in op.apps"
@@ -202,58 +188,30 @@
               </Tooltip>
             </div>
           </div>
-        </details>
+        </UpdateSection>
 
         <!-- Bench-wide jobs, run before any site is touched. -->
-        <details
+        <UpdateSection
           v-if="serverJobs.length"
-          :open="serverOpen"
-          class="group/server rounded-lg border border-outline-gray-2 p-1"
-          @toggle="serverOpen = $event.target.open"
+          v-model:open="serverOpen"
+          icon="lucide-server"
+          :title="`Server (${serverJobs.length})`"
         >
-          <summary
-            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
-          >
-            <div class="flex items-center gap-2">
-              <span class="size-4 text-ink-gray-5 shrink-0 lucide-server" />
-              <h2 class="text-base font-medium text-ink-gray-8">
-                Server ({{ serverJobs.length }})
-              </h2>
-            </div>
-            <span
-              class="size-4 text-ink-gray-5 transition-transform group-open/server:rotate-180 lucide-chevron-down"
-            />
-          </summary>
-
-          <div>
-            <JobRow
-              v-for="job in serverJobs"
-              :key="job.id"
-              :job="job"
-              @click="openTaskLog(job)"
-            />
-          </div>
-        </details>
+          <JobRow
+            v-for="job in serverJobs"
+            :key="job.id"
+            :job="job"
+            @click="openTaskLog(job)"
+          />
+        </UpdateSection>
 
         <!-- Sites -->
-        <details
+        <UpdateSection
           v-if="op.sites?.length"
-          :open="sitesOpen"
-          class="group/sites rounded-lg border border-outline-gray-2 p-1"
-          @toggle="sitesOpen = $event.target.open"
+          v-model:open="sitesOpen"
+          icon="lucide-globe"
+          :title="`Sites (${sitesCount})`"
         >
-          <summary
-            class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
-          >
-            <div class="flex items-center gap-2">
-              <span class="size-4 text-ink-gray-5 shrink-0 lucide-globe" />
-              <h2 class="text-base font-medium text-ink-gray-8">Sites ({{ sitesCount }})</h2>
-            </div>
-            <span
-              class="size-4 text-ink-gray-5 transition-transform group-open/sites:rotate-180 lucide-chevron-down"
-            />
-          </summary>
-
           <div>
             <div v-for="site in op.sites" :key="site.name">
               <div
@@ -294,43 +252,26 @@
               </div>
             </div>
           </div>
-        </details>
+        </UpdateSection>
       </div>
 
       <!-- User decisions -->
-      <details
+      <UpdateSection
         v-if="op.decisions?.length"
-        open
-        class="group/decisions mt-2 rounded-lg border border-outline-gray-2 p-1"
+        class="mt-2"
+        icon="lucide-skip-forward"
+        :title="`Skipped patches (${op.decisions.length})`"
       >
-        <summary
-          class="flex items-center justify-between px-2.5 py-2 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
+        <div
+          v-for="(decision, index) in op.decisions"
+          :key="index"
+          class="px-2.5 py-2 text-sm text-ink-gray-7"
         >
-          <div class="flex items-center gap-2">
-            <span class="size-4 text-ink-gray-5 shrink-0 lucide-skip-forward" />
-            <h2 class="text-base font-medium text-ink-gray-8">
-              Skipped patches ({{ op.decisions.length }})
-            </h2>
-          </div>
-          <span
-            class="size-4 text-ink-gray-5 transition-transform group-open/decisions:rotate-180 lucide-chevron-down"
-          />
-        </summary>
-
-        <div>
-          <div
-            v-for="(decision, index) in op.decisions"
-            :key="index"
-            class="px-2.5 py-2 text-sm text-ink-gray-7"
-          >
-            <code class="rounded bg-surface-gray-2 px-1 font-mono text-xs">{{
-              decision.patch
-            }}</code>
-            on
-            <span class="font-medium text-ink-gray-8">{{ decision.site }}</span>
-          </div>
+          <code class="rounded bg-surface-gray-2 px-1 font-mono text-xs">{{ decision.patch }}</code>
+          on
+          <span class="font-medium text-ink-gray-8">{{ decision.site }}</span>
         </div>
-      </details>
+      </UpdateSection>
 
       <!-- Skip patch confirmation -->
       <Dialog v-model="confirmSkip" :options="{ title: 'Skip this patch permanently?' }">
@@ -385,6 +326,7 @@ import {
 import AppIcon from '@/components/apps/AppIcon.vue'
 import JobRow from '@/components/updates/JobRow.vue'
 import LogView from '@/components/logs/LogView.vue'
+import UpdateSection from '@/components/updates/UpdateSection.vue'
 import UpdateStateBadge from '@/components/updates/UpdateStateBadge.vue'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { processLine } from '@/utils/ansi'
