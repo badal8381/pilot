@@ -33,14 +33,14 @@
 
     <!-- Always the grid shape: `view` resets to 'grid' on every mount, and a
          mount is the only time this is loading. -->
-    <div v-if="loading" class="gap-3 grid grid-cols-1 md:grid-cols-2 mt-4">
+    <div v-if="loading" class="gap-3 grid grid-cols-1 md:grid-cols-2 mt-1">
       <SiteSkeleton v-for="index in 4" :key="index" :index="index - 1" />
     </div>
     <div v-else-if="error" class="mt-16">
       <ErrorMessage :message="error" />
     </div>
 
-    <div v-else-if="filteredSites.length" class="mt-4">
+    <div v-else-if="filteredSites.length" class="mt-1">
       <!-- A single result keeps the full width. -->
       <div
         v-if="view === 'grid'"
@@ -68,7 +68,7 @@
               <div class="gap-2 grid grid-cols-[3fr_1fr]">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <!-- Site Name -->
-                  <span class="font-semibold text-ink-gray-9 text-base truncate">
+                  <span class="font-medium text-ink-gray-9 text-base truncate">
                     {{ site.name }}
                   </span>
 
