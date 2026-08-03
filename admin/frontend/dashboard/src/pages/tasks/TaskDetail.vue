@@ -53,18 +53,14 @@
 
     <div class="flex justify-between items-center gap-4 mt-5 px-2 min-w-0">
       <RouterLink
-        v-if="site?.route"
-        :to="site.route"
+        :to="scope.route"
         class="group flex items-center gap-1 min-w-0 font-medium text-ink-gray-9 text-lg no-underline"
       >
-        <span class="truncate">{{ site.label }}</span>
+        <span class="truncate">{{ scope.label }}</span>
         <span
           class="opacity-0 group-hover:opacity-100 size-4 text-ink-gray-5 transition-opacity shrink-0 lucide-arrow-up-right"
         />
       </RouterLink>
-      <p v-else-if="site" class="min-w-0 font-medium text-ink-gray-9 text-lg truncate">
-        {{ site.label }}
-      </p>
       <p class="text-ink-gray-8 text-base shrink-0">{{ metaLine }}</p>
     </div>
 
@@ -143,9 +139,10 @@ async function loadAiStatus() {
   }
 }
 
-const site = computed(() => {
+// What the task ran against. A bench-level task has no site; it belongs to the server.
+const scope = computed(() => {
   const label = siteLabel(task.value)
-  if (label === 'Server-level') return null
+  if (label === 'Server-level') return { label: 'Server', route: { name: 'Server' } }
   return { label, route: siteRoute(task.value) }
 })
 
