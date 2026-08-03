@@ -49,7 +49,8 @@
             :key="job.id"
             variant="ghost"
             size="sm"
-            icon-left="lucide-square-terminal"
+            :theme="isJobFailed(job) ? 'red' : 'gray'"
+            :icon-left="isJobFailed(job) ? 'lucide-circle-x' : 'lucide-square-terminal'"
             @click="openTaskLog(job)"
           >
             {{ job.label }}
@@ -263,10 +264,14 @@
                   v-for="job in siteJobs(site.name)"
                   :key="job.id"
                   type="button"
-                  class="flex items-center gap-1.5 px-1.5 py-1.5 rounded transition-colors w-full text-ink-gray-7 hover:bg-surface-gray-1 text-sm text-left"
+                  class="flex items-center gap-1.5 px-1.5 py-1.5 rounded transition-colors w-full hover:bg-surface-gray-1 text-sm text-left"
+                  :class="isJobFailed(job) ? 'text-ink-red-7' : 'text-ink-gray-7'"
                   @click="openTaskLog(job)"
                 >
-                  <span class="lucide-square-terminal size-4 shrink-0" />
+                  <span
+                    class="size-4 shrink-0"
+                    :class="isJobFailed(job) ? 'lucide-circle-x' : 'lucide-square-terminal'"
+                  />
                   {{ job.label }}
                 </button>
               </div>
@@ -396,6 +401,10 @@ const durationSeconds = computed(() => {
 
 // Bench-wide chain tasks (update, revert apps, restart); site-bound ones live in the site tree.
 const serverJobs = computed(() => (op.value?.task_logs || []).filter((log) => !log.site))
+
+// A retried step leaves several jobs behind, so only the one that broke the chain
+// earns colour. Killing a migrate mid-run stops the update just as a crash does.
+const isJobFailed = (job) => job.status === 'failed' || job.status === 'killed'
 
 const alertTitle = computed(() =>
   op.value?.state === 'revert_failed' ? 'Restore failed' : 'This update needs attention',
