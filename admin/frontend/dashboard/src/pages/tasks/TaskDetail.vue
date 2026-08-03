@@ -51,7 +51,7 @@
 
     <TaskDebugDialog v-model="showDebug" :task-id="taskId" />
 
-    <div class="flex justify-between items-center gap-4 px-2 min-w-0">
+    <div class="flex justify-between items-center gap-4 mt-5 px-2 min-w-0">
       <RouterLink
         v-if="site?.route"
         :to="site.route"
@@ -71,7 +71,7 @@
     <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
 
     <!-- Steps -->
-    <div class="mt-4">
+    <div class="mt-3">
       <TaskStream
         v-if="isTaskActive(task)"
         :url="tasksApi.streamUrl(taskId)"
