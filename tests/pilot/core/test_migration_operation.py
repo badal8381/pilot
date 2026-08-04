@@ -258,7 +258,7 @@ def test_update_operation_captures_tag_pinned_target(tmp_path: Path) -> None:
 def _site_with_apps(name: str, apps: list[str]) -> MagicMock:
     site = MagicMock()
     site.config.name = name
-    site.installed_apps.return_value = apps
+    site.active_apps.return_value = apps
     return site
 
 

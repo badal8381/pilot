@@ -54,7 +54,7 @@ def drop_site(page: Page, base_url: str, site_name: str) -> None:
 def installed_apps(page: Page, base_url: str, site_name: str) -> list[str]:
     res = page.request.get(f"{base_url}/api/v1/sites/{site_name}")
     expect(res).to_be_ok()
-    return res.json().get("installed_apps") or []
+    return res.json().get("active_apps") or []
 
 
 def site_exists(page: Page, base_url: str, site_name: str) -> bool:

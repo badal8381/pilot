@@ -34,11 +34,11 @@ class MigrationStore:
         )
 
     def _sites_for_apps(self, names: set[str]) -> list[str]:
-        """Sites where at least one of `names` is installed, plus any site whose installed-apps lookup came back empty (every real site has 'frappe', so empty means the lookup failed, not that nothing applies)."""
+        """Sites where at least one of `names` is installed, plus any site whose active-apps lookup came back empty (every real site has 'frappe', so empty means the lookup failed, not that nothing applies)."""
         result = []
         for site in self.bench.sites():
-            installed = set(site.installed_apps())
-            if not installed or names & installed:
+            active = set(site.active_apps())
+            if not active or names & active:
                 result.append(site.config.name)
         return result
 

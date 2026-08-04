@@ -127,7 +127,8 @@ export function useSite(name) {
     return sitesApi.configuration.update(name, config)
   }
 
-  const installedApps = computed(() => store.site.value?.installed_apps || [])
+  // Active apps are what the UI calls installed - a disabled app reads as uninstalled.
+  const installedApps = computed(() => store.site.value?.active_apps || [])
 
   const status = computed(() => {
     if (!store.site.value) return 'unknown'

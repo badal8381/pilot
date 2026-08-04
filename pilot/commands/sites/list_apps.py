@@ -20,5 +20,5 @@ class ListSiteAppsCommand(Command):
         self.site: "Site" = self.bench.site(self.site_name)
 
     def run(self) -> None:
-        for app in self.site.installed_apps():
+        for app in self.site.active_apps():
             self.report(app)

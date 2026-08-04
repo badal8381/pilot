@@ -105,11 +105,11 @@ const installableSites = computed(() => props.sites.filter((s) => !isInstalled(s
 const showAllSitesOption = computed(() => props.sites.length > 1 && installableSites.value.length > 1)
 
 function isInstalled(site) {
-  return Boolean(props.app && site.installed_apps?.includes(props.app.name))
+  return Boolean(props.app && site.active_apps?.includes(props.app.name))
 }
 
 function siteMeta(site) {
-  const n = site.installed_apps?.length || 0
+  const n = site.active_apps?.length || 0
   return `${n} app${n === 1 ? '' : 's'}`
 }
 
