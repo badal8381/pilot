@@ -27,13 +27,8 @@
         :class="[hasOutput ? '' : 'invisible', expanded ? 'rotate-180' : '']"
       />
     </div>
-    <LogView
-      v-if="expanded && hasOutput"
-      class="mt-1"
-      :lines="lines"
-      :streaming="streaming"
-      :rounded="false"
-    />
+    <!-- The step list insets this by p-1, so its rounding never reaches here. -->
+    <LogView v-if="expanded && hasOutput" class="mt-1" :lines="lines" :streaming="streaming" />
   </div>
 </template>
 
