@@ -122,13 +122,15 @@ import { useSiteStorage } from '@/composables/sites/useSiteStorage'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { openTaskDetailPage } from '@/utils/taskRoute'
+import { toSentenceCase } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
 const siteName = route.params.name
 
 const { setBreadcrumbs } = useBreadcrumbs()
-const { site, loading, error, status, load, reload, login, backup } = useSite(siteName)
+const { site, loading, error, status, load, reload, login, backup, apps, loadApps } =
+  useSite(siteName)
 
 const { load: loadStorage, storageLabel } = useSiteStorage()
 const storageUsed = computed(() => storageLabel(siteName))
@@ -184,8 +186,10 @@ watch(
   appAction,
   async (value) => {
     if (!value) return
-    await appRegistry.load()
-    const title = appRegistry.titleMap.value[value.app] || value.app
+    await Promise.all([appRegistry.load(), loadApps()])
+    const appDetail = apps.value.find((app) => app.name === value.app)
+    const title =
+      appRegistry.titleMap.value[value.app] || toSentenceCase(appDetail?.title) || value.app
     toast.success(`${title} ${APP_ACTIONS[value.action]} on ${siteName}`)
     router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
   },
