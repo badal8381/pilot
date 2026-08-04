@@ -293,6 +293,8 @@ Starting an update or standalone migration returns both an operation identity an
 
 The global migration status button shows unresolved failures before active work, and active work before ordinary update availability.
 
+The list page filters by status through five tabs — All, Running, Attention, Completed, Reverted — held in the `status` query parameter so a filtered view survives a reload. Running covers every in-flight state and Attention covers both `needs_attention` and `revert_failed`, groupings the `status` API parameter cannot express because it matches one state exactly; the list therefore filters client-side over the page it already fetched.
+
 The detail page groups the chain into a Server section and a Sites section, split on whether a `task_logs` entry names a site: bench-level tasks (`update`, `revert-apps`, `restart-services`) on one side, per-site ones under their site row on the other. Every entry carries the task's own `status`, which is how the UI marks the attempt that failed; it is `null` only when the task is no longer readable. The Target Apps card shows the original and updated commit and offers a GitHub comparison link when the app uses a GitHub repository.
 
 ## Code Map

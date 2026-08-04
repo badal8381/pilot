@@ -1,6 +1,8 @@
 <template>
   <div class="mx-auto max-w-3xl">
-    <Teleport defer to="#header-actions">
+    <!-- The tabs need a phone's full content width, so Refresh only joins them
+         once there is room to spare. -->
+    <Teleport v-if="isMobile" defer to="#header-actions">
       <Button
         variant="subtle"
         size="sm"
@@ -12,65 +14,123 @@
       />
     </Teleport>
 
-    <div v-if="loading && !operations.length" class="-mx-3">
+    <!-- A flex item sizes to the strip's natural width and overflows the screen;
+         a block child is held to the content width and fits. -->
+    <StickyToolbar :class="isMobile ? '' : 'flex items-center gap-2'">
+      <TabButtons
+        :size="isMobile ? 'md' : 'sm'"
+        :options="UPDATE_FILTERS"
+        :modelValue="statusFilter"
+        @update:modelValue="onFilterChange"
+      />
+      <Button
+        v-if="!isMobile"
+        class="ml-auto"
+        variant="subtle"
+        size="sm"
+        :loading="loading"
+        icon="lucide-refresh-cw"
+        label="Refresh"
+        tooltip="Refresh"
+        @click="load"
+      />
+    </StickyToolbar>
+
+    <div v-if="loading && !operations.length" class="-mx-3 mt-4">
       <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
     </div>
     <div v-else-if="error" class="mt-4">
       <ErrorMessage :message="error" />
     </div>
 
-    <div
-      v-else-if="operations.length"
-      class="flex flex-col -mx-3 divide-y divide-outline-gray-1"
+    <!-- ListRow's own hover paints surface-sidebar, transparent in the dark
+         theme. Rows are links, hence the descendant selector. -->
+    <ListView
+      v-else-if="rows.length"
+      class="mt-4 [&_a:hover]:bg-surface-gray-1"
+      :columns="columns"
+      :rows="rows"
+      row-key="id"
+      :options="{ selectable: false, showTooltip: true, getRowRoute }"
     >
-      <RouterLink
-        v-for="op in operations"
-        :key="op.id"
-        :to="{ name: 'UpdateDetail', params: { operationId: op.id } }"
-        class="items-center gap-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] hover:bg-surface-gray-1 px-3 py-2.5 rounded no-underline transition-colors"
-      >
-        <div class="min-w-0">
-          <!-- A block, not a span: `truncate` is inert on an inline box. -->
-          <p class="font-medium text-ink-gray-9 text-base truncate">{{ opTitle(op) }}</p>
-          <p class="mt-0.5 text-ink-gray-6 text-p-sm truncate">{{ subtitle(op) }}</p>
-        </div>
-
+      <template #cell="{ column, row, item }">
         <!-- Completed is the norm; only exceptional states get a badge. -->
         <Badge
-          v-if="badge(op)"
-          :label="badge(op).label"
-          :theme="badge(op).theme"
+          v-if="column.key === 'badge'"
+          v-show="row.badge"
+          :label="row.badge?.label"
+          :theme="row.badge?.theme"
           variant="subtle"
         />
-        <span v-else />
-        <div class="flex justify-end items-center gap-3 min-w-0">
-          <span class="text-ink-gray-6 text-sm truncate">{{ timing(op) }}</span>
-          <span class="lucide-chevron-right size-4 text-ink-gray-6 shrink-0" />
-        </div>
-      </RouterLink>
-    </div>
+        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      </template>
+    </ListView>
 
     <EmptyState
       v-else
+      class="mt-8"
       icon="lucide-git-pull-request-arrow"
-      title="No updates yet"
-      description="App updates across your sites appear here, with backup and recovery."
+      :title="isFiltered ? 'No matching updates' : 'No updates yet'"
+      :description="
+        isFiltered
+          ? 'No updates are in this state right now.'
+          : 'App updates across your sites appear here, with backup and recovery.'
+      "
     />
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
-import { Badge, Button, ErrorMessage } from 'frappe-ui'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Badge, Button, ErrorMessage, ListRowItem, ListView, TabButtons } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 import { updatesApi } from '@/api/updates'
-import { opTitle, pendingActionLabel, stateLabel, stateTone } from '@/utils/updateFormat'
-import { fmtDateTime, fmtDuration, relativeTime } from '@/utils/taskFormat'
+import {
+  matchesUpdateFilter,
+  opTitle,
+  pendingActionLabel,
+  siteNames,
+  sitesLabel,
+  stateLabel,
+  stateTone,
+  UPDATE_FILTERS,
+} from '@/utils/updateFormat'
+import { fmtDuration, relativeTime } from '@/utils/taskFormat'
+
+const route = useRoute()
+const router = useRouter()
+const isMobile = useIsMobile()
 
 const operations = ref([])
 const loading = ref(false)
 const error = ref('')
+
+const FILTER_VALUES = UPDATE_FILTERS.map((option) => option.value)
+
+// In the URL like the tasks list, so a filtered view survives a reload and can
+// be pasted to someone else.
+const statusFilter = computed(() => {
+  const value = typeof route.query.status === 'string' ? route.query.status : 'all'
+  return FILTER_VALUES.includes(value) ? value : 'all'
+})
+const isFiltered = computed(() => statusFilter.value !== 'all')
+
+// Filtered here rather than by the API: its status filter matches a single
+// state, and every tab but Completed and Reverted covers several.
+const visibleOperations = computed(() =>
+  operations.value.filter((op) => matchesUpdateFilter(op, statusFilter.value)),
+)
+
+function onFilterChange(value) {
+  const query = { ...route.query }
+  if (value === 'all') delete query.status
+  else query.status = value
+  router.replace({ name: 'Updates', query })
+}
 
 function badge(op) {
   if (op.pending_action) return { label: pendingActionLabel(op.pending_action), theme: 'amber' }
@@ -79,12 +139,29 @@ function badge(op) {
   return { label: stateLabel(op.state), theme: tone === 'orange' ? 'amber' : tone }
 }
 
-// Two runs of the same apps share a title, so the run time stays on the row to tell them apart.
-function subtitle(op) {
-  const sites = op.sites || []
-  const where = sites.length === 1 ? sites[0].name : `${sites.length} sites`
-  return [where, fmtDateTime(op.started_at || op.created_at)].join(' · ')
-}
+// Numeric widths are fr units (ListView convention) so the columns stretch to
+// fill the row instead of leaving dead space.
+const columns = [
+  { label: 'Update', key: 'title', align: 'left', width: 2 },
+  { label: 'Site', key: 'site', align: 'left', width: 2, getTooltip: (row) => row.siteNames },
+  { label: 'Status', key: 'badge', align: 'left', width: 1.5 },
+  { label: 'Last run', key: 'timing', align: 'right', width: 2 },
+]
+
+// ListRowItem reads row[column.key], so the operation is flattened to the four
+// strings the columns render.
+const rows = computed(() =>
+  visibleOperations.value.map((op) => ({
+    id: op.id,
+    title: opTitle(op),
+    site: sitesLabel(op),
+    siteNames: siteNames(op),
+    badge: badge(op),
+    timing: timing(op),
+  })),
+)
+
+const getRowRoute = (row) => ({ name: 'UpdateDetail', params: { operationId: row.id } })
 
 function timing(op) {
   const parts = []
@@ -103,9 +180,9 @@ async function load() {
       updatesApi.current().catch(() => null),
       updatesApi.list({ limit: 50 }),
     ])
-    const rows = history.data || []
+    const past = history.data || []
     // Pin the active/unresolved operation at the top (it is also in history).
-    operations.value = current ? [current, ...rows.filter((op) => op.id !== current.id)] : rows
+    operations.value = current ? [current, ...past.filter((op) => op.id !== current.id)] : past
   } catch (e) {
     error.value = e?.message || 'Could not load updates.'
   } finally {
