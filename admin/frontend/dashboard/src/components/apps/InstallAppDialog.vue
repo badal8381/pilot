@@ -130,7 +130,7 @@ async function installOnSite(name) {
   const taskId = await startInstall(site)
   open.value = false
   if (taskId) openTaskDetailPage(router, taskId)
-  else openSitePage(router, site.name)
+  else openSitePage(router, site.name, props.app.name)
 }
 
 async function installOnAllSites() {
@@ -139,7 +139,7 @@ async function installOnAllSites() {
   const taskIds = await Promise.all(targets.map((site) => startInstall(site)))
   open.value = false
   if (taskIds.some(Boolean)) router.push({ name: 'Tasks' })
-  else if (targets.length === 1) openSitePage(router, targets[0].name)
+  else if (targets.length === 1) openSitePage(router, targets[0].name, props.app.name)
   else router.push({ name: 'Sites' })
 }
 
