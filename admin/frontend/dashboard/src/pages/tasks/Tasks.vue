@@ -111,7 +111,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -135,8 +135,6 @@ const router = useRouter()
 const isMobile = useIsMobile()
 const { tasks, loading, error, load } = useTasks()
 
-const statusFilter = ref('all')
-
 const filterOptions = [
   { label: 'All', value: 'all' },
   { label: 'Queued', value: 'queued' },
@@ -144,8 +142,13 @@ const filterOptions = [
   { label: 'Failed', value: 'failed' },
   { label: 'Succeeded', value: 'success' },
 ]
+const STATUS_VALUES = filterOptions.map((option) => option.value)
 
-// Both filters live in the URL so filtered views are shareable.
+// All three filters live in the URL so filtered views are shareable.
+const statusFilter = computed(() => {
+  const value = typeof route.query.status === 'string' ? route.query.status : 'all'
+  return STATUS_VALUES.includes(value) ? value : 'all'
+})
 const siteFilter = computed(() => (typeof route.query.site === 'string' ? route.query.site : ''))
 const typeFilter = computed(() => (typeof route.query.type === 'string' ? route.query.type : ''))
 
@@ -201,7 +204,7 @@ const isFiltered = computed(
 )
 
 function onFilterChange(value) {
-  statusFilter.value = value
+  setFilterQuery({ status: value === 'all' ? '' : value })
   load(value)
 }
 
