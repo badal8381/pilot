@@ -76,11 +76,15 @@ class ProcessDefinitionBuilder:
             return self.web_definition(dev=True)
         return pd
 
-    def py_memory_env(self) -> dict:
+    def python_env(self) -> dict:
+        """Shared env for Python processes. PYTHONUNBUFFERED keeps stdout unbuffered:
+        every runner captures it into a pipe or log file, where Python would otherwise
+        block-buffer app-code print() until ~8KB accumulates."""
+        env = {"PYTHONUNBUFFERED": "1"}
         arenas = self.bench.config.gunicorn.malloc_arena_max
         if arenas and arenas > 0:
-            return {"MALLOC_ARENA_MAX": str(arenas)}
-        return {}
+            env["MALLOC_ARENA_MAX"] = str(arenas)
+        return env
 
     def web_definition(self, dev: bool = False) -> ProcessDefinition:
         sites = self.bench.sites_path
@@ -101,7 +105,7 @@ class ProcessDefinitionBuilder:
                 name="web",
                 argv=argv,
                 log_file=self.bench.logs_path / "web.log",
-                env={"DEV_SERVER": "1"},
+                env={**self.python_env(), "DEV_SERVER": "1"},
                 working_dir=sites,
             )
         gunicorn = self.bench.env_path / "bin" / "gunicorn"
@@ -110,7 +114,7 @@ class ProcessDefinitionBuilder:
             name="web",
             argv=[str(gunicorn), "-c", "../config/gunicorn.conf.py", "frappe.app:application"],
             log_file=self.bench.logs_path / "web.log",
-            env=self.py_memory_env(),
+            env=self.python_env(),
             working_dir=sites,
             stop_timeout=1600 if companion else None,
         )
@@ -119,7 +123,7 @@ class ProcessDefinitionBuilder:
         if self.bench.config.socketio_backend == "python":
             argv = [str(self.python), "-m", "frappe.realtime.server"]
             working_dir = self.bench.path
-            backend_env = self.py_memory_env()
+            backend_env = self.python_env()
         else:
             argv = ["node", f"{self.bench.apps_path}/frappe/socketio.js"]
             working_dir = self.bench.sites_path
@@ -139,6 +143,7 @@ class ProcessDefinitionBuilder:
             name="watch",
             argv=[str(self.python), "-m", "frappe.utils.bench_helper", "frappe", "watch"],
             log_file=self.bench.logs_path / "watch.log",
+            env=self.python_env(),
             working_dir=self.bench.sites_path,
             critical=False,
         )
@@ -158,7 +163,7 @@ class ProcessDefinitionBuilder:
                 queues,
             ],
             log_file=self.bench.logs_path / "worker_pool.log",
-            env=self.py_memory_env(),
+            env=self.python_env(),
             working_dir=self.bench.sites_path,
         )
 
@@ -179,7 +184,7 @@ class ProcessDefinitionBuilder:
                     queue,
                 ],
                 log_file=self.bench.logs_path / f"worker_{slug}_{i}.log",
-                env=self.py_memory_env(),
+                env=self.python_env(),
                 working_dir=sites,
             )
             for i in range(1, count + 1)
@@ -211,6 +216,7 @@ class ProcessDefinitionBuilder:
             ],
             log_file=self.bench.logs_path / "admin.log",
             env={
+                **self.python_env(),
                 "BENCH_ADMIN_ROOT": str(self.bench.path),
                 "PYTHONPATH": str(root),
                 "MALLOC_ARENA_MAX": "2",
@@ -240,7 +246,7 @@ class ProcessDefinitionBuilder:
                 mode_flag,
             ],
             log_file=self.bench.logs_path / "admin.log",
-            env={"PYTHONPATH": str(root)},
+            env={**self.python_env(), "PYTHONPATH": str(root)},
         )
 
     def admin_frontend_dev_definition(self) -> ProcessDefinition:
