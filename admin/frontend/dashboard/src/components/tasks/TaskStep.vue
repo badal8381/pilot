@@ -32,6 +32,7 @@
       class="mt-1"
       :lines="lines"
       :streaming="streaming"
+      :rounded="false"
     />
   </div>
 </template>
