@@ -1,16 +1,13 @@
 <template>
   <div>
     <p class="font-semibold text-ink-gray-8 text-base">General</p>
-    <!-- Matches SettingsRow: label text-base ink-gray-8 medium, description text-p-sm ink-gray-6. -->
-    <div
-      class="mt-1 [&_[data-slot='label']]:font-medium [&_[data-slot='label']]:text-ink-gray-8 [&_[data-slot='description']]:text-ink-gray-6"
-    >
+    <div class="mt-1">
       <div
         v-for="s in visibleSettings"
         :key="s.key"
         class="py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
       >
-        <Switch
+        <SettingsSwitch
           :label="s.label"
           :description="s.description"
           :model-value="getValue(s)"
@@ -25,7 +22,8 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { ErrorMessage, Switch } from 'frappe-ui'
+import { ErrorMessage } from 'frappe-ui'
+import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
 import { useSite } from '@/composables/sites/useSite'
 import { sitesApi } from '@/api/sites'
 import { settingsApi } from '@/api/settings'

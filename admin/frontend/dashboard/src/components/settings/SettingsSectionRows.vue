@@ -3,28 +3,24 @@
     <component :is="openSection.component" @passwordChanged="handlePasswordChanged" />
   </div>
 
-  <div v-else class="divide-y divide-outline-alpha-gray-1">
+  <!-- -mx cancels the rows' own padding, so their text still lines up with the
+       section heading while a hovered row reads as inset. -->
+  <div v-else class="-mx-2.5 divide-y divide-outline-alpha-gray-1">
     <SettingsRow
       v-for="section in sections"
       :key="section.id"
+      as="button"
+      interactive
       :label="section.label"
       :description="section.description"
+      @click="openSection = section"
     >
-      <!-- Icon-only: `label` is not rendered but becomes the accessible name. A
-           plain aria-label attr would be overwritten by Button's own. -->
-      <Button
-        size="sm"
-        variant="ghost"
-        icon="lucide-chevron-right"
-        :label="`${section.action || 'Manage'} ${section.label}`"
-        @click="openSection = section"
-      />
+      <span class="size-4 text-ink-gray-5 lucide-chevron-right" aria-hidden="true" />
     </SettingsRow>
   </div>
 </template>
 
 <script setup>
-import { Button } from 'frappe-ui'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 
 defineProps({ sections: { type: Array, required: true } })
