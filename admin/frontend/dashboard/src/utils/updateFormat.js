@@ -1,5 +1,41 @@
 import { fmtDateTime } from './taskFormat.js'
 
+export const ACTIVE_STATES = [
+  'preparing',
+  'backing_up',
+  'updating',
+  'migrating',
+  'retrying',
+  'reverting_apps',
+  'reverting_sites',
+  'restarting',
+]
+export const ATTENTION_STATES = ['needs_attention', 'revert_failed']
+
+// The API's status filter matches one state exactly, so these groups can only
+// be applied client-side.
+const FILTER_STATES = {
+  active: ACTIVE_STATES,
+  attention: ATTENTION_STATES,
+  completed: ['completed'],
+  reverted: ['reverted'],
+}
+
+// One-word labels: five of them have to fit a 375px phone without scrolling.
+export const UPDATE_FILTERS = [
+  { label: 'All', value: 'all' },
+  { label: 'Running', value: 'active' },
+  { label: 'Attention', value: 'attention' },
+  { label: 'Completed', value: 'completed' },
+  { label: 'Reverted', value: 'reverted' },
+]
+
+// Every state belongs to exactly one group, so no update is unreachable.
+export function matchesUpdateFilter(operation, filter) {
+  if (filter === 'all') return true
+  return (FILTER_STATES[filter] || []).includes(operation?.state)
+}
+
 export function opTitle(op) {
   if (op?.kind === 'site_migrate') return `Migrate ${op.sites?.[0]?.name || 'site'}`
   // Operations store no name; two picked apps read fine by name, more become a count.
@@ -8,6 +44,22 @@ export function opTitle(op) {
   const count = picked.length || op?.apps?.length || 0
   if (count) return `Update ${count} app${count === 1 ? '' : 's'}`
   return fmtDateTime(op?.started_at || op?.created_at)
+}
+
+/**
+ * The Site column. One site reads by name; several would outgrow the column, so
+ * they collapse to a count and `siteNames` carries the full list into the cell's
+ * tooltip. An operation touching no site is bench-level work.
+ */
+export function sitesLabel(op) {
+  const sites = op?.sites || []
+  if (!sites.length) return 'Server'
+  if (sites.length === 1) return sites[0].name
+  return `${sites.length} sites`
+}
+
+export function siteNames(op) {
+  return (op?.sites || []).map((site) => site.name).join(', ')
 }
 
 export function patchSkipped(op) {

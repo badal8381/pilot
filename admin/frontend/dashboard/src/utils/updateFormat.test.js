@@ -2,12 +2,16 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  matchesUpdateFilter,
   opTitle,
   patchSkipped,
   pendingActionLabel,
+  siteNames,
   siteStatus,
+  sitesLabel,
   stateLabel,
   stateTone,
+  UPDATE_FILTERS,
 } from './updateFormat.js'
 import { fmtDateTime } from './taskFormat.js'
 
@@ -83,6 +87,67 @@ test('siteStatus formats per-site lifecycle', () => {
   assert.equal(siteStatus({ migration_status: 'failed' }).label, 'Failed')
   assert.equal(siteStatus({ backup_status: 'backing_up' }).label, 'Backing up')
   assert.equal(siteStatus({ backup_status: 'pending' }).label, 'Pending')
+})
+
+test('sitesLabel names one site and counts the rest', () => {
+  assert.equal(sitesLabel({ sites: [{ name: 'a.localhost' }] }), 'a.localhost')
+  assert.equal(sitesLabel({ sites: [{ name: 'a.localhost' }, { name: 'b.localhost' }] }), '2 sites')
+  assert.equal(sitesLabel({ sites: Array(12).fill({ name: 'x' }) }), '12 sites')
+})
+
+test('sitesLabel calls an operation with no sites bench-level', () => {
+  assert.equal(sitesLabel({ sites: [] }), 'Server')
+  assert.equal(sitesLabel({}), 'Server')
+  assert.equal(sitesLabel(null), 'Server')
+})
+
+test('siteNames spells out the full list for the tooltip', () => {
+  assert.equal(
+    siteNames({ sites: [{ name: 'a.localhost' }, { name: 'b.localhost' }] }),
+    'a.localhost, b.localhost',
+  )
+  assert.equal(siteNames({}), '')
+})
+
+test('matchesUpdateFilter groups the states behind each tab', () => {
+  assert.equal(matchesUpdateFilter({ state: 'needs_attention' }, 'all'), true)
+  assert.equal(matchesUpdateFilter({ state: 'backing_up' }, 'active'), true)
+  assert.equal(matchesUpdateFilter({ state: 'completed' }, 'active'), false)
+  // A failed revert still wants a human, so it sits with the other red state.
+  assert.equal(matchesUpdateFilter({ state: 'needs_attention' }, 'attention'), true)
+  assert.equal(matchesUpdateFilter({ state: 'revert_failed' }, 'attention'), true)
+  assert.equal(matchesUpdateFilter({ state: 'completed' }, 'completed'), true)
+  assert.equal(matchesUpdateFilter({ state: 'reverted' }, 'reverted'), true)
+})
+
+test('matchesUpdateFilter survives an unknown filter or a stateless operation', () => {
+  assert.equal(matchesUpdateFilter({ state: 'completed' }, 'nonsense'), false)
+  assert.equal(matchesUpdateFilter({}, 'active'), false)
+  assert.equal(matchesUpdateFilter(null, 'all'), true)
+})
+
+// The canary: a new state added without a home would be filtered out of every
+// tab but All, so it would silently vanish from four of the five views.
+test('every operation state belongs to exactly one tab', () => {
+  const states = [
+    'completed',
+    'reverted',
+    'needs_attention',
+    'revert_failed',
+    'preparing',
+    'backing_up',
+    'updating',
+    'migrating',
+    'retrying',
+    'reverting_apps',
+    'reverting_sites',
+    'restarting',
+  ]
+  const tabs = UPDATE_FILTERS.filter(({ value }) => value !== 'all')
+  for (const state of states) {
+    const matched = tabs.filter(({ value }) => matchesUpdateFilter({ state }, value))
+    assert.equal(matched.length, 1, `${state} matched ${matched.length} tabs, expected 1`)
+  }
 })
 
 test('pendingActionLabel describes a queued action', () => {
