@@ -2,71 +2,44 @@
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
-  <div v-else class="space-y-6">
-    <div class="space-y-6">
-      <Switch
-        label="Enable WAF"
-        description="ModSecurity + OWASP Core Rule Set inspects request contents (SQLi, XSS, path traversal) for all sites and the admin."
+  <div v-else class="space-y-12">
+    <div class="space-y-4">
+      <SettingsSwitch
+        label="Enable web application firewall"
+        description="Inspects request contents for SQLi, XSS and path traversal, across all sites and the admin."
         :model-value="enabled"
         @update:model-value="(v) => (enabled = v)"
       />
 
-      <Alert v-if="!production" title="Not enforced yet" theme="yellow" :dismissible="false">
-        <template #description>
-          <span class="text-ink-gray-6 text-p-sm"
-            >The WAF takes effect only in production (it's applied by nginx). This bench isn't
-            deployed, so nothing is enforced until you run
-            <span class="font-mono text-xs">pilot setup production</span>.</span
-          >
-        </template>
-      </Alert>
+      <p v-if="setupNote" class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm">
+        <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
+        <span>{{ setupNote }}</span>
+      </p>
 
-      <Alert
-        v-if="production && enabled && !installed"
-        title="ModSecurity not installed"
-        theme="yellow"
-        :dismissible="false"
-      >
-        <template #description>
-          <span class="text-ink-gray-6 text-p-sm"
-            >The ModSecurity module isn't installed on this host, so the WAF stays inactive even
-            when enabled. Redeploy production (<span class="font-mono text-xs"
-              >pilot setup production</span
-            >) to install it, then it takes effect.</span
-          >
-        </template>
-      </Alert>
-
-      <div>
-        <p class="mb-3 font-medium text-ink-gray-8 text-base leading-normal">
-          Managed ruleset (OWASP CRS)
-        </p>
-        <div class="gap-4 grid grid-cols-2">
+      <div class="items-start gap-4 grid grid-cols-1 sm:grid-cols-2">
+        <div class="space-y-1.5">
           <FormControl type="select" label="Action" :options="ACTION_OPTIONS" v-model="mode" />
-          <FormControl
-            type="select"
-            label="Sensitivity"
-            :options="SENSITIVITY_OPTIONS"
-            v-model="paranoia"
-          />
+          <p v-if="mode === 'DetectionOnly'" class="text-ink-gray-5 text-p-sm">
+            Matches are logged, not blocked. Review
+            <RouterLink
+              class="text-ink-gray-7 hover:text-ink-gray-8"
+              :to="{ name: 'Analytics', query: { view: 'system', window: '1h' } }"
+              >the firewall analytics</RouterLink
+            >, then switch to Block.
+          </p>
+          <p v-else class="text-ink-gray-5 text-p-sm">{{ ACTION_HINTS[mode] }}</p>
+        </div>
+        <div class="space-y-1.5">
+          <!-- Label markup matches frappe-ui's InputLabel. -->
+          <span class="block text-ink-gray-5 text-base">Sensitivity</span>
+          <TabButtons :options="SENSITIVITY_OPTIONS" v-model="paranoia" />
+          <p class="text-ink-gray-5 text-p-sm">{{ sensitivityHint }}</p>
         </div>
       </div>
-
-      <Alert
-        v-if="enabled && mode === 'DetectionOnly'"
-        title="Log only"
-        theme="yellow"
-        :dismissible="false"
-      >
-        <template #description>
-          <span class="text-ink-gray-6 text-p-sm"
-            >Matches (managed <b>and</b> custom rules) are <b>logged, not blocked</b>. Review the
-            WAF analytics, then switch Action to <b>Block</b> to enforce.</span
-          >
-        </template>
-      </Alert>
     </div>
 
+    <!-- Visible with the WAF off: rules are staged first and save independently
+         of `enabled`. -->
     <WafCustomRules
       v-model="customRules"
       :fields="ruleFields"
@@ -75,60 +48,92 @@
     />
 
     <details class="group">
-      <summary class="flex items-center gap-1.5 text-ink-gray-6 text-sm cursor-pointer select-none">
+      <!-- Chrome marks a clicked summary :focus-visible; blur keeps the focus
+           ring for keyboard only. w-fit so the ring hugs the word. -->
+      <summary
+        class="flex items-center gap-1.5 pr-1.5 rounded-sm w-fit text-ink-gray-6 text-base cursor-pointer select-none"
+        @click="(e) => e.currentTarget.blur()"
+      >
         <span
           class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
         ></span>Advanced
       </summary>
       <div class="space-y-4 mt-4">
-        <div class="gap-4 grid grid-cols-2 items-start">
-          <FormControl type="number" label="Anomaly threshold" min="1" v-model="inboundThreshold" />
-          <FormControl
-            type="text"
-            label="Max inspected body size"
-            placeholder="50m"
-            v-model="bodyLimit"
-          />
+        <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 items-start">
+          <div class="space-y-1.5">
+            <FormControl
+              type="number"
+              label="Anomaly threshold"
+              min="1"
+              v-model="inboundThreshold"
+            />
+            <p v-if="thresholdError" class="text-ink-red-6 text-p-sm">{{ thresholdError }}</p>
+            <p v-else class="text-ink-gray-5 text-p-sm">
+              Score needed before Action applies. Sensitivity raises scores, so the two compound.
+            </p>
+          </div>
+          <div class="space-y-1.5">
+            <FormControl type="text" label="Max inspected body size" v-model="bodyLimit" />
+            <p class="text-ink-gray-5 text-p-sm">Number with a k, m or g suffix, e.g. 50m.</p>
+          </div>
         </div>
-        <Switch
+        <div class="space-y-1.5">
+          <FormControl
+            type="textarea"
+            label="Exempt paths"
+            :rows="3"
+            placeholder="/api/method/frappe.ping"
+            v-model="exemptPathsText"
+          />
+          <p class="text-ink-gray-5 text-p-sm">
+            One path prefix per line. Requests under these skip the firewall entirely.
+          </p>
+        </div>
+        <div class="space-y-1.5">
+          <FormControl
+            type="textarea"
+            label="Rule exclusions (SecLang)"
+            :rows="3"
+            placeholder="SecRuleRemoveById 942100"
+            v-model="exclusionsText"
+          />
+          <p class="text-ink-gray-5 text-p-sm">
+            One SecLang directive per line. Turns a managed rule off everywhere.
+          </p>
+        </div>
+        <SettingsSwitch
           label="Inspect responses"
           description="Scan outbound responses for leaks. Adds latency."
           :model-value="inspectResponses"
           @update:model-value="(v) => (inspectResponses = v)"
-        />
-        <FormControl
-          type="textarea"
-          label="Exclusions"
-          :rows="3"
-          v-model="exclusionsText"
-          placeholder="One SecLang rule per line, e.g. SecRuleRemoveById 942100"
-        />
-        <FormControl
-          type="textarea"
-          label="Exempt paths"
-          :rows="2"
-          v-model="exemptPathsText"
-          placeholder="One path prefix per line, e.g. /api/method/frappe.ping"
         />
       </div>
     </details>
 
     <ErrorMessage v-if="error" :message="error" />
 
-    <div class="flex justify-end">
-      <Button variant="solid" :loading="saving" @click="save">Save changes</Button>
+    <div v-if="dirty" class="flex justify-end">
+      <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
+        Save changes
+      </Button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, Spinner, Switch, toast } from 'frappe-ui'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { Button, ErrorMessage, FormControl, Spinner, TabButtons, toast } from 'frappe-ui'
+import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
 import WafCustomRules from '@/components/settings/WafCustomRules.vue'
 import { settingsApi } from '@/api/settings'
+import { ruleProblem } from '@/utils/wafRules'
+import { useUnsavedChanges } from '@/composables/common/useUnsavedChanges'
 
+// "Paused" leaves the module loaded and idle; the Enable switch drops it from
+// the server config. The stored value stays "Off" - only the label differs.
 const ACTION_OPTIONS = [
-  { label: 'Off', value: 'Off' },
+  { label: 'Paused', value: 'Off' },
   { label: 'Log only', value: 'DetectionOnly' },
   { label: 'Block', value: 'On' },
 ]
@@ -138,6 +143,18 @@ const SENSITIVITY_OPTIONS = [
   { label: 'High', value: 3 },
   { label: 'Very High', value: 4 },
 ]
+// CRS paranoia levels.
+const SENSITIVITY_HINTS = {
+  1: 'Very few false positives. Start here.',
+  2: 'Admin tooling may start tripping it.',
+  3: 'Expect to add exclusions.',
+  4: 'Most coverage, most false positives.',
+}
+// DetectionOnly's hint lives in the template - it carries a link.
+const ACTION_HINTS = {
+  Off: 'Loaded but idle. Nothing is inspected.',
+  On: 'Matching requests are rejected.',
+}
 
 const loading = ref(true)
 const saving = ref(false)
@@ -158,6 +175,18 @@ const ruleFields = ref([])
 const ruleOperators = ref([])
 const ruleActions = ref([])
 
+const sensitivityHint = computed(() => SENSITIVITY_HINTS[Number(paranoia.value)] || '')
+
+// `installed` only means anything in production, so at most one applies.
+const setupNote = computed(() => {
+  if (!enabled.value) return ''
+  if (!production.value)
+    return "Enforced in production only. This bench isn't deployed - run pilot setup production first."
+  if (!installed.value)
+    return 'ModSecurity is not installed on this host. Redeploy production to install it.'
+  return ''
+})
+
 function linesToArray(text) {
   return text
     .split('\n')
@@ -165,37 +194,58 @@ function linesToArray(text) {
     .filter(Boolean)
 }
 
-function validate() {
-  const threshold = Number(inboundThreshold.value)
-  if (!Number.isInteger(threshold) || threshold < 1)
-    return 'Anomaly threshold must be a positive whole number.'
-  if (!bodyLimit.value.trim()) return 'Max inspected body size is required (e.g. 50m).'
-  return ''
+function buildPayload() {
+  return {
+    enabled: enabled.value,
+    mode: mode.value,
+    paranoia: Number(paranoia.value),
+    inbound_threshold: Number(inboundThreshold.value),
+    body_limit: bodyLimit.value.trim(),
+    inspect_responses: inspectResponses.value,
+    exclusions: linesToArray(exclusionsText.value),
+    exempt_paths: linesToArray(exemptPathsText.value),
+    custom_rules: customRules.value,
+  }
 }
 
-async function save() {
-  error.value = validate()
-  if (error.value) return
+const savedPayload = ref('')
+const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
 
+// After `dirty`: useUnsavedChanges evaluates its argument immediately, and a
+// route-level guard never fires for the shell's param-only navigation.
+useUnsavedChanges(dirty)
+
+function warnIfDirty(event) {
+  if (!dirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', warnIfDirty))
+onUnmounted(() => window.removeEventListener('beforeunload', warnIfDirty))
+
+const thresholdError = computed(() => {
+  const threshold = Number(inboundThreshold.value)
+  if (Number.isInteger(threshold) && threshold >= 1) return ''
+  return 'Must be a positive whole number.'
+})
+const canSave = computed(
+  () =>
+    !thresholdError.value &&
+    Boolean(bodyLimit.value.trim()) &&
+    !customRules.value.some((rule) => ruleProblem(rule)),
+)
+
+async function save() {
   saving.value = true
   try {
-    const payload = {
-      enabled: enabled.value,
-      mode: mode.value,
-      paranoia: Number(paranoia.value),
-      inbound_threshold: Number(inboundThreshold.value),
-      body_limit: bodyLimit.value.trim(),
-      inspect_responses: inspectResponses.value,
-      exclusions: linesToArray(exclusionsText.value),
-      exempt_paths: linesToArray(exemptPathsText.value),
-      custom_rules: customRules.value,
-    }
+    const payload = buildPayload()
     const result = await settingsApi.update({ waf: payload })
     if (!result.ok) {
       error.value = result.error || 'Failed to save.'
       return
     }
-    toast.success('WAF updated')
+    savedPayload.value = JSON.stringify(payload)
+    toast.success('Web application firewall updated')
     if (result.nginx_error) toast.error(result.nginx_error)
   } catch (e) {
     error.value = e.message || 'Failed to save.'
@@ -212,7 +262,8 @@ onMounted(async () => {
     enabled.value = !!waf.enabled
     installed.value = !!waf.installed
     mode.value = waf.mode || 'DetectionOnly'
-    paranoia.value = waf.paranoia || 1
+    // TabButtons matches by Object.is; a stringy "2" would fall back to Low.
+    paranoia.value = Number(waf.paranoia) || 1
     inboundThreshold.value = waf.inbound_threshold ?? 5
     bodyLimit.value = waf.body_limit || '50m'
     inspectResponses.value = !!waf.inspect_responses
@@ -222,6 +273,8 @@ onMounted(async () => {
     ruleFields.value = waf.rule_fields || []
     ruleOperators.value = waf.rule_operators || []
     ruleActions.value = waf.rule_actions || []
+    // Same builder as the save payload, so normalisation is not an edit.
+    savedPayload.value = JSON.stringify(buildPayload())
   } catch (e) {
     error.value = e.message || 'Could not load settings.'
   } finally {

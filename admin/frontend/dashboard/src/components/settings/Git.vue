@@ -24,7 +24,7 @@
       class="flex sm:flex-row sm:justify-between sm:items-center flex-col gap-3"
     >
       <div>
-        <p class="font-medium text-ink-gray-8 text-sm">Connected as {{ username }}</p>
+        <p class="font-medium text-ink-gray-8 text-base">Connected as {{ username }}</p>
         <p class="text-ink-gray-5 text-p-sm">GitHub · Personal access token</p>
       </div>
       <div class="flex items-center gap-2">
@@ -52,7 +52,8 @@
       />
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="connecting" @click="verifyAndConnect">
+        <!-- The token is the one required field; Enter still hits the guard. -->
+        <Button variant="solid" :loading="connecting" :disabled="!token.trim()" @click="verifyAndConnect">
           {{ connected ? 'Update Token' : 'Verify & Connect' }}
         </Button>
       </div>

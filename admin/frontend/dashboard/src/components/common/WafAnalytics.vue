@@ -2,7 +2,7 @@
   <div v-if="data && data.log_present" class="mb-6">
     <div class="flex items-center gap-2 mb-3">
       <span class="size-4 text-ink-gray-6 lucide-shield-alert" />
-      <h2 class="font-semibold text-ink-gray-9 text-base">Web Application Firewall</h2>
+      <h2 class="font-semibold text-ink-gray-9 text-base">Web application firewall</h2>
       <span
         v-if="data.mode === 'DetectionOnly'"
         class="bg-surface-amber-2 px-2 py-0.5 rounded-full text-ink-amber-3 text-xs"

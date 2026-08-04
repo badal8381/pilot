@@ -1,13 +1,17 @@
 <template>
-  <Dialog v-model="open" bare size="4xl">
+  <Dialog v-model="open" bare size="5xl">
     <template #default="{ close }">
-      <div class="relative flex sm:h-[70vh] max-h-[85vh]">
+      <!-- 6rem = the Dialog's own chrome (overlay py-4 + content my-8); a
+           literal 100vh overflows and sets the overlay scrolling. -->
+      <div class="relative flex sm:h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)]">
+        <!-- Sizing and tokens from frappe-ui's own SettingsSidebar.
+             surface-sidebar is theme-aware: light gray in light, transparent in dark. -->
         <div
-          class="flex-col p-4 sm:border-r border-outline-gray-2 w-full sm:w-52 shrink-0"
+          class="flex-col bg-surface-sidebar p-2 sm:border-r border-outline-gray-1 w-full sm:w-[220px] shrink-0"
           :class="activeSection ? 'hidden sm:flex' : 'flex'"
         >
           <h3
-            class="mb-1 p-2 pb-3 border-b sm:border-b-0 border-outline-gray-2 font-semibold text-ink-gray-9 text-base"
+            class="mb-1 p-2 pb-3 border-b sm:border-b-0 border-outline-gray-1 font-semibold text-ink-gray-9 text-base"
           >
             Settings
           </h3>
@@ -16,6 +20,8 @@
             class="sm:hidden top-3 right-3 absolute"
             variant="ghost"
             icon="lucide-x"
+            label="Close settings"
+            tooltip="Close"
             @click="close"
           />
           <div class="flex flex-col gap-2 sm:gap-0.5 pt-2 sm:pt-0">
@@ -25,8 +31,12 @@
               :variant="isMobile ? 'subtle' : 'ghost'"
               :size="isMobile ? 'md' : 'sm'"
               class="!justify-start border sm:border-0 w-full"
-              :class="currentSection === section.id ? 'sm:!bg-surface-gray-3 sm:!text-ink-gray-9 !text-ink-gray-6' : '!text-ink-gray-6'"
-              @click="activeSection = section.id"
+              :class="
+                currentSection === section.id
+                  ? 'sm:!bg-surface-elevation-3 sm:!shadow-sm sm:!text-ink-gray-9 !text-ink-gray-6'
+                  : '!text-ink-gray-6'
+              "
+              @click="guarded(() => (activeSection = section.id))"
             >
               <template #prefix>
                 <span :class="section.icon" class="size-4"></span>
@@ -35,8 +45,9 @@
             </Button>
           </div>
         </div>
+        <!-- frappe-ui's SettingsHeader/SettingsBody padding; off below sm. -->
         <div
-          class="flex-col flex-1 p-6 overflow-y-auto"
+          class="flex-col flex-1 px-6 sm:px-[4.4rem] pt-6 sm:pt-10 pb-10 sm:pb-16 overflow-y-auto"
           :class="activeSection ? 'flex' : 'hidden sm:flex'"
         >
           <div class="flex justify-between items-center pb-4">
@@ -45,16 +56,21 @@
                 v-if="subSection || sessionJti || activeSection"
                 :class="{ 'sm:hidden': !subSection && !sessionJti }"
                 class="-ml-2"
-                variant="subtle"
+                variant="ghost"
                 icon="lucide-arrow-left"
+                label="Back"
+                tooltip="Back"
                 @click="goBack"
               />
               <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
             </div>
             <div id="settings-header-actions" class="contents"></div>
           </div>
-          <General v-if="currentSection === 'general'" v-model:open-section="subSection" />
-          <Security v-else-if="currentSection === 'security'" v-model:open-section="subSection" />
+          <General v-if="currentSection === 'general'" v-model:open-section="guardedSubSection" />
+          <Security
+            v-else-if="currentSection === 'security'"
+            v-model:open-section="guardedSubSection"
+          />
           <Sessions
             v-else-if="currentSection === 'sessions'"
             v-model:nested-view="nestedView"
@@ -65,12 +81,25 @@
       </div>
     </template>
   </Dialog>
+
+  <Dialog v-model="showDiscard" :options="{ title: 'Unsaved changes', size: 'sm' }">
+    <template #body-content>
+      <p class="text-ink-gray-7 text-p-base">
+        You have changes here that have not been saved. Leaving loses them.
+      </p>
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="subtle" @click="showDiscard = false">Keep editing</Button>
+        <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>
+      </div>
+    </template>
+  </Dialog>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Button } from 'frappe-ui'
+import { hasUnsavedChanges } from '@/composables/common/useUnsavedChanges'
 import General from '@/components/settings/General.vue'
 import Security from '@/components/settings/Security.vue'
 import Sessions from '@/components/settings/Sessions.vue'
@@ -78,11 +107,40 @@ import SystemInfo from '@/components/settings/SystemInfo.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { GENERAL_SECTIONS, SECURITY_SECTIONS } from '@/components/settings/sections'
 
-const open = defineModel()
+const openModel = defineModel()
 
 const isMobile = useIsMobile()
 const route = useRoute()
 const router = useRouter()
+
+// Every exit funnels through here. Panel switching is a route *param* change
+// on one record, so onBeforeRouteLeave never fires for it.
+const showDiscard = ref(false)
+let pendingNav = null
+function guarded(action) {
+  if (!hasUnsavedChanges()) return action()
+  pendingNav = action
+  showDiscard.value = true
+}
+function discardAndGo() {
+  // Read before closing: closing trips the watcher below, which nulls it.
+  const action = pendingNav
+  pendingNav = null
+  showDiscard.value = false
+  action?.()
+}
+watch(showDiscard, (shown) => {
+  if (!shown) pendingNav = null
+})
+
+// Closing is guarded; opening never is.
+const open = computed({
+  get: () => openModel.value,
+  set: (value) => {
+    if (value) openModel.value = true
+    else guarded(() => (openModel.value = false))
+  },
+})
 
 const sections = computed(() => [
   { id: 'general', label: 'General', icon: 'lucide-settings' },
@@ -90,9 +148,7 @@ const sections = computed(() => [
   { id: 'sessions', label: 'Sessions', icon: 'lucide-monitor' },
   { id: 'system-info', label: 'System Info', icon: 'lucide-info' },
 ])
-// Both section and sub-section are routed (deep-linkable, back button
-// closes/steps back). Sub-section options come from a shared registry so
-// this dialog can resolve a route id without General/Security exposing one.
+// Section and sub-section are routed, so views are deep-linkable.
 const activeSection = computed({
   get: () => route.params.section || null,
   set: (id) => router.push(id ? { name: 'Settings', params: { section: id } } : { name: 'Settings' }),
@@ -115,19 +171,20 @@ const subSection = computed({
       params: { section: currentSection.value, subSection: section?.id },
     }),
 })
+// Guarded here, not in `subSection`, so goBack() can move without re-asking.
+const guardedSubSection = computed({
+  get: () => subSection.value,
+  set: (section) => guarded(() => (subSection.value = section)),
+})
 
-// Sessions doesn't use the sub-section registry (its "sub-pages" are individual,
-// dynamically-fetched sessions, not a fixed list) - the same :subSection route slot
-// carries a jti instead, so a specific session's activity view is a real deep link.
+// For Sessions the :subSection route slot carries a jti instead.
 const sessionJti = computed({
   get: () => (currentSection.value === 'sessions' ? route.params.subSection || null : null),
   set: (jti) =>
     router.push({ name: 'Settings', params: { section: 'sessions', subSection: jti || undefined } }),
 })
 
-// Sessions reports the human title (an IP, once it resolves the jti) since the route
-// only carries the raw id - reset whenever the visible section changes so re-entering
-// the tab later never inherits a stale title.
+// Reset on section change so a stale title is never inherited.
 const nestedView = ref(null)
 watch(currentSection, () => (nestedView.value = null))
 
@@ -137,8 +194,10 @@ const headerTitle = computed(() => {
 })
 
 function goBack() {
-  if (sessionJti.value) sessionJti.value = null
-  else if (subSection.value) subSection.value = null
-  else activeSection.value = null
+  guarded(() => {
+    if (sessionJti.value) sessionJti.value = null
+    else if (subSection.value) subSection.value = null
+    else activeSection.value = null
+  })
 }
 </script>
