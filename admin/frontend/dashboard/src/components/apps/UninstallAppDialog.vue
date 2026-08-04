@@ -3,7 +3,7 @@
     v-model:open="open"
     :title="canDisable ? 'Remove App' : 'Uninstall App'"
     :subject="{ name: app?.name, label: appLabel, badge: app?.label, description: app?.description, logo: app?.logo_url }"
-    :warning="mode === 'uninstall' ? uninstallWarning : null"
+    :warning="canDisable ? null : uninstallWarning"
     :error="error"
     :confirm-label="mode === 'disable' ? 'Disable' : 'Uninstall'"
     :confirm-theme="mode === 'disable' ? 'gray' : 'red'"
