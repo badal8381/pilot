@@ -224,3 +224,19 @@ export function fmtDateTime(iso) {
   if (!iso) return '-'
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
+
+/**
+ * The list's trailing column. A queued task has no duration, so its place in
+ * the queue takes that slot - it is the only thing worth knowing about a task
+ * that has not started.
+ */
+export function taskTiming(task) {
+  if (task.status === 'queued') {
+    const position = task.queue_position ? `#${task.queue_position} in queue` : ''
+    return [position, relativeTime(task.queued_at)].filter(Boolean).join(' · ')
+  }
+  const duration = fmtDuration(task.duration_seconds)
+  return [duration ? `took ${duration}` : '', relativeTime(task.started_at || task.queued_at)]
+    .filter(Boolean)
+    .join(' · ')
+}

@@ -57,51 +57,32 @@
       <ErrorMessage :message="error" />
     </div>
 
-    <div
-      v-else-if="visibleTasks.length"
-      class="flex flex-col -mx-3 mt-4 divide-y divide-outline-gray-1"
+    <!-- ListRow's own hover paints surface-sidebar, transparent in the dark
+         theme. Rows are links, hence the descendant selector. -->
+    <ListView
+      v-else-if="rows.length"
+      class="mt-4 [&_a:hover]:bg-surface-gray-1"
+      :columns="columns"
+      :rows="rows"
+      row-key="id"
+      :options="{ selectable: false, showTooltip: true, getRowRoute }"
     >
-      <RouterLink
-        v-for="task in visibleTasks"
-        :key="task.task_id"
-        :to="taskDetailRoute(task.task_id)"
-        class="items-center gap-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] hover:bg-surface-gray-1 px-3 py-2.5 rounded no-underline transition-colors"
-      >
-        <div class="min-w-0">
-          <!-- truncate is inert on inline boxes. -->
-          <p class="font-medium text-ink-gray-9 text-base truncate">
-            {{ commandLabel(task.command) }}
-          </p>
-          <p class="mt-0.5 text-ink-gray-6 text-p-sm truncate">
-            {{ siteLabel(task) }}
-            <template v-if="task.status === 'queued' && task.queue_position">
-              · #{{ task.queue_position }} in queue</template
-            >
-          </p>
-        </div>
-
+      <template #cell="{ column, row, item }">
         <!-- Success is the norm; only exceptional states get a badge. -->
         <Badge
-          v-if="task.status !== 'success'"
-          :label="statusConfig(task).label"
-          :theme="statusConfig(task).theme"
+          v-if="column.key === 'badge'"
+          v-show="row.badge"
+          :label="row.badge?.label"
+          :theme="row.badge?.theme"
           variant="subtle"
         />
-        <span v-else />
-        <div class="flex justify-end items-center gap-3 min-w-0">
-          <span class="text-ink-gray-6 text-sm truncate">
-            <template v-if="task.status !== 'queued' && fmtDuration(task.duration_seconds)"
-              >took {{ fmtDuration(task.duration_seconds) }} · </template
-            >{{ relativeTime(task.started_at || task.queued_at) }}
-          </span>
-          <span class="lucide-chevron-right size-4 text-ink-gray-6 shrink-0" />
-        </div>
-      </RouterLink>
-    </div>
+        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      </template>
+    </ListView>
 
     <EmptyState
       v-else
-      class="mt-4"
+      class="mt-8"
       icon="lucide-list-checks"
       :title="isFiltered ? 'No matching tasks' : 'No tasks yet'"
       :description="
@@ -116,7 +97,7 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
+import { Badge, Button, Dropdown, ErrorMessage, ListRowItem, ListView, TabButtons } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
@@ -124,11 +105,10 @@ import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useTasks } from '@/composables/tasks/useTasks'
 import {
   commandLabel,
-  fmtDuration,
-  relativeTime,
   siteLabel,
   statusConfig,
   TASK_TYPES,
+  taskTiming,
   taskType,
 } from '@/utils/taskFormat'
 import { taskDetailRoute } from '@/utils/taskRoute'
@@ -162,6 +142,28 @@ const visibleTasks = computed(() =>
       (!typeFilter.value || taskType(task) === typeFilter.value),
   ),
 )
+
+// Numeric widths are fr units (ListView convention) so the columns stretch to
+// fill the row instead of leaving dead space.
+const columns = [
+  { label: 'Task', key: 'title', align: 'left', width: 2 },
+  { label: 'Site', key: 'site', align: 'left', width: 2 },
+  { label: 'Status', key: 'badge', align: 'left', width: 1.5 },
+  { label: 'Last run', key: 'timing', align: 'right', width: 2 },
+]
+
+// ListRowItem reads row[column.key], so each task is flattened to what renders.
+const rows = computed(() =>
+  visibleTasks.value.map((task) => ({
+    id: task.task_id,
+    title: commandLabel(task.command),
+    site: siteLabel(task),
+    badge: task.status === 'success' ? null : statusConfig(task),
+    timing: taskTiming(task),
+  })),
+)
+
+const getRowRoute = (row) => taskDetailRoute(row.id)
 
 // "Other" is a fallback for unknown commands; listed only once one exists.
 const typeMenu = computed(() => {

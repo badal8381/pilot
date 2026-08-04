@@ -9,6 +9,7 @@ import {
   siteRoute,
   statusConfig,
   taskScope,
+  taskTiming,
 } from './taskFormat.js'
 
 test('queued tasks have their own presentation', () => {
@@ -98,4 +99,28 @@ test('cancelling follows the flag the backend sends', () => {
   assert.equal(isTaskCancellable({ status: 'running', is_cancellable: false }), false)
   assert.equal(isTaskCancellable({ status: 'running' }), false)
   assert.equal(isTaskCancellable(null), false)
+})
+
+test('taskTiming leads a queued task with its place in the queue', () => {
+  const queued = { status: 'queued', queue_position: 3, queued_at: new Date().toISOString() }
+  assert.match(taskTiming(queued), /^#3 in queue · /)
+  // Nothing has started, so a stale duration from an earlier attempt is ignored.
+  assert.doesNotMatch(taskTiming({ ...queued, duration_seconds: 42 }), /took/)
+})
+
+test('taskTiming omits the position when the queue has not reported one', () => {
+  const queued = { status: 'queued', queued_at: new Date().toISOString() }
+  assert.doesNotMatch(taskTiming(queued), /queue/)
+  assert.doesNotMatch(taskTiming(queued), /^ · /)
+})
+
+test('taskTiming reports how long a finished task took', () => {
+  const done = { status: 'success', duration_seconds: 93, started_at: new Date().toISOString() }
+  assert.match(taskTiming(done), /^took 1m 33s · /)
+})
+
+test('taskTiming falls back to the queued time when a task never started', () => {
+  const killed = { status: 'killed', queued_at: new Date().toISOString() }
+  assert.equal(taskTiming(killed).includes('took'), false)
+  assert.equal(taskTiming(killed).startsWith(' · '), false)
 })
