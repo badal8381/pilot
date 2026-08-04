@@ -1,7 +1,7 @@
 <template>
   <div class="mt-5">
-    <div v-if="appsLoading" class="flex justify-center py-12">
-      <LoadingText />
+    <div v-if="appsLoading" class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
+      <MarketplaceAppCardSkeleton v-for="i in 4" :key="i" :index="i - 1" />
     </div>
     <div v-else-if="!installedApps.length" class="py-12 text-ink-gray-5 text-sm text-center">
       No apps installed on this site.
@@ -31,8 +31,9 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Button, Dropdown, LoadingText } from 'frappe-ui'
+import { Button, Dropdown } from 'frappe-ui'
 import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
+import MarketplaceAppCardSkeleton from '@/components/marketplace/MarketplaceAppCardSkeleton.vue'
 import UninstallAppDialog from '@/components/apps/UninstallAppDialog.vue'
 import { useSite } from '@/composables/sites/useSite'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'

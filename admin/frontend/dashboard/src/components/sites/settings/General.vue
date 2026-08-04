@@ -1,7 +1,10 @@
 <template>
   <div>
     <p class="font-semibold text-ink-gray-8 text-base">General</p>
-    <div class="mt-1 [&_[data-slot='label']]:text-sm [&_div:has([data-slot='description'])]:mt-0.5">
+    <!-- Matches SettingsRow: label text-base ink-gray-8 medium, description text-p-sm ink-gray-6. -->
+    <div
+      class="mt-1 [&_[data-slot='label']]:font-medium [&_[data-slot='label']]:text-ink-gray-8 [&_[data-slot='description']]:text-ink-gray-6"
+    >
       <div
         v-for="s in visibleSettings"
         :key="s.key"
@@ -13,7 +16,6 @@
           :model-value="getValue(s)"
           :disabled="savingKey === s.key"
           @update:model-value="(v) => toggle(s, v)"
-          class="[&_label]:text-ink-gray-9"
         />
       </div>
     </div>

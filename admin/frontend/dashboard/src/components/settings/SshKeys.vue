@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <div class="flex justify-end">
@@ -79,7 +79,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, ListView, ListRowItem, toast } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { sshKeysApi } from '@/api/sshKeys'
 

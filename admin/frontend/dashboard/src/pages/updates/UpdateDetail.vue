@@ -14,6 +14,8 @@
             variant="subtle"
             size="sm"
             icon="lucide-arrow-left"
+            label="Back to updates"
+            tooltip="Back to updates"
             @click="router.push({ name: 'Updates' })"
           />
           <h1 class="flex-1 min-w-0 font-semibold text-ink-gray-9 text-xl truncate">{{ title }}</h1>
@@ -31,6 +33,8 @@
           variant="subtle"
           size="sm"
           icon="lucide-refresh-cw"
+          label="Refresh"
+          tooltip="Refresh"
           :loading="refreshing"
           @click="refresh"
         />
@@ -65,8 +69,7 @@
           <span class="lucide-alert-triangle mt-0.5 size-5 shrink-0 text-ink-red-6" />
           <div class="min-w-0 flex-1">
             <h2 class="font-semibold text-sm">This update needs attention</h2>
-            <!-- Tool output: uv and frappe both indent and box-draw, which a
-                 collapsing <p> turns into one unreadable paragraph. -->
+            <!-- Tool output indents and box-draws; keep it preformatted. -->
             <pre
               v-if="op.diagnosis?.message"
               class="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-ink-red-8"
@@ -135,7 +138,7 @@
 
         <details
           v-if="op.diagnosis?.output_excerpt"
-          class="border-t border-outline-red-2 bg-surface-elevation-1"
+          class="border-t border-outline-red-2 bg-surface-base"
         >
           <summary
             class="cursor-pointer px-4 py-3 text-p-sm font-medium text-ink-gray-7 hover:bg-surface-gray-1 sm:px-5"

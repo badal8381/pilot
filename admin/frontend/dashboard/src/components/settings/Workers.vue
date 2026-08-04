@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <div v-for="(group, index) in groups" :key="index" class="flex items-end gap-3">
@@ -31,7 +31,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Button, ErrorMessage, TextInput, toast } from 'frappe-ui'
+import { Button, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 

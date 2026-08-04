@@ -18,7 +18,7 @@ pilot admin upgrade</pre>
     <div v-else-if="updating" class="flex flex-col gap-3">
       <p class="text-ink-gray-7 text-sm">Updating to {{ latestVersion }}…</p>
       <div v-if="!log" class="flex justify-center items-center py-8">
-        <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+        <Spinner size="lg" class="text-ink-gray-4" />
       </div>
       <pre
         v-else
@@ -48,7 +48,7 @@ pilot admin upgrade</pre>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { Button, Dialog, ErrorMessage, toast } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, Spinner, toast } from 'frappe-ui'
 import { cliUpdatesApi } from '@/api/settings'
 import { tasksApi } from '@/api/tasks'
 import { isTaskActive } from '@/utils/taskFormat'
