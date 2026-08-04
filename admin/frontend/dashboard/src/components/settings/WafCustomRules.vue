@@ -22,22 +22,28 @@
 
     <div
       v-if="rules.length"
-      class="bg-surface-elevation-1 border border-outline-gray-2 rounded-lg divide-y divide-outline-gray-1"
+      class="bg-surface-elevation-1 p-1 border border-outline-gray-2 rounded-lg"
     >
       <div
         v-for="rule in rules"
         :key="keyOf(rule)"
         :data-rule-key="keyOf(rule)"
-        class="first:rounded-t-lg last:rounded-b-lg ring-1 ring-inset transition-shadow"
+        class="rounded ring-1 ring-inset transition-shadow"
         :class="[
           // Fast in, slow out. transition-shadow: a ring is box-shadow underneath.
           flaggedKey === keyOf(rule) ? 'ring-outline-red-3 duration-75' : 'ring-transparent duration-1000',
           dragKey === keyOf(rule) ? 'opacity-50' : '',
+          // No dividers, so air below an open rule marks where its fields stop.
+          // Below only: a top margin would shove the header down as it opens.
+          isOpen(rule) ? 'mb-1 last:mb-0' : '',
         ]"
         @dragover.prevent="onDragOver(rule)"
       >
         <!-- The whole row toggles; interactive children stop the click. -->
-        <div class="flex items-center gap-3 px-3 py-2.5 cursor-pointer" @click="toggleOpen(rule)">
+        <div
+          class="flex items-center gap-3 px-2.5 h-10 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
+          @click="toggleOpen(rule)"
+        >
           <button
             type="button"
             draggable="true"
@@ -51,17 +57,21 @@
           </button>
           <button
             type="button"
-            class="flex-1 min-w-0 text-left"
+            class="flex flex-1 items-baseline gap-2 min-w-0 text-left"
             :aria-expanded="isOpen(rule)"
             @click.stop="toggleOpen(rule)"
           >
-            <p
-              class="font-medium text-base truncate"
+            <span
+              class="min-w-0 font-medium text-base truncate"
               :class="rule.enabled ? 'text-ink-gray-8' : 'text-ink-gray-5'"
             >
               {{ rule.name || 'Untitled rule' }}
-            </p>
-            <p class="mt-0.5 text-ink-gray-6 text-p-sm">{{ preview(rule) }}</p>
+            </span>
+            <span class="min-w-0 text-ink-gray-6 text-p-sm truncate">
+              {{ ruleSummary(rule) }}
+            </span>
+            <!-- What the rule does outranks what it matches on: never truncate it. -->
+            <span class="shrink-0 text-ink-gray-6 text-p-sm">→ {{ actionLabel(rule) }}</span>
           </button>
           <!-- The nginx renderer silently drops broken rules. -->
           <Badge v-if="ruleProblem(rule)" class="shrink-0" theme="amber">Incomplete</Badge>
@@ -75,18 +85,11 @@
             @click.stop
             @update:model-value="(v) => (rule.enabled = v)"
           />
-          <Button
-            class="shrink-0"
-            variant="ghost"
-            icon="lucide-chevron-down"
-            :label="isOpen(rule) ? 'Collapse rule' : 'Edit rule'"
-            :tooltip="isOpen(rule) ? 'Collapse' : 'Edit'"
-            :class="isOpen(rule) ? 'rotate-180' : ''"
-            @click.stop="toggleOpen(rule)"
-          />
         </div>
 
-        <div v-if="isOpen(rule)" class="space-y-4 px-3 pb-3">
+        <!-- Indent on the left only: the fields keep the header's right edge.
+             pl clears the drag handle so the fields line up under the rule name. -->
+        <div v-if="isOpen(rule)" class="space-y-4 pt-1 pr-2.5 pb-5 pl-[2.375rem]">
         <FormControl
           type="text"
           label="Rule name"
@@ -97,56 +100,66 @@
         <div class="space-y-2">
           <!-- All/Any only once there is something to combine. -->
           <div class="flex flex-wrap items-center gap-2 text-ink-gray-7 text-base">
-            <span>When</span>
-            <Select
-              v-if="rule.conditions.length > 1"
-              v-model="rule.match"
-              :options="MATCH_OPTIONS"
-              class="w-24"
+            <!-- One phrase when there is no Select between the words, or the flex
+                 gap reads as a double space. -->
+            <template v-if="rule.conditions.length > 1">
+              <span>When</span>
+              <Select v-model="rule.match" :options="MATCH_OPTIONS" class="w-24" />
+              <span>of the following match:</span>
+            </template>
+            <span v-else>When this matches:</span>
+          </div>
+
+          <div class="relative space-y-2 pl-5">
+            <!-- One condition bends into its row, several run straight past them
+                 all. -top-2 spans the space-y gap so the line meets "When". -->
+            <span
+              aria-hidden="true"
+              class="absolute left-1 -top-2 border-outline-gray-3"
+              :class="
+                rule.conditions.length > 1
+                  ? 'bottom-1 border-l'
+                  : 'h-[1.625rem] w-2.5 border-l border-b rounded-bl-lg'
+              "
             />
-            <span>{{ rule.conditions.length > 1 ? 'of the following match:' : 'this matches:' }}</span>
-          </div>
 
-          <div
-            v-if="rule.conditions.length > 1"
-            class="hidden sm:grid grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] gap-2 text-ink-gray-5 text-sm"
-          >
-            <span>Field</span>
-            <span>Condition</span>
-            <span>Value</span>
-            <span />
-          </div>
+            <div
+              v-if="rule.conditions.length > 1"
+              class="hidden sm:grid grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] gap-2 text-ink-gray-5 text-sm"
+            >
+              <span>Field</span>
+              <span>Condition</span>
+              <span>Value</span>
+              <span />
+            </div>
 
-          <div
-            v-for="(cond, ci) in rule.conditions"
-            :key="keyOf(cond)"
-            class="gap-2 grid grid-cols-1 sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
-          >
-            <!-- Stacked inside the field column to keep rows aligned. -->
-            <div class="space-y-1.5 min-w-0">
-              <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
-              <TextInput
-                v-if="cond.field === 'header'"
-                v-model="cond.header_name"
-                placeholder="Header name"
-                class="w-full"
+            <div
+              v-for="(cond, ci) in rule.conditions"
+              :key="keyOf(cond)"
+              class="gap-2 grid grid-cols-1 sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
+            >
+              <!-- Stacked inside the field column to keep rows aligned. -->
+              <div class="space-y-1.5 min-w-0">
+                <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
+                <TextInput
+                  v-if="cond.field === 'header'"
+                  v-model="cond.header_name"
+                  placeholder="Header name"
+                  class="w-full"
+                />
+              </div>
+              <Select v-model="cond.operator" :options="operatorOptions" class="w-full" />
+              <TextInput v-model="cond.value" :placeholder="placeholder(cond.field)" class="w-full" />
+              <!-- Conditionless rules are dropped silently; the last one cannot go. -->
+              <Button
+                variant="ghost"
+                icon="lucide-x"
+                label="Remove condition"
+                tooltip="Remove condition"
+                :disabled="rule.conditions.length === 1"
+                @click="removeCondition(rule, ci)"
               />
             </div>
-            <Select v-model="cond.operator" :options="operatorOptions" class="w-full" />
-            <TextInput
-              v-model="cond.value"
-              :placeholder="placeholder(cond.field)"
-              class="w-full"
-            />
-            <!-- Conditionless rules are dropped silently; the last one cannot go. -->
-            <Button
-              variant="ghost"
-              icon="lucide-x"
-              label="Remove condition"
-              tooltip="Remove condition"
-              :disabled="rule.conditions.length === 1"
-              @click="removeCondition(rule, ci)"
-            />
           </div>
 
           <Button variant="ghost" icon-left="lucide-plus" @click="addCondition(rule)">
@@ -158,6 +171,15 @@
           <div class="flex flex-wrap items-center gap-2 text-ink-gray-7 text-base">
             <span>Then</span>
             <Select v-model="rule.action" :options="actionOptions" class="w-48" />
+            <Button
+              class="ml-auto"
+              variant="ghost"
+              theme="red"
+              icon-left="lucide-trash-2"
+              @click="promptRemove(rule)"
+            >
+              Delete rule
+            </Button>
           </div>
           <p
             v-if="rule.action === 'skip'"
@@ -166,12 +188,6 @@
             <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
             Matching requests bypass the WAF entirely - no managed rules, no inspection.
           </p>
-        </div>
-
-        <div class="flex justify-end">
-          <Button variant="ghost" theme="red" icon-left="lucide-trash-2" @click="promptRemove(rule)">
-            Delete rule
-          </Button>
         </div>
         </div>
       </div>
@@ -196,7 +212,14 @@
 import { computed, onUnmounted, ref } from 'vue'
 import { Badge, Button, Dialog, FormControl, Select, Switch, TextInput } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
-import { ruleProblem } from '@/utils/wafRules'
+import {
+  ACTION_LABELS,
+  FIELD_LABELS,
+  OPERATOR_LABELS,
+  actionLabel,
+  ruleProblem,
+  ruleSummary,
+} from '@/utils/wafRules'
 
 // Two-way bound so the child owns list edits without mutating a prop.
 const rules = defineModel({ type: Array, default: () => [] })
@@ -206,25 +229,6 @@ const props = defineProps({
   actions: { type: Array, default: () => [] },
 })
 
-const FIELD_LABELS = {
-  uri_path: 'URI Path',
-  uri_full: 'Full URI',
-  query: 'Query String',
-  method: 'HTTP Method',
-  source_ip: 'Source IP',
-  user_agent: 'User Agent',
-  header: 'Request Header',
-  host: 'Host',
-}
-const OPERATOR_LABELS = {
-  is: 'is',
-  is_not: 'is not',
-  contains: 'contains',
-  not_contains: 'does not contain',
-  starts_with: 'starts with',
-  matches: 'matches regex',
-}
-const ACTION_LABELS = { block: 'Block', log: 'Log', skip: 'Skip' }
 const PLACEHOLDERS = {
   source_ip: '10.0.0.0/8, 203.0.113.4',
   method: 'POST',
@@ -345,13 +349,4 @@ function confirmRemove() {
   removingRule.value = null
 }
 
-function preview(rule) {
-  const joiner = rule.match === 'any' ? ' OR ' : ' AND '
-  const parts = rule.conditions.map((c) => {
-    const field =
-      c.field === 'header' ? `Header ${c.header_name || '?'}` : FIELD_LABELS[c.field] || c.field
-    return `${field} ${OPERATOR_LABELS[c.operator] || c.operator} "${c.value || '…'}"`
-  })
-  return `When ${parts.join(joiner) || '…'} → ${ACTION_LABELS[rule.action] || rule.action}`
-}
 </script>
