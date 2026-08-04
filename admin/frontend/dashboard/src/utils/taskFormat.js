@@ -144,22 +144,25 @@ const SITE_ARG_KEY = {
   'new-site-from-backup': 'name',
 }
 
+// Work with no site of its own belongs to the server. Doubles as the value the
+// site filter carries, so it has to read as a label.
+export const SERVER_SCOPE = 'Server'
+
 export function siteLabel(task) {
   const key = SITE_ARG_KEY[task.command]
-  return (key && task.args?.[key]) || 'Server-level'
+  return (key && task.args?.[key]) || SERVER_SCOPE
 }
 
 export function siteRoute(task) {
   const site = siteLabel(task)
-  if (site === 'Server-level') return null
+  if (site === SERVER_SCOPE) return null
   return { name: 'SiteDetail', params: { name: site } }
 }
 
-// What a task ran against, so a detail header reads the same either way. A
-// bench-level task has no site: it belongs to the server itself.
+// What a task ran against, so a detail header reads the same either way.
 export function taskScope(task) {
   const label = siteLabel(task)
-  if (label === 'Server-level') return { label: 'Server', route: { name: 'Server' } }
+  if (label === SERVER_SCOPE) return { label, route: { name: 'Server' } }
   return { label, route: siteRoute(task) }
 }
 

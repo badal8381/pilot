@@ -6,6 +6,8 @@ import {
   isTaskCancellable,
   redirectRouteOnSuccess,
   relativeTime,
+  SERVER_SCOPE,
+  siteLabel,
   siteRoute,
   statusConfig,
   taskScope,
@@ -27,6 +29,14 @@ test('queued and running tasks are active', () => {
 test('task timing tolerates a missing timestamp', () => {
   assert.equal(relativeTime(null), '')
   assert.equal(relativeTime(undefined), '')
+})
+
+test('siteLabel names the site, or the server when a task has none', () => {
+  assert.equal(siteLabel({ command: 'migrate', args: { site: 'a.local' } }), 'a.local')
+  assert.equal(siteLabel({ command: 'new-site', args: { name: 'a.local' } }), 'a.local')
+  assert.equal(siteLabel({ command: 'build', args: {} }), SERVER_SCOPE)
+  assert.equal(siteLabel({ command: 'migrate', args: {} }), SERVER_SCOPE)
+  assert.equal(siteLabel({ command: 'build' }), SERVER_SCOPE)
 })
 
 test('siteRoute links to the site behind a site-scoped task', () => {

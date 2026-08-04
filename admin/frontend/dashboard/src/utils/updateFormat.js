@@ -1,4 +1,4 @@
-import { fmtDateTime } from './taskFormat.js'
+import { fmtDateTime, SERVER_SCOPE } from './taskFormat.js'
 
 export const ACTIVE_STATES = [
   'preparing',
@@ -53,7 +53,7 @@ export function opTitle(op) {
  */
 export function sitesLabel(op) {
   const sites = op?.sites || []
-  if (!sites.length) return 'Server'
+  if (!sites.length) return SERVER_SCOPE
   if (sites.length === 1) return sites[0].name
   return `${sites.length} sites`
 }
