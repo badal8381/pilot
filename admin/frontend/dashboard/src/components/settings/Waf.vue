@@ -11,18 +11,6 @@
         @update:model-value="(v) => (enabled = v)"
       />
 
-      <p class="text-ink-gray-5 text-p-sm">
-        Runs ModSecurity with the OWASP Core Rule Set.
-        <a
-          href="https://coreruleset.org/docs/"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-ink-gray-7 hover:text-ink-gray-8"
-        >
-          Read what the rules cover
-        </a>
-      </p>
-
       <p v-if="setupNote" class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm">
         <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
         <span>{{ setupNote }}</span>
