@@ -13,11 +13,11 @@ let pending = null
 
 export function useSiteStorage() {
   function load(force = false) {
-    if (pending) return pending
-    if (!force && breakdown.value && Date.now() - fetchedAt < REFRESH_AFTER_MS) {
-      return Promise.resolve()
+    if (!force) {
+      if (pending) return pending
+      if (breakdown.value && Date.now() - fetchedAt < REFRESH_AFTER_MS) return Promise.resolve()
     }
-    pending = monitorApi
+    const request = monitorApi
       .storage()
       .then((data) => {
         breakdown.value = data
@@ -25,8 +25,11 @@ export function useSiteStorage() {
       })
       .catch(() => {}) // a size label; every caller renders fine without it
       .finally(() => {
-        pending = null
+        // A stale in-flight request may finish after a forced one replaced
+        // it; only clear `pending` if it still points at this request.
+        if (pending === request) pending = null
       })
+    pending = request
     return pending
   }
 
