@@ -124,7 +124,7 @@
               <div
                 class="hidden sm:flex items-center gap-1.5 pr-3 border-r-2 border-outline-gray-2"
               >
-                <span class="text-ink-gray-5 text-xs">Per Page</span>
+                <span class="text-ink-gray-5 text-xs shrink-0">Per Page</span>
                 <FormControl
                   type="select"
                   v-model="perPage"
@@ -137,7 +137,7 @@
                 of {{ currentResult.row_count }} rows
                 <span v-if="currentResult.truncated">(truncated)</span>
               </span>
-              <div class="flex items-center gap-1">
+              <div class="flex items-center ">
                 <Button
                   variant="ghost"
                   size="xs"
