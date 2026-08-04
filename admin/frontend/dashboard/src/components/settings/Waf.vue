@@ -5,11 +5,23 @@
   <div v-else class="space-y-12">
     <div class="space-y-4">
       <SettingsSwitch
-        label="Enable WAF"
+        label="Enable web application firewall"
         description="Inspects request contents for SQLi, XSS and path traversal, across all sites and the admin."
         :model-value="enabled"
         @update:model-value="(v) => (enabled = v)"
       />
+
+      <p class="text-ink-gray-5 text-p-sm">
+        Runs ModSecurity with the OWASP Core Rule Set.
+        <a
+          href="https://coreruleset.org/docs/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-ink-gray-7 hover:text-ink-gray-8"
+        >
+          Read what the rules cover
+        </a>
+      </p>
 
       <p v-if="setupNote" class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm">
         <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
@@ -24,7 +36,7 @@
             <RouterLink
               class="text-ink-gray-7 hover:text-ink-gray-8"
               :to="{ name: 'Analytics', query: { view: 'system', window: '1h' } }"
-              >the WAF analytics</RouterLink
+              >the firewall analytics</RouterLink
             >, then switch to Block.
           </p>
           <p v-else class="text-ink-gray-5 text-p-sm">{{ ACTION_HINTS[mode] }}</p>
@@ -86,7 +98,7 @@
             v-model="exemptPathsText"
           />
           <p class="text-ink-gray-5 text-p-sm">
-            One path prefix per line. Requests under these skip the WAF entirely.
+            One path prefix per line. Requests under these skip the firewall entirely.
           </p>
         </div>
         <div class="space-y-1.5">
@@ -245,7 +257,7 @@ async function save() {
       return
     }
     savedPayload.value = JSON.stringify(payload)
-    toast.success('WAF updated')
+    toast.success('Web application firewall updated')
     if (result.nginx_error) toast.error(result.nginx_error)
   } catch (e) {
     error.value = e.message || 'Failed to save.'

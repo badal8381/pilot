@@ -72,12 +72,16 @@
     </ListView>
 
     <div v-if="status.enabled" class="pt-2 border-t border-outline-gray-1">
-      <SettingsRow
-        label="Recovery codes"
-        :description="`${status.recovery_codes_remaining} unused. Use one when no device is available.`"
-      >
-        <Button size="sm" variant="subtle" @click="showRegenerate = true">Regenerate</Button>
-      </SettingsRow>
+      <!-- -mx on the row alone: on the rule above it the border would overhang
+           the list it divides. -->
+      <div class="-mx-2.5">
+        <SettingsRow
+          label="Recovery codes"
+          :description="`${status.recovery_codes_remaining} unused. Use one when no device is available.`"
+        >
+          <Button size="sm" variant="subtle" @click="showRegenerate = true">Regenerate</Button>
+        </SettingsRow>
+      </div>
     </div>
   </div>
 

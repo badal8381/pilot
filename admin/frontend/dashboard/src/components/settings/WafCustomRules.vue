@@ -186,7 +186,7 @@
             class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm"
           >
             <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
-            Matching requests bypass the WAF entirely - no managed rules, no inspection.
+            Matching requests bypass the firewall entirely - no managed rules, no inspection.
           </p>
         </div>
         </div>
