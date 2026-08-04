@@ -51,7 +51,7 @@ def site_apps(name: str):
 
     provider = AppProvider(bench_root)
     result = []
-    for app_name in site.installed_apps:
+    for app_name in site.active_apps:
         try:
             info = provider.get_app(app_name)
             result.append(
@@ -79,7 +79,7 @@ def site_apps(name: str):
                 }
             )
 
-    return jsonify({"apps": result})
+    return jsonify({"apps": result, "can_disable": Bench(bench_root).has_app_disabling})
 
 
 @sites_bp.get("/<name>/marketplace")
@@ -107,30 +107,73 @@ def install_site_app(name: str):
     bench_root = Path(current_app.config["BENCH_ROOT"])
     if not site_exists(bench_root, name):
         return site_not_found()
-    data = request.get_json(silent=True)
-    if not isinstance(data, dict):
-        return malformed_body()
-    fields = text_fields(data, "app", "repo", "branch")
-    if fields is None:
-        return invalid_fields()
-    app, repo, branch = fields["app"], fields["repo"], fields["branch"]
-    if not app and not repo:
-        return error_response("missing_app", "App name or repository is required.", 422)
-    if repo and (err := validate_repo_url(repo)):
-        return error_response("invalid_repository", err, 422)
+    requested, request_error = _requested_install()
+    if request_error is not None:
+        return request_error
+    app, repo, branch = requested
+
+    bench = Bench(bench_root)
+    try:
+        cloned = _cloned_app(bench, app, repo)
+        if enabled := _enable_disabled_app(bench, name, cloned):
+            return jsonify({"app": enabled, "enabled": True})
+    except BenchError as error:
+        # Frappe refuses to enable an app whose dependency is still disabled - that is
+        # the user's problem to fix, not a failure to start work.
+        return error_response("cannot_enable", _frappe_reason(error), 422)
+    except Exception as error:
+        return task_failure(error)
 
     try:
-        task_id = _submit_install_task(bench_root, name, app, repo, branch)
+        task_id = _submit_install_task(bench, name, cloned, repo, branch, app)
     except Exception as error:
         return task_failure(error)
     return accepted_task_response(bench_root, task_id)
 
 
-def _submit_install_task(bench_root: Path, site: str, app: str, repo: str, branch: str) -> str:
+def _requested_install():
+    """Return ((app, repo, branch), None), or (None, error_response)."""
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return None, malformed_body()
+    fields = text_fields(data, "app", "repo", "branch")
+    if fields is None:
+        return None, invalid_fields()
+    app, repo, branch = fields["app"], fields["repo"], fields["branch"]
+    if not app and not repo:
+        return None, error_response("missing_app", "App name or repository is required.", 422)
+    if repo and (err := validate_repo_url(repo)):
+        return None, error_response("invalid_repository", err, 422)
+    return (app, repo, branch), None
+
+
+def _frappe_reason(error: Exception) -> str:
+    """The last line of a failed frappe command is its reason; the rest is plumbing."""
+    return str(error).strip().rsplit("\n", 1)[-1].strip() or "Could not enable the app."
+
+
+def _enable_disabled_app(bench: Bench, site: str, cloned: "App | None") -> str | None:
+    """A disabled app still has its schema and data on the site, so installing it again
+    is a flag flip - done inline, no task. An app it requires but no longer has must be
+    installed first, which is task work, so that falls through to the queue instead."""
+    if cloned is None:
+        return None
+    site_object = bench.site(site)
+    if cloned.module_name not in site_object.disabled_apps():
+        return None
+    app = bench.app(cloned.module_name)
+    if site_object.get_missing_dependencies(app):
+        return None
+    site_object.enable_app(app)
+    return cloned.module_name
+
+
+def _submit_install_task(
+    bench: Bench, site: str, cloned: "App | None", repo: str, branch: str, app: str
+) -> str:
     """An app already cloned into the bench installs directly; otherwise it is
     fetched first, by repository URL or by marketplace name."""
-    bench = Bench(bench_root)
-    if cloned := _cloned_app(bench, app, repo):
+    if cloned:
         return InstallAppTask.queue(bench, site=site, app=cloned.module_name)
     if repo:
         return GetAndInstallAppTask.queue(bench, repo=repo, branch=branch, site=site)
@@ -151,7 +194,7 @@ def _cloned_app(bench: Bench, app: str, repo: str) -> "App | None":
 
 @sites_bp.post("/<name>/actions/update-apps")
 @require_scope(site_name)
-def update_site_apps(name: str):
+def update_site_apps(name: str):  # noqa: C901
     """Update apps installed on this site through Pilot's safeguarded migration flow."""
     bench_root = Path(current_app.config["BENCH_ROOT"])
     if not site_exists(bench_root, name):
@@ -161,17 +204,17 @@ def update_site_apps(name: str):
     if request_error is not None:
         return request_error
     try:
-        installed = set(SiteProvider(bench_root).get_one(name).installed_apps)
+        active = set(SiteProvider(bench_root).get_one(name).active_apps)
     except Exception:
         return internal_error("Could not read site apps.")
-    apps = requested if requested is not None else installed - {"frappe"}
+    apps = requested if requested is not None else active - {"frappe"}
     if not apps:
         return invalid_fields()
-    not_installed = sorted(apps - installed)
-    if not_installed:
+    inactive = sorted(apps - active)
+    if inactive:
         return error_response(
             "app_not_installed",
-            f"App '{not_installed[0]}' is not installed on this site.",
+            f"App '{inactive[0]}' is not installed on this site.",
             422,
         )
 
@@ -264,9 +307,19 @@ def delete_site_app(name: str, app: str):
     if err:
         return error_response("invalid_app", err, 422)
 
+    bench = Bench(bench_root)
+    if request.args.get("mode") == "disable":
+        try:
+            bench.site(name).disable_app(bench.app(app))
+        except BenchError as error:
+            return error_response("cannot_disable", _frappe_reason(error), 422)
+        except Exception as error:
+            return task_failure(error)
+        return jsonify({"app": app, "disabled": True})
+
     force = request.args.get("force") == "true"
     try:
-        task_id = UninstallAppTask.queue(Bench(bench_root), site=name, app=app, force=force)
+        task_id = UninstallAppTask.queue(bench, site=name, app=app, force=force)
     except Exception as error:
         return task_failure(error)
     return accepted_task_response(bench_root, task_id)

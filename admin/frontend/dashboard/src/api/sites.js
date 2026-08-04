@@ -28,10 +28,10 @@ export const sitesApi = {
     list: (name) => request.get(`sites/${encodeURIComponent(name)}/apps`).json(),
     install: (name, payload) =>
       request.post(`sites/${encodeURIComponent(name)}/apps`, { json: payload }).json(),
-    remove: (name, app, { force = false } = {}) =>
+    remove: (name, app, { force = false, mode = '' } = {}) =>
       request
         .delete(`sites/${encodeURIComponent(name)}/apps/${encodeURIComponent(app)}`, {
-          searchParams: force ? { force: 'true' } : {},
+          searchParams: { ...(force ? { force: 'true' } : {}), ...(mode ? { mode } : {}) },
         })
         .json(),
   },
