@@ -58,12 +58,17 @@ def _make_sqlite_site(
     connection.close()
 
 
-def _stub_database(monkeypatch: pytest.MonkeyPatch, engine, rows: list[list]) -> list[str]:
-    """Keep the real engine so identifier quoting is exercised, stub the wire."""
+def _stub_database(
+    monkeypatch: pytest.MonkeyPatch, engine, rows: list[list], only_for: str | None = None
+) -> list[str]:
+    """Keep the real engine so identifier quoting is exercised, stub the wire. `only_for`
+    makes every other query fail, modelling a table or column this Frappe lacks."""
     executed: list[str] = []
 
     def execute(self, query: str, read_only: bool = True) -> QueryResult:
         executed.append(query)
+        if only_for and only_for not in query:
+            raise DatabaseError("no such column")
         return QueryResult(columns=["value"], rows=rows, duration_ms=0.0)
 
     monkeypatch.setattr(type(engine), "execute", execute)
@@ -72,24 +77,24 @@ def _stub_database(monkeypatch: pytest.MonkeyPatch, engine, rows: list[list]) ->
 
 
 def test_is_setup_complete_true_on_mariadb(monkeypatch: pytest.MonkeyPatch) -> None:
-    executed = _stub_database(monkeypatch, _mariadb(), [["1"]])
+    executed = _stub_database(monkeypatch, _mariadb(), [["1"]], only_for="tabSingles")
 
     assert site_config.is_setup_complete(_BENCH_ROOT, "site.localhost") is True
-    assert "`tabSingles`" in executed[0]
+    assert any("`tabSingles`" in query for query in executed)
 
 
 def test_is_setup_complete_false_on_mariadb(monkeypatch: pytest.MonkeyPatch) -> None:
-    _stub_database(monkeypatch, _mariadb(), [["0"]])
+    _stub_database(monkeypatch, _mariadb(), [["0"]], only_for="tabSingles")
 
     assert site_config.is_setup_complete(_BENCH_ROOT, "site.localhost") is False
 
 
 def test_is_setup_complete_true_on_postgres(monkeypatch: pytest.MonkeyPatch) -> None:
-    executed = _stub_database(monkeypatch, _postgres(), [["1"]])
+    executed = _stub_database(monkeypatch, _postgres(), [["1"]], only_for="tabSingles")
 
     assert site_config.is_setup_complete(_BENCH_ROOT, "postgres.localhost") is True
-    assert '"tabSingles"' in executed[0]
-    assert "`" not in executed[0]
+    assert any('"tabSingles"' in query for query in executed)
+    assert not any("`" in query for query in executed)
 
 
 @pytest.mark.parametrize("stored", ["true", "TRUE", " true "])
@@ -97,20 +102,20 @@ def test_is_setup_complete_accepts_postgres_boolean_spelling(
     monkeypatch: pytest.MonkeyPatch, stored: str
 ) -> None:
     """set_single_value writes a Python bool: psycopg2 renders it 'true', mysqlclient '1'."""
-    _stub_database(monkeypatch, _postgres(), [[stored]])
+    _stub_database(monkeypatch, _postgres(), [[stored]], only_for="tabSingles")
 
     assert site_config.is_setup_complete(_BENCH_ROOT, "postgres.localhost") is True
 
 
 @pytest.mark.parametrize("stored", ["0", "false", "", "t", "yes"])
 def test_is_setup_complete_rejects_other_values(monkeypatch: pytest.MonkeyPatch, stored: str) -> None:
-    _stub_database(monkeypatch, _postgres(), [[stored]])
+    _stub_database(monkeypatch, _postgres(), [[stored]], only_for="tabSingles")
 
     assert site_config.is_setup_complete(_BENCH_ROOT, "postgres.localhost") is False
 
 
 def test_is_setup_complete_false_when_setting_absent(monkeypatch: pytest.MonkeyPatch) -> None:
-    _stub_database(monkeypatch, _postgres(), [])
+    _stub_database(monkeypatch, _postgres(), [], only_for="tabSingles")
 
     assert site_config.is_setup_complete(_BENCH_ROOT, "postgres.localhost") is False
 
@@ -206,3 +211,48 @@ def test_list_active_apps_keeps_everything_on_a_frappe_without_the_disabled_colu
 
     assert site_config.list_active_apps({}, tmp_path, "sqlite.localhost") == ["frappe", "erpnext"]
 
+
+def _make_wizard_site(bench_root: Path, site_name: str, wizard_apps: dict[str, int], disabled: list[str]) -> None:
+    """A site whose Frappe tracks setup per app, the way v16 does."""
+    site_path = bench_root / "sites" / site_name
+    (site_path / "db").mkdir(parents=True)
+    (site_path / "site_config.json").write_text(json.dumps({"db_type": "sqlite", "db_name": "site_db"}))
+
+    connection = sqlite3.connect(site_path / "db" / "site_db.db")
+    with connection:
+        connection.execute("CREATE TABLE `tabSingles` (doctype TEXT, field TEXT, value TEXT)")
+        connection.execute("INSERT INTO `tabSingles` VALUES ('System Settings', 'setup_complete', '1')")
+        connection.execute("CREATE TABLE `tabDefaultValue` (parent TEXT, defkey TEXT, defvalue TEXT)")
+        connection.execute(
+            "INSERT INTO `tabDefaultValue` VALUES ('__global', 'disabled_apps', ?)", (json.dumps(disabled),)
+        )
+        connection.execute(
+            "CREATE TABLE `tabInstalled Application` "
+            "(app_name TEXT, idx INTEGER, has_setup_wizard INTEGER, is_setup_complete INTEGER)"
+        )
+        connection.executemany(
+            "INSERT INTO `tabInstalled Application` VALUES (?, ?, 1, ?)",
+            [(app, index, done) for index, (app, done) in enumerate(wizard_apps.items())],
+        )
+    connection.close()
+
+
+def test_is_setup_complete_false_while_an_app_wizard_is_pending(tmp_path: Path) -> None:
+    """The System Settings flag still says complete here - the per-app table is what counts."""
+    _make_wizard_site(tmp_path, "s.localhost", {"frappe": 1, "erpnext": 0}, disabled=[])
+
+    assert site_config.is_setup_complete(tmp_path, "s.localhost") is False
+
+
+def test_is_setup_complete_ignores_a_disabled_apps_wizard(tmp_path: Path) -> None:
+    """A disabled app contributes no wizard stages, so it can never finish one - holding
+    setup open on its behalf would leave the user an empty wizard they cannot complete."""
+    _make_wizard_site(tmp_path, "s.localhost", {"frappe": 1, "erpnext": 0}, disabled=["erpnext"])
+
+    assert site_config.is_setup_complete(tmp_path, "s.localhost") is True
+
+
+def test_is_setup_complete_true_when_every_wizard_is_done(tmp_path: Path) -> None:
+    _make_wizard_site(tmp_path, "s.localhost", {"frappe": 1, "erpnext": 1}, disabled=[])
+
+    assert site_config.is_setup_complete(tmp_path, "s.localhost") is True

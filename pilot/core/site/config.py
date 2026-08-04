@@ -120,7 +120,40 @@ def query_installed_apps_via_db(bench_root: Path, site_name: str) -> list[str] |
 
 
 def is_setup_complete(bench_root: Path, site_name: str) -> bool | None:
-    """None means the site database was unreachable, so setup state is unknown."""
+    """Whether every app in use that ships a setup wizard has finished it. Read from the
+    same table `frappe.is_setup_complete()` reads, not the System Settings flag, which
+    only catches up when the app list is rewritten. A disabled app is skipped - it
+    contributes no wizard, so it can never finish one. None means the database was
+    unreachable, so setup state is unknown."""
+    apps = query_setup_wizard_apps_via_db(bench_root, site_name)
+    if not apps:
+        return _query_site_setup_flag(bench_root, site_name)
+    disabled = set(query_disabled_apps_via_db(bench_root, site_name))
+    return all(finished for app, finished in apps if app not in disabled)
+
+
+def query_setup_wizard_apps_via_db(bench_root: Path, site_name: str) -> list[tuple[str, bool]] | None:
+    """(app, finished) for each app that ships a setup wizard. None on a Frappe that does
+    not track setup per app, where the columns are missing and the query fails."""
+    rows = _query_site_database(
+        bench_root,
+        site_name,
+        lambda database: (
+            "SELECT app_name, is_setup_complete "
+            f"FROM {database.quote_identifier('tabInstalled Application')} WHERE has_setup_wizard = 1"
+        ),
+    )
+    if rows is None:
+        return None
+    return [
+        (str(row[0]).strip(), str(row[1]).strip().lower() in _TRUE_SINGLES_VALUES)
+        for row in rows
+        if row and str(row[0]).strip()
+    ]
+
+
+def _query_site_setup_flag(bench_root: Path, site_name: str) -> bool | None:
+    """The site-wide System Settings flag, for a Frappe that tracks no more than that."""
     rows = _query_site_database(
         bench_root,
         site_name,
