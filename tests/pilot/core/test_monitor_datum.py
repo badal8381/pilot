@@ -106,14 +106,14 @@ def test_system_metrics_are_named_in_base_units() -> None:
     shipper.add_system(SYSTEM_RECORD)
     samples = _samples(shipper)
 
-    assert samples[("pilot_cpu_usage_percent", "")] == 12.5
-    assert samples[("pilot_cpu_percent", "mode=user")] == 8.0
-    assert samples[("pilot_system_load_average", "window=5m")] == 0.4
-    assert samples[("pilot_memory_used_bytes", "")] == 4 * 1024**3
-    assert samples[("pilot_disk_total_bytes", "")] == 50 * 1024**3
-    assert samples[("pilot_disk_usage_percent", "")] == 40.0
-    assert samples[("pilot_throughput_bytes_per_second", "device=network,direction=receive")] == 2000.0
-    assert samples[("pilot_throughput_bytes_per_second", "device=disk,direction=write")] == 500.0
+    assert samples[("system_cpu_usage_percent", "")] == 12.5
+    assert samples[("system_cpu_mode_percent", "mode=user")] == 8.0
+    assert samples[("system_load_average", "window=5m")] == 0.4
+    assert samples[("system_memory_used_bytes", "")] == 4 * 1024**3
+    assert samples[("system_disk_total_bytes", "")] == 50 * 1024**3
+    assert samples[("system_disk_usage_percent", "")] == 40.0
+    assert samples[("system_network_receive_bytes_per_second", "")] == 2000.0
+    assert samples[("system_disk_write_bytes_per_second", "")] == 500.0
     assert not [name for name, _ in samples if "_mb" in name or "_kb" in name]
 
 
@@ -155,11 +155,19 @@ def test_database_counters_ship_as_counters() -> None:
     shipper.add_database(DATABASE_RECORD)
     samples = _samples(shipper)
 
-    assert samples[("pilot_database_queries_total", "kind=select")] == 100
-    assert samples[("pilot_database_questions_total", "")] == 200
-    assert samples[("pilot_database_row_lock_wait_seconds_total", "")] == 2.5
-    assert samples[("pilot_database_connections", "")] == 9
-    assert samples[("pilot_database_buffer_pool_size_bytes", "")] == 1024**3
+    assert samples[("mariadb_queries_total", "kind=select")] == 100
+    assert samples[("mariadb_questions_total", "")] == 200
+    assert samples[("mariadb_row_lock_wait_seconds_total", "")] == 2.5
+    assert samples[("mariadb_connections", "")] == 9
+    assert samples[("mariadb_buffer_pool_size_bytes", "")] == 1024**3
+
+
+def test_host_memory_is_not_shipped_twice() -> None:
+    """The host's RAM is a system fact; MariaDB's sample must not repeat it."""
+    shipper = _shipper()
+    shipper.add_database(DATABASE_RECORD)
+
+    assert not [name for name, _ in _samples(shipper) if "memory" in name]
 
 
 def test_database_metrics_are_skipped_when_the_sample_failed() -> None:
