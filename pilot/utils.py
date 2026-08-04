@@ -394,7 +394,7 @@ def run_command(
         return _run_command_tee(argv, cwd, env)
     process = _start_process(argv, cwd, env, stream_output, stdin_text is not None)
     stdout, stderr = _wait_for_process(process, argv, timeout, stdin_text)
-    _raise_on_failure(argv, process, stderr, stream_output, redactions)
+    _raise_on_failure(argv, process, stdout, stderr, stream_output, redactions)
     return subprocess.CompletedProcess(argv, process.returncode, stdout, stderr)
 
 
@@ -475,11 +475,15 @@ def _terminate_process_group(process: subprocess.Popen) -> None:
     process.wait()
 
 
-def _raise_on_failure(argv, process, stderr, stream_output, redactions) -> None:
+def _raise_on_failure(argv, process, stdout, stderr, stream_output, redactions) -> None:
     if process.returncode == 0:
         return
-    stderr_text = redact_text(stderr.decode(), redactions) if not stream_output and stderr else ""
+    detail = redact_text(stderr.decode(), redactions) if not stream_output and stderr else ""
+    if not detail and not stream_output and stdout:
+        # Frappe reports a refusal by throwing, which prints the reason - not a stack
+        # frame - as the last line of stdout. Without it the caller sees only a code.
+        detail = redact_text(stdout.decode(), redactions).strip().rsplit("\n", 1)[-1]
     raise CommandError(
-        f"Command {argv[0]!r} failed with exit code {process.returncode}.\n{stderr_text}".strip(),
+        f"Command {argv[0]!r} failed with exit code {process.returncode}.\n{detail}".strip(),
         returncode=process.returncode,
     )

@@ -87,3 +87,18 @@ def test_non_privileged_command_starts_new_session() -> None:
         _start_process(["mkdir", "-p", "/opt/x"], None, None, False)
 
     assert popen.call_args.kwargs["start_new_session"] is True
+
+
+def test_failure_reports_stdout_when_stderr_is_empty() -> None:
+    """Frappe prints why it refused on stdout, so an exit code alone tells the caller
+    nothing - the reason has to survive into the error."""
+    with pytest.raises(CommandError) as excinfo:
+        run_command(["sh", "-c", "echo 'App x depends on y.'; exit 1"])
+    assert "App x depends on y." in str(excinfo.value)
+
+
+def test_failure_prefers_stderr_over_stdout() -> None:
+    with pytest.raises(CommandError) as excinfo:
+        run_command(["sh", "-c", "echo noise; echo real-error 1>&2; exit 1"])
+    assert "real-error" in str(excinfo.value)
+    assert "noise" not in str(excinfo.value)
