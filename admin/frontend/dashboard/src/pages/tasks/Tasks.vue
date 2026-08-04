@@ -57,28 +57,13 @@
       <ErrorMessage :message="error" />
     </div>
 
-    <!-- ListRow's own hover paints surface-sidebar, transparent in the dark
-         theme. Rows are links, hence the descendant selector. -->
-    <ListView
+    <StatusListView
       v-else-if="rows.length"
-      class="mt-4 [&_a:hover]:bg-surface-gray-1"
+      class="mt-4"
       :columns="columns"
       :rows="rows"
-      row-key="id"
-      :options="{ selectable: false, showTooltip: true, getRowRoute }"
-    >
-      <template #cell="{ column, row, item }">
-        <!-- Success is the norm; only exceptional states get a badge. -->
-        <Badge
-          v-if="column.key === 'badge'"
-          v-show="row.badge"
-          :label="row.badge?.label"
-          :theme="row.badge?.theme"
-          variant="subtle"
-        />
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
-      </template>
-    </ListView>
+      :get-row-route="getRowRoute"
+    />
 
     <EmptyState
       v-else
@@ -97,9 +82,10 @@
 <script setup>
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, ErrorMessage, ListRowItem, ListView, TabButtons } from 'frappe-ui'
+import { Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
+import StatusListView from '@/components/common/StatusListView.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useTasks } from '@/composables/tasks/useTasks'
