@@ -55,7 +55,7 @@ def test_buffer_pool_and_lock_wait() -> None:
         Innodb_row_lock_waits=4,
         Threads_connected=7,
         innodb_buffer_pool_size=134217728,
-        total_ram_mb=1024,
+        total_ram_bytes=1024 * 1024**2,
     )
 
     point = _provider()._point((t0, before), (t1, after))

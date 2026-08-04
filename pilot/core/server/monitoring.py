@@ -169,7 +169,7 @@ class Monitor:
             record[key] = _to_int(status.get(key))
         for key in _DB_VARIABLE_KEYS:
             record[key] = _to_int(variables.get(key))
-        record["total_ram_mb"] = self._memory_usage().get("total_mb")
+        record["total_ram_bytes"] = self._memory_usage().get("total_bytes")
         self._append(self.db_log_path, record)
 
     def collect_slow_queries(self) -> None:
@@ -216,14 +216,13 @@ class Monitor:
         return round(delta / delta_total * 100, 2) if delta_total > 0 else 0.0
 
     def _process_metrics(self, service: str, pid: int) -> dict:
-        memory_kb = self._proc_memory_kb(pid)
         read_bytes, write_bytes = self._io_bytes(pid)
         return {
             "service": service,
             "pid": pid,
             "state": self._process_state(pid),
             "cpu_percent": self._cpu_percent(pid),
-            "memory_rss_mb": round(memory_kb / 1024, 2),
+            "memory_rss_bytes": self._proc_memory_bytes(pid),
             "read_bytes": read_bytes,
             "write_bytes": write_bytes,
             "open_fds": self._open_fds(pid),
@@ -247,8 +246,8 @@ class Monitor:
     def _process_state(self, pid: int) -> str:
         return self._proc_reader.process_state(pid)
 
-    def _proc_memory_kb(self, pid: int) -> int:
-        return self._proc_reader.proc_memory_kb(pid)
+    def _proc_memory_bytes(self, pid: int) -> int:
+        return self._proc_reader.proc_memory_bytes(pid)
 
     def _io_bytes(self, pid: int) -> tuple[int, int]:
         return self._proc_reader.io_bytes(pid)
