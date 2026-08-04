@@ -12,9 +12,11 @@ let fetchedAt = 0
 let pending = null
 
 export function useSiteStorage() {
-  function load() {
+  function load(force = false) {
     if (pending) return pending
-    if (breakdown.value && Date.now() - fetchedAt < REFRESH_AFTER_MS) return Promise.resolve()
+    if (!force && breakdown.value && Date.now() - fetchedAt < REFRESH_AFTER_MS) {
+      return Promise.resolve()
+    }
     pending = monitorApi
       .storage()
       .then((data) => {

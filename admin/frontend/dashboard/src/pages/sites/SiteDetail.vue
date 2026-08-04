@@ -285,7 +285,7 @@ onUnmounted(() => {
 
 onMounted(() => {
   load()
-  loadStorage()
+  loadStorage(true)
 })
 </script>
 

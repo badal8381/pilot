@@ -335,6 +335,6 @@ const showCreate = ref(false)
 
 onMounted(() => {
   load()
-  loadStorage()
+  loadStorage(true)
 })
 </script>
