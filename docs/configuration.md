@@ -101,7 +101,6 @@ allow_bench_management = true
 
 - `[monitor]`: per-bench `log_path` for this bench's own application metrics. The host-wide system/DB/slow-query log paths are fixed at `cli_root()/system/logs/*` and not configurable anywhere.
 - `[gunicorn]`: Gunicorn process settings.
-- `[central]`: Central endpoint and Pilot auth token.
 - `[firewall]`: firewall behavior.
 - `[waf]`: WAF behavior.
 - `[s3]`: S3 backup credentials and bucket settings.
@@ -113,7 +112,7 @@ Unknown fields are ignored by normal loads for compatibility. Strict validation 
 
 ## Common Config
 
-Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
+Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer, one Central enrolment, one metrics destination. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
 
 ```toml
 [mariadb]
@@ -135,12 +134,22 @@ existing = false
 email = "ops@example.com"
 webroot_path = "/var/www/letsencrypt"
 
+[central]
+endpoint = "https://central.example.com"
+auth_token = ""
+
+[datum]
+endpoint = "https://datum.internal"
+token = ""
+
 [admin]
 jwks_url = "https://issuer.example.com/jwks.json"
 jwks_audience = "bench-fleet"
 ```
 
-`BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
+`BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, `config.central`, `config.datum`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
+
+`[datum]` is where the monitor ships metrics. With both `endpoint` and `token` set, and the optional `datum` package installed (`pip install pilot[metrics]`), every collection tick is posted as one batch of samples. The JSON-Lines monitor logs are written either way - they stay the Admin UI's source of truth.
 
 The host-wide system/DB/slow-query monitor log paths (`system_log_path`/`db_log_path`/`slow_query_log_path`) are not configurable at all, in `bench.toml` or `common_config.toml` - they're fixed at `cli_root()/system/logs/{system-stats.log,db-stats.log,slow-queries.json}` (see `pilot/config/monitor.py`).
 

@@ -11,6 +11,7 @@ from pathlib import Path
 import psutil
 
 from pilot.core.server.monitoring_config import MonitorConfigurator
+from pilot.core.server.monitoring_datum import MetricShipper
 from pilot.core.server.monitoring_proc import ProcMetricsReader
 from pilot.core.server.monitoring_processes import ProcessResolver
 from pilot.utils import cli_root, iter_sibling_benches
@@ -134,36 +135,35 @@ class Monitor:
     def slow_query_log_path(self) -> Path:
         return self._configurator.slow_query_log_path
 
-    def collect_system_metrics(self) -> None:
-        self._append(
-            self.system_log_path,
-            {
-                "time": datetime.now(UTC).isoformat(),
-                "load_avg": self._load_average(),
-                "cpu_percent": self._system_cpu,
-                "cpu_breakdown": self._cpu_breakdown,
-                "memory": self._memory_usage(),
-                "storage": self._storage_usage(),
-                "network": self._network,
-                "disk_io": self._disk_io,
-            },
-        )
+    def collect_system_metrics(self) -> dict:
+        record = {
+            "time": datetime.now(UTC).isoformat(),
+            "load_avg": self._load_average(),
+            "cpu_percent": self._system_cpu,
+            "cpu_breakdown": self._cpu_breakdown,
+            "memory": self._memory_usage(),
+            "storage": self._storage_usage(),
+            "network": self._network,
+            "disk_io": self._disk_io,
+        }
+        self._append(self.system_log_path, record)
+        return record
 
-    def collect_database_metrics(self) -> None:
+    def collect_database_metrics(self) -> dict | None:
         """One raw MariaDB sample per host. Never crashes the daemon on a bad DB."""
         if self.bench.config.db_type != "mariadb":
-            return
+            return None
         try:
             from pilot.core.database import make_database
             from pilot.core.database.engines import MariaDB
 
             database = make_database(self.bench.config)
             if not isinstance(database, MariaDB):
-                return
+                return None
             status = database.get_global_status()
             variables = database.get_global_variables()
         except Exception:
-            return
+            return None
         record: dict[str, typing.Any] = {"time": datetime.now(UTC).isoformat()}
         for key in _DB_STATUS_KEYS:
             record[key] = _to_int(status.get(key))
@@ -171,6 +171,7 @@ class Monitor:
             record[key] = _to_int(variables.get(key))
         record["total_ram_bytes"] = self._memory_usage().get("total_bytes")
         self._append(self.db_log_path, record)
+        return record
 
     def collect_slow_queries(self) -> None:
         """Append new slow-log rows to the occurrence log. Skips quietly if the
@@ -190,7 +191,7 @@ class Monitor:
         except Exception:
             return
 
-    def collect_application_metrics(self) -> None:
+    def collect_application_metrics(self) -> dict:
         processes = []
         for service, pid in self.monitored_targets().items():
             try:
@@ -199,14 +200,13 @@ class Monitor:
                 # Either never started, or exited between resolving the pid and reading it.
                 processes.append({"service": service, "pid": pid, "missing": True})
 
-        self._append(
-            self.log_path,
-            {
-                "time": datetime.now(UTC).isoformat(),
-                "bench": self.bench.config.name,
-                "processes": processes,
-            },
-        )
+        record = {
+            "time": datetime.now(UTC).isoformat(),
+            "bench": self.bench.config.name,
+            "processes": processes,
+        }
+        self._append(self.log_path, record)
+        return record
 
     def _proc_usage(self, seconds_before: float, pid: int, delta_total: float) -> float:
         try:
@@ -293,20 +293,28 @@ def _production_monitors() -> list[Monitor]:
 
 def main() -> None:
     monitors = _production_monitors()
+    if not monitors:
+        return
+
     for monitor in monitors:
         monitor.sample_cpu()
         monitor.sample_io()
     time.sleep(CPU_SAMPLE_INTERVAL)
+
+    shipper = MetricShipper(monitors[0].bench.config.datum)
     for monitor in monitors:
         monitor.compute_cpu()
         monitor.compute_io()
-        monitor.collect_application_metrics()
+        shipper.add_application(monitor.collect_application_metrics())
+
     # System/DB-wide metrics describe the shared host, not any one bench -
     # collect them exactly once per tick, not once per bench.
-    if monitors:
-        monitors[0].collect_system_metrics()
-        monitors[0].collect_database_metrics()
-        monitors[0].collect_slow_queries()
+    host = monitors[0]
+    shipper.add_system(host.collect_system_metrics())
+    shipper.add_database(host.collect_database_metrics())
+    host.collect_slow_queries()
+    # One tick, one POST, after every log is on disk.
+    shipper.send()
 
 
 if __name__ == "__main__":
