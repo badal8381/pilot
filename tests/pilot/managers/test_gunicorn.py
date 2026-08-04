@@ -593,12 +593,42 @@ def test_malloc_arena_max_validation(tmp_path: Path) -> None:
         make_bench(tmp_path, gunicorn=GunicornConfig(malloc_arena_max=-1)).config.validate()
 
 
-def test_py_memory_env_caps_glibc_arenas(tmp_path: Path) -> None:
+def test_python_env_caps_glibc_arenas(tmp_path: Path) -> None:
     bench = make_bench(tmp_path, GunicornConfig(malloc_arena_max=2))
-    assert _definitions(bench).py_memory_env() == {"MALLOC_ARENA_MAX": "2"}
+    assert _definitions(bench).python_env()["MALLOC_ARENA_MAX"] == "2"
 
     bench0 = make_bench(tmp_path, GunicornConfig(malloc_arena_max=0))
-    assert _definitions(bench0).py_memory_env() == {}
+    assert "MALLOC_ARENA_MAX" not in _definitions(bench0).python_env()
+
+
+def test_python_processes_run_unbuffered(tmp_path: Path) -> None:
+    bench = make_bench(tmp_path, GunicornConfig())
+    definitions = _definitions(bench)
+
+    dev = {pd.name: pd for pd in definitions.process_definitions()}
+    prod = {pd.name: pd for pd in definitions.prod_process_definitions()}
+
+    for name in ("web", "watch", "admin"):
+        assert dev[name].env.get("PYTHONUNBUFFERED") == "1", name
+    for name in ("web", "admin"):
+        assert prod[name].env.get("PYTHONUNBUFFERED") == "1", name
+    assert all(
+        pd.env.get("PYTHONUNBUFFERED") == "1" for name, pd in prod.items() if name.startswith("worker")
+    )
+
+    assert "PYTHONUNBUFFERED" not in prod["redis_cache"].env
+    assert dev["web"].env["DEV_SERVER"] == "1"
+
+
+def test_unbuffered_env_reaches_service_units(tmp_path: Path) -> None:
+    from pilot.managers.processes.supervisor import SupervisorRenderer
+    from pilot.managers.processes.systemd import SystemdRenderer
+
+    bench = make_bench(tmp_path, GunicornConfig())
+    web = next(pd for pd in _definitions(bench).prod_process_definitions() if pd.name == "web")
+
+    assert "Environment=PYTHONUNBUFFERED=1" in SystemdRenderer("test-bench").render(web)
+    assert 'PYTHONUNBUFFERED="1"' in SupervisorRenderer("test-bench", bench.logs_path).render(web)
 
 
 def test_max_requests_emitted_when_enabled(tmp_path: Path) -> None:
