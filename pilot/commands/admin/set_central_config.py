@@ -9,11 +9,11 @@ from pilot.exceptions import BenchError
 
 @dataclass(kw_only=True)
 class SetCentralConfigCommand(Command):
-    """Persist the Central endpoint and pilot auth token in bench.toml."""
+    """Persist the Central endpoint and pilot auth token in common_config.toml."""
 
     name: ClassVar[str] = "set-central-config"
     group: ClassVar[str] = "admin"
-    help: ClassVar[str] = "Store the Central endpoint + pilot auth token in bench.toml."
+    help: ClassVar[str] = "Store the Central endpoint + pilot auth token for this host."
 
     endpoint: Annotated[str, Arg(help="Central API base URL the pilot calls back on", required=True)]
     token: Annotated[str, Arg(help="Opaque token the pilot presents to Central", required=True)]
@@ -23,13 +23,14 @@ class SetCentralConfigCommand(Command):
 
         toml_path = BenchConfig.toml_path(self.bench.path)
         try:
-            with BenchConfig.open(self.bench.path, mode="raw") as config:
-                config.setdefault("central", {})["endpoint"] = self.endpoint
-                config["central"]["auth_token"] = self.token
+            # Enrolment is host-shared, so this lands in common_config.toml.
+            with BenchConfig.open(self.bench.path) as config:
+                config.central.endpoint = self.endpoint
+                config.central.auth_token = self.token
         except FileNotFoundError as exc:
             raise BenchError(f"{toml_path} not found - is this a bench?") from exc
         except ValueError as exc:
             raise BenchError(f"{toml_path} contains invalid TOML: {exc}") from exc
         self.bench.config.central.endpoint = self.endpoint
         self.bench.config.central.auth_token = self.token
-        self.report("Central config written to bench.toml")
+        self.report("Central config written to common_config.toml")

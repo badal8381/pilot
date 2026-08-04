@@ -18,6 +18,8 @@ from pilot.config import (
     WorkerConfig,
     WorkerGroup,
 )
+from pilot.config.central import CentralConfig
+from pilot.config.common import CommonConfig
 from pilot.core.bench import Bench
 from pilot.exceptions import BenchError
 from pilot.integrations.central import CentralClient, CentralClientError
@@ -47,9 +49,11 @@ def _write_common(bench: Bench, data: dict) -> Path:
 
 
 def _write_central(bench: Bench, endpoint: str, token: str) -> None:
-    config = BenchConfig.read_raw(bench.path)
-    config["central"] = {"endpoint": endpoint, "auth_token": token}
-    BenchConfig.write_raw(bench.path, config)
+    """Enrolment is host-shared, so it lives in common_config.toml."""
+    benches_root = bench.path.parent
+    common = CommonConfig.read(benches_root)
+    common.central = CentralConfig(endpoint=endpoint, auth_token=token)
+    common.write(benches_root)
     bench.config = BenchConfig.read(bench.path)
 
 
@@ -67,13 +71,15 @@ class _FakeResponse:
         return False
 
 
-def test_set_central_config_merges_into_bench_toml(tmp_path: Path) -> None:
+def test_set_central_config_writes_to_common_config(tmp_path: Path) -> None:
     bench = _bench(tmp_path)
     SetCentralConfigCommand(bench, endpoint="https://central.test", token="tok-123").run()
-    config = BenchConfig.read_raw(bench.path)
-    assert config["central"]["endpoint"] == "https://central.test"
-    assert config["central"]["auth_token"] == "tok-123"
-    assert config["bench"]["name"] == "b1"  # untouched
+
+    central = CommonConfig.read(bench.path.parent).central
+    assert central.endpoint == "https://central.test"
+    assert central.auth_token == "tok-123"
+    assert "central" not in BenchConfig.read_raw(bench.path)
+    assert BenchConfig.read_raw(bench.path)["bench"]["name"] == "b1"  # untouched
 
 
 def test_set_central_config_raises_without_bench_toml(tmp_path: Path) -> None:
@@ -168,7 +174,7 @@ def test_heartbeat_wraps_non_json_response(tmp_path: Path) -> None:
 def _app_client(bench_root: Path):
     from admin.backend.app import create_app
     from admin.backend.internal.session import Session
-    from pilot.core.bench import Bench
+
     bench_root.mkdir(parents=True, exist_ok=True)
     (bench_root / "bench.toml").write_text(
         BenchConfig.from_flat(bench_root.name, {"admin_enabled": True, "admin_password": "secret"}).dumps()
