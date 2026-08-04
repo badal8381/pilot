@@ -68,14 +68,14 @@ class CentralClient:
         return _message(self._request(f"/api/method/{method_path}", method=http_method, data=data))
 
     def _credentials(self) -> tuple[str, str]:
-        endpoint, token = self._bench_toml_credentials()
+        endpoint, token = self._common_config_credentials()
         if not (endpoint and token):
             endpoint, token = self._legacy_common_site_config_credentials()
         if not endpoint or not token:
-            raise CentralClientError("central.endpoint / central.auth_token not set in bench.toml")
+            raise CentralClientError("central.endpoint / central.auth_token not set in common_config.toml")
         return endpoint.rstrip("/"), token
 
-    def _bench_toml_credentials(self) -> tuple[str | None, str | None]:
+    def _common_config_credentials(self) -> tuple[str | None, str | None]:
         central = self.bench.config.central
         return central.endpoint, central.auth_token
 

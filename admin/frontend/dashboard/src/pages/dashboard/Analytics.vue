@@ -301,7 +301,7 @@ const liveNow = ref(Date.now())
 const timeOffset = ref(0)
 
 // Historical mode state
-const system = ref({ earliest: null, points: [], memory_total_mb: null, storage: null })
+const system = ref({ earliest: null, points: [], memory_total_bytes: null, storage: null })
 const application = ref({ earliest: null, services: [], cpu: [], memory: [] })
 const historyLoading = ref(false)
 const historyError = ref('')
@@ -370,10 +370,10 @@ function appendLivePoint(s) {
     'Busy IOWait': cpu.iowait,
     'Busy IRQ': cpu.irq,
     'Busy Other': cpu.other,
-    Used: mem.used_mb,
-    'Cached + Buffers': mem.cached_mb,
-    Free: mem.free_mb,
-    'Swap Used': mem.swap_used_mb,
+    Used: mem.used_bytes,
+    'Cached + Buffers': mem.cached_bytes,
+    Free: mem.free_bytes,
+    'Swap Used': mem.swap_used_bytes,
     Load1: load1,
     Load5: load5,
     Load15: load15,
@@ -554,7 +554,7 @@ const loadChartConfig = computed(() => ({
 }))
 
 const memChartConfig = computed(() => {
-  const data = scaleFields(currentPoints.value, MEMORY_SERIES, 1024)
+  const data = scaleFields(currentPoints.value, MEMORY_SERIES, 1024 ** 3)
   const peak = data.reduce(
     (max, p) =>
       Math.max(
@@ -582,7 +582,7 @@ const diskInfo = computed(() =>
   isHistorical.value
     ? system.value.storage?.disk
     : stats.value
-      ? { used_mb: stats.value.disk_used / 1024 ** 2, total_mb: stats.value.disk_total / 1024 ** 2 }
+      ? { used_bytes: stats.value.disk_used, total_bytes: stats.value.disk_total }
       : null,
 )
 
@@ -642,7 +642,11 @@ const appCpuConfig = computed(() => ({
 const appMemConfig = computed(() => ({
   title: 'Process Memory',
   config: {
-    data: normalizeAppData(appWindowData.value.memory, appWindowData.value.services),
+    data: scaleFields(
+      normalizeAppData(appWindowData.value.memory, appWindowData.value.services),
+      appWindowData.value.services,
+      1024 ** 2,
+    ),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, echartOptions: { name: 'MB', splitLine: GRID } },
     series: appWindowData.value.services.map((name, i) => lineSeries(name, PALETTE[i])),

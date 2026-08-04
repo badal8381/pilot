@@ -55,7 +55,7 @@ class DatabaseMonitoringProvider(WindowedLogProvider):
         reads = delta("Innodb_buffer_pool_reads")
         lock_waits = delta("Innodb_row_lock_waits")
         pool_size = after.get("innodb_buffer_pool_size", 0)
-        total_ram = (after.get("total_ram_mb") or 0) * 1024 * 1024
+        total_ram = after.get("total_ram_bytes") or 0
         return {
             "time": self.to_epoch_ms(t1),
             "Insert": by_type["Com_insert"],

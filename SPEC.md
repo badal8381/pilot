@@ -45,13 +45,12 @@ The stable top-level config groups are:
 - `[monitor]`
 - `[gunicorn]`
 - `[admin]`
-- `[central]`
 - `[firewall]`
 - `[waf]`
 - `[s3]`
 - `[llm]`
 
-Settings shared by every bench under one benches directory - `[mariadb]`, `[postgres]`, `[letsencrypt]`, and `admin.jwks_url`/`jwks_audience` - live in `common_config.toml` instead, merged in by `BenchConfig` alone. See [Configuration](docs/configuration.md#common-config).
+Settings shared by every bench under one benches directory - `[mariadb]`, `[postgres]`, `[letsencrypt]`, `[central]`, `[datum]`, and `admin.jwks_url`/`jwks_audience` - live in `common_config.toml` instead, merged in by `BenchConfig` alone. See [Configuration](docs/configuration.md#common-config).
 
 Sites are represented by site directories and bench config records where needed.
 
