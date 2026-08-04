@@ -25,7 +25,7 @@
       class="bg-surface-elevation-1 border border-outline-gray-2 rounded-lg divide-y divide-outline-gray-1"
     >
       <div
-        v-for="(rule, ri) in rules"
+        v-for="rule in rules"
         :key="keyOf(rule)"
         :data-rule-key="keyOf(rule)"
         class="first:rounded-t-lg last:rounded-b-lg ring-1 ring-inset transition-shadow"
@@ -169,7 +169,7 @@
         </div>
 
         <div class="flex justify-end">
-          <Button variant="ghost" theme="red" icon-left="lucide-trash-2" @click="promptRemove(ri)">
+          <Button variant="ghost" theme="red" icon-left="lucide-trash-2" @click="promptRemove(rule)">
             Delete rule
           </Button>
         </div>
@@ -332,15 +332,17 @@ function removeCondition(rule, index) {
 }
 
 const showRemove = ref(false)
-const removingIndex = ref(-1)
-const removingLabel = computed(() => rules.value[removingIndex.value]?.name || 'this rule')
-function promptRemove(index) {
-  removingIndex.value = index
+const removingRule = ref(null)
+const removingLabel = computed(() => removingRule.value?.name || 'this rule')
+function promptRemove(rule) {
+  removingRule.value = rule
   showRemove.value = true
 }
 function confirmRemove() {
-  rules.value.splice(removingIndex.value, 1)
+  const index = rules.value.indexOf(removingRule.value)
+  if (index !== -1) rules.value.splice(index, 1)
   showRemove.value = false
+  removingRule.value = null
 }
 
 function preview(rule) {
