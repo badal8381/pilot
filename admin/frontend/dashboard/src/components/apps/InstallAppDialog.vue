@@ -72,7 +72,7 @@ import ActionDialog from '@/components/common/ActionDialog.vue'
 import SiteRow from '@/components/sites/SiteRow.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
-import { openTaskDetailPage } from '@/utils/taskRoute'
+import { openSitePage, openTaskDetailPage } from '@/utils/taskRoute'
 
 const props = defineProps({
   app: { type: Object, default: null },
@@ -113,29 +113,34 @@ function siteMeta(site) {
   return `${n} app${n === 1 ? '' : 's'}`
 }
 
+// An app the site only has disabled comes back enabled inline, with no task to follow.
 async function startInstall(site) {
   const result = await sitesApi.apps.install(site.name, {
     app: props.app.name,
   })
-  if (!result.task_id)
+  if (!result.task_id && !result.enabled)
     throw new Error(apiErrorMessage(result, `Could not install on ${site.name}.`))
-  return result.task_id
+  return result.task_id || ''
 }
 
+// An install follows its task; an enable has no task, so it lands on the site itself.
 async function installOnSite(name) {
   const site = props.sites.find((s) => s.name === name)
   if (!site) return
   const taskId = await startInstall(site)
   open.value = false
-  openTaskDetailPage(router, taskId)
+  if (taskId) openTaskDetailPage(router, taskId)
+  else openSitePage(router, site.name)
 }
 
 async function installOnAllSites() {
   const targets = installableSites.value
   if (!targets.length) return
-  await Promise.all(targets.map((site) => startInstall(site)))
+  const taskIds = await Promise.all(targets.map((site) => startInstall(site)))
   open.value = false
-  router.push({ name: 'Tasks' })
+  if (taskIds.some(Boolean)) router.push({ name: 'Tasks' })
+  else if (targets.length === 1) openSitePage(router, targets[0].name)
+  else router.push({ name: 'Sites' })
 }
 
 async function confirmInstall() {
