@@ -22,8 +22,15 @@ def _postgres() -> PostgreSQL:
     return PostgreSQL(host="localhost", port=5432, user="u", password="p", database="site_db")
 
 
-def _make_sqlite_site(bench_root: Path, site_name: str, setup_complete: str, apps: list[str]) -> None:
-    """A real SQLite site, so the probe runs against an actual Frappe-shaped schema."""
+def _make_sqlite_site(
+    bench_root: Path,
+    site_name: str,
+    setup_complete: str,
+    apps: list[str],
+    disabled: list[str] | None = None,
+) -> None:
+    """A real SQLite site, so the probe runs against an actual Frappe-shaped schema.
+    `disabled=None` models a Frappe old enough to have no `disabled` field."""
     site_path = bench_root / "sites" / site_name
     (site_path / "db").mkdir(parents=True)
     (site_path / "site_config.json").write_text(json.dumps({"db_type": "sqlite", "db_name": "site_db"}))
@@ -35,11 +42,19 @@ def _make_sqlite_site(bench_root: Path, site_name: str, setup_complete: str, app
             "INSERT INTO `tabSingles` VALUES ('System Settings', 'setup_complete', ?)",
             (setup_complete,),
         )
+        connection.execute("CREATE TABLE `tabDocField` (parent TEXT, fieldname TEXT)")
+        connection.execute("CREATE TABLE `tabDefaultValue` (parent TEXT, defkey TEXT, defvalue TEXT)")
         connection.execute("CREATE TABLE `tabInstalled Application` (app_name TEXT, idx INTEGER)")
         connection.executemany(
             "INSERT INTO `tabInstalled Application` VALUES (?, ?)",
             [(app, index) for index, app in enumerate(apps)],
         )
+        if disabled is not None:
+            connection.execute("INSERT INTO `tabDocField` VALUES ('Installed Application', 'disabled')")
+            connection.execute(
+                "INSERT INTO `tabDefaultValue` VALUES ('__global', 'disabled_apps', ?)",
+                (json.dumps(disabled),),
+            )
     connection.close()
 
 
@@ -152,3 +167,42 @@ def test_query_installed_apps_via_db_none_when_database_unreachable(
     monkeypatch.setattr(site_config, "make_site_database", unreachable)
 
     assert site_config.query_installed_apps_via_db(_BENCH_ROOT, "site.localhost") is None
+
+
+def test_query_disabled_apps_reads_the_disabled_apps_global(tmp_path: Path) -> None:
+    _make_sqlite_site(tmp_path, "sqlite.localhost", "1", ["frappe", "erpnext"], disabled=["erpnext"])
+
+    assert site_config.query_disabled_apps_via_db(tmp_path, "sqlite.localhost") == ["erpnext"]
+
+
+def test_has_app_disabling_follows_the_installed_application_docfield(tmp_path: Path) -> None:
+    _make_sqlite_site(tmp_path, "sqlite.localhost", "1", ["frappe"], disabled=[])
+
+    assert site_config.has_app_disabling(tmp_path, "sqlite.localhost") is True
+
+
+def test_has_app_disabling_false_without_the_docfield(tmp_path: Path) -> None:
+    _make_sqlite_site(tmp_path, "sqlite.localhost", "1", ["frappe"])
+
+    assert site_config.has_app_disabling(tmp_path, "sqlite.localhost") is False
+
+
+def test_list_active_apps_drops_disabled_apps(tmp_path: Path) -> None:
+    """A disabled app stays installed on the site, but is not one the site runs."""
+    _make_sqlite_site(tmp_path, "sqlite.localhost", "1", ["frappe", "erpnext"], disabled=["erpnext"])
+    site_config_json = {"installed_apps": ["frappe", "erpnext"]}
+
+    installed = site_config.list_installed_apps(site_config_json, tmp_path, "sqlite.localhost")
+    active = site_config.list_active_apps(site_config_json, tmp_path, "sqlite.localhost")
+
+    assert installed == ["frappe", "erpnext"]
+    assert active == ["frappe"]
+
+
+def test_list_active_apps_keeps_everything_on_a_frappe_without_the_disabled_column(
+    tmp_path: Path,
+) -> None:
+    _make_sqlite_site(tmp_path, "sqlite.localhost", "1", ["frappe", "erpnext"])
+
+    assert site_config.list_active_apps({}, tmp_path, "sqlite.localhost") == ["frappe", "erpnext"]
+

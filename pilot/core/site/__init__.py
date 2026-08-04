@@ -128,16 +128,45 @@ class Site:
 
         SiteApps(self).uninstall_app(app, force)
 
+    def enable_app(self, app: "App") -> None:
+        from pilot.core.site.apps import SiteApps
+
+        SiteApps(self).enable_app(app)
+
+    def disable_app(self, app: "App") -> None:
+        from pilot.core.site.apps import SiteApps
+
+        SiteApps(self).disable_app(app)
+
+    def disabled_apps(self) -> list[str]:
+        from pilot.core.site.apps import SiteApps
+
+        return SiteApps(self).disabled_apps()
+
+    def get_missing_dependencies(self, app: "App") -> list[str]:
+        """Apps `app` requires that this site does not have at all."""
+        from pilot.core.site.apps import SiteApps
+
+        return SiteApps(self).get_missing_dependencies(app)
+
     def list_apps(self) -> list[str]:
+        """Every app the site holds data for, disabled ones included."""
         from pilot.core.site.apps import SiteApps
 
         return SiteApps(self).list_apps()
 
     def installed_apps(self) -> list[str]:
-        """Return installed apps using cache, DB, then Frappe as fallback."""
+        """Every app installed on the site, disabled ones included. Read from cache,
+        DB, then Frappe as fallback."""
         from pilot.core.site.apps import SiteApps
 
         return SiteApps(self).installed_apps()
+
+    def active_apps(self) -> list[str]:
+        """Installed apps the site actually runs - what the Admin UI shows as installed."""
+        from pilot.core.site.apps import SiteApps
+
+        return SiteApps(self).active_apps()
 
     def migrate(self, skip_failing: bool = False) -> str:
         """Run migration through the shared path, returning the full captured output."""
@@ -294,10 +323,24 @@ def list_installed_apps(site_config: dict, bench_root: Path, site_name: str) -> 
     return _list_installed_apps(site_config, bench_root, site_name)
 
 
+def list_active_apps(site_config: dict, bench_root: Path, site_name: str) -> list[str]:
+    """Installed apps the site actually runs, disabled ones dropped."""
+    from pilot.core.site.config import list_active_apps as _list_active_apps
+
+    return _list_active_apps(site_config, bench_root, site_name)
+
+
 def query_installed_apps_via_db(bench_root: Path, site_name: str) -> list[str] | None:
     from pilot.core.site.config import query_installed_apps_via_db as _query_installed_apps_via_db
 
     return _query_installed_apps_via_db(bench_root, site_name)
+
+
+def exclude_disabled_apps(apps: list[str], bench_root: Path, site_name: str) -> list[str]:
+    """Drop apps the site holds disabled - Pilot reports those as uninstalled."""
+    from pilot.core.site.config import exclude_disabled_apps as _exclude_disabled_apps
+
+    return _exclude_disabled_apps(apps, bench_root, site_name)
 
 
 def is_setup_complete(bench_root: Path, site_name: str) -> bool | None:

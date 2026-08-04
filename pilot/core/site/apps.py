@@ -6,6 +6,7 @@ from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from pilot.exceptions import BenchError
+from pilot.integrations.marketplace import Marketplace
 from pilot.utils import run_command
 
 if TYPE_CHECKING:
@@ -18,6 +19,9 @@ class SiteApps:
         self.site = site
 
     def install_app(self, app: "App") -> None:
+        if app.config.name in self.disabled_apps():
+            self.enable_app(app)
+            return
         self._clear_cache()
         try:
             run_command(
@@ -30,9 +34,7 @@ class SiteApps:
 
     def install_app_with_dependencies(self, app: "App") -> list["App"]:
         self.site.install_app(app)
-        from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
-
-        required = DependencyDeclarationsCheck().get_hooks_required_apps(app)
+        required = self.get_required_apps(app)
         dependencies = []
         for name in required:
             try:
@@ -58,6 +60,63 @@ class SiteApps:
         finally:
             self._clear_cache()
 
+    def disabled_apps(self) -> list[str]:
+        from pilot.core.site.config import query_disabled_apps_via_db
+
+        return query_disabled_apps_via_db(self.site.bench.path, self.site.config.name)
+
+    def enable_app(self, app: "App") -> None:
+        """Bring a disabled app back on the site. Its schema and data never left, so this
+        is a flag flip - but Frappe refuses while an app it requires is still off, so
+        those come back first: disabled ones flipped, missing ones installed."""
+        self._enable_with_dependencies(app, set())
+
+    def _enable_with_dependencies(self, app: "App", seen: set[str]) -> None:
+        """`seen` carries the apps already handled, so a cycle in required_apps stops."""
+        seen.add(app.config.name)
+        required = [name for name in self.get_required_apps(app) if name not in seen]
+        if required:
+            disabled, installed = set(self.disabled_apps()), set(self.installed_apps())
+            for name in required:
+                dependency = self.site.bench.app(name)
+                if name in disabled:
+                    self._enable_with_dependencies(dependency, seen)
+                elif name not in installed:
+                    self.install_app(dependency)
+        self._toggle_app("enable-app", app)
+
+    def get_required_apps(self, app: "App") -> list[str]:
+        """Frappe validates these itself and names what is missing, so an unreadable
+        hooks.py only costs us the chance to bring a dependency back automatically."""
+        from pilot.core.app.validator.dependency_declarations import DependencyDeclarationsCheck
+
+        try:
+            return DependencyDeclarationsCheck().get_hooks_required_apps(app)
+        except OSError:
+            return []
+
+    def get_missing_dependencies(self, app: "App") -> list[str]:
+        """Apps this one requires that the site does not have at all. Installing those
+        is task work, so a caller wanting a quick enable should queue instead."""
+        installed = set(self.installed_apps())
+        return [name for name in self.get_required_apps(app) if name not in installed]
+
+    def disable_app(self, app: "App") -> None:
+        """Take the app out of use on the site, keeping its schema and data."""
+        if not self.site.bench.has_app_disabling:
+            raise BenchError("This bench's Frappe version cannot disable apps. Uninstall it instead.")
+        if app.config.name not in Marketplace.registry_by_name():
+            raise BenchError(f"App '{app.config.name}' is not a marketplace app and cannot be disabled.")
+        self._toggle_app("disable-app", app)
+
+    def _toggle_app(self, command: str, app: "App") -> None:
+        """Captured, not streamed: this runs inline for a waiting caller, and Frappe's
+        reason for refusing (a dependency still disabled, say) is worth more than a log."""
+        run_command(
+            self.site._frappe_call("frappe", "--site", self.site.config.name, command, app.config.name),
+            cwd=self.site.bench.sites_path,
+        )
+
     def _clear_cache(self) -> None:
         run_command(
             self.site._frappe_call("frappe", "--site", self.site.config.name, "clear-cache"),
@@ -78,14 +137,21 @@ class SiteApps:
     def installed_apps(self) -> list[str]:
         from pilot.core.site.config import list_installed_apps
 
+        return list_installed_apps(self._site_config(), self.site.bench.path, self.site.config.name)
+
+    def active_apps(self) -> list[str]:
+        from pilot.core.site.config import list_active_apps
+
+        return list_active_apps(self._site_config(), self.site.bench.path, self.site.config.name)
+
+    def _site_config(self) -> dict:
         config_path = self.site.path / "site_config.json"
         if not config_path.exists():
             raise BenchError(f"Site '{self.site.config.name}' does not exist.")
         try:
-            site_config = json.loads(config_path.read_text())
+            return json.loads(config_path.read_text())
         except (json.JSONDecodeError, OSError):
-            site_config = {}
-        return list_installed_apps(site_config, self.site.bench.path, self.site.config.name)
+            return {}
 
     def uninstall_apps(
         self,
