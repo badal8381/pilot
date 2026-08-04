@@ -151,7 +151,8 @@
           v-if="op.apps?.length"
           v-model:open="appsOpen"
           icon="lucide-box"
-          :title="`Target apps (${op.apps.length})`"
+          title="Target apps"
+          :count="op.apps.length"
         >
           <div>
             <div
@@ -195,7 +196,8 @@
           v-if="serverJobs.length"
           v-model:open="serverOpen"
           icon="lucide-server"
-          :title="`Server (${serverJobs.length})`"
+          title="Server"
+          :count="serverJobs.length"
         >
           <JobRow
             v-for="job in serverJobs"
@@ -210,7 +212,8 @@
           v-if="op.sites?.length"
           v-model:open="sitesOpen"
           icon="lucide-globe"
-          :title="`Sites (${sitesCount})`"
+          title="Sites"
+          :count="sitesCount"
         >
           <div>
             <div v-for="site in op.sites" :key="site.name">
@@ -260,7 +263,8 @@
         v-if="op.decisions?.length"
         class="mt-2"
         icon="lucide-skip-forward"
-        :title="`Skipped patches (${op.decisions.length})`"
+        title="Skipped patches"
+        :count="op.decisions.length"
       >
         <div
           v-for="(decision, index) in op.decisions"
