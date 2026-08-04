@@ -62,7 +62,7 @@ const routes = [
   {
     path: '/insights/activity',
     name: 'Activity',
-    component: () => import('./pages/activities/Activity.vue'),
+    component: () => import('./pages/Activities.vue'),
     meta: { title: 'Activity', group: 'Insights' },
   },
   {
