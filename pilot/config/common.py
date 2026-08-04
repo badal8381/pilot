@@ -84,7 +84,7 @@ class CommonConfig:
         }
         if self.central != CentralConfig():
             data["central"] = self._central_section()
-        if self.datum.endpoint or self.datum.token:
+        if self.datum != DatumConfig():
             data["datum"] = {"endpoint": self.datum.endpoint, "token": self.datum.token}
         if self.jwks_url:
             data["admin"] = {"jwks_url": self.jwks_url, "jwks_audience": self.jwks_audience}
