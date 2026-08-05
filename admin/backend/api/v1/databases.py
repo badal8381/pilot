@@ -5,11 +5,26 @@ from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
 
-from admin.backend.api.responses import error_response
+from admin.backend.api.responses import accepted_task_response, error_response
 from admin.backend.api.v1.benches.support import guard_bench_management
-from pilot.exceptions import DatabaseError
+from pilot.core.bench import Bench
+from pilot.core.database.quick_actions import DatabaseQuickActions
+from pilot.exceptions import DatabaseError, TaskConflictError
+from pilot.tasks.restart_database import RestartDatabaseTask
+from pilot.tasks.set_innodb_buffer_pool_size import SetInnoDBBufferPoolSizeTask
+from pilot.tasks.set_max_database_connections import SetMaxDatabaseConnectionsTask
+from pilot.tasks.set_performance_schema import SetPerformanceSchemaTask
 
 database_bp = Blueprint("database", __name__)
+_DATABASE_RESOURCE_KEY = "database-server"
+
+
+def _bench() -> Bench:
+    return Bench(Path(current_app.config["BENCH_ROOT"]))
+
+
+def _quick_actions() -> DatabaseQuickActions:
+    return DatabaseQuickActions(_bench().config)
 
 
 @database_bp.get("/sites")
@@ -89,6 +104,164 @@ def get_diagnostics():
         return error_response("diagnostics_unavailable", str(exc), 422)
     except Exception:
         return error_response("diagnostics_unavailable", "Could not read database diagnostics.", 500)
+
+
+@database_bp.get("/quick-actions")
+def get_quick_actions():
+    try:
+        return jsonify(_quick_actions().capabilities())
+    except DatabaseError as exc:
+        return error_response("quick_actions_unavailable", str(exc), 422)
+    except Exception:
+        return error_response("quick_actions_unavailable", "Could not read quick actions.", 500)
+
+
+@database_bp.post("/quick-actions/restart")
+def restart_database():
+    forbidden = guard_bench_management()
+    if forbidden is not None:
+        return forbidden
+
+    try:
+        _quick_actions().require_restart()
+        bench = _bench()
+        task_id = RestartDatabaseTask.queue(
+            bench,
+            idempotency_key=request.headers.get("Idempotency-Key"),
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+        return accepted_task_response(bench.path, task_id)
+    except (DatabaseError, TaskConflictError) as exc:
+        return error_response("database_action_unavailable", str(exc), 409)
+    except ValueError as exc:
+        return error_response("invalid_database_action", str(exc), 422)
+    except Exception:
+        return error_response("database_action_failed", "Could not queue the database restart.", 500)
+
+
+@database_bp.post("/quick-actions/performance-schema")
+def set_performance_schema():
+    forbidden = guard_bench_management()
+    if forbidden is not None:
+        return forbidden
+
+    data = request.get_json(silent=True)
+    enabled = data.get("enabled") if isinstance(data, dict) else None
+    if type(enabled) is not bool:
+        return error_response("invalid_enabled", "enabled must be a boolean.", 422)
+
+    try:
+        actions = _quick_actions()
+        capability = actions.require_performance_schema()
+        if capability["enabled"] is enabled:
+            state = "enabled" if enabled else "disabled"
+            return error_response(
+                "database_action_unchanged",
+                f"Performance Schema is already {state}.",
+                409,
+            )
+        bench = _bench()
+        task_id = SetPerformanceSchemaTask.queue(
+            bench,
+            state="enabled" if enabled else "disabled",
+            idempotency_key=request.headers.get("Idempotency-Key"),
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+        return accepted_task_response(bench.path, task_id)
+    except (DatabaseError, TaskConflictError) as exc:
+        return error_response("database_action_unavailable", str(exc), 409)
+    except ValueError as exc:
+        return error_response("invalid_database_action", str(exc), 422)
+    except Exception:
+        return error_response(
+            "database_action_failed",
+            "Could not queue the Performance Schema change.",
+            500,
+        )
+
+
+@database_bp.post("/quick-actions/innodb-buffer-pool-size")
+def set_innodb_buffer_pool_size():
+    forbidden = guard_bench_management()
+    if forbidden is not None:
+        return forbidden
+
+    data = request.get_json(silent=True)
+    size_mb = data.get("size_mb") if isinstance(data, dict) else None
+    if type(size_mb) is not int:
+        return error_response("invalid_size_mb", "size_mb must be a whole number.", 422)
+
+    try:
+        actions = _quick_actions()
+        capability = actions.require_innodb_buffer_pool_size(size_mb)
+        if capability["current_mb"] == size_mb:
+            return error_response(
+                "database_action_unchanged",
+                f"InnoDB Buffer Pool size is already {size_mb} MB.",
+                409,
+            )
+        bench = _bench()
+        task_id = SetInnoDBBufferPoolSizeTask.queue(
+            bench,
+            size_mb=size_mb,
+            idempotency_key=request.headers.get("Idempotency-Key"),
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+        return accepted_task_response(bench.path, task_id)
+    except (DatabaseError, TaskConflictError) as exc:
+        return error_response("database_action_unavailable", str(exc), 409)
+    except ValueError as exc:
+        return error_response("invalid_size_mb", str(exc), 422)
+    except Exception:
+        return error_response(
+            "database_action_failed",
+            "Could not queue the InnoDB Buffer Pool size change.",
+            500,
+        )
+
+
+@database_bp.post("/quick-actions/max-connections")
+def set_max_connections():
+    forbidden = guard_bench_management()
+    if forbidden is not None:
+        return forbidden
+
+    data = request.get_json(silent=True)
+    max_connections = data.get("max_connections") if isinstance(data, dict) else None
+    if type(max_connections) is not int:
+        return error_response(
+            "invalid_max_connections",
+            "max_connections must be a whole number.",
+            422,
+        )
+
+    try:
+        actions = _quick_actions()
+        capability = actions.require_max_connections(max_connections)
+        if capability["current"] == max_connections:
+            return error_response(
+                "database_action_unchanged",
+                f"Max DB Connections is already {max_connections}.",
+                409,
+            )
+        bench = _bench()
+        task_id = SetMaxDatabaseConnectionsTask.queue(
+            bench,
+            max_connections=max_connections,
+            idempotency_key=request.headers.get("Idempotency-Key"),
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+        return accepted_task_response(bench.path, task_id)
+    except (DatabaseError, TaskConflictError) as exc:
+        return error_response("database_action_unavailable", str(exc), 409)
+    except ValueError as exc:
+        return error_response("invalid_max_connections", str(exc), 422)
+    except Exception:
+        return error_response(
+            "database_action_failed",
+            "Could not queue the Max DB Connections change.",
+            500,
+        )
 
 
 @database_bp.get("/processlist")

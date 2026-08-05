@@ -1,0 +1,23 @@
+<template>
+  <div v-if="openSection">
+    <component :is="openSection.component" />
+  </div>
+  <div v-else class="divide-y divide-outline-alpha-gray-1">
+    <SettingsRow
+      v-for="section in sections"
+      :key="section.id"
+      :label="section.label"
+      :description="section.description"
+    >
+      <Button size="sm" variant="subtle" @click="openSection = section">Manage</Button>
+    </SettingsRow>
+  </div>
+</template>
+
+<script setup>
+import { Button } from "frappe-ui";
+import SettingsRow from "@/components/settings/SettingsRow.vue";
+import { DATABASE_SECTIONS as sections } from "@/components/settings/sections";
+
+const openSection = defineModel("openSection");
+</script>
