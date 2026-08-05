@@ -5,8 +5,13 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
+import pilot
 from pilot.config import AppConfig
+from pilot.core.app import repository
 from pilot.core.app.repository import AppRepository
+from pilot.core.app.revisions import RevisionPin
 from pilot.internal.git import GitRepo
 
 
@@ -70,3 +75,73 @@ def test_checkout_of_a_clean_repo_stashes_nothing(tmp_path: Path) -> None:
     _repository(path)._checkout_pinned_ref(first)
 
     assert GitRepo(path)._run("stash", "list").stdout.strip() == ""
+
+
+@pytest.fixture
+def git_calls(monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    """Records the git command lines AppRepository would have run."""
+    calls: list[list[str]] = []
+    monkeypatch.setattr(repository, "run_command", lambda cmd, **kwargs: calls.append(cmd))
+    monkeypatch.setattr(AppRepository, "remote_url", property(lambda self: "https://host/demo.git"))
+    monkeypatch.setattr(AppRepository, "_sync_remote_url", lambda self: None)
+    return calls
+
+
+def _set_dev_install(monkeypatch: pytest.MonkeyPatch, dev: bool) -> None:
+    monkeypatch.setattr(pilot, "is_dev_build", dev)
+
+
+def test_release_install_clones_shallow(
+    tmp_path: Path, git_calls: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_dev_install(monkeypatch, False)
+
+    _repository(tmp_path / "app").clone()
+
+    assert git_calls[0][-3:-1] == ["--depth", "1"]
+
+
+def test_dev_install_clones_the_full_history(
+    tmp_path: Path, git_calls: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_dev_install(monkeypatch, True)
+
+    _repository(tmp_path / "app").clone()
+
+    assert "--depth" not in git_calls[0]
+
+
+def test_dev_install_does_not_shallow_a_pinned_checkout(
+    tmp_path: Path, git_calls: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`fetch --depth 1` would truncate a full clone, so a dev install skips it."""
+    _set_dev_install(monkeypatch, True)
+    monkeypatch.setattr(AppRepository, "_checkout_pinned_ref", lambda self, ref: None)
+
+    _repository(tmp_path / "app").checkout_pinned_target(RevisionPin(kind="tag", ref="v1.0.0"))
+
+    assert "--depth" not in git_calls[0]
+
+
+def test_update_leaves_an_inherited_shallow_repo_shallow(
+    tmp_path: Path, git_calls: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An app cloned before the dev install is not backfilled - that would drag down
+    the full history of every app on the next update."""
+    _set_dev_install(monkeypatch, True)
+    monkeypatch.setattr(AppRepository, "is_shallow", property(lambda self: True))
+
+    _repository(tmp_path / "app").update()
+
+    assert git_calls[0][-1] == "--depth=1"
+
+
+def test_update_of_a_full_repo_passes_no_depth(
+    tmp_path: Path, git_calls: list[list[str]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _set_dev_install(monkeypatch, True)
+    monkeypatch.setattr(AppRepository, "is_shallow", property(lambda self: False))
+
+    _repository(tmp_path / "app").update()
+
+    assert "--depth=1" not in git_calls[0]
