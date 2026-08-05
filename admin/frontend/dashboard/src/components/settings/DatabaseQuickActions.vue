@@ -1,6 +1,14 @@
 <template>
   <Teleport defer to="#settings-header-actions">
-    <Button variant="ghost" :loading="loading" @click="load">Refresh</Button>
+    <Tooltip text="Refresh database capabilities">
+      <Button
+        variant="ghost"
+        icon="lucide-refresh-cw"
+        :loading="loading"
+        aria-label="Refresh database capabilities"
+        @click="load"
+      />
+    </Tooltip>
   </Teleport>
 
   <div v-if="loading && !capabilities" class="flex justify-center items-center h-40">
@@ -93,7 +101,7 @@
   </div>
 
   <Dialog v-model="confirmationOpen" :options="confirmationOptions">
-    <template #body-content>
+    <template>
       <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
         {{ confirmation.message }}
       </p>
@@ -110,7 +118,7 @@
   </Dialog>
 
   <Dialog v-model="sizingOpen" :options="sizingOptions">
-    <template #body-content>
+    <template>
       <div v-if="sizingAction" class="space-y-4">
         <FormControl
           v-model.number="sizingValue"
@@ -124,11 +132,11 @@
         <div class="text-ink-gray-6 text-sm">
           <p>
             Recommended:
-            {{ formatSizingValue(sizingAction.recommended, sizingAction.unit) }}.
+            {{ formatSizingValue(sizingAction.recommended, sizingAction.unit) }}
           </p>
           <p>
             Allowed: {{ formatSizingValue(sizingAction.min, sizingAction.unit) }} to
-            {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}.
+            {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}
           </p>
         </div>
         <p v-if="sizingRequiresRestart" class="text-ink-orange-7 text-sm">
@@ -158,7 +166,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Badge, Button, Dialog, ErrorMessage, FormControl, Switch } from 'frappe-ui'
+import { Badge, Button, Dialog, ErrorMessage, FormControl, Switch, Tooltip } from 'frappe-ui'
 import { databaseApi } from '@/api/database'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { openTaskDetailPage } from '@/utils/taskRoute'
@@ -222,13 +230,13 @@ const engineLabel = computed(() => {
 })
 const bufferPoolDescription = computed(() => {
   const capability = action('innodb_buffer_pool_size')
-  const description = 'Control how much memory MariaDB uses to cache InnoDB data and indexes.'
+  const description = ''
   if (!capability.available) return description
-  return `${description} Current: ${formatSizingValue(capability.current_mb, 'MB')}. Recommended: ${formatSizingValue(capability.recommended_mb, 'MB')}.`
+  return `${description} Current: ${formatSizingValue(capability.current_mb, 'MB')}`
 })
 const maxConnectionsDescription = computed(() => {
   const current = action('max_connections').current
-  return `Current: ${Number.isInteger(current) ? current : 'unavailable'}.`
+  return `Current: ${Number.isInteger(current) ? current : 'unavailable'}`
 })
 
 function action(name) {

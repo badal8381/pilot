@@ -42,7 +42,6 @@ export const DATABASE_SECTIONS = [
   {
     id: 'quick-actions',
     label: 'Quick actions',
-    description: 'Run guarded database operations and tune supported MariaDB limits.',
     component: DatabaseQuickActions,
   },
 ]
