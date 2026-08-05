@@ -47,11 +47,357 @@ def _client(
 def test_diagnostics_returns_provider_payload(tmp_path: Path) -> None:
     client = _client(tmp_path / "benches" / "current")
     payload = {"active_connections": 2, "lock_waits": {}, "binlog": {}}
-    with patch(f"{_PROVIDER}.get_diagnostics", return_value=payload), patch(f"{_PROVIDER}.__init__", return_value=None):
+    with (
+        patch(f"{_PROVIDER}.get_diagnostics", return_value=payload),
+        patch(f"{_PROVIDER}.__init__", return_value=None),
+    ):
         response = client.get("/api/v1/database/diagnostics")
 
     assert response.status_code == 200
     assert response.get_json() == payload
+
+
+def test_database_quick_actions_returns_capability_payload(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    payload = {
+        "engine": "mariadb",
+        "managed": True,
+        "reachable": True,
+        "actions": {
+            "restart": {"available": True, "reason": "", "requires_restart": True},
+            "performance_schema": {
+                "available": True,
+                "reason": "",
+                "enabled": False,
+                "requires_restart": True,
+            },
+            "innodb_buffer_pool_size": {
+                "available": True,
+                "reason": "",
+                "current_mb": 128,
+                "min_mb": 128,
+                "max_mb": 352,
+                "recommended_mb": 128,
+                "dynamic_max_mb": 128,
+                "unit": "MB",
+                "requires_restart": False,
+            },
+            "max_connections": {
+                "available": True,
+                "reason": "",
+                "current": 50,
+                "min": 10,
+                "max": 50,
+                "recommended": 50,
+                "requires_restart": False,
+            },
+            "manage_binlogs": {"available": True, "reason": ""},
+        },
+    }
+    actions = Mock()
+    actions.capabilities.return_value = payload
+    with patch("admin.backend.api.v1.databases._quick_actions", return_value=actions):
+        response = client.get("/api/v1/database/quick-actions")
+
+    assert response.status_code == 200
+    assert response.get_json() == payload
+
+
+def test_restart_database_queues_guarded_non_cancellable_task(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    actions = Mock()
+    with (
+        patch("admin.backend.api.v1.databases._quick_actions", return_value=actions),
+        patch("admin.backend.api.v1.databases.RestartDatabaseTask.queue", return_value="task-1") as queue,
+        patch(
+            "admin.backend.api.v1.databases.accepted_task_response",
+            return_value=({"task_id": "task-1"}, 202),
+        ),
+    ):
+        response = client.post(
+            "/api/v1/database/quick-actions/restart",
+            headers={"Idempotency-Key": "restart-once"},
+        )
+
+    assert response.status_code == 202
+    assert response.get_json() == {"task_id": "task-1"}
+    actions.require_restart.assert_called_once()
+    assert queue.call_args.kwargs == {
+        "idempotency_key": "restart-once",
+        "resource_key": "database-server",
+    }
+
+
+def test_restart_database_returns_capability_reason(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    actions = Mock()
+    actions.require_restart.side_effect = DatabaseError("Pilot cannot restart an external MariaDB server.")
+    with (
+        patch("admin.backend.api.v1.databases._quick_actions", return_value=actions),
+        patch("admin.backend.api.v1.databases.RestartDatabaseTask.queue") as queue,
+    ):
+        response = client.post("/api/v1/database/quick-actions/restart")
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["message"] == "Pilot cannot restart an external MariaDB server."
+    queue.assert_not_called()
+
+
+@pytest.mark.parametrize("payload", [{}, {"enabled": 1}, {"enabled": "true"}, {"enabled": None}, []])
+def test_performance_schema_rejects_non_boolean(
+    tmp_path: Path,
+    payload,
+) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    response = client.post("/api/v1/database/quick-actions/performance-schema", json=payload)
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == "invalid_enabled"
+
+
+def test_performance_schema_queues_guarded_task(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    actions = Mock()
+    actions.require_performance_schema.return_value = {"enabled": False}
+    with (
+        patch("admin.backend.api.v1.databases._quick_actions", return_value=actions),
+        patch(
+            "admin.backend.api.v1.databases.SetPerformanceSchemaTask.queue",
+            return_value="task-2",
+        ) as queue,
+        patch(
+            "admin.backend.api.v1.databases.accepted_task_response",
+            return_value=({"task_id": "task-2"}, 202),
+        ),
+    ):
+        response = client.post(
+            "/api/v1/database/quick-actions/performance-schema",
+            json={"enabled": True},
+            headers={"Idempotency-Key": "performance-on"},
+        )
+
+    assert response.status_code == 202
+    actions.require_performance_schema.assert_called_once()
+    assert queue.call_args.kwargs == {
+        "state": "enabled",
+        "idempotency_key": "performance-on",
+        "resource_key": "database-server",
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "payload", "error_code"),
+    [
+        ("/api/v1/database/quick-actions/innodb-buffer-pool-size", {}, "invalid_size_mb"),
+        (
+            "/api/v1/database/quick-actions/innodb-buffer-pool-size",
+            {"size_mb": True},
+            "invalid_size_mb",
+        ),
+        (
+            "/api/v1/database/quick-actions/innodb-buffer-pool-size",
+            {"size_mb": "256"},
+            "invalid_size_mb",
+        ),
+        ("/api/v1/database/quick-actions/max-connections", {}, "invalid_max_connections"),
+        (
+            "/api/v1/database/quick-actions/max-connections",
+            {"max_connections": 40.5},
+            "invalid_max_connections",
+        ),
+        (
+            "/api/v1/database/quick-actions/max-connections",
+            {"max_connections": "40"},
+            "invalid_max_connections",
+        ),
+    ],
+)
+def test_sizing_actions_reject_non_integer_payloads(
+    tmp_path: Path,
+    path: str,
+    payload,
+    error_code: str,
+) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    response = client.post(path, json=payload)
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == error_code
+
+
+def test_innodb_buffer_pool_size_queues_guarded_task(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    actions = Mock()
+    actions.require_innodb_buffer_pool_size.return_value = {"current_mb": 128}
+    with (
+        patch("admin.backend.api.v1.databases._quick_actions", return_value=actions),
+        patch(
+            "admin.backend.api.v1.databases.SetInnoDBBufferPoolSizeTask.queue",
+            return_value="task-3",
+        ) as queue,
+        patch(
+            "admin.backend.api.v1.databases.accepted_task_response",
+            return_value=({"task_id": "task-3"}, 202),
+        ),
+    ):
+        response = client.post(
+            "/api/v1/database/quick-actions/innodb-buffer-pool-size",
+            json={"size_mb": 256},
+            headers={"Idempotency-Key": "pool-256"},
+        )
+
+    assert response.status_code == 202
+    actions.require_innodb_buffer_pool_size.assert_called_once_with(256)
+    assert queue.call_args.kwargs == {
+        "size_mb": 256,
+        "idempotency_key": "pool-256",
+        "resource_key": "database-server",
+    }
+
+
+def test_max_connections_queues_guarded_task(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    actions = Mock()
+    actions.require_max_connections.return_value = {"current": 50}
+    with (
+        patch("admin.backend.api.v1.databases._quick_actions", return_value=actions),
+        patch(
+            "admin.backend.api.v1.databases.SetMaxDatabaseConnectionsTask.queue",
+            return_value="task-4",
+        ) as queue,
+        patch(
+            "admin.backend.api.v1.databases.accepted_task_response",
+            return_value=({"task_id": "task-4"}, 202),
+        ),
+    ):
+        response = client.post(
+            "/api/v1/database/quick-actions/max-connections",
+            json={"max_connections": 40},
+            headers={"Idempotency-Key": "connections-40"},
+        )
+
+    assert response.status_code == 202
+    actions.require_max_connections.assert_called_once_with(40)
+    assert queue.call_args.kwargs == {
+        "max_connections": 40,
+        "idempotency_key": "connections-40",
+        "resource_key": "database-server",
+    }
+
+
+@pytest.mark.parametrize(
+    ("path", "payload", "require_method", "capability", "queue_target"),
+    [
+        (
+            "/api/v1/database/quick-actions/performance-schema",
+            {"enabled": True},
+            "require_performance_schema",
+            {"enabled": True},
+            "admin.backend.api.v1.databases.SetPerformanceSchemaTask.queue",
+        ),
+        (
+            "/api/v1/database/quick-actions/innodb-buffer-pool-size",
+            {"size_mb": 128},
+            "require_innodb_buffer_pool_size",
+            {"current_mb": 128},
+            "admin.backend.api.v1.databases.SetInnoDBBufferPoolSizeTask.queue",
+        ),
+        (
+            "/api/v1/database/quick-actions/max-connections",
+            {"max_connections": 50},
+            "require_max_connections",
+            {"current": 50},
+            "admin.backend.api.v1.databases.SetMaxDatabaseConnectionsTask.queue",
+        ),
+    ],
+)
+def test_unchanged_database_actions_do_not_queue_tasks(
+    tmp_path: Path,
+    path: str,
+    payload: dict,
+    require_method: str,
+    capability: dict,
+    queue_target: str,
+) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    actions = Mock()
+    getattr(actions, require_method).return_value = capability
+
+    with (
+        patch("admin.backend.api.v1.databases._quick_actions", return_value=actions),
+        patch(queue_target) as queue,
+    ):
+        response = client.post(path, json=payload)
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "database_action_unchanged"
+    queue.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("path", "payload", "method", "message", "error_code"),
+    [
+        (
+            "/api/v1/database/quick-actions/innodb-buffer-pool-size",
+            {"size_mb": 500},
+            "require_innodb_buffer_pool_size",
+            "size_mb must be between 128 and 352 MB.",
+            "invalid_size_mb",
+        ),
+        (
+            "/api/v1/database/quick-actions/max-connections",
+            {"max_connections": 100},
+            "require_max_connections",
+            "max_connections must be between 10 and 50.",
+            "invalid_max_connections",
+        ),
+    ],
+)
+def test_sizing_actions_return_range_errors_as_unprocessable(
+    tmp_path: Path,
+    path: str,
+    payload,
+    method: str,
+    message: str,
+    error_code: str,
+) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    actions = Mock()
+    getattr(actions, method).side_effect = ValueError(message)
+    with patch("admin.backend.api.v1.databases._quick_actions", return_value=actions):
+        response = client.post(path, json=payload)
+
+    assert response.status_code == 422
+    assert response.get_json()["error"] == {
+        "code": error_code,
+        "message": message,
+        "details": {},
+    }
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/database/quick-actions/restart",
+        "/api/v1/database/quick-actions/performance-schema",
+        "/api/v1/database/quick-actions/innodb-buffer-pool-size",
+        "/api/v1/database/quick-actions/max-connections",
+    ],
+)
+def test_database_mutations_are_forbidden_when_bench_management_is_disabled(
+    tmp_path: Path,
+    path: str,
+) -> None:
+    client = _client(
+        tmp_path / "benches" / "current",
+        allow_bench_management=False,
+    )
+    with patch("admin.backend.api.v1.databases._quick_actions") as actions:
+        response = client.post(path)
+
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "bench_management_forbidden"
+    actions.assert_not_called()
 
 
 def test_diagnostics_maps_unexpected_failure_to_500(tmp_path: Path) -> None:
@@ -87,9 +433,20 @@ def test_binlogs_lists_files(tmp_path: Path) -> None:
 
 def test_lockwaits_lists_rows(tmp_path: Path) -> None:
     client = _client(tmp_path / "benches" / "current")
-    rows = [{"id": "42", "type": "RECORD", "mode": "X", "table": "tabDoc", "index": "PRIMARY",
-             "state": "LOCK WAIT", "started": "2026-01-01T00:00:00", "query": "UPDATE tabDoc SET x=1",
-             "rows_locked": 3, "rows_modified": 1}]
+    rows = [
+        {
+            "id": "42",
+            "type": "RECORD",
+            "mode": "X",
+            "table": "tabDoc",
+            "index": "PRIMARY",
+            "state": "LOCK WAIT",
+            "started": "2026-01-01T00:00:00",
+            "query": "UPDATE tabDoc SET x=1",
+            "rows_locked": 3,
+            "rows_modified": 1,
+        }
+    ]
     patcher, _ = _patched_provider(**{"get_lock_wait_rows.return_value": rows})
     with patcher:
         response = client.get("/api/v1/database/lockwaits")
@@ -101,7 +458,11 @@ def test_lockwaits_lists_rows(tmp_path: Path) -> None:
 def test_lockwaits_maps_unsupported_engine_to_422(tmp_path: Path) -> None:
     client = _client(tmp_path / "benches" / "current")
     patcher, _ = _patched_provider(
-        **{"get_lock_wait_rows.side_effect": DatabaseError("The selected engine does not support this operation")}
+        **{
+            "get_lock_wait_rows.side_effect": DatabaseError(
+                "The selected engine does not support this operation"
+            )
+        }
     )
     with patcher:
         response = client.get("/api/v1/database/lockwaits")
