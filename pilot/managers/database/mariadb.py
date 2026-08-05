@@ -35,6 +35,11 @@ _GLOBAL_INTEGER_VARIABLES = {
 }
 
 
+class _ManagedCnfParser(configparser.ConfigParser):
+    def optionxform(self, optionstr: str) -> str:
+        return optionstr
+
+
 class MariaDBManager(UserOwnedDBManager):
     _UNIT_NAME = "pilot-mariadb.service"
     _DISPLAY_NAME = "MariaDB"
@@ -217,13 +222,12 @@ class MariaDBManager(UserOwnedDBManager):
         return "\n".join(lines) + "\n"
 
     def _read_managed_options(self) -> dict[str, str]:
-        parser = configparser.ConfigParser(
+        parser = _ManagedCnfParser(
             interpolation=None,
             strict=True,
             delimiters=("=",),
             comment_prefixes=("#", ";"),
         )
-        parser.optionxform = str
         try:
             parser.read_string(self.managed_cnf_path.read_text(encoding="utf-8"))
         except (OSError, configparser.Error) as exc:
@@ -491,7 +495,7 @@ class MariaDBManager(UserOwnedDBManager):
     ) -> None:
         if size_mb < limits.innodb_buffer_pool_min_mb:
             raise DatabaseError(
-                "InnoDB Buffer Pool size cannot be less than " f"{limits.innodb_buffer_pool_min_mb} MB."
+                f"InnoDB Buffer Pool size cannot be less than {limits.innodb_buffer_pool_min_mb} MB."
             )
         if size_mb > limits.innodb_buffer_pool_max_mb:
             raise DatabaseError(
@@ -508,7 +512,7 @@ class MariaDBManager(UserOwnedDBManager):
             raise DatabaseError(f"Max DB connections must be at least {limits.max_connections_min}.")
         if max_connections > limits.max_connections_max:
             raise DatabaseError(
-                "Max DB connections cannot be greater than " f"{limits.max_connections_max} on this server."
+                f"Max DB connections cannot be greater than {limits.max_connections_max} on this server."
             )
 
     @staticmethod
@@ -550,7 +554,7 @@ class MariaDBManager(UserOwnedDBManager):
                 f"configuration also failed: {rollback_error}"
             ) from apply_error
         raise DatabaseError(
-            "Could not apply the Performance Schema change. " "The previous configuration was restored."
+            "Could not apply the Performance Schema change. The previous configuration was restored."
         ) from apply_error
 
     def _require_managed_server(self) -> None:

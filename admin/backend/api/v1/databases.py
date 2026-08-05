@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
+from flask.typing import ResponseReturnValue
 
 from admin.backend.api.responses import accepted_task_response, error_response
 from admin.backend.api.v1.benches.support import guard_bench_management
@@ -28,7 +29,7 @@ def _quick_actions() -> DatabaseQuickActions:
 
 
 @database_bp.get("/sites")
-def list_query_sites():
+def list_query_sites() -> ResponseReturnValue:
     bench_root: Path = current_app.config["BENCH_ROOT"]
     sites_path = bench_root / "sites"
     if not sites_path.is_dir():
@@ -45,7 +46,7 @@ def list_query_sites():
 
 
 @database_bp.get("/schema")
-def get_schema():
+def get_schema() -> ResponseReturnValue:
     bench_root: Path = current_app.config["BENCH_ROOT"]
     site = request.args.get("site", "")
     if not site:
@@ -61,7 +62,7 @@ def get_schema():
 
 
 @database_bp.post("/queries")
-def execute_query():
+def execute_query() -> ResponseReturnValue:
     bench_root: Path = current_app.config["BENCH_ROOT"]
     data = request.get_json(silent=True)
 
