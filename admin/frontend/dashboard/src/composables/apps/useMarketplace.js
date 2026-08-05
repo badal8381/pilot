@@ -4,6 +4,7 @@ import { settingsApi } from '@/api/settings'
 import { sitesApi } from '@/api/sites'
 import { parseBranchVersion, toSentenceCase } from '@/utils/format'
 import { matchesPill } from '@/utils/marketplaceCategories'
+import { isFrappeApp } from '@/utils/siteApps'
 
 function parseVersion(branch) {
   const match = /^version-(\d+)/.exec(branch || '')
@@ -15,10 +16,6 @@ function parseBenchBranch(branch) {
   if (version !== null) return { version, label: `v${version}` }
   if (branch === 'develop') return { version: null, label: 'Nightly' }
   return { version: null, label: parseBranchVersion(branch) || null }
-}
-
-export function isFrappeApp(app) {
-  return Boolean(app.repo?.includes('github.com/frappe/'))
 }
 
 function sortApps(a, b) {
@@ -140,6 +137,8 @@ export function useMarketplace(initialSiteName = '') {
     matchingApps.value.filter((app) => !isFrappeApp(app)).sort(sortApps),
   )
 
+  const appCount = computed(() => registry.value.length)
+
   const registryNames = computed(() => new Set(registry.value.map((app) => app.name)))
   const otherBenchApps = computed(() =>
     benchApps.value
@@ -156,6 +155,7 @@ export function useMarketplace(initialSiteName = '') {
   return {
     loading,
     error,
+    appCount,
     search,
     selectedPill,
     worksWith,
