@@ -4,19 +4,15 @@
       <div class="space-y-4">
         <slot name="subject">
           <div v-if="subject" class="flex items-center gap-3">
-            <span
-              v-if="subject.icon"
-              class="place-items-center grid bg-surface-gray-2 rounded-[10px] size-9 shrink-0"
-            >
+            <Avatar v-if="subject.icon" size="xl" shape="square">
               <span class="size-4 text-ink-gray-7" :class="subject.icon" />
-            </span>
+            </Avatar>
             <AppIcon
               v-else
               :name="subject.name || subject.label"
               :label="subject.label"
               :logo="subject.logo || ''"
-              class="rounded-[10px] size-9"
-              initial-class="text-base"
+              size="xl"
             />
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
@@ -67,7 +63,7 @@
 </template>
 
 <script setup>
-import { Button, Dialog, ErrorMessage } from 'frappe-ui'
+import { Avatar, Button, Dialog, ErrorMessage } from 'frappe-ui'
 import AppIcon from '@/components/apps/AppIcon.vue'
 
 defineProps({

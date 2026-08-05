@@ -15,9 +15,14 @@
             placement="bottom-end"
           >
             <template #default="{ open }">
-              <Button variant="ghost" size="sm" :active="open">
-                <span class="size-4 lucide-ellipsis" />
-              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="App actions"
+                tooltip="Actions"
+              />
             </template>
           </Dropdown>
           <span v-else class="size-7 shrink-0" />

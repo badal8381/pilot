@@ -188,9 +188,14 @@
               />
               <Dropdown :options="siteLogOptions(site.name)" placement="bottom-end">
                 <template #default="{ open }">
-                  <Button variant="ghost" size="sm" :active="open" tooltip="Site jobs">
-                    <span class="lucide-list-checks size-4" />
-                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    :active="open"
+                    tooltip="Site jobs"
+                    icon="lucide-list-checks"
+                    label="Site jobs"
+                  />
                 </template>
               </Dropdown>
             </div>
