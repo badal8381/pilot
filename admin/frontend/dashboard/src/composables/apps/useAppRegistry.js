@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { appsApi } from '@/api/apps'
 
-const COLORS = ['#4f46e5', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed']
+const THEMES = ['violet', 'blue', 'green', 'amber', 'red']
 export const FRAPPE_LOGO_URL =
   'https://raw.githubusercontent.com/frappe/frappe/refs/heads/develop/.github/framework-logo-new.svg'
 
@@ -13,10 +13,10 @@ export function isFrappeFramework(name) {
   return lower === 'frappe' || lower === 'frappe framework'
 }
 
-export function hashColor(name) {
+export function hashTheme(name) {
   let hash = 0
-  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) | 0
-  return COLORS[Math.abs(hash) % COLORS.length]
+  for (const char of name ?? '') hash = (hash * 31 + char.charCodeAt(0)) | 0
+  return THEMES[Math.abs(hash) % THEMES.length]
 }
 
 export function useAppRegistry() {
@@ -66,6 +66,5 @@ export function useAppRegistry() {
     descriptionMap,
     documentationMap,
     websiteMap,
-    hashColor,
   }
 }
