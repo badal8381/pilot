@@ -1,21 +1,25 @@
 <template>
-  <div class="mx-auto max-w-3xl pb-40">
-    <div
-      class="flex sm:flex-row flex-col sm:justify-between sm:items-end gap-3 sm:gap-4 pt-4 pb-2"
-    >
-      <div class="flex flex-col items-start">
-        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <h1 class="font-semibold text-ink-gray-9 text-xl">Explore Frappe Marketplace</h1>
-          <span
-            v-if="benchVersionLabel"
-            class="inline-flex items-center gap-1 bg-surface-gray-2 px-2 py-0.5 rounded-full h-min text-ink-gray-6 text-xs shrink-0"
-          >
-            <span class="size-3 lucide-box"></span> {{ benchVersionLabel }}
-          </span>
-        </div>
-      </div>
+  <PageHero v-if="loading">
+    <template #icon><Skeleton class="rounded-lg size-9 sm:size-10 shrink-0" /></template>
+    <template #title>
+      <Skeleton class="rounded w-40 h-4" />
+      <Skeleton class="rounded-full w-14 h-5 shrink-0" />
+    </template>
+    <template #subtitle><Skeleton class="rounded w-24 h-3.5" /></template>
+    <template #actions><Skeleton class="rounded w-28 h-8 sm:h-7" /></template>
+  </PageHero>
+
+  <PageHero v-else icon="lucide-store">
+    <template #title>
+      <h1 class="font-medium text-ink-gray-9 text-lg truncate">Frappe Marketplace</h1>
+      <Badge v-if="benchVersionLabel" :label="benchVersionLabel" size="md" class="shrink-0">
+        <template #prefix><span class="size-2.5 lucide-box" /></template>
+      </Badge>
+    </template>
+    <template #subtitle>{{ error ? '' : appCountLabel }}</template>
+    <template #actions>
       <Button
-        class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto shrink-0"
+        class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base max-w-[180px] sm:max-w-[250px] overflow-hidden"
         :size="isMobile ? 'md' : 'sm'"
         @click="showChooseSite = true"
       >
@@ -27,8 +31,10 @@
           <span class="size-4 text-ink-gray-5 lucide-chevron-down" />
         </template>
       </Button>
-    </div>
+    </template>
+  </PageHero>
 
+  <div class="mx-auto max-w-3xl pb-40">
     <!-- Filters -->
     <MarketplaceFilters
       v-model:search="search"
@@ -130,8 +136,9 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Button, ErrorMessage, Skeleton } from 'frappe-ui'
+import { Badge, Button, ErrorMessage, Skeleton } from 'frappe-ui'
 import AddAppFromGithubDialog from '@/components/apps/AddAppFromGithubDialog.vue'
+import PageHero from '@/components/common/PageHero.vue'
 import ChooseSiteDialog from '@/components/sites/ChooseSiteDialog.vue'
 import InstallAppDialog from '@/components/apps/InstallAppDialog.vue'
 import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
@@ -146,6 +153,7 @@ const route = useRoute()
 const {
   loading,
   error,
+  appCount,
   search,
   selectedPill,
   worksWith,
@@ -162,6 +170,10 @@ const {
 } = useMarketplace(route.query.site)
 
 const siteLabel = computed(() => currentSiteName.value || 'All sites')
+
+const appCountLabel = computed(
+  () => `${appCount.value} ${appCount.value === 1 ? 'app' : 'apps'} available`,
+)
 
 const filteredHeading = computed(() => {
   const name = selectedPill.value !== 'All' ? selectedPill.value : 'Matching apps'
