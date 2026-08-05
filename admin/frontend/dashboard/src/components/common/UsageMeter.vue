@@ -6,6 +6,9 @@ interface UsagePart {
   label: string
   bytes: number | null
   color: string
+  // Set false for a part that belongs in the legend but not the bar, such as
+  // headroom that would otherwise scale every real segment out of sight.
+  inBar?: boolean
 }
 
 interface Props {
@@ -44,7 +47,9 @@ const hiddenCount = computed(() =>
 )
 
 const barParts = computed(() => {
-  const known = formattedParts.value.filter((part) => (part.bytes ?? 0) > 0)
+  const known = formattedParts.value.filter(
+    (part) => part.inBar !== false && (part.bytes ?? 0) > 0,
+  )
   const denominator = props.total ?? known.reduce((sum, part) => sum + (part.bytes ?? 0), 0)
   if (!denominator) return []
   return known.map((part) => ({ ...part, percent: ((part.bytes ?? 0) / denominator) * 100 }))

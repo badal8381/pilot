@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import Mock
 
 from admin.backend.providers.database import DatabaseDiagnosticsProvider
-from pilot.core.database import BinlogFile, BinlogStatus, LockWaitRow, LockWaitStatus
+from pilot.core.database import BinlogFile, BinlogStatus, DatabaseProcess, LockWaitRow, LockWaitStatus
 
 
 def _provider(db: Mock) -> DatabaseDiagnosticsProvider:
@@ -25,6 +25,35 @@ def test_get_diagnostics_shapes_dataclasses_as_dicts() -> None:
         "lock_waits": {"current_waits": 1, "total_waits": 9, "timeout_seconds": 50},
         "binlog": {"enabled": True, "file_count": 2, "size_bytes": 4096},
     }
+
+
+def test_get_process_list_shapes_processes_as_dicts() -> None:
+    db = Mock()
+    db.get_process_list.return_value = [
+        DatabaseProcess(
+            id=7,
+            user="app",
+            host="localhost:53422",
+            database="mydb",
+            command="Query",
+            state=None,
+            duration_seconds=3.0,
+            query="SELECT 1",
+        )
+    ]
+
+    assert _provider(db).get_process_list() == [
+        {
+            "id": 7,
+            "user": "app",
+            "host": "localhost:53422",
+            "database": "mydb",
+            "command": "Query",
+            "state": None,
+            "duration_seconds": 3.0,
+            "query": "SELECT 1",
+        }
+    ]
 
 
 def test_sqlite_bench_has_no_database_server(tmp_path) -> None:
@@ -155,6 +184,26 @@ def test_get_database_size_uses_a_connection_bound_to_the_site(tmp_path) -> None
         }
 
     make.assert_called_once_with(tmp_path, "shop.local")
+
+
+def test_site_scoped_size_takes_free_space_from_the_server(tmp_path) -> None:
+    """A site's own database user need not be allowed to ask the server where
+    its data directory is - PostgreSQL hides that setting from non-superusers -
+    but the free space it measures is the same disk whatever the scope."""
+    from unittest.mock import patch
+
+    from pilot.core.database import DatabaseSize
+
+    site_db = Mock()
+    site_db.get_database_size.return_value = DatabaseSize(
+        data_bytes=21, index_bytes=27, claimable_bytes=None, free_bytes=None
+    )
+    server = Mock()
+    server.get_free_disk_bytes.return_value = 855949434880
+    provider = DatabaseDiagnosticsProvider(bench_root=tmp_path, database=server)
+
+    with patch("admin.backend.providers.database.make_site_database", return_value=site_db):
+        assert provider.get_database_size("shop.local")["free_bytes"] == 855949434880
 
 
 def test_get_database_size_without_a_site_uses_the_server_connection() -> None:

@@ -17,6 +17,23 @@ class QueryResult:
 
 
 @dataclass
+class DatabaseProcess:
+    """One client connection to the server, in engine-neutral terms. `command`
+    is what the connection is doing (MariaDB's Command, PostgreSQL's state) and
+    `state` the finer step or wait inside it. `duration_seconds` is how long it
+    has been in that state. Fields an engine cannot report stay None."""
+
+    id: int
+    user: str | None
+    host: str | None
+    database: str | None
+    command: str | None
+    state: str | None
+    duration_seconds: float | None
+    query: str | None
+
+
+@dataclass
 class LockWaitStatus:
     current_waits: int
     total_waits: int | None
@@ -103,7 +120,7 @@ class Database(ABC):
     def get_schema(self) -> list[dict]:
         return [{"name": t, "columns": self.get_table_columns(t)} for t in self.get_tables()]
 
-    def get_process_list(self, database: str = "") -> list[dict]:
+    def get_process_list(self, database: str = "") -> list[DatabaseProcess]:
         """`database` narrows the result to one database; empty means server-wide."""
         raise NotImplementedError
 
@@ -146,6 +163,20 @@ class Database(ABC):
         """Server data directory, or None when the server is not on this host
         and the path would therefore be meaningless locally."""
         raise NotImplementedError
+
+    def get_free_disk_bytes(self) -> int | None:
+        """Free space on the disk holding the server's data directory. None
+        when that directory cannot be reached from here - a remote server, or
+        a user without the privilege to ask the server where it is."""
+        import shutil
+
+        directory = self.get_data_directory()
+        if not directory:
+            return None
+        try:
+            return shutil.disk_usage(directory).free
+        except OSError:
+            return None
 
     def get_scalar(self, query: str):
         result = self.execute(query)

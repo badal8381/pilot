@@ -171,7 +171,7 @@
   <Dialog v-model="showKillDialog" :options="{ title: 'Kill database process', size: 'sm' }">
     <template #body-content>
       <p class="text-ink-gray-7 text-sm">
-        Close connection <strong>{{ killTarget?.Id }}</strong> and roll back whatever it is running?
+        Close connection <strong>{{ killTarget?.id }}</strong> and roll back whatever it is running?
         Any bench sharing this server may own it.
       </p>
 
@@ -335,13 +335,13 @@ const purgeError = ref('')
 const processRows = computed(() =>
   processes.value.map((process, index) => ({
     number: index + 1,
-    id: process.Id,
-    state: process.State || '—',
-    time: `${process.Time}s`,
-    user: process.User,
-    host: process.Host || '—',
-    command: process.Command,
-    query: truncateQuery(process.Info),
+    id: process.id,
+    state: process.state || '—',
+    time: formatSeconds(process.duration_seconds),
+    user: process.user || '—',
+    host: process.host || '—',
+    command: process.command || '—',
+    query: truncateQuery(process.query),
     process,
   })),
 )
@@ -377,14 +377,14 @@ const killDetails = computed(() => {
   const process = killTarget.value
   if (!process) return []
   return [
-    { label: 'User', value: process.User },
-    { label: 'Database', value: process.db || '—' },
-    { label: 'State', value: process.Command },
-    { label: 'Running for', value: `${process.Time}s` },
+    { label: 'User', value: process.user || '—' },
+    { label: 'Database', value: process.database || '—' },
+    { label: 'State', value: process.command || '—' },
+    { label: 'Running for', value: formatSeconds(process.duration_seconds) },
   ]
 })
 
-const killQuery = computed(() => killTarget.value?.Info || '')
+const killQuery = computed(() => killTarget.value?.query || '')
 
 const pendingFiles = computed(() =>
   pendingIndex.value < 0 ? [] : binlogs.value.slice(0, pendingIndex.value + 1),
@@ -433,6 +433,10 @@ function truncateQuery(query) {
   return query.length > MAX_QUERY_LENGTH ? `${query.slice(0, MAX_QUERY_LENGTH)}…` : query
 }
 
+function formatSeconds(seconds) {
+  return seconds == null ? '—' : `${Math.round(seconds)}s`
+}
+
 function fileAge(file) {
   return file.modified_ms ? relativeTime(new Date(file.modified_ms).toISOString()) : '—'
 }
@@ -453,10 +457,10 @@ async function kill() {
   killing.value = true
   killError.value = ''
   try {
-    const result = await databaseApi.killProcess(killTarget.value.Id)
+    const result = await databaseApi.killProcess(killTarget.value.id)
     if (result.error) throw new Error(apiErrorMessage(result, 'Could not kill the process.'))
     showKillDialog.value = false
-    toast.success(`Killed process ${killTarget.value.Id}`)
+    toast.success(`Killed process ${killTarget.value.id}`)
     await loadProcesses()
   } catch (e) {
     killError.value = e.message || 'Could not kill the process.'

@@ -38,13 +38,3 @@ def file_modified_ms(path: Path) -> int | None:
 
 def is_local_host(host: str, socket: str | None = None) -> bool:
     return bool(socket) or host in ("localhost", "127.0.0.1", "::1", "")
-
-
-def disk_free(path: str) -> int | None:
-    """Best-effort: the data directory may not be readable from this process."""
-    import shutil
-
-    try:
-        return shutil.disk_usage(path).free
-    except OSError:
-        return None
