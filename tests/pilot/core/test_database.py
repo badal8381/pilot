@@ -646,20 +646,30 @@ def test_postgres_get_lock_wait_rows_leaves_unsupported_fields_none() -> None:
     responses = {
         "blocked.granted": (
             ["pid", "locktype", "mode", "relation", "state", "query_start", "query", "datname"],
-            [[123, "relation", "RowExclusiveLock", 16385, "active",
-              "2026-01-01 00:00:00", "UPDATE tabDoc SET x=1", "site_one"]],
+            [
+                [
+                    123,
+                    "relation",
+                    "RowExclusiveLock",
+                    16385,
+                    "active",
+                    "2026-01-01 00:00:00",
+                    "UPDATE tabDoc SET x=1",
+                    "site_one",
+                ]
+            ],
         ),
-        "relname FROM pg_class": (["oid", "relname"], [[16385, "tabDoc"]]),
+        "n.nspname": (["oid", "nspname", "relname"], [[16385, "public", "tabDoc"]]),
     }
     with patch.object(PostgreSQL, "execute", _canned_execute(responses)):
-        rows = db.get_lock_wait_rows()
+        rows = db.get_lock_wait_rows("site_one")
 
     assert len(rows) == 1
     row = rows[0]
     assert row.id == "123"
     assert row.type == "relation"
     assert row.mode == "RowExclusiveLock"
-    assert row.table == "site_one.tabDoc"
+    assert row.table == "site_one.public.tabDoc"
     assert row.index is None
     assert row.state == "active"
     assert row.started == "2026-01-01 00:00:00"
@@ -668,10 +678,9 @@ def test_postgres_get_lock_wait_rows_leaves_unsupported_fields_none() -> None:
     assert row.rows_modified is None
 
 
-def test_postgres_lock_wait_tables_resolve_in_their_own_database() -> None:
-    """The same OID names a different table in every database, so resolving it
-    against the connection's own catalog reported another database's table, or
-    a bare number when the OID was not in that catalog at all."""
+def test_postgres_server_wide_lock_waits_do_not_query_every_database() -> None:
+    """The server-wide view refreshes every two seconds, so relation lookup
+    must not open one connection for every database with a wait."""
     from pilot.core.database import QueryResult
 
     db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
@@ -680,21 +689,42 @@ def test_postgres_lock_wait_tables_resolve_in_their_own_database() -> None:
         [2, "relation", "RowExclusiveLock", 16385, "active", None, "UPDATE", "site_two"],
         [3, "advisory", "ExclusiveLock", None, "active", None, "SELECT", "site_one"],
     ]
-    catalogs = {"site_one": [[16385, "tabItem"]], "site_two": [[16385, "tabCustomer"]]}
-    asked: list[str] = []
 
     def execute(self, query: str, read_only: bool = True) -> QueryResult:
-        if "blocked.granted" in query:
-            return QueryResult(columns=[], rows=locks, duration_ms=0)
-        assert "relname FROM pg_class" in query
-        asked.append(self._database)
-        return QueryResult(columns=[], rows=catalogs[self._database], duration_ms=0)
+        assert "blocked.granted" in query
+        return QueryResult(columns=[], rows=locks, duration_ms=0)
 
     with patch.object(PostgreSQL, "execute", execute):
         rows = db.get_lock_wait_rows()
 
-    assert [row.table for row in rows] == ["site_one.tabItem", "site_two.tabCustomer", None]
-    assert sorted(asked) == ["site_one", "site_two"]
+    assert [row.table for row in rows] == [
+        "site_one (relation OID 16385)",
+        "site_two (relation OID 16385)",
+        None,
+    ]
+
+
+def test_postgres_site_lock_wait_includes_schema_in_relation_name() -> None:
+    """Relation names need the database and schema because PostgreSQL permits
+    the same table name in multiple schemas."""
+    from pilot.core.database import QueryResult
+
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
+    lock = [1, "relation", "RowExclusiveLock", 16385, "active", None, "UPDATE", "site_one"]
+    asked: list[str] = []
+
+    def execute(self, query: str, read_only: bool = True) -> QueryResult:
+        if "blocked.granted" in query:
+            return QueryResult(columns=[], rows=[lock], duration_ms=0)
+        assert "JOIN pg_namespace" in query
+        asked.append(self._database)
+        return QueryResult(columns=[], rows=[[16385, "archive", "tabItem"]], duration_ms=0)
+
+    with patch.object(PostgreSQL, "execute", execute):
+        rows = db.get_lock_wait_rows("site_one")
+
+    assert rows[0].table == "site_one.archive.tabItem"
+    assert asked == ["site_one"]
 
 
 def test_postgres_lock_waits_ask_no_catalog_when_nothing_is_waiting() -> None:
@@ -777,20 +807,31 @@ def test_postgres_get_database_size_leaves_claimable_space_unknown() -> None:
     assert size.free_bytes is None
 
 
-def test_postgres_server_wide_size_sums_every_database() -> None:
-    """pg_class only ever describes the connected database, so a server-wide
-    connection has to ask each one; it used to report the maintenance
-    database's own size, which is always close to zero."""
+def test_postgres_server_wide_size_uses_one_combined_query() -> None:
+    """A host may have hundreds of databases, so server scope must not open a
+    connection and query pg_class once for every site."""
     db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
-    responses = {
-        "pg_database": (["datname"], [["site_one"], ["site_two"]]),
-        "pg_table_size": ([], [[1000, 200]]),
-    }
-    with patch.object(PostgreSQL, "execute", _canned_execute(responses)):
+    calls: list = []
+    responses = {"pg_database_size": (["total", "unavailable"], [[2400, 0]])}
+    with patch.object(PostgreSQL, "execute", _canned_execute(responses, calls)):
         size = db.get_database_size()
 
-    assert size.data_bytes == 2000
-    assert size.index_bytes == 400
+    assert size.data_bytes is None
+    assert size.index_bytes is None
+    assert size.total_bytes == 2400
+    assert len(calls) == 1
+    assert "datallowconn" not in calls[0][0]
+
+
+def test_postgres_server_wide_size_fails_if_a_database_cannot_be_measured() -> None:
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
+    responses = {"pg_database_size": (["total", "unavailable"], [[2400, 1]])}
+
+    with (
+        patch.object(PostgreSQL, "execute", _canned_execute(responses)),
+        pytest.raises(DatabaseError, match="1 database"),
+    ):
+        db.get_database_size()
 
 
 def test_postgres_get_table_sizes_reports_per_relation() -> None:

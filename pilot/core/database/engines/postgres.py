@@ -190,13 +190,13 @@ class PostgreSQL(Database):
             "WHERE NOT blocked.granted"
         )
         rows = [row for row in result.rows if not database or row[7] == database]
-        tables = self._table_names(rows)
+        tables = self._table_names(database, rows) if database else {}
         return [
             LockWaitRow(
                 id=str(row[0]),
                 type=row[1],
                 mode=row[2],
-                table=tables.get((row[7], row[3])),
+                table=self._relation_name(row[7], row[3], tables),
                 index=None,
                 state=row[4],
                 started=str(row[5]) if row[5] is not None else None,
@@ -207,20 +207,26 @@ class PostgreSQL(Database):
             for row in rows
         ]
 
-    def _table_names(self, rows: list[list]) -> dict[tuple[str, int], str]:
-        """A relation OID only names a table inside its own database, so each
-        database resolves its own. Casting the OID in the connection's catalog
-        named whatever that OID happens to be there, or nothing at all. Names
-        carry their database, the way MariaDB's lock table does."""
-        wanted = {(row[7], row[3]) for row in rows if row[7] and row[3]}
-        names: dict[tuple[str, int], str] = {}
-        for database in {name for name, _ in wanted}:
-            oids = ", ".join(str(int(oid)) for name, oid in wanted if name == database)
-            catalog = self._scoped_to(database).execute(
-                f"SELECT oid, relname FROM pg_class WHERE oid IN ({oids})"
-            )
-            names.update({(database, int(row[0])): f"{database}.{row[1]}" for row in catalog.rows})
-        return names
+    def _table_names(self, database: str, rows: list[list]) -> dict[int, str]:
+        """Resolve relation OIDs only for a selected database. Server-wide
+        lock polling must not open one connection per affected database."""
+        wanted = {int(row[3]) for row in rows if row[3]}
+        if not wanted:
+            return {}
+        oids = ", ".join(str(oid) for oid in wanted)
+        catalog = self._scoped_to(database).execute(
+            "SELECT c.oid, n.nspname, c.relname FROM pg_class c "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+            f"WHERE c.oid IN ({oids})"
+        )
+        return {int(row[0]): f"{database}.{row[1]}.{row[2]}" for row in catalog.rows}
+
+    @staticmethod
+    def _relation_name(database: str | None, oid: int | None, names: dict[int, str]) -> str | None:
+        if not database or not oid:
+            return None
+        relation_oid = int(oid)
+        return names.get(relation_oid, f"{database} (relation OID {relation_oid})")
 
     # `pg_table_size` covers the heap and its TOAST, matching what MariaDB
     # reports as data_length. Reclaimable bloat needs the pgstattuple
@@ -231,21 +237,31 @@ class PostgreSQL(Database):
     )
 
     def get_database_size(self) -> DatabaseSize:
-        """`pg_class` only ever describes the database the connection is bound
-        to, so a server-wide instance asks each database for its own totals."""
-        totals = [self._table_size_totals()] if self._database else self._every_database_totals()
+        """Return an exact split for one database or one combined server total.
+
+        PostgreSQL catalogs cannot split every database's size from one
+        connection. Reconnecting to every database makes this request linear in
+        the number of sites, so server scope uses pg_database_size instead.
+        """
+        data, index = self._table_size_totals() if self._database else (None, None)
         return DatabaseSize(
-            data_bytes=sum(data for data, _ in totals),
-            index_bytes=sum(index for _, index in totals),
+            data_bytes=data,
+            index_bytes=index,
             claimable_bytes=None,
             free_bytes=self.get_free_disk_bytes(),
+            total_bytes=None if self._database else self._server_database_bytes(),
         )
 
-    def _every_database_totals(self) -> list[tuple[int, int]]:
-        names = self.execute(
-            "SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate"
+    def _server_database_bytes(self) -> int:
+        result = self.execute(
+            "SELECT COALESCE(SUM(size_bytes), 0), COUNT(*) FILTER (WHERE size_bytes IS NULL) "
+            "FROM (SELECT pg_database_size(datname) AS size_bytes FROM pg_database "
+            "WHERE NOT datistemplate) databases"
         )
-        return [self._scoped_to(str(row[0]))._table_size_totals() for row in names.rows]
+        total, unavailable = result.rows[0] if result.rows else (0, 0)
+        if int(unavailable):
+            raise DatabaseError(f"Could not measure {int(unavailable)} database(s) on this server")
+        return int(total)
 
     def _scoped_to(self, database: str) -> "PostgreSQL":
         return PostgreSQL(

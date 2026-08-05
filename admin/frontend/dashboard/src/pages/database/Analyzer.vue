@@ -311,6 +311,10 @@ const lockWaitsLoading = ref(false)
 const lockWaitsError = ref('')
 const autoRefreshLocks = ref(true)
 let lockWaitsTimer = null
+let lockWaitsPollVersion = 0
+let lockWaitsRequest = null
+let lockWaitsRequestSite = null
+let lockWaitsReloadQueued = false
 
 const binlogs = ref([])
 const binlogsLoading = ref(false)
@@ -510,18 +514,45 @@ async function loadProcesses() {
   }
 }
 
-async function loadLockWaits() {
+function loadLockWaits() {
+  if (lockWaitsRequest) {
+    if (lockWaitsRequestSite !== selectedSite.value) lockWaitsReloadQueued = true
+    return lockWaitsRequest
+  }
+  lockWaitsRequest = drainLockWaitsRequests()
+  return lockWaitsRequest
+}
+
+async function drainLockWaitsRequests() {
   lockWaitsLoading.value = true
+  try {
+    do {
+      lockWaitsReloadQueued = false
+      await fetchLockWaits()
+    } while (lockWaitsReloadQueued)
+  } finally {
+    lockWaitsLoading.value = false
+    lockWaitsRequest = null
+    lockWaitsRequestSite = null
+  }
+}
+
+async function fetchLockWaits() {
+  const site = selectedSite.value
+  lockWaitsRequestSite = site
   lockWaitsError.value = ''
   try {
-    const result = await databaseApi.lockWaitRows(selectedSite.value)
+    const result = await databaseApi.lockWaitRows(site)
+    if (site !== selectedSite.value) {
+      lockWaitsReloadQueued = true
+      return
+    }
     if (result?.error)
       throw new Error(apiErrorMessage(result, 'Could not load database lock waits.'))
     lockWaits.value = Array.isArray(result) ? result : []
   } catch (e) {
-    lockWaitsError.value = e.message || 'Could not load database lock waits.'
-  } finally {
-    lockWaitsLoading.value = false
+    if (site !== selectedSite.value) lockWaitsReloadQueued = true
+    else lockWaitsError.value = e.message || 'Could not load database lock waits.'
   }
 }
 
@@ -555,13 +586,21 @@ async function loadBinlogs() {
   }
 }
 
+async function pollLockWaits(version) {
+  await loadLockWaits()
+  if (version !== lockWaitsPollVersion || !autoRefreshLocks.value) return
+  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
+}
+
 function startLockWaitsAutoRefresh() {
   stopLockWaitsAutoRefresh()
-  lockWaitsTimer = setInterval(loadLockWaits, AUTO_REFRESH_INTERVAL_MS)
+  const version = lockWaitsPollVersion
+  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
 }
 
 function stopLockWaitsAutoRefresh() {
-  if (lockWaitsTimer) clearInterval(lockWaitsTimer)
+  lockWaitsPollVersion += 1
+  if (lockWaitsTimer) clearTimeout(lockWaitsTimer)
   lockWaitsTimer = null
 }
 

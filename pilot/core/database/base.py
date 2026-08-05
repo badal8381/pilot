@@ -60,14 +60,17 @@ class LockWaitRow:
 
 @dataclass
 class DatabaseSize:
-    """Storage breakdown. `claimable_bytes` is space a rebuild would return to
-    the filesystem; `free_bytes` is what the data directory's disk has left.
-    Either is None when the engine or a remote host can't report it."""
+    """Storage breakdown. `total_bytes` carries an exact combined size when an
+    engine cannot split a server-wide total into data and indexes.
+    `claimable_bytes` is space a rebuild would return to the filesystem;
+    `free_bytes` is what the data directory's disk has left. Fields stay None
+    when the engine or a remote host cannot report them."""
 
-    data_bytes: int
-    index_bytes: int
+    data_bytes: int | None
+    index_bytes: int | None
     claimable_bytes: int | None
     free_bytes: int | None
+    total_bytes: int | None = None
 
 
 @dataclass
