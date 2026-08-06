@@ -42,10 +42,10 @@ class DeleteBackupTask(Task):
 
     @step("delete", lambda self: f"Delete {len(self.filenames)} backup(s) for {self.site}")
     def delete(self) -> None:
-        backup_dir = self.site_record.backups.directory
+        backups = self.site_record.backups
         deleted, offsite = [], False
         for filename in self.filenames:
-            path = backup_dir / filename
+            path = backups.resolve_file(filename)
             if path.is_file():
                 path.unlink()
                 deleted.append(filename)
