@@ -1,8 +1,8 @@
 import { computed } from 'vue'
-import { useTheme } from 'frappe-ui'
 import { sidebarSections } from '@/components/navigation/list'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 import { useSession } from '@/composables/auth/useSession'
+import { useTheme } from '@/composables/common/useTheme'
 import {
   DATABASE_SECTIONS,
   GENERAL_SECTIONS,
