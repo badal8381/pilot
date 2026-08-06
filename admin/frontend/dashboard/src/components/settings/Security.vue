@@ -7,7 +7,7 @@
 
   <Dialog v-model="showRevokePrompt" :options="{ title: 'Password changed', size: 'md' }">
     <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
+      <p class="text-ink-gray-7 text-p-base">
         Revoke every other active session? Anyone signed in elsewhere will be signed out
         immediately — this browser stays signed in.
       </p>

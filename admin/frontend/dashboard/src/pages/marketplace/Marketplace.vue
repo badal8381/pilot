@@ -1,9 +1,10 @@
 <template>
   <div class="mx-auto max-w-3xl pb-40">
-    <!-- Header -->
-    <div class="flex justify-between items-start gap-4 pt-4 pb-2">
+    <div
+      class="flex sm:flex-row flex-col sm:justify-between sm:items-end gap-3 sm:gap-4 pt-4 pb-2"
+    >
       <div class="flex flex-col items-start">
-        <div class="flex items-center gap-2.5">
+        <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <h1 class="font-semibold text-ink-gray-9 text-xl">Explore Frappe Marketplace</h1>
           <span
             v-if="benchVersionLabel"
@@ -12,11 +13,12 @@
             <span class="size-3 lucide-box"></span> {{ benchVersionLabel }}
           </span>
         </div>
-        <p class="mt-2 max-w-lg text-ink-gray-6 text-p-base">
-          Open source apps built by developers worldwide for the Frappe ecosystem
-        </p>
       </div>
-      <Button class="shrink-0" @click="showChooseSite = true">
+      <Button
+        class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto shrink-0"
+        :size="isMobile ? 'md' : 'sm'"
+        @click="showChooseSite = true"
+      >
         <template #prefix>
           <span class="size-4 text-ink-gray-5 lucide-globe" />
         </template>
@@ -36,10 +38,18 @@
       @add-from-github="showAddFromGithub = true"
     />
 
-    <!-- Loading -->
-    <div v-if="loading || error" class="flex flex-row justify-center items-center w-full h-[250px]">
-      <LoadingText v-if="loading" class="mt-8" />
-      <ErrorMessage v-else-if="error" :message="error" class="mt-8" />
+    <!-- Mirrors one section of the real grid so apps land in place. -->
+    <section v-if="loading" class="mt-12">
+      <div class="flex items-center h-4">
+        <Skeleton class="rounded w-32 h-3.5" />
+      </div>
+      <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+        <MarketplaceAppCardSkeleton v-for="i in 8" :key="i" :index="i - 1" />
+      </div>
+    </section>
+
+    <div v-else-if="error" class="flex justify-center items-center w-full h-[250px]">
+      <ErrorMessage :message="error" />
     </div>
 
     <!-- Marketplace Apps -->
@@ -120,14 +130,17 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Button, ErrorMessage, LoadingText } from 'frappe-ui'
+import { Button, ErrorMessage, Skeleton } from 'frappe-ui'
 import AddAppFromGithubDialog from '@/components/apps/AddAppFromGithubDialog.vue'
 import ChooseSiteDialog from '@/components/sites/ChooseSiteDialog.vue'
 import InstallAppDialog from '@/components/apps/InstallAppDialog.vue'
 import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
+import MarketplaceAppCardSkeleton from '@/components/marketplace/MarketplaceAppCardSkeleton.vue'
 import MarketplaceFilters from '@/components/marketplace/MarketplaceFilters.vue'
 import { useMarketplace } from '@/composables/apps/useMarketplace'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 
+const isMobile = useIsMobile()
 const route = useRoute()
 
 const {

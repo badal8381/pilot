@@ -70,15 +70,17 @@ const STATE_LABEL = {
   restarting: 'Restarting services',
 }
 
+// Gray unless the state is worth interrupting for - see STATUS_CONFIG in
+// taskFormat.js, which this row shares its shape with.
 const STATE_ICON = {
-  green: { icon: 'lucide-check', iconBg: 'bg-surface-green-2 text-ink-green-8' },
+  green: { icon: 'lucide-check', iconBg: 'bg-surface-gray-2 text-ink-gray-6' },
   red: { icon: 'lucide-x', iconBg: 'bg-surface-red-2 text-ink-red-8' },
-  blue: { icon: 'lucide-rotate-ccw', iconBg: 'bg-surface-blue-2 text-ink-blue-8' },
+  blue: { icon: 'lucide-rotate-ccw', iconBg: 'bg-surface-gray-2 text-ink-gray-6' },
   orange: {
     icon: 'lucide-loader-circle animate-spin',
     iconBg: 'bg-surface-amber-2 text-ink-amber-8',
   },
-  gray: { icon: 'lucide-clock-3', iconBg: 'bg-surface-gray-3 text-ink-gray-6' },
+  gray: { icon: 'lucide-clock-3', iconBg: 'bg-surface-gray-2 text-ink-gray-6' },
 }
 
 export function stateIcon(state) {

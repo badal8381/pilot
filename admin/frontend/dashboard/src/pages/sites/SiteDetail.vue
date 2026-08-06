@@ -1,6 +1,30 @@
 <template>
-  <div v-if="loading" class="flex justify-center py-12">
-    <LoadingText />
+  <!-- The real hero's frame; only the text inside it resolves. -->
+  <div v-if="loading" class="mx-auto w-full max-w-3xl">
+    <div class="relative -mx-4 sm:-mx-6 -mt-6 px-4 sm:px-6 pt-6 pb-7 overflow-hidden">
+      <div class="absolute inset-0 pointer-events-none dot-field" aria-hidden="true" />
+      <div
+        class="relative flex justify-between items-center gap-3 mt-2 bg-surface-base p-2 sm:p-4 border rounded-xl border-outline-gray-2"
+      >
+        <div class="flex items-center gap-3 min-w-0">
+          <Skeleton class="rounded-lg size-9 sm:size-10 shrink-0" />
+          <div>
+            <div class="flex items-center gap-2 h-7">
+              <Skeleton class="rounded w-40 h-4" />
+              <Skeleton class="rounded-full w-14 h-4 shrink-0" />
+            </div>
+            <div class="hidden sm:flex items-center mt-1 h-5">
+              <Skeleton class="rounded w-24 h-3" />
+            </div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <Skeleton class="hidden sm:block rounded w-24 h-7" />
+          <Skeleton class="rounded w-9 h-7" />
+        </div>
+      </div>
+    </div>
+    <Skeleton class="rounded w-64 h-7" />
   </div>
   <div v-else-if="error" class="py-12">
     <ErrorMessage :message="error" />
@@ -31,9 +55,12 @@
                 class="shrink-0"
               />
             </div>
-            <div class="hidden sm:flex items-center gap-1.5 mt-1 text-ink-gray-5 text-sm">
-              <span class="size-3.5 lucide-box" />
-              {{ version || 'Version -' }}
+            <div
+              v-if="storageUsed"
+              class="hidden sm:flex items-center gap-1.5 mt-1 text-ink-gray-5 text-sm"
+            >
+              <span class="size-3.5 lucide-hard-drive" />
+              {{ storageUsed }} used
             </div>
           </div>
         </div>
@@ -54,7 +81,9 @@
     </div>
 
     <!-- Tabs -->
-    <TabButtons v-model="activeTab" :options="tabs" />
+    <StickyToolbar>
+      <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
+    </StickyToolbar>
 
     <!-- Sections -->
     <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
@@ -63,14 +92,6 @@
     <Activities v-else-if="activeTab === 'activity'" :site-name="siteName" />
     <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
   </div>
-
-  <AppActionDialog
-    v-if="appAction"
-    v-model:open="showAppAction"
-    :app-name="appAction.app"
-    :action="appAction.action"
-    :site-name="siteName"
-  />
 
   <Teleport defer to="#header-actions">
     <Button
@@ -89,33 +110,38 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, ErrorMessage, LoadingText, TabButtons, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, ErrorMessage, Skeleton, TabButtons, toast } from 'frappe-ui'
 import SiteApps from '@/components/sites/Apps.vue'
 import SiteBackups from '@/components/sites/Backups.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
 import Activities from '@/pages/Activities.vue'
-import AppActionDialog from '@/components/sites/AppActionDialog.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
-import { useBench } from '@/composables/benches/useBench'
+import { useSiteStorage } from '@/composables/sites/useSiteStorage'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { openTaskDetailPage } from '@/utils/taskRoute'
+import { toSentenceCase } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
 const siteName = route.params.name
 
 const { setBreadcrumbs } = useBreadcrumbs()
-const { site, loading, error, status, load, reload, login, backup } = useSite(siteName)
-const { version, load: loadBench } = useBench()
+const { site, loading, error, status, load, reload, login, backup, apps, loadApps } =
+  useSite(siteName)
+
+const { load: loadStorage, storageLabel } = useSiteStorage()
+const storageUsed = computed(() => storageLabel(siteName))
 
 setBreadcrumbs([{ label: 'Sites', route: { name: 'Sites' } }, { label: siteName }])
 
-const STATUS_THEMES = { online: 'green', broken: 'red', offline: 'orange', provisioning: 'blue' }
+const STATUS_THEMES = { online: 'gray', broken: 'red', offline: 'orange', provisioning: 'blue' }
 const STATUS_LABELS = {
-  online: 'Live',
+  online: 'Active',
   broken: 'Broken',
   offline: 'Paused',
   provisioning: 'Creating',
@@ -151,25 +177,27 @@ watchEffect(() => {
   if (site.value) document.title = `${site.value.name} | ${tabLabel.value}`
 })
 
-const APP_ACTIONS = ['install-app', 'uninstall-app']
+const APP_ACTIONS = { 'install-app': 'installed', 'uninstall-app': 'uninstalled' }
+const appRegistry = useAppRegistry()
 const appAction = computed(() => {
   const app = route.query.app
   const action = route.query.action
-  if (typeof app !== 'string' || !APP_ACTIONS.includes(action)) return null
+  if (typeof app !== 'string' || !(action in APP_ACTIONS)) return null
   return { app, action }
 })
-const showAppAction = ref(false)
 watch(
   appAction,
-  (value) => {
-    showAppAction.value = Boolean(value)
+  async (value) => {
+    if (!value) return
+    await Promise.all([appRegistry.load(), loadApps()])
+    const appDetail = apps.value.find((app) => app.name === value.app)
+    const title =
+      appRegistry.titleMap.value[value.app] || toSentenceCase(appDetail?.title) || value.app
+    toast.success(`${title} ${APP_ACTIONS[value.action]} on ${siteName}`)
+    router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
   },
   { immediate: true },
 )
-watch(showAppAction, (open) => {
-  if (open) return
-  router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
-})
 
 const isMobile = useIsMobile()
 
@@ -264,7 +292,7 @@ onUnmounted(() => {
 
 onMounted(() => {
   load()
-  loadBench()
+  loadStorage(true)
 })
 </script>
 

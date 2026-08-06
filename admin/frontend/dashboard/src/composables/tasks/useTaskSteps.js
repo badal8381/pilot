@@ -1,4 +1,5 @@
 import { computed } from 'vue'
+import { fmtDuration } from '@/utils/taskFormat'
 
 // [\w-]+, not \w+: step keys may contain hyphens (e.g. "clear-cache"), and
 // \w+ alone would silently fail to match, which reads as "no step" rather
@@ -70,8 +71,7 @@ export function useTaskSteps(rawLines, streaming, task) {
 
   function stepDuration(section) {
     if (!section.startedAt || !section.endedAt) return null
-    const s = (section.endedAt - section.startedAt) / 1000
-    return s < 60 ? `${s.toFixed(1)}s` : `${(s / 60).toFixed(1)}m`
+    return fmtDuration((section.endedAt - section.startedAt) / 1000, { precise: true })
   }
 
   return { stepSections, hasSteps, progressPct, stepDuration }

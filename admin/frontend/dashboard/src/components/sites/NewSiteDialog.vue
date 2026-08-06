@@ -2,7 +2,7 @@
   <Dialog v-model="open" title="New Site" size="lg">
     <template #default>
       <div v-if="loading" class="flex justify-center items-center h-80">
-        <span class="size-6 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+        <Spinner size="lg" class="text-ink-gray-4" />
       </div>
       <div v-else @pointerdown.stop class="space-y-5">
         <!-- Site name -->
@@ -110,7 +110,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { Button, Checkbox, Dialog, ErrorMessage, FormControl } from 'frappe-ui'
+import { Button, Checkbox, Dialog, ErrorMessage, FormControl, Spinner } from 'frappe-ui'
 import AppIcon from '@/components/apps/AppIcon.vue'
 import { apiErrorMessage } from '@/api/client'
 import { appsApi } from '@/api/apps'

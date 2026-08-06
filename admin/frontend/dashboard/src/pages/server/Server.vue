@@ -55,9 +55,16 @@ onMounted(load)
         of {{ formatBytes(storageData.disk_total) }} used
       </span>
 
-      <Button class="ml-auto" variant="ghost" size="sm" :loading="loading" @click="load">
-        <template #icon><span class="size-4 lucide-refresh-cw" /></template>
-      </Button>
+      <Button
+        class="ml-auto"
+        variant="ghost"
+        size="sm"
+        icon="lucide-refresh-cw"
+        label="Refresh"
+        tooltip="Refresh"
+        :loading="loading"
+        @click="load"
+      />
 
       <Button :iconLeft="h(FCLogo, { class: 'size-4' })"> Manage Storage </Button>
     </div>
@@ -65,7 +72,7 @@ onMounted(load)
     <!-- loader -->
     <div
       v-if="loading && !storageData"
-      class="bg-surface-elevation-1 border border-outline-gray-2 rounded-xl overflow-hidden"
+      class="bg-surface-base border border-outline-gray-2 rounded-xl overflow-hidden"
     >
       <div
         class="divide-y lg:divide-x lg:divide-y-0 grid grid-cols-1 divide-outline-gray-2 lg:grid-cols-2"
@@ -86,7 +93,7 @@ onMounted(load)
 
     <div
       v-else-if="storageData"
-      class="bg-surface-elevation-1 border border-outline-gray-2 rounded-xl fade-in overflow-hidden"
+      class="bg-surface-base border border-outline-gray-2 rounded-xl fade-in overflow-hidden"
     >
       <div
         class="divide-y lg:divide-x lg:divide-y-0 grid grid-cols-1 divide-outline-gray-2 lg:grid-cols-2"

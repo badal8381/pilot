@@ -24,26 +24,22 @@
       <div v-if="backupsLoading" class="flex justify-center py-12">
         <LoadingText />
       </div>
-      <div v-else-if="!backups.length" class="flex flex-col items-center gap-4 py-12 text-center">
-        <span
-          class="place-items-center grid bg-surface-gray-2 rounded-full size-10 text-ink-gray-5"
-        >
-          <span class="size-5 lucide-archive" />
-        </span>
-        <div>
-          <p class="font-medium text-ink-gray-7 text-sm">No backups yet</p>
-          <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
-            <template v-if="!enabled"
-              >Enable automatic backups to start protecting your site.</template
-            >
-            <template v-else>Automatic backups run on schedule. You can also back up now.</template>
-          </p>
-        </div>
+      <EmptyState
+        v-else-if="!backups.length"
+        :bordered="false"
+        icon="lucide-archive"
+        title="No backups yet"
+        :description="
+          enabled
+            ? 'Automatic backups run on schedule. You can also back up now.'
+            : 'Enable automatic backups to start protecting your site.'
+        "
+      >
         <Button size="sm" :loading="backingUp" @click="backupNow">
           <template #prefix><span class="size-4 lucide-archive" /></template>
           Back up now
         </Button>
-      </div>
+      </EmptyState>
       <ListView
         v-else
         :columns="columns"
@@ -115,6 +111,7 @@ import {
   ListRowItem,
   LoadingText,
 } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'

@@ -1,18 +1,18 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else-if="jti">
     <div v-if="activityLoading" class="flex justify-center items-center h-40">
-      <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+      <Spinner size="lg" class="text-ink-gray-4" />
     </div>
-    <div
+    <EmptyState
+      compact
       v-else-if="!activity.length"
-      class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
-    >
-      <p class="font-medium text-ink-gray-7 text-sm">No activity recorded</p>
-      <p class="max-w-xs text-ink-gray-5 text-xs">Actions taken by this session will show up here.</p>
-    </div>
+      icon="lucide-history"
+      title="No activity recorded"
+      description="Actions taken by this session will show up here."
+    />
     <ListView
       v-else
       :columns="activityColumns"
@@ -22,7 +22,14 @@
     >
       <template #cell="{ column, row, item }">
         <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Button variant="ghost" size="sm" icon="lucide-info" @click="openDetail(row)" />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="lucide-info"
+            label="Activity details"
+            tooltip="Details"
+            @click="openDetail(row)"
+          />
         </div>
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
@@ -36,16 +43,13 @@
       {{ loadError }}
     </div>
     <template v-else>
-      <div
+      <EmptyState
+        compact
         v-if="!activeTokens.length"
-        class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
-      >
-        <div class="flex justify-center items-center bg-surface-gray-2 rounded-full size-11">
-          <span class="size-5 text-ink-gray-5 lucide-key-round"></span>
-        </div>
-        <p class="font-medium text-ink-gray-7 text-sm">No active sessions</p>
-        <p class="max-w-xs text-ink-gray-5 text-xs">Sign-ins appear here while their tokens are valid.</p>
-      </div>
+        icon="lucide-key-round"
+        title="No active sessions"
+        description="Sign-ins appear here while their tokens are valid."
+      />
 
       <ListView
         v-else
@@ -58,7 +62,14 @@
           <div v-if="column.key === 'actions'" class="flex justify-end">
             <Dropdown :options="menuOptions(row)" placement="left">
               <template #default="{ open }">
-                <Button variant="ghost" size="sm" :active="open" icon="lucide-ellipsis" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  :active="open"
+                  icon="lucide-ellipsis"
+                  label="Session actions"
+                  tooltip="Actions"
+                />
               </template>
             </Dropdown>
           </div>
@@ -70,11 +81,11 @@
 
   <Dialog v-model="showRevoke" :options="{ title: 'Revoke session', size: 'md' }">
     <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
+      <p class="text-ink-gray-7 text-p-base">
         Revoke this session? Its token stops working immediately and whoever holds it must sign in
         again.
       </p>
-      <p class="mt-2 font-mono text-ink-gray-5 text-xs">{{ revoking?.ip }}</p>
+      <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
         <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
@@ -98,7 +109,8 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, Dropdown, ListView, ListRowItem, toast } from 'frappe-ui'
+import { Button, Dialog, Dropdown, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { sessionApi } from '@/api/session'
 import { auditApi } from '@/api/audit'
 import { commandLabel, fmtDateTime, relativeTime } from '@/utils/taskFormat'
