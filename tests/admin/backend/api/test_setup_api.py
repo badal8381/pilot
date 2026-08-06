@@ -145,7 +145,7 @@ def test_configuration_update_rejects_keys_the_wizard_does_not_own(tmp_path: Pat
     assert response.status_code == 422
     assert response.get_json()["error"]["code"] == "invalid_setup_configuration"
     assert "admin_jwks_url" in response.get_json()["error"]["message"]
-    assert BenchConfig.read(tmp_path).admin.password == "admin-secret"
+    assert BenchConfig.read(tmp_path).admin.verify_password("admin-secret")
 
 
 def test_setup_configuration_needs_a_session(tmp_path: Path) -> None:

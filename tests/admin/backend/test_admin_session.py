@@ -725,7 +725,9 @@ def test_change_admin_password_writes_config_without_revoking_sessions(tmp_path:
 
     assert response.status_code == 200
     assert response.get_json() == {}
-    assert BenchConfig.from_file(bench_root / "bench.toml").admin.password == _NEW_PASSWORD
+    stored = BenchConfig.from_file(bench_root / "bench.toml").admin
+    assert stored.verify_password(_NEW_PASSWORD)
+    assert _NEW_PASSWORD not in stored.password  # bench.toml keeps a verifier, not the password
     assert old_jti not in RevokedTokens(bench)
 
 
@@ -773,7 +775,7 @@ def test_change_admin_password_requires_authentication(tmp_path: Path) -> None:
     response = _change_password(client, new_password=_NEW_PASSWORD)
 
     assert response.status_code == 401
-    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.password == "secret"
+    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.verify_password("secret")
 
 
 def test_change_admin_password_rejects_site_scoped_token(tmp_path: Path) -> None:
@@ -875,7 +877,7 @@ def test_settings_patch_ignores_admin_password(tmp_path: Path) -> None:
     client.set_cookie("sid", _session_token())
 
     assert client.patch("/api/v1/settings", json={"admin_password": _NEW_PASSWORD}).status_code == 200
-    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.password == "secret"
+    assert BenchConfig.from_file(tmp_path / "benches" / "current" / "bench.toml").admin.verify_password("secret")
 
 
 def _enroll_device(client, name: str = "phone") -> dict:

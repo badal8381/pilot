@@ -21,6 +21,8 @@ class AdminConfig:
     port: int = 7000  # New series not conflicting with sites
     timeout: int = 180  # seconds
     enabled: bool = False
+    # A hash from pilot.internal.password_hash. Benches that predate the
+    # hash_admin_password patch still hold cleartext, which verify_password accepts.
     password: str = ""
     jwt_secret: str = ""
     jwks_url: str = ""  # trust session tokens minted by a remote issuer publishing keys here
@@ -49,6 +51,17 @@ class AdminConfig:
             allow_bench_management=data.get("allow_bench_management", default_allow_bench_management()),
             recovery_codes=list(data.get("recovery_codes", [])),
         )
+
+    def set_password(self, password: str) -> None:
+        """Store a new password, hashed. The cleartext is never written anywhere."""
+        from pilot.internal.password_hash import hash_password, is_hashed
+
+        self.password = password if is_hashed(password) else hash_password(password)
+
+    def verify_password(self, password: str) -> bool:
+        from pilot.internal.password_hash import verify_password
+
+        return verify_password(password, self.password)
 
     @property
     def internal_port(self) -> int:

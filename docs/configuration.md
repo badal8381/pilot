@@ -97,6 +97,8 @@ allow_bench_management = true
 
 `allow_bench_management` gates creating and managing sibling benches from this bench's Admin. It defaults to `true` only on a development checkout (`install.sh --dev`). A release install defaults to `false`, so set it in `bench.toml` to turn it on.
 
+`password` is stored as a PBKDF2-HMAC-SHA256 hash (`$pbkdf2-sha256$<iterations>$<salt>$<key>`, hashlib only - no dependency), so `bench.toml` holds a verifier rather than the password. Set it with `pilot set-admin-password` or the Settings page; a bench upgraded from an older version is migrated by the `hash_admin_password` patch, and its cleartext keeps working until then.
+
 `jwt_secret` is this bench's own local token signing secret, kept in `bench.toml`. `jwks_url` and `jwks_audience` trust a remote issuer instead and are host-shared - see [Common Config](#common-config).
 
 ## Other Groups

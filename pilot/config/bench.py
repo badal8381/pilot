@@ -626,7 +626,9 @@ class BenchConfig:
             self._apply_setting(key, value)
 
     def _apply_setting(self, key: str, value) -> None:
-        if key in FLAT_KEYS:
+        if key == "admin_password":
+            self.admin.set_password(str(value))
+        elif key in FLAT_KEYS:
             _set_path(self, FLAT_KEYS[key], value)
         elif key == "app_repo":
             self.apps[0].repo = str(value)

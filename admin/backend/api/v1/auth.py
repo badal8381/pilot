@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hmac
 import time
 from pathlib import Path
 
@@ -28,10 +27,10 @@ from pilot.core.bench.settings import active_tokens_payload
 auth_bp = Blueprint("auth", __name__)
 
 
-def _validate_new_password(new_password: str, current_password: str) -> str | None:
+def _validate_new_password(bench: Bench, new_password: str) -> str | None:
     from pilot.internal.validators import validate_admin_password
 
-    if hmac.compare_digest(new_password, current_password):
+    if bench.config.admin.verify_password(new_password):
         return "New password must differ from the current password."
     return validate_admin_password(new_password)
 
@@ -171,7 +170,7 @@ def _validate_login(data: dict, bench):
             "No admin password configured in bench.toml",
             503,
         ), None
-    if not hmac.compare_digest(str(data.get("password", "")), bench.config.admin.password):
+    if not bench.config.admin.verify_password(str(data.get("password", ""))):
         return error_response("invalid_credentials", "Incorrect password.", 401), None
     return None, None
 
@@ -188,11 +187,11 @@ def change_admin_password():
         return error_response("malformed_request", "Expected a JSON object.", 400)
 
     new_password = str(data.get("new_password", ""))
-    if error := _validate_new_password(new_password, bench.config.admin.password):
+    if error := _validate_new_password(bench, new_password):
         return error_response("invalid_password", error, 422)
 
     with BenchConfig.open(bench_root) as config:
-        config.admin.password = new_password
+        config.admin.set_password(new_password)
 
     bench.audit_action("session", {"event": "admin_password_changed"})
     return jsonify({})

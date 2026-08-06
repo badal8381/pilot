@@ -72,6 +72,10 @@ def validate_cron_expression(expr: str) -> str | None:
 
 def validate_admin_password(password: str) -> str | None:
     """Mirror of the dashboard's PASSWORD_REQUIREMENTS (utils/passwordStrength.js)."""
+    from pilot.internal.password_hash import is_hashed
+
+    if is_hashed(password):
+        return "Password must not be a stored password hash."
     if len(password) < 8:
         return "Password must be at least 8 characters."
     if not (_LOWERCASE_RE.search(password) and _UPPERCASE_RE.search(password)):

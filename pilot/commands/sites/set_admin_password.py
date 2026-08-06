@@ -21,7 +21,6 @@ class SetAdminPasswordCommand(Command):
         if not password:
             raise BenchError("Password must not be empty.")
 
-        with BenchConfig.open(self.bench.path, mode="raw") as data:
-            data.setdefault("admin", {})["password"] = password
-        self.bench.config.admin.password = password
+        with BenchConfig.open(self.bench.path) as config:
+            config.admin.set_password(password)
         self.report("Admin password updated.")
