@@ -1,8 +1,8 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTheme } from 'frappe-ui'
 import { authApi } from '@/api/auth'
 import { useSession } from '@/composables/auth/useSession'
+import { useTheme } from '@/composables/common/useTheme'
 
 // dialogs
 const showBenches = ref(false)

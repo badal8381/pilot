@@ -98,6 +98,15 @@ body {
   isolation: isolate;
 }
 
+/* needed as theme switcher dynamically adds this class
+ * since many frappe-ui components use transitions
+ * fixes flash bang during theme switching */
+.no-transition *,
+.no-transition *::before,
+.no-transition *::after {
+  transition: none !important;
+}
+
 /* Dropdown/Menu content teleports to <body> without a z-index; lift it above both
    the dialog overlay (z-index: auto, so in-dialog menus like bench actions
    aren't hidden) and the mobile sidebar drawer (z-30, so the sidebar's Bench

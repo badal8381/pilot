@@ -1,8 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, TabButtons, useTheme } from 'frappe-ui'
+import { Button, TabButtons } from 'frappe-ui'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
+import { useTheme } from '@/composables/common/useTheme'
 
 const router = useRouter()
 const { showBenches, logout, session } = useAppMenu()
