@@ -28,7 +28,7 @@ defineProps<Props>()
 			orientation="vertical"
 		>
 			<ScrollAreaThumb
-				class="relative flex-1 rounded-[10px] bg-surface-gray-3"
+				class="relative flex-1 rounded-[10px] bg-surface-gray-2"
 			/>
 		</ScrollAreaScrollbar>
 
@@ -37,7 +37,7 @@ defineProps<Props>()
 			orientation="horizontal"
 		>
 			<ScrollAreaThumb
-				class="relative flex-1 rounded-[10px] bg-surface-gray-3 before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-[44px] before:w-full before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+				class="relative flex-1 rounded-[10px] bg-surface-gray-2 before:absolute before:left-1/2 before:top-1/2 before:h-full before:min-h-[44px] before:w-full before:min-w-[44px] before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
 			/>
 		</ScrollAreaScrollbar>
 	</ScrollAreaRoot>

@@ -1,36 +1,48 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
-import { Button, ErrorMessage, FormControl, LoadingText } from 'frappe-ui'
+import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Select, Skeleton } from 'frappe-ui'
 import { useActivities } from '@/composables/activities/useActivities'
+import { useSites } from '@/composables/sites/useSites'
 import { commandLabel, relativeTime } from '@/utils/taskFormat'
 import type { AuditEntry } from '@/types/audit'
 
-interface TypeMeta {
-  icon: string
-  iconBg: string
+import Table from '@/components/common/Table.vue'
+
+const typeMetaMap: any = {
+  backup: { icon: 'lucide-database', bg: 'bg-surface-blue-2 text-ink-blue-8' },
+  app: { icon: 'lucide-package', bg: 'bg-surface-purple-2 text-ink-purple-8' },
+  ssh_key: { icon: 'lucide-key', bg: 'bg-surface-gray-2 text-ink-gray-7' },
+  git: { icon: 'lucide-git-branch', bg: 'bg-surface-gray-2 text-ink-gray-7' },
+  task: { icon: 'lucide-list-checks', bg: 'bg-surface-blue-2 text-ink-blue-8' },
+  bypass_patch: { icon: 'lucide-wrench', bg: 'bg-surface-red-2 text-ink-red-8' },
+}
+const defaultTypeMeta = {
+  icon: 'lucide-activity',
+  bg: 'bg-surface-gray-2 text-ink-gray-7',
 }
 
-const typeMetaMap: Record<string, TypeMeta> = {
-  backup: { icon: 'lucide-database', iconBg: 'bg-surface-blue-2 text-ink-blue-8' },
-  app: { icon: 'lucide-package', iconBg: 'bg-surface-purple-2 text-ink-purple-8' },
-  session: { icon: 'lucide-key-round', iconBg: 'bg-surface-amber-2 text-ink-amber-8' },
-  ssh_key: { icon: 'lucide-key', iconBg: 'bg-surface-gray-2 text-ink-gray-7' },
-  git: { icon: 'lucide-git-branch', iconBg: 'bg-surface-gray-2 text-ink-gray-7' },
-  task: { icon: 'lucide-list-checks', iconBg: 'bg-surface-blue-2 text-ink-blue-8' },
-  bypass_patch: { icon: 'lucide-wrench', iconBg: 'bg-surface-red-2 text-ink-red-8' },
+const activityTypeMeta = (entry: AuditEntry) => {
+  const meta = typeMetaMap[entry.type] || defaultTypeMeta
+
+  // backup icon : failed must show red else green
+  if (entry.type === 'backup' && entry.event !== 'download' && entry.event !== 'delete') {
+    return {
+      icon: meta.icon,
+      bg:
+        entry.status === 'failed'
+          ? 'bg-surface-red-2 text-ink-red-8'
+          : 'bg-surface-green-2 text-ink-green-8',
+    }
+  }
+  return meta
 }
-const defaultTypeMeta: TypeMeta = {
-  icon: 'lucide-activity',
-  iconBg: 'bg-surface-gray-2 text-ink-gray-7',
-}
-const activityTypeMeta = (entry: AuditEntry) => typeMetaMap[entry.type] || defaultTypeMeta
+
 const activityTypeIcon = (type: string) => (typeMetaMap[type] || defaultTypeMeta).icon
 
 const typeLabels: Record<string, string> = {
   backup: 'Backup',
   app: 'App',
-  session: 'Session',
   ssh_key: 'SSH key',
   git: 'Git',
   task: 'Task',
@@ -45,17 +57,6 @@ const activityTypeOptions = [
   })),
 ]
 
-const sessionEventLabels: Record<string, string> = {
-  login_redeemed: 'Signed in with a login link',
-  issued: 'Session started',
-  revoked: 'Session logged out',
-  other_sessions_revoked: 'Other sessions logged out',
-  admin_password_changed: 'Admin password changed',
-  two_factor_device_added: 'Two-factor device added',
-  two_factor_device_removed: 'Two-factor device removed',
-  recovery_codes_regenerated: 'Recovery codes regenerated',
-}
-
 const activityLabel = (entry: AuditEntry) => {
   const site = entry.site ? ` on ${entry.site}` : ''
   switch (entry.type) {
@@ -65,8 +66,6 @@ const activityLabel = (entry: AuditEntry) => {
       return `Backup ${entry.status === 'failed' ? 'failed' : 'completed'}${site}`
     case 'app':
       return `App ${entry.app} ${entry.event}${site}`
-    case 'session':
-      return sessionEventLabels[entry.event || ''] || 'Session updated'
     case 'ssh_key':
       return entry.event === 'added' ? 'SSH key added' : 'SSH key removed'
     case 'git':
@@ -82,6 +81,12 @@ const activityLabel = (entry: AuditEntry) => {
   }
 }
 
+const activityResourceLabel = (entry: AuditEntry) => {
+  if (entry.site) return entry.site
+  if (entry.type === 'task' && entry.task_id) return entry.task_id
+  return ''
+}
+
 const activityResourceRoute = (entry: AuditEntry): RouteLocationRaw | null => {
   if (entry.site) return { name: 'SiteDetail', params: { name: entry.site } }
   if (entry.type === 'task' && entry.task_id)
@@ -89,10 +94,17 @@ const activityResourceRoute = (entry: AuditEntry): RouteLocationRaw | null => {
   return null
 }
 
-const activityResourceLabel = (entry: AuditEntry) => {
-  if (entry.site) return entry.site
-  if (entry.type === 'task' && entry.task_id) return entry.task_id
-  return ''
+const activityActions = (entry: AuditEntry) => {
+  const target = activityResourceRoute(entry)
+  const options = [{ label: 'View details', icon: 'lucide-info', onClick: () => openDetail(entry) }]
+  if (target) {
+    options.push({
+      label: entry.site ? 'View site' : 'View task',
+      icon: 'lucide-arrow-up-right',
+      onClick: () => router.push(target),
+    })
+  }
+  return options
 }
 
 const activityActor = (entry: AuditEntry) => {
@@ -102,13 +114,69 @@ const activityActor = (entry: AuditEntry) => {
 
 const activityTime = (entry: AuditEntry) => relativeTime(entry.logged_at)
 
+const showDetail = ref(false)
+const viewingDetail = ref<AuditEntry | null>(null)
+
+const openDetail = (entry: AuditEntry) => {
+  viewingDetail.value = entry
+  showDetail.value = true
+}
+
+// Flattens args into the top level and drops empties, so the dialog is a plain,
+// complete key/value dump of the raw audit record - no per-type formatting to maintain.
+const detailEntries = computed(() => {
+  if (!viewingDetail.value) return []
+  const { args, ...rest } = viewingDetail.value as AuditEntry & { args?: Record<string, unknown> }
+  return Object.entries({ ...rest, ...args })
+    .filter(([, value]) => value !== null && value !== undefined && value !== '')
+    .map(([key, value]) => ({
+      key,
+      value: typeof value === 'object' ? JSON.stringify(value) : String(value),
+    }))
+})
+
 const route = useRoute()
 const router = useRouter()
 const { activities, loading, loadingMore, error, hasMore, load, loadMore } = useActivities()
+const { sites, load: loadSites } = useSites()
+
+const siteOptions = computed(() => [
+  { label: 'All sites', value: '', icon: 'lucide-globe' },
+  ...sites.value.map((site) => ({ label: site.name, value: site.name, icon: 'lucide-globe' })),
+])
+
+const activityTable = computed(() => ({
+  columns: [
+    { key: 'activity', label: 'Activity', class: 'flex items-center gap-3' },
+    { key: 'resource', label: 'Resource' },
+    { key: 'actor', label: 'Triggered by' },
+    { key: 'time', label: 'Date/time', class: 'text-right whitespace-nowrap' },
+    { key: 'actions', label: '', class: 'text-right' },
+  ],
+
+  rows: activities.value
+    .filter((entry) => entry.type !== 'session')
+    .map((entry, index) => {
+      const actor = activityActor(entry)
+      return {
+        id: `${entry.logged_at}-${index}`,
+        entry,
+        activity: activityLabel(entry),
+        resource: activityResourceLabel(entry) || '-',
+        actor: actor.secondary ? `${actor.primary} (${actor.secondary})` : actor.primary,
+        time: activityTime(entry),
+      }
+    }),
+}))
 
 const typeFilter = ref('')
 
 const siteFilter = computed(() => (typeof route.query.site === 'string' ? route.query.site : ''))
+const siteFilterModel = computed({
+  get: () => siteFilter.value,
+  set: (value: string) =>
+    router.replace(value ? { name: 'Activity', query: { site: value } } : { name: 'Activity' }),
+})
 const currentFilters = computed(() => ({
   type: typeFilter.value || undefined,
   site: siteFilter.value || undefined,
@@ -116,10 +184,9 @@ const currentFilters = computed(() => ({
 
 const reload = () => load(currentFilters.value)
 
-const clearSiteFilter = () => router.replace({ name: 'Activity' })
-
 watch(siteFilter, reload)
 onMounted(reload)
+onMounted(loadSites)
 </script>
 
 <template>
@@ -131,120 +198,88 @@ onMounted(reload)
           A trail of actions taken on this bench - logins, backups, app changes and more.
         </p>
       </div>
-      <Button
-        variant="subtle"
-        size="sm"
-        :loading="loading"
-        icon-left="lucide-refresh-cw"
-        @click="reload"
-      >
-        Refresh
-      </Button>
+
+      <Button :loading icon-left="lucide-refresh-cw" @click="reload"> Refresh </Button>
     </div>
 
     <div class="flex flex-wrap items-center gap-3 mt-4 shrink-0">
-      <div class="w-48">
-        <FormControl
-          type="select"
-          v-model="typeFilter"
-          :options="activityTypeOptions"
-          @update:modelValue="reload"
-        />
+      <Select
+        v-model="typeFilter"
+        class="w-48"
+        :options="activityTypeOptions"
+        @update:modelValue="reload"
+      />
+      <Combobox
+        v-model="siteFilterModel"
+        class="w-48"
+        :options="siteOptions"
+        placeholder="All sites"
+      />
+    </div>
+
+    <div v-if="loading" class="flex flex-col gap-1 mt-4">
+      <div v-for="i in 8" :key="i" class="flex items-center gap-3 px-4 py-3">
+        <Skeleton class="rounded-full size-6 shrink-0" />
+        <Skeleton class="h-3 rounded" :class="i % 2 ? 'w-48' : 'w-36'" />
+        <Skeleton class="ml-auto h-3 w-24 rounded shrink-0" />
+        <Skeleton class="h-3 w-16 rounded shrink-0" />
       </div>
     </div>
 
-    <div
-      v-if="siteFilter"
-      class="flex items-center gap-2 bg-surface-blue-1 mt-4 px-3 py-2 rounded shrink-0"
-    >
-      <span class="lucide-filter size-4 text-ink-blue-7 shrink-0" />
-      <p class="flex-1 min-w-0 text-p-sm text-ink-blue-8 truncate">
-        Activity on <span class="font-semibold">{{ siteFilter }}</span>
-      </p>
-      <Button variant="ghost" size="sm" icon="lucide-x" @click="clearSiteFilter" />
-    </div>
+    <ErrorMessage :message="'error'" v-else-if="error" class="mt-4" />
 
-    <div v-if="loading" class="flex flex-1 justify-center items-center">
-      <LoadingText />
-    </div>
-    <div v-else-if="error" class="mt-4">
-      <ErrorMessage :message="error" />
-    </div>
-
-    <div
-      v-else-if="activities.length"
-      class="flex flex-col flex-1 border border-outline-gray-2 rounded mt-4 min-h-0 overflow-hidden"
-    >
-      <div class="flex-1 overflow-y-auto">
-        <table class="w-full text-left">
-          <thead
-            class="top-0 sticky bg-surface-gray-2 text-ink-gray-5 text-xs uppercase tracking-wide"
+    <div v-else-if="activities.length" class="flex flex-col flex-1 mt-4 min-h-0 overflow-hidden">
+      <Table v-bind="activityTable">
+        <template #activity="{ row }">
+          <span
+            class="place-items-center grid rounded-full size-6 shrink-0"
+            :class="activityTypeMeta(row.entry).bg"
           >
-            <tr>
-              <th class="px-4 py-2.5 font-medium">Activity</th>
-              <th class="px-4 py-2.5 font-medium">Resource</th>
-              <th class="px-4 py-2.5 font-medium">Triggered by</th>
-              <th class="px-4 py-2.5 font-medium text-right">Date/time</th>
-            </tr>
-          </thead>
-          <tbody class="divide-outline-gray-1 divide-y">
-            <tr
-              v-for="(entry, index) in activities"
-              :key="`${entry.logged_at}-${index}`"
-              class="hover:bg-surface-gray-1 transition-colors"
-            >
-              <td class="px-4 py-3">
-                <div class="flex items-center gap-3">
-                  <span
-                    class="place-items-center grid rounded-full size-8 shrink-0"
-                    :class="activityTypeMeta(entry).iconBg"
-                  >
-                    <span class="size-4" :class="activityTypeMeta(entry).icon" />
-                  </span>
-                  <span class="font-medium text-ink-gray-9 text-sm"
-                    >{{ activityLabel(entry) }}</span
-                  >
-                </div>
-              </td>
-              <td class="px-4 py-3">
-                <RouterLink
-                  v-if="activityResourceRoute(entry)"
-                  :to="activityResourceRoute(entry)!"
-                  class="text-ink-gray-7 text-sm no-underline hover:text-ink-gray-9 hover:underline"
-                >
-                  {{ activityResourceLabel(entry) }}
-                </RouterLink>
-                <span v-else class="text-ink-gray-3 text-sm">-</span>
-              </td>
-              <td class="px-4 py-3 max-w-[12rem]">
-                <div class="text-ink-gray-6 text-sm truncate">
-                  {{ activityActor(entry).primary }}
-                </div>
-                <div v-if="activityActor(entry).secondary" class="text-ink-gray-4 text-xs truncate">
-                  {{ activityActor(entry).secondary }}
-                </div>
-              </td>
-              <td
-                class="px-4 py-3 text-ink-gray-5 text-sm text-right tabular-nums whitespace-nowrap"
-                :title="entry.logged_at"
-              >
-                {{ activityTime(entry) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+            <span class="size-3.5" :class="activityTypeMeta(row.entry).icon" />
+          </span>
+          <span class="font-medium text-ink-gray-9 text-sm">{{ row.activity }}</span>
+        </template>
 
-      <div v-if="hasMore" class="flex justify-center border-outline-gray-2 p-2 border-t shrink-0">
-        <Button variant="subtle" :loading="loadingMore" @click="loadMore(currentFilters)">
-          Load more
-        </Button>
+        <template #actions="{ row }">
+          <div class="flex justify-end">
+            <Dropdown :options="activityActions(row.entry)" placement="bottom-end">
+              <template #default>
+                <Button variant="ghost" size="sm" icon="lucide-more-horizontal" />
+              </template>
+            </Dropdown>
+          </div>
+        </template>
+      </Table>
+
+      <div v-if="hasMore" class="flex justify-end border-outline-gray-2 p-2 border-t shrink-0">
+        <Button :loading="loadingMore" @click="loadMore(currentFilters)"> Load more </Button>
       </div>
     </div>
 
-    <div v-else class="flex flex-col flex-1 justify-center items-center gap-2 text-ink-gray-4">
-      <span class="lucide-inbox size-8" />
-      <p class="text-sm">No activity found.</p>
+    <!-- empty state -->
+    <div
+      v-else
+      class="flex flex-col justify-center items-center gap-3 mt-4 h-1/2 border border-dashed rounded-xl border-outline-gray-2"
+    >
+      <div class="place-items-center grid bg-surface-gray-2 rounded-lg size-10">
+        <span class="lucide-history size-5 text-ink-gray-5" />
+      </div>
+
+      <div class="flex flex-col items-center gap-1">
+        <p class="font-semibold text-ink-gray-8 text-sm">No activity yet</p>
+        <p class="max-w-xs text-ink-gray-5 text-p-sm text-center">
+          Actions like logins, backups, and app changes will show up here once they happen.
+        </p>
+      </div>
     </div>
   </div>
+
+  <Dialog v-model="showDetail" :options="{ title: 'Activity details', size: 'md' }">
+    <div class="space-y-2 max-h-96 overflow-y-auto">
+      <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
+        <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
+        <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
+      </div>
+    </div>
+  </Dialog>
 </template>
