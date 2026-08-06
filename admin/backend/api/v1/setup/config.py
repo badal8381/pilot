@@ -10,6 +10,24 @@ from pilot.internal.validators import validate_branch_name, validate_repo_url
 
 _PASSWORD_KEYS = ("admin_password", "mariadb_password", "postgres_password")
 _DB_ENGINES = ("mariadb", "postgres")
+_DB_FIELDS = ("admin_user", "existing", "host", "password", "port")
+
+SETTABLE_KEYS = frozenset(
+    {
+        "admin_password",
+        "app_branch",
+        "app_repo",
+        "db_mode",
+        "db_type",
+        *(f"{engine}_{field}" for engine in _DB_ENGINES for field in _DB_FIELDS),
+    }
+)
+
+
+def validate_settable_keys(data: dict) -> str | None:
+    """The wizard owns its own fields only. Every other setting needs the settings API."""
+    unknown = sorted(set(data) - SETTABLE_KEYS)
+    return f"Setup cannot change: {', '.join(unknown)}" if unknown else None
 
 
 def validate_configuration(data: dict) -> str | None:

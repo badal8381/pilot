@@ -127,6 +127,25 @@ def test_configuration_update_rejects_malformed_and_invalid_payloads(
     assert invalid.get_json()["error"]["code"] == "invalid_setup_configuration"
 
 
+def test_configuration_update_rejects_keys_the_wizard_does_not_own(tmp_path: Path) -> None:
+    client = setup_client(tmp_path)
+
+    response = client.put(
+        "/api/v1/setup/configuration",
+        json={
+            "admin_password": "admin-secret",
+            "mariadb_password": "database-secret",
+            "admin_jwks_url": "https://attacker.example.com/jwks.json",
+            "admin_allow_bench_management": True,
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == "invalid_setup_configuration"
+    assert "admin_jwks_url" in response.get_json()["error"]["message"]
+    assert not BenchConfig.exists(tmp_path)
+
+
 def test_only_one_unauthenticated_request_can_claim_setup(
     tmp_path: Path,
     monkeypatch,

@@ -9,6 +9,7 @@ from admin.backend.api.v1.setup.config import (
     apply_existing_local_database,
     read_defaults,
     validate_configuration,
+    validate_settable_keys,
 )
 from admin.backend.api.v1.setup.database import database_validation, database_validation_state
 from admin.backend.api.v1.setup.state import (
@@ -58,6 +59,8 @@ def update_configuration():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("malformed_request", "Expected a JSON object.", 400)
+    if error := validate_settable_keys(data):
+        return error_response("invalid_setup_configuration", error, 422)
 
     with exclusive_file_lock(bench_root / ".setup-configuration"):
         return _update_configuration(bench_root, data)

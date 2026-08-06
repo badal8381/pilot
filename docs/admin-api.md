@@ -61,6 +61,10 @@ Two app operations answer inline instead of returning a task id, because both ar
 - `DELETE /sites/<name>/apps/<app>?mode=disable` returns `{"app": ..., "disabled": true}`. Without the parameter the route queues an uninstall as before.
 - `POST /sites/<name>/apps` for an app the site only has disabled returns `{"app": ..., "enabled": true}`. It falls through to the install queue when a required app has to be installed first.
 
+### Setup
+
+`PUT /setup/configuration` accepts only the fields the wizard owns: `admin_password`, `app_repo`, `app_branch`, `db_type`, `db_mode`, and the `mariadb_*`/`postgres_*` connection fields. Any other key gets a 422. Change the remaining `bench.toml` settings through the settings API.
+
 ## Errors
 
 Raise HTTP errors at the route boundary. Core objects should raise domain exceptions such as config or bench errors.
