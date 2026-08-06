@@ -8,6 +8,14 @@ _HOSTNAME_PATTERN = re.compile(
 )
 
 
+def default_allow_bench_management() -> bool:
+    """Managing sibling benches is a development convenience. A release install keeps
+    it off until an operator sets it in bench.toml."""
+    from pilot import is_dev_build
+
+    return is_dev_build
+
+
 @dataclass
 class AdminConfig:
     port: int = 7000  # New series not conflicting with sites
@@ -20,7 +28,7 @@ class AdminConfig:
     jwks_audience: str = ""
     domain: str = ""
     tls: bool = False
-    allow_bench_management: bool = True
+    allow_bench_management: bool = field(default_factory=default_allow_bench_management)
     # Break-glass codes for when no enrolled device is available. Stored in the clear so
     # an operator with server access can still read them; the API returns them only when
     # they are issued, never on demand.
@@ -38,7 +46,7 @@ class AdminConfig:
             jwks_audience=data.get("jwks_audience", ""),
             domain=data.get("domain", ""),
             tls=data.get("tls", False),
-            allow_bench_management=data.get("allow_bench_management", True),
+            allow_bench_management=data.get("allow_bench_management", default_allow_bench_management()),
             recovery_codes=list(data.get("recovery_codes", [])),
         )
 

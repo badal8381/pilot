@@ -95,6 +95,8 @@ allow_bench_management = true
 
 `admin.internal_port` is derived as `port + 1` for the localhost Gunicorn service behind nginx.
 
+`allow_bench_management` gates creating and managing sibling benches from this bench's Admin. It defaults to `true` only on a development checkout (`install.sh --dev`). A release install defaults to `false`, so set it in `bench.toml` to turn it on.
+
 `jwt_secret` is this bench's own local token signing secret, kept in `bench.toml`. `jwks_url` and `jwks_audience` trust a remote issuer instead and are host-shared - see [Common Config](#common-config).
 
 ## Other Groups

@@ -409,10 +409,19 @@ def test_admin_tls_roundtrip() -> None:
     assert "tls = false" in config.dumps()
 
 
-def test_admin_allow_bench_management_defaults_to_true() -> None:
+def test_admin_allow_bench_management_defaults_to_true_on_a_dev_checkout() -> None:
     config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.admin.allow_bench_management is True
     assert "allow_bench_management = true" in config.dumps()
+
+
+def test_admin_allow_bench_management_defaults_to_false_on_a_release_install(monkeypatch) -> None:
+    import pilot
+
+    monkeypatch.setattr(pilot, "is_dev_build", False)
+    config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
+    assert config.admin.allow_bench_management is False
+    assert "allow_bench_management = false" in config.dumps()
 
 
 def test_admin_allow_bench_management_can_be_disabled() -> None:
