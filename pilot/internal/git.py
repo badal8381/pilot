@@ -1,18 +1,35 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import subprocess
 import time
 from pathlib import Path
 
 _STALE_TEMP_FILE_SECONDS = 24 * 60 * 60
+# ext:: hands git an arbitrary command to run as the transport, so no bench input can
+# ever be allowed to reach it. See gitprotocol-ext(5).
+_BASE_GIT_CONFIG = {"protocol.ext.allow": "never"}
+
+
+def git_env(config: dict[str, str] | None = None, base: dict | None = None) -> dict:
+    """Environment that carries git config for one invocation. Credentials belong here,
+    never in argv (readable in /proc) or in .git/config (outlives the call)."""
+    settings = {**_BASE_GIT_CONFIG, **(config or {})}
+    env = dict(os.environ if base is None else base)
+    env["GIT_CONFIG_COUNT"] = str(len(settings))
+    for index, (key, value) in enumerate(settings.items()):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
+    return env
 
 
 class GitRepo:
     """Git CLI wrapper with quiet read accessors."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, config: dict[str, str] | None = None) -> None:
         self.path = Path(path)
+        self.config = config or {}
 
     @property
     def is_cloned(self) -> bool:
@@ -144,6 +161,7 @@ class GitRepo:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                env=git_env(self.config),
             )
         except (OSError, subprocess.SubprocessError):
             return subprocess.CompletedProcess(args, returncode=1, stdout="", stderr="")

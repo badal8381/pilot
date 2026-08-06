@@ -46,8 +46,8 @@ class GitProvider(abc.ABC):
         """Return repositories the token can access (private and public)."""
 
     @abc.abstractmethod
-    def authenticated_clone_url(self, repo_url: str) -> str:
-        """Rewrite ``repo_url`` into a token-embedded HTTPS clone URL."""
+    def auth_config(self, repo_url: str) -> dict[str, str]:
+        """Git config that authenticates requests to ``repo_url``."""
 
     @abc.abstractmethod
     def list_branches(self, full_name: str) -> list[str]:
@@ -68,9 +68,6 @@ class GitProvider(abc.ABC):
 
     # -- shared helpers --------------------------------------------------------
 
-    def is_owner(self, repo_url: str) -> bool:
-        return self.host in (repo_url or "")
-
     def _get_json(self, url: str, headers: dict):
         req = urllib.request.Request(url, headers=headers)
         try:
@@ -83,6 +80,22 @@ class GitProvider(abc.ABC):
             raise GitProviderError(f"{self.name} API error (HTTP {exc.code}).") from exc
         except urllib.error.URLError as exc:
             raise GitProviderError(f"Could not reach {self.name}: {exc.reason}.") from exc
+
+
+def without_credentials(repo_url: str) -> str:
+    """The same URL with any user:token userinfo dropped."""
+    parsed = urllib.parse.urlsplit(repo_url or "")
+    if not parsed.username and not parsed.password:
+        return repo_url
+    netloc = parsed.hostname or ""
+    if parsed.port:
+        netloc = f"{netloc}:{parsed.port}"
+    return urllib.parse.urlunsplit(parsed._replace(netloc=netloc))
+
+
+def repo_host(repo_url: str) -> str:
+    """The repo URL's hostname, lowercased; "" when it has none (a local path)."""
+    return (urllib.parse.urlsplit(normalize_to_https(repo_url)).hostname or "").lower()
 
 
 def normalize_to_https(repo_url: str) -> str:
@@ -98,17 +111,18 @@ def normalize_to_https(repo_url: str) -> str:
     return url
 
 
-def inject_https_token(repo_url: str, username: str, token: str) -> str:
-    """Embed username/token userinfo into an HTTPS clone URL."""
-    https = normalize_to_https(repo_url)
-    if not token or not https.startswith("https://"):
-        return https
-    rest = https[len("https://") :]
-    # Strip any userinfo already present so we don't double up.
-    if "@" in rest.split("/", 1)[0]:
-        rest = rest.split("@", 1)[1]
-    quoted = urllib.parse.quote(token, safe="")
-    return f"https://{username}:{quoted}@{rest}"
+def basic_auth_config(repo_url: str, username: str, token: str) -> dict[str, str]:
+    """An Authorization header for this repo's host, as git config.
+
+    A header keeps the token out of argv and out of .git/config, unlike userinfo in the
+    clone URL. Scoped to the host so it never travels to another one."""
+    import base64
+
+    parsed = urllib.parse.urlsplit(normalize_to_https(repo_url))
+    if not token or parsed.scheme != "https" or not parsed.hostname:
+        return {}
+    credential = base64.b64encode(f"{username}:{token}".encode()).decode()
+    return {f"http.https://{parsed.hostname}/.extraHeader": f"Authorization: Basic {credential}"}
 
 
 def same_repository(url_a: str, url_b: str) -> bool:

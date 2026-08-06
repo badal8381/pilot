@@ -217,24 +217,24 @@ def _clone_at_tag(remote: Path, clone_dir: Path, tag: str, shallow: bool = True)
     subprocess.run(["git", "-C", str(clone_dir), "checkout", "-q", tag], check=True)
 
 
-def test_sync_remote_url_refreshes_origin_with_stored_token(tmp_path: Path) -> None:
-    from pilot.integrations.git.credentials import GitCredentialStore
-
+def test_sync_remote_url_scrubs_a_token_an_older_clone_left_in_origin(tmp_path: Path) -> None:
+    """.git/config is world-readable in a bench directory, so no token may live there.
+    Requests are authenticated by git config passed per call instead."""
     bench = make_bench(tmp_path)
     repo_url = "https://github.com/frappe/myapp"
     app = App(AppConfig(name="myapp", repo=repo_url, branch="master"), bench)
     app.path.mkdir(parents=True)
     _init_git_repo(app.path)
-    subprocess.run(["git", "-C", str(app.path), "remote", "add", "origin", repo_url], check=True)
-
-    GitCredentialStore(tmp_path).save("github", "fresh-token")
+    embedded = "https://x-access-token:stale-token@github.com/frappe/myapp"
+    subprocess.run(["git", "-C", str(app.path), "remote", "add", "origin", embedded], check=True)
 
     app._repository._sync_remote_url()
 
     origin_url = subprocess.run(
         ["git", "-C", str(app.path), "remote", "get-url", "origin"], capture_output=True, text=True, check=True
     ).stdout.strip()
-    assert "fresh-token" in origin_url
+    assert origin_url == repo_url
+    assert "stale-token" not in origin_url
 
 
 def test_sync_remote_url_leaves_origin_untouched_without_stored_token(tmp_path: Path) -> None:

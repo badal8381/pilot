@@ -9,7 +9,7 @@ from pilot.integrations.git.base import (
     GitAuthError,
     GitProvider,
     GitProviderError,
-    inject_https_token,
+    basic_auth_config,
     normalize_to_https,
 )
 
@@ -77,8 +77,8 @@ class GitHubProvider(GitProvider):
                 break
         return repos
 
-    def authenticated_clone_url(self, repo_url: str) -> str:
-        return inject_https_token(repo_url, "x-access-token", self.token)
+    def auth_config(self, repo_url: str) -> dict[str, str]:
+        return basic_auth_config(repo_url, "x-access-token", self.token)
 
     def list_branches(self, full_name: str) -> list[str]:
         url = f"{self.api_base}/repos/{full_name}/branches?per_page=100"
