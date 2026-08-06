@@ -67,6 +67,10 @@
             <div id="settings-header-actions" class="contents"></div>
           </div>
           <General v-if="currentSection === 'general'" v-model:open-section="guardedSubSection" />
+          <Database
+            v-else-if="currentSection === 'database'"
+            v-model:open-section="guardedSubSection"
+          />
           <Security
             v-else-if="currentSection === 'security'"
             v-model:open-section="guardedSubSection"
@@ -101,11 +105,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { Dialog, Button } from 'frappe-ui'
 import { hasUnsavedChanges } from '@/composables/common/useUnsavedChanges'
 import General from '@/components/settings/General.vue'
+import Database from '@/components/settings/Database.vue'
 import Security from '@/components/settings/Security.vue'
 import Sessions from '@/components/settings/Sessions.vue'
 import SystemInfo from '@/components/settings/SystemInfo.vue'
 import { useIsMobile } from '@/composables/common/useIsMobile'
-import { GENERAL_SECTIONS, SECURITY_SECTIONS } from '@/components/settings/sections'
+import {
+  DATABASE_SECTIONS,
+  GENERAL_SECTIONS,
+  SECURITY_SECTIONS,
+} from '@/components/settings/sections'
 
 const openModel = defineModel()
 
@@ -144,6 +153,7 @@ const open = computed({
 
 const sections = computed(() => [
   { id: 'general', label: 'General', icon: 'lucide-settings' },
+  { id: 'database', label: 'Database', icon: 'lucide-database' },
   { id: 'security', label: 'Security', icon: 'lucide-shield' },
   { id: 'sessions', label: 'Sessions', icon: 'lucide-monitor' },
   { id: 'system-info', label: 'System Info', icon: 'lucide-info' },
@@ -160,6 +170,7 @@ const activeSectionLabel = computed(
 
 const subSectionOptions = computed(() => {
   if (currentSection.value === 'general') return GENERAL_SECTIONS
+  if (currentSection.value === 'database') return DATABASE_SECTIONS
   if (currentSection.value === 'security') return SECURITY_SECTIONS
   return []
 })
