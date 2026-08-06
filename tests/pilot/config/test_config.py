@@ -409,6 +409,28 @@ def test_admin_tls_roundtrip() -> None:
     assert "tls = false" in config.dumps()
 
 
+@pytest.mark.parametrize(
+    "section,field,url",
+    [
+        ("admin", "jwks_url", "http://169.254.169.254/token"),
+        ("central", "endpoint", "http://metadata.google.internal/computeMetadata"),
+        ("datum", "endpoint", "file:///etc/shadow"),
+        ("llm", "api_base", "http://user:password@llm.example.com/v1"),
+    ],
+)
+def test_endpoints_this_bench_fetches_refuse_unsafe_urls(section: str, field: str, url: str) -> None:
+    config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
+    setattr(getattr(config, section), field, url)
+    with pytest.raises(ConfigError):
+        config.validate()
+
+
+def test_a_private_llm_endpoint_stays_allowed() -> None:
+    config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
+    config.llm.api_base = "http://127.0.0.1:11434/v1"
+    config.validate()
+
+
 def test_admin_allow_bench_management_defaults_to_true_on_a_dev_checkout() -> None:
     config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.admin.allow_bench_management is True

@@ -28,6 +28,7 @@ from pilot.core.bench.settings import (
     worker_groups_payload,
 )
 from pilot.integrations.llm import clear_system_prompt, read_system_prompt, write_system_prompt
+from pilot.internal.validators import validate_external_url
 from pilot.managers.platform import is_linux, native_process_manager
 from pilot.managers.redis import RedisManager
 from pilot.managers.waf import WafManager
@@ -167,6 +168,8 @@ def llm_models():
         api_key = _saved_llm_api_key()
 
     api_base = str(payload.get("api_base", "")).strip() or _saved_llm_api_base()
+    if error := validate_external_url(api_base, "api_base"):
+        return error_response("invalid_api_base", error, 422)
 
     try:
         return jsonify(models_for(provider, api_key, api_base))

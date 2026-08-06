@@ -112,6 +112,10 @@ Nginx has no per-bench `bench.toml` section - `config.nginx` always holds its co
 
 Unknown fields are ignored by normal loads for compatibility. Strict validation can report unknown config paths.
 
+## Fetched Endpoints
+
+`admin.jwks_url`, `central.endpoint`, `datum.endpoint`, and `llm.api_base` are URLs this bench requests itself, so `BenchConfig.validate` sends each through `validate_external_url`: the scheme must be `http` or `https`, credentials must not be embedded, and the host must not be link-local or a cloud metadata name. Loopback and private addresses stay allowed - a self-hosted model or a local JWKS issuer is a normal setup. Validation reads the literal host only; a domain that resolves to a blocked address is not caught.
+
 ## Common Config
 
 Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer, one Central enrolment, one metrics destination. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
