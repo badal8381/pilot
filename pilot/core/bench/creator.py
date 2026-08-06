@@ -64,7 +64,7 @@ class BenchCreator:
             on_progress("  Change it any time with 'pilot set-admin-password'.")
         on_progress("\nNext step:")
         on_progress("  pilot start")
-        on_progress(f"  Then open http://localhost:{admin_port} - the setup wizard takes it from there.")
+        on_progress(f"  Then open the sign-in link it prints for http://localhost:{admin_port}.")
 
         return Bench(self.target_directory)
 

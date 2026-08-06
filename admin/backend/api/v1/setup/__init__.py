@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Blueprint, current_app, g, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 
 from admin.backend.api.responses import accepted_task_response, error_response, no_content_response
 from admin.backend.api.v1.setup.config import (
@@ -18,7 +18,6 @@ from admin.backend.api.v1.setup.state import (
     setup_handoff_task,
     wizard_marker_path,
 )
-from admin.backend.middleware import allow_during_setup, client_ip, set_session_cookie
 from pilot.config import BenchConfig
 from pilot.config.bench import FRAMEWORK_BRANCHES
 from pilot.core.bench import Bench
@@ -40,20 +39,17 @@ __all__ = [
 
 
 @setup_bp.get("/configuration")
-@allow_during_setup
 def get_configuration():
     bench_root = Path(current_app.config["BENCH_ROOT"])
     return jsonify(read_defaults(bench_root))
 
 
 @setup_bp.get("/framework-branches")
-@allow_during_setup
 def get_framework_branches():
     return jsonify({"branches": FRAMEWORK_BRANCHES})
 
 
 @setup_bp.put("/configuration")
-@allow_during_setup
 def update_configuration():
     bench_root = Path(current_app.config["BENCH_ROOT"])
     data = request.get_json(silent=True)
@@ -67,21 +63,13 @@ def update_configuration():
 
 
 def _update_configuration(bench_root: Path, data: dict):
-    current = {}
-    if BenchConfig.exists(bench_root):
-        try:
-            current = BenchConfig.read_flat(bench_root)
-        except Exception:
-            return error_response(
-                "configuration_unavailable",
-                "Setup configuration is unavailable.",
-                503,
-            )
-    if current.get("admin_password") and g.jwt_claims is None:
+    try:
+        current = BenchConfig.read_flat(bench_root)
+    except Exception:
         return error_response(
-            "authentication_required",
-            "Authentication is required.",
-            401,
+            "configuration_unavailable",
+            "Setup configuration is unavailable.",
+            503,
         )
 
     data = apply_existing_local_database(bench_root, data)
@@ -115,7 +103,6 @@ def _update_configuration(bench_root: Path, data: dict):
 
 
 @setup_bp.post("/database-validations")
-@allow_during_setup
 def validate_database():
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
@@ -142,7 +129,6 @@ def validate_database():
 
 
 @setup_bp.post("/actions/start")
-@allow_during_setup
 def start_setup():
     bench_root = Path(current_app.config["BENCH_ROOT"])
     idempotency_key = request.headers.get("Idempotency-Key")
@@ -188,7 +174,6 @@ def start_setup():
 
 
 @setup_bp.post("/actions/finish")
-@allow_during_setup
 def finish_setup():
     import os
     import signal

@@ -7,7 +7,7 @@ from flask import Blueprint, current_app, jsonify
 
 from admin.backend.api.responses import error_response
 from admin.backend.api.v1.setup import wizard_marker_path
-from admin.backend.middleware import allow_unauthenticated
+from admin.backend.middleware import allow_unauthenticated, is_request_authenticated
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 from pilot.internal.atomic_file import exclusive_file_lock
@@ -53,18 +53,28 @@ def bootstrap():
                 else:
                     return jsonify(_setup_bootstrap(bench_root))
     return jsonify(
-        {
-            "mode": "admin",
-            "enabled": config.admin.enabled,
-            "name": config.name,
-            "db_type": config.db_type,
-            "production": config.production.enabled,
-            "native_process_manager": native_process_manager(),
-            "allow_bench_management": config.admin.allow_bench_management,
-            "developer_mode": config.allow_developer_mode,
-            "task_worker": TaskActivityReader(bench_root).read().public_dict,
-        }
+        _visible_bootstrap(
+            bench_root,
+            {
+                "mode": "admin",
+                "enabled": config.admin.enabled,
+                "name": config.name,
+                "db_type": config.db_type,
+                "production": config.production.enabled,
+                "native_process_manager": native_process_manager(),
+                "allow_bench_management": config.admin.allow_bench_management,
+                "developer_mode": config.allow_developer_mode,
+                "task_worker": TaskActivityReader(bench_root).read().public_dict,
+            },
+        )
     )
+
+
+def _visible_bootstrap(bench_root: Path, payload: dict) -> dict:
+    """Everything for a caller with a session; only what the sign-in page needs without."""
+    if is_request_authenticated(Bench(bench_root)):
+        return payload
+    return {key: payload[key] for key in ("mode", "enabled", "name")}
 
 
 def _setup_bootstrap(bench_root: Path) -> dict:

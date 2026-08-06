@@ -7,10 +7,8 @@ from playwright.sync_api import Page, expect
 
 
 def login(page: Page, base_url: str, password: str) -> None:
-    # PUT /api/v1/setup/configuration hands back a session cookie, which carries over
-    # in this shared browser context - so without clearing it we'd already be
-    # authenticated and the login form would never render. Drop it to exercise the
-    # actual login.
+    # The wizard's own sign-in carries over in this shared browser context, so without
+    # clearing it the login form would never render. Drop it to exercise real login.
     page.context.clear_cookies()
     page.goto(f"{base_url}/")
     page.get_by_placeholder("Password").fill(password)

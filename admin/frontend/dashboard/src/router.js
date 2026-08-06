@@ -146,6 +146,10 @@ router.beforeEach(async (to) => {
 
   const { session, ensureSession } = useSession()
   await ensureSession()
+  // Setup authenticates like every other page. Without a session the sign-in page is
+  // the only stop; the wizard's own link (printed by `pilot start`) carries a ?sid=.
+  if (session.wizard && !session.authenticated)
+    return to.name === 'Login' ? true : { name: 'Login' }
   if (session.wizard) return to.name === 'Setup' ? true : { name: 'Setup' }
   if (to.name === 'Setup') return { path: '/' }
   if (!session.authenticated && to.name !== 'Login')

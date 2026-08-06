@@ -9,10 +9,23 @@ from pilot.internal.tasks.store import TaskStore
 from pilot.managers.task.models import TaskStatus
 
 
-def setup_client(bench_root: Path):
+def setup_client(bench_root: Path, *, authenticated: bool = True):
+    """A wizard client for a freshly created bench: bench.toml with an admin password
+    (written by `pilot new`), plus the session its setup link would mint."""
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
+
+    bench_root.mkdir(parents=True, exist_ok=True)
+    if not BenchConfig.exists(bench_root):
+        BenchConfig.write_flat(
+            bench_root, bench_root.name, {"admin_enabled": True, "admin_password": "admin-secret"}
+        )
     app = create_app(bench_root)
     app.config["TESTING"] = True
-    return app.test_client()
+    client = app.test_client()
+    if authenticated:
+        client.set_cookie("sid", Session(Bench(bench_root)).issue_session_token()[0])
+    return client
 
 
 def save_configuration(client):
@@ -122,7 +135,7 @@ def test_configuration_update_rejects_keys_the_wizard_does_not_own(tmp_path: Pat
     response = client.put(
         "/api/v1/setup/configuration",
         json={
-            "admin_password": "admin-secret",
+            "admin_password": "hijacked",
             "mariadb_password": "database-secret",
             "admin_jwks_url": "https://attacker.example.com/jwks.json",
             "admin_allow_bench_management": True,
@@ -132,17 +145,18 @@ def test_configuration_update_rejects_keys_the_wizard_does_not_own(tmp_path: Pat
     assert response.status_code == 422
     assert response.get_json()["error"]["code"] == "invalid_setup_configuration"
     assert "admin_jwks_url" in response.get_json()["error"]["message"]
-    assert not BenchConfig.exists(tmp_path)
+    assert BenchConfig.read(tmp_path).admin.password == "admin-secret"
 
 
-def test_configuration_update_needs_a_session_once_a_password_exists(tmp_path: Path) -> None:
-    BenchConfig.write_flat(tmp_path, tmp_path.name, {"admin_enabled": True, "admin_password": "admin-secret"})
-    client = setup_client(tmp_path)
+def test_setup_configuration_needs_a_session(tmp_path: Path) -> None:
+    client = setup_client(tmp_path, authenticated=False)
 
-    response = client.put("/api/v1/setup/configuration", json={"mariadb_password": "database-secret"})
+    read = client.get("/api/v1/setup/configuration")
+    write = client.put("/api/v1/setup/configuration", json={"mariadb_password": "database-secret"})
 
-    assert response.status_code == 401
-    assert response.get_json()["error"]["code"] == "authentication_required"
+    assert read.status_code == 401
+    assert write.status_code == 401
+    assert write.get_json()["error"]["code"] == "authentication_required"
 
 
 def _write_sibling_local_database(benches: Path, name: str, password: str) -> None:

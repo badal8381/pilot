@@ -215,11 +215,13 @@ async function createBench() {
       // over whichever scheme nginx reports it's actually serving (http until a
       // cert is in place). Poll until it answers, then redirect to that scheme.
       const scheme = data.scheme || 'http'
-      startProvisioning(`${scheme}://${data.domain}`)
+      startProvisioning(`${scheme}://${data.domain}/?sid=${data.setup_link}`)
       pollReady({ domain: data.domain, scheme }, data.domain, data.server_ip || '')
     } else {
       // Dev parent: standalone wizard on this host's raw port.
-      startProvisioning(`${window.location.protocol}//${window.location.hostname}:${data.port}`)
+      startProvisioning(
+        `${window.location.protocol}//${window.location.hostname}:${data.port}/?sid=${data.setup_link}`,
+      )
       pollReady({ port: data.port })
     }
   } catch {

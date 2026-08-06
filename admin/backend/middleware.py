@@ -10,7 +10,6 @@ from flask import Flask, current_app, g, request
 from admin.backend.api.responses import error_response
 from admin.backend.api.routes import is_api_path
 from admin.backend.internal.rate_limiter import SlidingWindow
-from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 
 _AUTH_POLICY = "_auth_policy"
@@ -22,16 +21,10 @@ _WINDOWS_LOCK = threading.Lock()
 class AuthPolicy(StrEnum):
     AUTHENTICATED = "authenticated"
     OPEN = "open"
-    SETUP_CONDITIONAL = "setup-conditional"
 
 
 def allow_unauthenticated(view):
     setattr(view, _AUTH_POLICY, AuthPolicy.OPEN)
-    return view
-
-
-def allow_during_setup(view):
-    setattr(view, _AUTH_POLICY, AuthPolicy.SETUP_CONDITIONAL)
     return view
 
 
@@ -116,15 +109,12 @@ def _check_auth_request(app: Flask, bench_root):
     if view is None:
         return None
 
-    policy = get_auth_policy(view)
-    if policy == AuthPolicy.OPEN:
+    if get_auth_policy(view) == AuthPolicy.OPEN:
         return None
 
-    bench, response = _auth_config(bench_root, policy)
+    bench, response = _auth_config(bench_root)
     if response is not None:
         return response
-    if bench is None:
-        return None
 
     response = _admin_session_response(bench)
     if response is not None:
@@ -134,13 +124,10 @@ def _check_auth_request(app: Flask, bench_root):
     return error_response("forbidden", error, 403) if error else None
 
 
-def _auth_config(bench_root, policy: AuthPolicy):
-    allowed_before_setup = policy == AuthPolicy.SETUP_CONDITIONAL
+def _auth_config(bench_root):
     try:
-        bench = Bench(bench_root)
+        return Bench(bench_root), None
     except Exception:
-        if allowed_before_setup and not BenchConfig.exists(bench_root):
-            return None, None
         return None, error_response(
             "configuration_unavailable",
             "Bench configuration is unavailable.",
@@ -148,19 +135,10 @@ def _auth_config(bench_root, policy: AuthPolicy):
             {"enabled": False},
         )
 
-    if allowed_before_setup and not bench.config.admin.password:
-        return None, None
-    return bench, None
-
 
 def _admin_session_response(bench):
-    admin = bench.config.admin
-    if not admin.enabled:
+    if not bench.config.admin.enabled:
         return error_response("admin_disabled", "Admin is disabled.", 503, {"enabled": False})
-    if not admin.password:
-        return error_response(
-            "session_unavailable", "No admin password is configured.", 503, {"enabled": False}
-        )
     if not is_request_authenticated(bench):
         return error_response("authentication_required", "Authentication is required.", 401)
     return None

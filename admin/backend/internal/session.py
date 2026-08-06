@@ -142,6 +142,9 @@ class Session:
 
     DEFAULT_TTL = 24 * 3600
     LOGIN_TTL = 5 * 60
+    # The setup link, and so the session redeeming it, live 3h - shorter than a password
+    # login because the link travels in a URL, over plain http.
+    SETUP_SESSION_TTL = 3 * 3600
 
     # Asymmetric only: a published JWKS public key must never be accepted as an HMAC secret.
     _JWKS_ALGORITHMS: ClassVar[list[str]] = [
@@ -186,6 +189,11 @@ class Session:
     def issue_login_token(self) -> str:
         """A short-lived, single-use token for the ?sid= sign-in link."""
         return self._encode(ttl=self.LOGIN_TTL, scope="bench", jti=secrets.token_urlsafe(8))
+
+    def issue_setup_link_token(self) -> str:
+        """The ?sid= link that opens the setup wizard on a bench nobody has signed in to.
+        Its exp is the session's lifetime: redeeming it inherits the link's remaining life."""
+        return self._encode(ttl=self.SETUP_SESSION_TTL, scope="bench", jti=secrets.token_urlsafe(8))
 
     def issue_site_token(self, site: str, ttl: int = DEFAULT_TTL) -> str:
         """A token scoped to a single site for site-to-bench API calls."""

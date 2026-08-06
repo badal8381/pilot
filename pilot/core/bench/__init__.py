@@ -329,6 +329,13 @@ class Bench:
 
         BenchProduction(self).setup_letsencrypt()
 
+    def issue_setup_link(self) -> str:
+        """A short-lived ?sid= token that signs a browser in to this bench's Admin,
+        so the setup wizard is reachable before anyone knows the password."""
+        from admin.backend.internal.session import Session
+
+        return Session(self).issue_setup_link_token()
+
     def initialize(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
         from pilot.core.bench.initializer import BenchInitializer
 

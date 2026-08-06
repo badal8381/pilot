@@ -183,7 +183,8 @@ class BenchRuntime:
 
         port = self._admin_port()
         on_progress("\nBench not initialized. Starting setup wizard...")
-        on_progress(f"  Open http://localhost:{port} in your browser\n")
+        on_progress(f"  Open http://localhost:{port}/?sid={self.bench.issue_setup_link()} in your browser")
+        on_progress("  The link signs you in and expires in an hour.\n")
 
         env = {**os.environ, "PYTHONPATH": str(root)}
         subprocess.run(

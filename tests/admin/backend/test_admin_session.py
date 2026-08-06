@@ -66,6 +66,12 @@ def _client(tmp_path: Path, jwt_secret: str = "k3y"):
     return app.test_client()
 
 
+def _signed_in_client(tmp_path: Path, jwt_secret: str = "k3y"):
+    client = _client(tmp_path, jwt_secret)
+    client.set_cookie("sid", _session_token(jwt_secret))
+    return client
+
+
 def test_valid_jwt_cookie_authenticates(tmp_path: Path) -> None:
     client = _client(tmp_path)
     client.set_cookie("sid", _session_token())
@@ -142,12 +148,12 @@ def test_delete_session_without_a_cookie_still_clears_it(tmp_path: Path) -> None
 def test_bootstrap_reports_bench_db_type(tmp_path: Path) -> None:
     # The engine is a bench-wide property; the admin reads it from bootstrap to
     # show one bench-level badge instead of a per-site one.
-    client = _client(tmp_path)
+    client = _signed_in_client(tmp_path)
     assert client.get("/api/v1/bootstrap").get_json()["db_type"] == "mariadb"
 
 
 def test_bootstrap_reports_sanitized_task_activity(tmp_path: Path) -> None:
-    body = _client(tmp_path).get("/api/v1/bootstrap").get_json()
+    body = _signed_in_client(tmp_path).get("/api/v1/bootstrap").get_json()
 
     assert body["task_worker"] == {
         "active": False,
@@ -169,12 +175,22 @@ def test_bootstrap_reports_postgres_engine(tmp_path: Path) -> None:
 
     app = create_app(bench_root)
     app.config["TESTING"] = True
-    assert app.test_client().get("/api/v1/bootstrap").get_json()["db_type"] == "postgres"
+    client = app.test_client()
+    client.set_cookie("sid", _session_token())
+    assert client.get("/api/v1/bootstrap").get_json()["db_type"] == "postgres"
 
 
 def test_bootstrap_reports_allow_bench_management_default_true(tmp_path: Path) -> None:
-    client = _client(tmp_path)
+    client = _signed_in_client(tmp_path)
     assert client.get("/api/v1/bootstrap").get_json()["allow_bench_management"] is True
+
+
+def test_bootstrap_tells_an_unauthenticated_caller_only_what_the_login_page_needs(
+    tmp_path: Path,
+) -> None:
+    body = _client(tmp_path).get("/api/v1/bootstrap").get_json()
+
+    assert set(body) == {"mode", "enabled", "name"}
 
 
 def test_bootstrap_reports_allow_bench_management_when_disabled(tmp_path: Path) -> None:
@@ -188,7 +204,9 @@ def test_bootstrap_reports_allow_bench_management_when_disabled(tmp_path: Path) 
 
     app = create_app(bench_root)
     app.config["TESTING"] = True
-    assert app.test_client().get("/api/v1/bootstrap").get_json()["allow_bench_management"] is False
+    client = app.test_client()
+    client.set_cookie("sid", _session_token())
+    assert client.get("/api/v1/bootstrap").get_json()["allow_bench_management"] is False
 
 
 def test_login_with_sid_sets_httponly_cookie(tmp_path: Path) -> None:
@@ -201,6 +219,37 @@ def test_login_with_sid_sets_httponly_cookie(tmp_path: Path) -> None:
     assert "HttpOnly" in cookie
     assert "Secure" not in cookie
     assert client.get("/api/v1/benches").status_code != 401
+
+
+def test_setup_link_signs_in_for_a_shorter_session_than_a_password(tmp_path: Path) -> None:
+    import jwt as decoder
+
+    client = _client(tmp_path)
+    bench = Bench(tmp_path / "benches" / "current")
+    link = Session(bench).issue_setup_link_token()
+
+    response = client.post("/api/v1/auth/session", json={"sid": link})
+
+    assert response.status_code == 201
+    cookie = next(h for k, h in response.headers if k == "Set-Cookie" and h.startswith("sid="))
+    session_token = cookie.removeprefix("sid=").split(";")[0]
+    claims = decoder.decode(session_token, "k3y", algorithms=["HS256"])
+    # The session inherits the link's remaining life (~3h), not the 24h of a password login.
+    lifetime = claims["exp"] - claims["iat"]
+    assert Session.SETUP_SESSION_TTL - 5 <= lifetime <= Session.SETUP_SESSION_TTL
+    assert lifetime < Session.DEFAULT_TTL
+    assert client.get("/api/v1/setup/configuration").status_code == 200
+
+
+def test_a_setup_link_cannot_be_redeemed_twice(tmp_path: Path) -> None:
+    client = _client(tmp_path)
+    link = Session(Bench(tmp_path / "benches" / "current")).issue_setup_link_token()
+
+    first = client.post("/api/v1/auth/session", json={"sid": link})
+    second = client.post("/api/v1/auth/session", json={"sid": link})
+
+    assert first.status_code == 201
+    assert second.status_code == 401
 
 
 def test_password_login_records_session_issued(tmp_path: Path) -> None:

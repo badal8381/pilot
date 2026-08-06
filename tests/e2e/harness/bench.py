@@ -43,11 +43,9 @@ class Bench:
             raise ValueError(f'Bench name must start with "{E2E_PREFIX}" (got "{name}")')
         self.name = name
         self._extra_env = env or {}
-        # `pilot new` no longer pre-generates an admin password (it's set in the
-        # wizard's first step and persisted by PUT /api/v1/setup/configuration).
-        # So the harness chooses it, the wizard enters it, and login reuses it.
-        # A bare token_urlsafe() isn't guaranteed to satisfy the wizard's password
-        # policy (upper + lower + digit + symbol) - fixed affixes guarantee it.
+        # `pilot new --admin-password` sets it, the wizard sign-in uses it, and so does
+        # login afterwards. A bare token_urlsafe() isn't guaranteed to satisfy the
+        # password policy (upper + lower + digit + symbol) - fixed affixes guarantee it.
         self._admin_password = admin_password or f"Aa1!{secrets.token_urlsafe(12)}"
         self._proc: subprocess.Popen | None = None
         self._info: dict | None = None
@@ -64,7 +62,7 @@ class Bench:
 
     @property
     def admin_password(self) -> str:
-        """Admin password entered by the wizard and reused for login."""
+        """Admin password `pilot new` was given, reused for every sign-in."""
         return self._admin_password
 
     @property
@@ -75,7 +73,7 @@ class Bench:
         """`pilot new <name>` then read the generated admin port."""
         if self.dir.exists():
             raise RuntimeError(f'Bench "{self.name}" already exists at {self.dir} - clean it up first')
-        self._run(["new", self.name])
+        self._run(["new", self.name, "--admin-password", self._admin_password])
         if not (self.dir / "bench.toml").exists():
             # `pilot` resolves its benches dir as <dir containing pilot>/benches.
             # The repo launcher (<repo>/bin/pilot, the default) puts it at <repo>/benches,
@@ -348,8 +346,7 @@ class Bench:
         )
 
     def _read_config(self) -> dict:
-        """Read admin.port from the generated bench.toml. (admin.password is empty
-        on a fresh bench - the wizard sets it; see admin_password.)"""
+        """Read admin.port from the generated bench.toml."""
         with open(self.dir / "bench.toml", "rb") as f:
             data = tomllib.load(f)
         return {"admin_port": int(data["admin"]["port"])}
