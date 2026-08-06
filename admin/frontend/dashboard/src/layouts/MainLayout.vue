@@ -15,10 +15,12 @@ import UpdateStatusButton from '@/components/common/UpdateStatusButton.vue'
 import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import BenchSwitcherDialog from '@/components/benches/BenchSwitcherDialog.vue'
 import NewBenchDialog from '@/components/benches/NewBenchDialog.vue'
+import SearchDialog from '@/components/search/SearchDialog.vue'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSession } from '@/composables/auth/useSession'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
+import { openSearch, searchOpen, useSearchShortcut } from '@/composables/common/useSearch'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +28,7 @@ const { items, resetBreadcrumbs } = useBreadcrumbs()
 const isMobile = useIsMobile()
 const { session } = useSession()
 const { showBenches, showNewBench } = useAppMenu()
+useSearchShortcut()
 
 // Remembers the last non-Settings route so dismissing the dialog (backdrop
 // click, Escape, close button) exits to it directly instead of stepping back
@@ -104,7 +107,7 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
     <template #nav>
       <MobileNav class="!bg-surface-base">
         <MobileNavItem label="Home" icon="lucide-house" to="/home" :active="route.name == 'Home'" />
-        <MobileNavItem label="Search" icon="lucide-search" />
+        <MobileNavItem label="Search" icon="lucide-search" @click="openSearch" />
         <MobileNavItem label="Notifications" icon="lucide-bell" />
         <MobileNavItem
           label="Settings"
@@ -149,4 +152,5 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
     <BenchSwitcherDialog v-model="showBenches" @new-bench="showNewBench = true" />
     <NewBenchDialog v-model="showNewBench" />
   </template>
+  <SearchDialog v-model:open="searchOpen" />
 </template>

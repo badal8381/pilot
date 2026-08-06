@@ -178,8 +178,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watchEffect } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch, watchEffect } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Badge,
   Button,
@@ -203,6 +203,7 @@ import { useSiteStorage } from '@/composables/sites/useSiteStorage'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 import { openSiteLogin } from '@/utils/siteLogin'
 
+const route = useRoute()
 const router = useRouter()
 const isMobile = useIsMobile()
 const { setBreadcrumbs } = useBreadcrumbs()
@@ -332,6 +333,16 @@ function siteMenuOptions(site) {
 }
 
 const showCreate = ref(false)
+
+watch(
+  () => route.query.new,
+  (value) => {
+    if (!value) return
+    showCreate.value = true
+    router.replace({ name: 'Sites' })
+  },
+  { immediate: true },
+)
 
 onMounted(() => {
   load()
