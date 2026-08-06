@@ -1,4 +1,16 @@
-export const sidebarSections = [
+interface SidebarNavItem {
+  label: string
+  icon: string
+  to: string
+  flag?: string
+}
+
+interface SidebarSection {
+  label?: string
+  items: SidebarNavItem[]
+}
+
+export const sidebarSections: SidebarSection[] = [
   {
     items: [
       { label: 'Sites', icon: 'lucide-globe', to: '/sites' },
