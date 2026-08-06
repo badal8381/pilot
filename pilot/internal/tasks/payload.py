@@ -11,6 +11,7 @@ from pathlib import Path
 from pilot.internal.tasks.args import (
     fingerprint_task_args,
     public_task_args,
+    reject_unsafe_git_args,
     reject_url_credentials,
     task_secret_args,
 )
@@ -112,6 +113,7 @@ class TaskPayloadBuilder:
         if command not in self._required_args:
             raise ValueError(f"Unknown command: {command!r}. Allowed: {sorted(self._required_args)}")
         reject_url_credentials(args)
+        reject_unsafe_git_args(args)
         for key in self._required_args[command]:
             if key not in args:
                 raise ValueError(f"Command {command!r} requires arg {key!r}")

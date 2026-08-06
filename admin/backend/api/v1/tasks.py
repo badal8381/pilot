@@ -122,7 +122,7 @@ def retry_task(task_id: str):
         return error_response("task_not_found", str(error), 404)
     except Exception:
         return error_response("task_unavailable", "Could not read task.", 500)
-    if task_has_secrets(task.command):
+    if task_has_secrets(task.command, task.args):
         return error_response(
             "fresh_credentials_required",
             "This task requires fresh credentials and cannot be retried.",

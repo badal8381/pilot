@@ -27,13 +27,14 @@ def create_task(
     bench_root: Path,
     task_id: str = TASK_ID,
     status: TaskStatus = TaskStatus.QUEUED,
+    args: dict | None = None,
 ) -> None:
     store = TaskStore(bench_root)
     store.create_queued(
         {
             "task_id": task_id,
             "command": "build",
-            "args": {"app": "frappe"},
+            "args": args or {"app": "frappe"},
             "command_argv": ["bench", "build", "--app", "frappe"],
             "queued_at": "2026-07-15T12:00:00+00:00",
             "started_at": None,
@@ -198,6 +199,20 @@ def test_retry_returns_queued_task_and_location(tmp_path: Path) -> None:
     assert response.headers["Location"] == f"/api/v1/tasks/{RETRY_TASK_ID}"
     assert response.get_json()["task_id"] == RETRY_TASK_ID
     assert response.get_json()["status"] == "queued"
+
+
+def test_retry_rejects_a_task_that_was_given_a_secret(tmp_path: Path) -> None:
+    """The secret is not kept, so a retry would run without it."""
+    create_task(
+        tmp_path,
+        status=TaskStatus.SUCCESS,
+        args={"site": "site1.localhost", "admin_password": "[redacted]"},
+    )
+
+    response = client(tmp_path).post(f"/api/v1/tasks/{TASK_ID}/actions/retry")
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "fresh_credentials_required"
 
 
 def test_retry_rejects_an_active_task(tmp_path: Path) -> None:
