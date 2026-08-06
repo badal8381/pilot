@@ -26,6 +26,6 @@ const props = defineProps({
 const stateClass = computed(() => {
   if (props.disabled) return 'opacity-60 cursor-not-allowed'
   if (props.selected) return 'bg-surface-gray-3'
-  return props.interactive ? 'hover:bg-surface-gray-2' : ''
+  return props.interactive ? 'hover:bg-surface-gray-1' : ''
 })
 </script>

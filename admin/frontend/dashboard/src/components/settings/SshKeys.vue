@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <div class="flex justify-end">
@@ -12,12 +12,13 @@
     >
       {{ loadError }}
     </div>
-    <div
+    <EmptyState
+      compact
       v-else-if="!rows.length"
-      class="py-12 border border-dashed rounded-xl border-outline-gray-2 text-ink-gray-5 text-p-sm text-center"
-    >
-      No SSH keys.
-    </div>
+      icon="lucide-key-round"
+      title="No SSH keys"
+      description="Add a public key to give its holder SSH access to this server."
+    />
     <ListView
       v-else
       :columns="columns"
@@ -32,6 +33,8 @@
             size="sm"
             theme="red"
             icon="lucide-trash-2"
+            label="Remove SSH key"
+            tooltip="Remove SSH key"
             @click="promptRemove(row)"
           />
         </div>
@@ -52,18 +55,20 @@
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-        <Button variant="solid" :loading="adding" @click="add">Add key</Button>
+        <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
+          Add key
+        </Button>
       </div>
     </template>
   </Dialog>
 
   <Dialog v-model="showRemove" :options="{ title: 'Remove SSH key', size: 'md' }">
     <template #body-content>
-      <p v-if="isLastKey" class="text-ink-gray-7 text-p-sm">
+      <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
         This is the last authorized key. It can't be removed, or you'd lose SSH access to this
         server.
       </p>
-      <p v-else class="text-ink-gray-7 text-p-sm">
+      <p v-else class="text-ink-gray-7 text-p-base">
         Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
         Whoever holds the matching private key loses SSH access.
       </p>
@@ -79,7 +84,8 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, ListView, ListRowItem, toast } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sshKeysApi } from '@/api/sshKeys'
 
@@ -126,10 +132,6 @@ function openAdd() {
 }
 
 async function add() {
-  if (!newKey.value.trim()) {
-    error.value = 'Paste a public key to add.'
-    return
-  }
   adding.value = true
   error.value = ''
   try {

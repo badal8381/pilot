@@ -43,7 +43,6 @@ export const SECURITY_SECTIONS = [
     label: 'Change password',
     description: 'Update the password that signs in to this bench.',
     component: ChangeAdminPassword,
-    action: 'Change',
   },
   {
     id: 'two-factor',
@@ -59,8 +58,8 @@ export const SECURITY_SECTIONS = [
   },
   {
     id: 'waf',
-    label: 'WAF settings',
-    description: 'Web application firewall rules for your sites.',
+    label: 'Web application firewall',
+    description: 'Inspect incoming requests for attacks before they reach your sites.',
     component: Waf,
   },
   {

@@ -63,14 +63,13 @@ def _io_rates() -> dict:
 
 
 def _memory_breakdown(mem, swap) -> dict:
-    free_mb = mem.free / 1024**2
-    cached_mb = (getattr(mem, "cached", 0) + getattr(mem, "buffers", 0)) / 1024**2
-    used_mb = max(mem.total / 1024**2 - free_mb - cached_mb, 0)
+    free_bytes = int(mem.free)
+    cached_bytes = int(getattr(mem, "cached", 0) + getattr(mem, "buffers", 0))
     return {
-        "used_mb": round(used_mb, 2),
-        "cached_mb": round(cached_mb, 2),
-        "free_mb": round(free_mb, 2),
-        "swap_used_mb": round(swap.used / 1024**2, 2),
+        "used_bytes": max(int(mem.total) - free_bytes - cached_bytes, 0),
+        "cached_bytes": cached_bytes,
+        "free_bytes": free_bytes,
+        "swap_used_bytes": int(swap.used),
     }
 
 

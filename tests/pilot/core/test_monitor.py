@@ -41,13 +41,18 @@ def _fake_proc_reads(monitor: Monitor) -> None:
     monitor._load_average = lambda: (0.5, 0.4, 0.3)  # type: ignore[method-assign]
     monitor._system_cpu = 12.5
     monitor._memory_usage = lambda: {
-        "total_mb": 8192.0,
-        "used_mb": 4096.0,
-        "available_mb": 4096.0,
+        "total_bytes": 8192 * 1024**2,
+        "used_bytes": 4096 * 1024**2,
+        "available_bytes": 4096 * 1024**2,
         "percent": 50.0,
     }  # type: ignore[method-assign]
     monitor._storage_usage = lambda: {
-        "disk": {"total_mb": 51200.0, "used_mb": 20480.0, "free_mb": 30720.0, "percent": 40.0}
+        "disk": {
+            "total_bytes": 51200 * 1024**2,
+            "used_bytes": 20480 * 1024**2,
+            "free_bytes": 30720 * 1024**2,
+            "percent": 40.0,
+        }
     }  # type: ignore[method-assign]
 
 
@@ -95,18 +100,18 @@ def test_collect_system_metrics_includes_storage(tmp_path: Path) -> None:
 def test_disk_usage_returns_expected_fields(tmp_path: Path) -> None:
     monitor = _make_monitor(_make_bench(tmp_path))
     result = monitor._disk_usage(tmp_path)
-    assert result["total_mb"] > 0
-    assert result["used_mb"] >= 0
-    assert result["free_mb"] >= 0
+    assert result["total_bytes"] > 0
+    assert result["used_bytes"] >= 0
+    assert result["free_bytes"] >= 0
     assert 0.0 <= result["percent"] <= 100.0
-    assert abs(result["total_mb"] - result["used_mb"] - result["free_mb"]) < 1.0
+    assert result["total_bytes"] == result["used_bytes"] + result["free_bytes"]
 
 
 def test_storage_usage_always_includes_disk(tmp_path: Path) -> None:
     monitor = _make_monitor(_make_bench(tmp_path))
     result = monitor._storage_usage()
     assert "disk" in result
-    assert result["disk"]["total_mb"] > 0
+    assert result["disk"]["total_bytes"] > 0
 
 
 def test_compute_cpu_breakdown_sums_to_100_percent(tmp_path: Path) -> None:
@@ -170,8 +175,17 @@ def test_memory_usage_breakdown_sums_to_total(tmp_path: Path) -> None:
     monitor = _make_monitor(_make_bench(tmp_path))
     result = monitor._memory_usage()
 
-    assert set(result) >= {"total_mb", "used_mb", "cached_mb", "free_mb", "swap_used_mb", "percent"}
-    assert abs(result["total_mb"] - result["used_mb"] - result["cached_mb"] - result["free_mb"]) < 1.0
+    assert set(result) >= {
+        "total_bytes",
+        "used_bytes",
+        "cached_bytes",
+        "free_bytes",
+        "swap_used_bytes",
+        "percent",
+    }
+    assert (
+        result["total_bytes"] == result["used_bytes"] + result["cached_bytes"] + result["free_bytes"]
+    )
 
 
 def test_compute_io_reports_bytes_per_sec(tmp_path: Path) -> None:
@@ -245,13 +259,13 @@ def test_proc_memory_falls_back_to_uss_without_pss(tmp_path: Path) -> None:
     monitor = _make_monitor(_make_bench(tmp_path))
     process = SimpleNamespace(memory_full_info=lambda: SimpleNamespace(uss=4 * 1024 * 1024))
     with patch("psutil.Process", return_value=process):
-        assert monitor._proc_memory_kb(1234) == 4096
+        assert monitor._proc_memory_bytes(1234) == 4 * 1024 * 1024
 
     process = SimpleNamespace(
         memory_full_info=lambda: SimpleNamespace(pss=2 * 1024 * 1024, uss=4 * 1024 * 1024)
     )
     with patch("psutil.Process", return_value=process):
-        assert monitor._proc_memory_kb(1234) == 2048
+        assert monitor._proc_memory_bytes(1234) == 2 * 1024 * 1024
 
 
 def test_io_bytes_is_zero_where_the_platform_has_no_counters(tmp_path: Path) -> None:

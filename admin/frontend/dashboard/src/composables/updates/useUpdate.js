@@ -50,7 +50,6 @@ export function useUpdate() {
         kind: 'active',
         label: pendingActionLabel(operation.pending_action),
         operationId: operation.id,
-        icon: 'lucide-loader-circle',
       }
     }
     if (needsAttention(operation)) {
@@ -66,7 +65,6 @@ export function useUpdate() {
         kind: 'active',
         label: stateLabel(operation.state),
         operationId: operation.id,
-        icon: 'lucide-loader-circle',
       }
     }
     if (updatesAvailable.value) {

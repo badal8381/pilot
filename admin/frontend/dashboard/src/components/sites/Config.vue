@@ -10,18 +10,10 @@
           variant="ghost"
           :loading="refreshing"
           icon="lucide-refresh-cw"
-          class="hidden sm:flex"
+          label="Refresh"
+          tooltip="Refresh"
           @click="refresh"
         />
-        <Button
-          size="sm"
-          variant="ghost"
-          :loading="refreshing"
-          icon-left="lucide-refresh-cw"
-          class="sm:hidden"
-          @click="refresh"
-          >Refresh</Button
-        >
         <Button size="sm" @click="openDialog()">
           <template #prefix><span class="size-4 lucide-plus" /></template>
           Add config

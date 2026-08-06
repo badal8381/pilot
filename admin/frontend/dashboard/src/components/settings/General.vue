@@ -1,17 +1,25 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else-if="openSection">
     <component :is="openSection.component" />
   </div>
   <div v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
-    <div class="divide-y divide-outline-alpha-gray-1">
-      <SettingsRow label="Allow developer mode" description="Enables per-site developer mode and code editor.">
+    <div class="-mx-2.5 divide-y divide-outline-alpha-gray-1">
+      <SettingsRow
+        label="Allow developer mode"
+        description="Enables per-site developer mode and code editor."
+        interactive
+        @click="!saving && toggleAllowDeveloperMode(!allowDeveloperMode)"
+      >
+        <!-- The Switch handles its own clicks; without stop the row would toggle
+             a second time and land back where it started. -->
         <Switch
           :model-value="allowDeveloperMode"
           :disabled="saving"
+          @click.stop
           @update:model-value="toggleAllowDeveloperMode"
         />
       </SettingsRow>
@@ -19,18 +27,13 @@
       <SettingsRow
         v-for="section in sections"
         :key="section.id"
+        as="button"
+        interactive
         :label="section.label"
         :description="section.description"
+        @click="openSection = section"
       >
-        <!-- Icon-only: `label` is not rendered but becomes the accessible name. A
-             plain aria-label attr would be overwritten by Button's own. -->
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="lucide-chevron-right"
-          :label="`${section.action || 'Manage'} ${section.label}`"
-          @click="openSection = section"
-        />
+        <span class="size-4 text-ink-gray-5 lucide-chevron-right" aria-hidden="true" />
       </SettingsRow>
 
       <Version />
@@ -40,7 +43,7 @@
 
 <script setup>
 import { onMounted, ref } from 'vue'
-import { Button, ErrorMessage, Switch, toast } from 'frappe-ui'
+import { ErrorMessage, Spinner, Switch, toast } from 'frappe-ui'
 import { settingsApi } from '@/api/settings'
 import { useSession } from '@/composables/auth/useSession'
 import SettingsRow from '@/components/settings/SettingsRow.vue'

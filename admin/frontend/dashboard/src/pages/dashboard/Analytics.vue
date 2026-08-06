@@ -1,19 +1,22 @@
 <template>
   <div class="mx-auto">
-    <!-- Header with time window selector -->
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-6">
-      <div>
-        <h1 class="font-semibold text-ink-gray-9 text-xl">Analytics</h1>
-        <p class="mt-1 text-ink-gray-5 text-sm sm:hidden">System and app metrics.</p>
-        <p class="mt-1 text-ink-gray-5 text-sm hidden sm:block">
-          System and application metrics for this bench.
-        </p>
-      </div>
-      <div class="flex items-center gap-2 w-full sm:w-auto">
-        <div class="w-[30%] sm:w-auto">
+    <!-- Teleports to the header bar on desktop; renders here below sm. -->
+    <Teleport defer to="#header-actions" :disabled="isMobile">
+      <!-- Sticky only in place: inside the pinned header it paints over the
+           header's own actions. -->
+      <StickyToolbar
+        :disabled="!isMobile"
+        class="flex items-center gap-2 mb-4 sm:mb-0 w-full sm:w-auto"
+      >
+        <div class="shrink-0">
           <Dropdown :options="windowOptions" placement="bottom-end">
             <template #default="{ open }">
-              <Button variant="outline" size="sm" :active="open" class="w-full sm:w-auto">
+              <Button
+                variant="outline"
+                :size="isMobile ? 'md' : 'sm'"
+                :active="open"
+                class="[&>.truncate]:text-left text-base"
+              >
                 <template #prefix>
                   <span
                     v-if="!isHistorical"
@@ -26,10 +29,15 @@
             </template>
           </Dropdown>
         </div>
-        <div class="w-[70%] sm:w-auto">
+        <div class="flex-1 sm:flex-none min-w-0">
           <Dropdown :options="scopeOptions" placement="bottom-end">
             <template #default="{ open }">
-              <Button variant="outline" size="sm" :active="open" class="w-full sm:w-auto max-w-[250px] overflow-hidden">
+              <Button
+                variant="outline"
+                :size="isMobile ? 'md' : 'sm'"
+                :active="open"
+                class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto sm:max-w-[250px] overflow-hidden"
+              >
                 <template #prefix v-if="view === 'site'"><span class="size-4 lucide-globe" /></template>
                 <template #suffix><span class="size-4 lucide-chevron-down" /></template>
                 <span class="truncate">{{ scopeLabel }}</span>
@@ -37,20 +45,19 @@
             </template>
           </Dropdown>
         </div>
-      </div>
-    </div>
+      </StickyToolbar>
+    </Teleport>
 
     <DatabaseInsights v-if="view === 'database'" :window="historyWindow" />
 
     <template v-else-if="view === 'site'">
       <SiteInsights v-if="activeSite" :site-name="activeSite" :window="historyWindow" />
-      <div
+      <EmptyState
         v-else-if="!sitesLoading"
-        class="flex flex-col justify-center items-center gap-2 h-[40vh] text-center"
-      >
-        <span class="size-10 text-ink-gray-3 lucide-globe" />
-        <p class="font-medium text-ink-gray-7 text-sm">No sites on this bench yet</p>
-      </div>
+        icon="lucide-globe"
+        title="No sites on this bench yet"
+        description="Create a site to start collecting metrics for it."
+      />
     </template>
 
     <!-- Loading state -->
@@ -68,47 +75,20 @@
         class="bg-surface-white mb-6 border rounded-lg border-outline-gray-2 overflow-hidden"
       >
         <div class="flex sm:flex-row flex-col divide-outline-gray-2 sm:divide-x">
-          <div class="flex-1 px-4 sm:px-5 py-3 sm:py-4">
-            <div class="mb-2 text-ink-gray-6 text-sm">CPU</div>
-            <div class="bg-surface-gray-2 mb-2 rounded-full h-1 overflow-hidden">
-              <div
-                class="bg-surface-gray-7 rounded-full h-full"
-                :style="{ width: Math.min(liveStats.cpu_percent, 100) + '%' }"
-              />
-            </div>
-            <div class="text-ink-gray-6 text-sm">
-              {{ liveStats.cpu_percent.toFixed(1) }}% of {{ liveStats.cpu_count }}
-              vCPUs
-            </div>
-          </div>
           <div
-            class="flex-1 px-4 sm:px-5 py-3 sm:py-4 border-t sm:border-t-0 border-outline-gray-2"
+            v-for="meter in liveMeters"
+            :key="meter.label"
+            class="flex-1 px-4 sm:px-5 py-3 sm:py-4 border-t first:border-t-0 sm:border-t-0 border-outline-gray-2"
           >
-            <div class="mb-2 text-ink-gray-6 text-sm">Memory</div>
-            <div class="bg-surface-gray-2 mb-2 rounded-full h-1 overflow-hidden">
+            <div class="flex justify-between items-baseline gap-2 mb-2">
+              <span class="text-ink-gray-6 text-sm">{{ meter.label }}</span>
+              <span class="text-ink-gray-6 text-sm shrink-0">{{ meter.value }}</span>
+            </div>
+            <div class="bg-surface-gray-2 rounded-full h-1 overflow-hidden">
               <div
                 class="bg-surface-gray-7 rounded-full h-full"
-                :style="{ width: Math.min(liveStats.memory_percent, 100) + '%' }"
+                :style="{ width: Math.min(meter.percent, 100) + '%' }"
               />
-            </div>
-            <div class="text-ink-gray-6 text-sm">
-              {{ formatBytes(liveStats.memory_used) }}
-              of {{ formatBytes(liveStats.memory_total) }}
-            </div>
-          </div>
-          <div
-            class="flex-1 px-4 sm:px-5 py-3 sm:py-4 border-t sm:border-t-0 border-outline-gray-2"
-          >
-            <div class="mb-2 text-ink-gray-6 text-sm">Storage</div>
-            <div class="bg-surface-gray-2 mb-2 rounded-full h-1 overflow-hidden">
-              <div
-                class="bg-surface-gray-7 rounded-full h-full"
-                :style="{ width: Math.min(liveStats.disk_percent, 100) + '%' }"
-              />
-            </div>
-            <div class="text-ink-gray-6 text-sm">
-              {{ formatBytes(liveStats.disk_used) }}
-              of {{ formatBytes(liveStats.disk_total) }}
             </div>
           </div>
         </div>
@@ -118,16 +98,12 @@
       <template v-if="isHistorical">
         <LoadingText v-if="historyLoading" />
         <ErrorMessage v-else-if="historyError" :message="historyError" />
-        <div
+        <EmptyState
           v-else-if="allEmpty"
-          class="flex flex-col justify-center items-center gap-2 h-[50vh] text-center"
-        >
-          <span class="size-10 text-ink-gray-3 lucide-chart-line" />
-          <p class="font-medium text-ink-gray-7 text-sm">No data for the last {{ windowLabel }}</p>
-          <p class="text-ink-gray-5 text-xs">
-            Monitoring hasn't collected metrics in this range yet.
-          </p>
-        </div>
+          icon="lucide-chart-line"
+          :title="`No data for the last ${windowLabel}`"
+          description="Monitoring hasn't collected metrics in this range yet."
+        />
       </template>
 
       <!-- Charts grid -->
@@ -135,7 +111,7 @@
         <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
           <AxisChart
             :config="chart.config"
-            class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 py-2"
+            class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
           />
         </ChartCard>
       </div>
@@ -156,13 +132,18 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Dropdown, LoadingText, ErrorMessage, AxisChart, Skeleton } from 'frappe-ui'
 import ChartCard from '@/components/common/ChartCard.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import WafAnalytics from '@/components/common/WafAnalytics.vue'
 import DatabaseInsights from '@/components/dashboard/DatabaseInsights.vue'
 import SiteInsights from '@/components/dashboard/SiteInsights.vue'
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 import { livePollDelayMs } from '@/utils/livePolling'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSites } from '@/composables/sites/useSites'
+
+const isMobile = useIsMobile()
 
 const WINDOWS = [
   { key: 'live', label: 'Live' },
@@ -301,7 +282,7 @@ const liveNow = ref(Date.now())
 const timeOffset = ref(0)
 
 // Historical mode state
-const system = ref({ earliest: null, points: [], memory_total_mb: null, storage: null })
+const system = ref({ earliest: null, points: [], memory_total_bytes: null, storage: null })
 const application = ref({ earliest: null, services: [], cpu: [], memory: [] })
 const historyLoading = ref(false)
 const historyError = ref('')
@@ -370,10 +351,10 @@ function appendLivePoint(s) {
     'Busy IOWait': cpu.iowait,
     'Busy IRQ': cpu.irq,
     'Busy Other': cpu.other,
-    Used: mem.used_mb,
-    'Cached + Buffers': mem.cached_mb,
-    Free: mem.free_mb,
-    'Swap Used': mem.swap_used_mb,
+    Used: mem.used_bytes,
+    'Cached + Buffers': mem.cached_bytes,
+    Free: mem.free_bytes,
+    'Swap Used': mem.swap_used_bytes,
     Load1: load1,
     Load5: load5,
     Load15: load15,
@@ -435,6 +416,28 @@ async function loadHistory(window) {
 // Derived state
 
 const liveStats = computed(() => (!isHistorical.value ? stats.value : null))
+
+const liveMeters = computed(() => {
+  const s = liveStats.value
+  if (!s) return []
+  return [
+    {
+      label: 'CPU',
+      percent: s.cpu_percent,
+      value: `${s.cpu_percent.toFixed(1)}% of ${s.cpu_count} vCPUs`,
+    },
+    {
+      label: 'Memory',
+      percent: s.memory_percent,
+      value: `${formatBytes(s.memory_used)} of ${formatBytes(s.memory_total)}`,
+    },
+    {
+      label: 'Storage',
+      percent: s.disk_percent,
+      value: `${formatBytes(s.disk_used)} of ${formatBytes(s.disk_total)}`,
+    },
+  ]
+})
 const systemEmpty = computed(
   () => isHistorical.value && !historyLoading.value && !system.value.points.length,
 )
@@ -554,7 +557,7 @@ const loadChartConfig = computed(() => ({
 }))
 
 const memChartConfig = computed(() => {
-  const data = scaleFields(currentPoints.value, MEMORY_SERIES, 1024)
+  const data = scaleFields(currentPoints.value, MEMORY_SERIES, 1024 ** 3)
   const peak = data.reduce(
     (max, p) =>
       Math.max(
@@ -582,7 +585,7 @@ const diskInfo = computed(() =>
   isHistorical.value
     ? system.value.storage?.disk
     : stats.value
-      ? { used_mb: stats.value.disk_used / 1024 ** 2, total_mb: stats.value.disk_total / 1024 ** 2 }
+      ? { used_bytes: stats.value.disk_used, total_bytes: stats.value.disk_total }
       : null,
 )
 
@@ -642,7 +645,11 @@ const appCpuConfig = computed(() => ({
 const appMemConfig = computed(() => ({
   title: 'Process Memory',
   config: {
-    data: normalizeAppData(appWindowData.value.memory, appWindowData.value.services),
+    data: scaleFields(
+      normalizeAppData(appWindowData.value.memory, appWindowData.value.services),
+      appWindowData.value.services,
+      1024 ** 2,
+    ),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, echartOptions: { name: 'MB', splitLine: GRID } },
     series: appWindowData.value.services.map((name, i) => lineSeries(name, PALETTE[i])),
@@ -687,8 +694,7 @@ onMounted(async () => {
   if (view.value === 'system') {
     if (isHistorical.value) loadHistory(activeWindow.value)
     else {
-      // Seed first: a bench with monitor history reaches a drawable chart in one
-      // shot and never enters the warm-up cadence.
+      // Seed first: monitor history reaches a drawable chart in one shot.
       await seedLiveHistory()
       await loadStats()
     }

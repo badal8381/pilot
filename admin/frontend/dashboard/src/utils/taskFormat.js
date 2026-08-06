@@ -3,13 +3,13 @@ export const STATUS_CONFIG = {
     label: 'Queued',
     theme: 'blue',
     icon: 'lucide-clock-3',
-    iconBg: 'bg-surface-blue-2 text-ink-blue-8',
+    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
   success: {
     label: 'Success',
     theme: 'green',
     icon: 'lucide-check',
-    iconBg: 'bg-surface-green-2 text-ink-green-8',
+    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
   failed: {
     label: 'Failed',
@@ -44,13 +44,6 @@ export function isTaskCancellable(task) {
   return Boolean(task?.is_cancellable)
 }
 
-export function taskActivityLabel(task) {
-  if (task.status === 'queued') {
-    return task.queue_position ? `Queued · #${task.queue_position} in queue` : 'Queued'
-  }
-  return relativeTime(task.started_at || task.queued_at)
-}
-
 const COMMAND_LABELS = {
   migrate: 'Migrate Site',
   'clear-cache': 'Clear Cache',
@@ -74,6 +67,70 @@ const COMMAND_LABELS = {
   'wizard-setup': 'Wizard Setup',
   'update-cli': 'Update CLI',
   'fetch-all-app-updates': 'Fetch App Updates',
+}
+
+// Ordered: the dropdown renders in this order.
+export const TASK_TYPES = [
+  {
+    value: 'sites',
+    label: 'Sites',
+    commands: [
+      'new-site',
+      'new-site-from-backup',
+      'drop-site',
+      'reinstall-site',
+      'revert-site',
+      'clear-cache',
+      'wizard-setup',
+    ],
+  },
+  {
+    value: 'apps',
+    label: 'Apps',
+    commands: [
+      'install-app',
+      'uninstall-app',
+      'get-app',
+      'remove-app',
+      'get-and-install-app',
+      'fetch-all-app-updates',
+      'switch-branch',
+      'revert-apps',
+    ],
+  },
+  {
+    value: 'backups',
+    label: 'Backups',
+    commands: ['backup-site', 'delete-backup', 'migration-backup'],
+  },
+  {
+    value: 'updates',
+    label: 'Updates',
+    commands: [
+      'update',
+      'migrate',
+      'retry-update',
+      'revert-migration',
+      'bypass-patch',
+      'build',
+      'update-cli',
+    ],
+  },
+  {
+    value: 'server',
+    label: 'Server',
+    commands: ['setup-nginx', 'setup-letsencrypt', 'restart-services'],
+  },
+  // Catch-all for commands this table has not learned.
+  { value: 'other', label: 'Other', commands: [] },
+]
+
+const COMMAND_TYPE = Object.fromEntries(
+  TASK_TYPES.flatMap(({ value, commands }) => commands.map((command) => [command, value])),
+)
+
+export function taskType(task) {
+  return COMMAND_TYPE[task.command] || 'other'
 }
 
 export function commandLabel(command) {
@@ -151,8 +208,15 @@ export function relativeTime(iso) {
   return `${Math.floor(hours / 24)} d ago`
 }
 
-export function fmtDuration(seconds) {
+/**
+ * The one duration format. `precise` keeps a decimal on sub-minute values for
+ * step timings, where the difference between 0.4s and 1.2s is worth reading -
+ * but anything over a minute still renders as "1m 30s", never "1.5m", so two
+ * durations on the same screen never disagree about what a minute looks like.
+ */
+export function fmtDuration(seconds, { precise = false } = {}) {
   if (seconds == null) return ''
+  if (precise && seconds < 60) return `${seconds.toFixed(1)}s`
   const total = Math.round(seconds)
   if (total < 60) return `${total}s`
   return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`

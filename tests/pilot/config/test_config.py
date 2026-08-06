@@ -225,17 +225,6 @@ def test_redis_version_defaults_to_none() -> None:
     assert config.redis.version is None
 
 
-def test_central_config_round_trips_through_typed_writer() -> None:
-    data = copy.deepcopy(MINIMAL_VALID_DATA)
-    data["central"] = {"endpoint": "https://central.test", "auth_token": "tok-123"}
-    config = load_from_dict(data)
-    toml = config.dumps()
-
-    assert "[central]" in toml
-    assert 'endpoint = "https://central.test"' in toml
-    assert 'auth_token = "tok-123"' in toml
-
-
 def test_postgres_defaults_when_section_absent() -> None:
     config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.postgres.host == "localhost"

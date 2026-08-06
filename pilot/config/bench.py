@@ -13,6 +13,7 @@ from pilot.config.admin import AdminConfig
 from pilot.config.app import AppConfig
 from pilot.config.central import CentralConfig
 from pilot.config.common import CommonConfig
+from pilot.config.datum import DatumConfig
 from pilot.config.firewall import FirewallConfig, FirewallRule
 from pilot.config.gunicorn import GunicornConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
@@ -122,6 +123,7 @@ class BenchConfig:
     letsencrypt: LetsEncryptConfig = field(default_factory=LetsEncryptConfig)
     admin: AdminConfig = field(default_factory=AdminConfig)
     central: CentralConfig = field(default_factory=CentralConfig)
+    datum: DatumConfig = field(default_factory=DatumConfig)
     firewall: FirewallConfig = field(default_factory=FirewallConfig)
     waf: WafConfig = field(default_factory=WafConfig)
     s3: S3Config = field(default_factory=S3Config)
@@ -205,6 +207,8 @@ class BenchConfig:
             mariadb=common.mariadb,
             postgres=common.postgres,
             letsencrypt=common.letsencrypt,
+            central=common.central,
+            datum=common.datum,
             **sections,
         )
         config.admin.jwks_url = common.jwks_url
@@ -421,13 +425,15 @@ class BenchConfig:
 
     def _write_common(self, bench_root: Path) -> None:
         """Persist this config's shared subset (mariadb/postgres/letsencrypt/
-        jwks) to common_config.toml, the single source every bench merges.
+        central/datum/jwks) to common_config.toml, the single source every bench merges.
         A no-op when nothing shared changed, so an unrelated bench.toml write
         never disturbs the file other benches are reading."""
         common = CommonConfig(
             mariadb=self.mariadb,
             postgres=self.postgres,
             letsencrypt=self.letsencrypt,
+            central=self.central,
+            datum=self.datum,
             jwks_url=self.admin.jwks_url,
             jwks_audience=self.admin.jwks_audience,
         )
@@ -534,15 +540,6 @@ class BenchConfig:
         }
         admin.update({key: value for key, value in optional_admin.items() if value})
         return admin
-
-    def _central_section(self) -> ConfigDict:
-        data: ConfigDict = {
-            "endpoint": self.central.endpoint,
-            "auth_token": self.central.auth_token,
-        }
-        if self.central.bootstrap_token:
-            data["bootstrap_token"] = self.central.bootstrap_token
-        return data
 
     def _firewall_section(self) -> ConfigDict:
         return {
@@ -719,13 +716,6 @@ _SECTIONS: tuple[_Section, ...] = (
         lambda config: config._admin_section(),
     ),
     _Section(
-        "central",
-        lambda data: CentralConfig.from_dict(data.get("central", {})),
-        lambda config: (
-            config._central_section() if (config.central.endpoint or config.central.auth_token) else None
-        ),
-    ),
-    _Section(
         "firewall",
         lambda data: FirewallConfig.from_dict(data.get("firewall")),
         lambda config: (
@@ -840,7 +830,6 @@ def _bench_schema() -> _Table:
             "production": _Table(keys=_keys(ProductionConfig) | _PRODUCTION_LEGACY),
             "gunicorn": _Table(keys=_keys(GunicornConfig)),
             "admin": _Table(keys=_keys(AdminConfig)),
-            "central": _Table(keys=_keys(CentralConfig)),
             "s3": _Table(keys=_keys(S3Config)),
             "llm": _Table(keys=_keys(LLMConfig)),
             "firewall": _Table(

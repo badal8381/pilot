@@ -13,7 +13,7 @@
         <div class="flex items-center gap-1.5">
           <span class="font-medium text-ink-gray-8 text-base truncate">{{ app.title }}</span>
           <span v-if="app.label" class="text-ink-gray-5 text-xs shrink-0">{{ app.label }}</span>
-          <Badge v-if="app.nightly" theme="orange" variant="subtle" label="Nightly" size="sm" />
+          <Badge v-if="app.nightly" theme="gray" variant="subtle" label="Nightly" size="sm" />
         </div>
         <div class="mt-0.5 text-ink-gray-5 text-p-sm truncate">
           {{ app.description }}

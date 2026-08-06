@@ -7,6 +7,8 @@ from unittest.mock import patch
 import pytest
 
 from pilot.config.bench import BenchConfig
+from pilot.config.central import CentralConfig
+from pilot.config.common import CommonConfig
 from pilot.integrations.central import CentralClientError, enroll_if_needed, seed, seed_from_metadata
 from tests.pilot.integrations.test_central_client import _bench, _FakeResponse
 
@@ -19,14 +21,12 @@ _ENROLL_RESULT = {
 
 
 def _seed(bench, *, endpoint="https://central.test", bootstrap_token="boot-xyz", auth_token=""):
-    config = BenchConfig.read_raw(bench.path)
-    central = config.setdefault("central", {})
-    central["endpoint"] = endpoint
-    if bootstrap_token:
-        central["bootstrap_token"] = bootstrap_token
-    if auth_token:
-        central["auth_token"] = auth_token
-    BenchConfig.write_raw(bench.path, config)
+    """Enrolment is host-shared, so the seed lands in common_config.toml."""
+    common = CommonConfig.read(bench.path.parent)
+    common.central = CentralConfig(
+        endpoint=endpoint, auth_token=auth_token, bootstrap_token=bootstrap_token
+    )
+    common.write(bench.path.parent)
     bench.config.central.endpoint = endpoint
     bench.config.central.bootstrap_token = bootstrap_token
     bench.config.central.auth_token = auth_token
@@ -53,9 +53,9 @@ def test_enroll_exchanges_seed_and_persists_credential_and_jwks(tmp_path: Path) 
     assert captured["body"] == {"bootstrap_token": "boot-xyz"}
     assert "X-Pilot-Token" not in captured["headers"]
 
-    saved = BenchConfig.read_raw(bench.path)
-    assert saved["central"]["auth_token"] == "pilot-token-abc"
-    assert "bootstrap_token" not in saved["central"]
+    saved = CommonConfig.read(bench.path.parent).central
+    assert saved.auth_token == "pilot-token-abc"
+    assert saved.bootstrap_token == ""
 
     # admin.jwks_* is host-shared (common_config.toml), not a bench.toml field.
     reloaded = BenchConfig.read(bench.path)

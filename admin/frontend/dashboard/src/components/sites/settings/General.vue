@@ -1,19 +1,18 @@
 <template>
   <div>
     <p class="font-semibold text-ink-gray-8 text-base">General</p>
-    <div class="mt-1 [&_[data-slot='label']]:text-sm [&_div:has([data-slot='description'])]:mt-0.5">
+    <div class="mt-1">
       <div
         v-for="s in visibleSettings"
         :key="s.key"
         class="py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
       >
-        <Switch
+        <SettingsSwitch
           :label="s.label"
           :description="s.description"
           :model-value="getValue(s)"
           :disabled="savingKey === s.key"
           @update:model-value="(v) => toggle(s, v)"
-          class="[&_label]:text-ink-gray-9"
         />
       </div>
     </div>
@@ -23,7 +22,8 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { ErrorMessage, Switch } from 'frappe-ui'
+import { ErrorMessage } from 'frappe-ui'
+import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
 import { useSite } from '@/composables/sites/useSite'
 import { sitesApi } from '@/api/sites'
 import { settingsApi } from '@/api/settings'

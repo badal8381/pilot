@@ -52,14 +52,14 @@ class ProcMetricsReader:
     def process_state(self, pid: int) -> str:
         return psutil.Process(pid).status()
 
-    def proc_memory_kb(self, pid: int) -> int:
+    def proc_memory_bytes(self, pid: int) -> int:
         """Proportional set size where the platform reports it, unique set size
         otherwise - both charge shared pages more honestly than RSS."""
         info = psutil.Process(pid).memory_full_info()
         shared_aware: int | None = getattr(info, "pss", None)
         if shared_aware is None:
             shared_aware = int(getattr(info, "uss", 0))
-        return shared_aware // 1024
+        return int(shared_aware)
 
     def io_bytes(self, pid: int) -> tuple[int, int]:
         process = psutil.Process(pid)
@@ -84,17 +84,17 @@ class ProcMetricsReader:
     def memory_usage(self) -> dict:
         memory = psutil.virtual_memory()
         swap = psutil.swap_memory()
-        total_mb = _to_mb(memory.total)
-        free_mb = _to_mb(memory.free)
-        cached_mb = _to_mb(getattr(memory, "cached", 0) + getattr(memory, "buffers", 0))
-        used_mb = round(max(total_mb - free_mb - cached_mb, 0), 2)
+        total_bytes = int(memory.total)
+        free_bytes = int(memory.free)
+        cached_bytes = int(getattr(memory, "cached", 0) + getattr(memory, "buffers", 0))
+        used_bytes = max(total_bytes - free_bytes - cached_bytes, 0)
         return {
-            "total_mb": total_mb,
-            "used_mb": used_mb,
-            "cached_mb": cached_mb,
-            "free_mb": free_mb,
-            "swap_used_mb": _to_mb(swap.used),
-            "percent": round(used_mb / total_mb * 100, 2) if total_mb else 0.0,
+            "total_bytes": total_bytes,
+            "used_bytes": used_bytes,
+            "cached_bytes": cached_bytes,
+            "free_bytes": free_bytes,
+            "swap_used_bytes": int(swap.used),
+            "percent": round(used_bytes / total_bytes * 100, 2) if total_bytes else 0.0,
         }
 
     def disk_usage(self, path: Path) -> dict:
@@ -106,15 +106,11 @@ class ProcMetricsReader:
         free_bytes = stats.f_bfree * stats.f_frsize
         used_bytes = total_bytes - free_bytes
         return {
-            "total_mb": _to_mb(total_bytes),
-            "used_mb": _to_mb(used_bytes),
-            "free_mb": _to_mb(free_bytes),
+            "total_bytes": total_bytes,
+            "used_bytes": used_bytes,
+            "free_bytes": free_bytes,
             "percent": round(used_bytes / total_bytes * 100, 2) if total_bytes else 0.0,
         }
 
     def storage_usage(self) -> dict:
         return {"disk": self.disk_usage(self.bench_path)}
-
-
-def _to_mb(value_bytes: float) -> float:
-    return round(value_bytes / 1024**2, 2)

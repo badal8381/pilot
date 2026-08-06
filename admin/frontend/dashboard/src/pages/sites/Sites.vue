@@ -1,16 +1,15 @@
 <template>
   <div class="mx-auto max-w-3xl">
-    <!-- Header -->
-    <div class="flex justify-between items-center">
-      <h1 class="font-medium text-ink-gray-8 text-base">
-        Your sites <span class="font-normal text-ink-gray-5">({{ filteredSites.length }})</span>
-      </h1>
-    </div>
-
     <!-- Bar -->
-    <div class="flex items-center gap-2 mt-4">
+    <StickyToolbar class="flex items-center gap-2">
       <!-- Search text bar -->
-      <FormControl v-model="search" type="text" placeholder="Search" class="flex-1">
+      <FormControl
+        v-model="search"
+        type="text"
+        placeholder="Search"
+        :size="isMobile ? 'md' : 'sm'"
+        class="flex-1"
+      >
         <template #prefix>
           <span class="size-4 text-ink-gray-5 lucide-search" />
         </template>
@@ -20,27 +19,39 @@
         v-model="statusFilter"
         type="select"
         :options="statusOptions"
+        :size="isMobile ? 'md' : 'sm'"
         class="max-w-24 sm:max-w-32"
       />
       <!-- List view type -->
-      <TabButtons v-model="view" :options="viewOptions" class="hidden sm:block" />
-    </div>
+      <TabButtons
+        v-model="view"
+        :options="viewOptions"
+        :size="isMobile ? 'md' : 'sm'"
+        class="hidden sm:block"
+      />
+    </StickyToolbar>
 
-    <div v-if="loading" class="flex justify-center mt-16">
-      <LoadingText />
+    <!-- Always the grid shape: `view` resets to 'grid' on every mount, and a
+         mount is the only time this is loading. -->
+    <div v-if="loading" class="gap-3 grid grid-cols-1 md:grid-cols-2 mt-1">
+      <SiteSkeleton v-for="index in 4" :key="index" :index="index - 1" />
     </div>
     <div v-else-if="error" class="mt-16">
       <ErrorMessage :message="error" />
     </div>
 
-    <div v-else-if="filteredSites.length" class="mt-4">
-      <!-- Grid view -->
-      <div v-if="view === 'grid'" class="gap-3 grid grid-cols-1 md:grid-cols-2">
+    <div v-else-if="filteredSites.length" class="mt-1">
+      <!-- A single result keeps the full width. -->
+      <div
+        v-if="view === 'grid'"
+        class="gap-3 grid grid-cols-1"
+        :class="filteredSites.length > 1 ? 'md:grid-cols-2' : ''"
+      >
         <!-- Site Card -->
         <div
           v-for="site in filteredSites"
           :key="site.name"
-          class="flex items-center gap-3 bg-surface-elevation-1 hover:bg-surface-gray-1 p-2 sm:p-4 border rounded-xl border-outline-gray-2 hover:border-outline-gray-3 transition-colors"
+          class="flex items-center gap-3 bg-surface-base p-2 sm:px-3 sm:py-2 border rounded-lg border-outline-gray-2 hover:border-outline-gray-3 transition-colors"
         >
           <RouterLink
             :to="{ name: 'SiteDetail', params: { name: site.name } }"
@@ -48,16 +59,16 @@
           >
             <!-- Icon -->
             <div
-              class="place-items-center grid bg-surface-elevation-1 rounded-lg size-10 text-ink-gray-6 shrink-0"
+              class="place-items-center grid bg-surface-gray-2 rounded size-8 text-ink-gray-6 shrink-0"
             >
-              <span class="size-5 lucide-globe"></span>
+              <span class="size-4 lucide-globe"></span>
             </div>
             <div class="flex-1 min-w-0">
               <!-- First Line -->
               <div class="gap-2 grid grid-cols-[3fr_1fr]">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <!-- Site Name -->
-                  <span class="font-semibold text-ink-gray-9 text-base truncate">
+                  <span class="font-medium text-ink-gray-9 text-base truncate">
                     {{ site.name }}
                   </span>
 
@@ -85,7 +96,7 @@
 
               <!-- Second Line -->
               <p class="text-ink-gray-5 text-p-sm">
-                {{ appsLabel(site) }}
+                {{ metaLabel(site) }}
               </p>
             </div>
           </RouterLink>
@@ -101,16 +112,10 @@
         :options="{ selectable: false, showTooltip: false }"
       >
         <template #cell="{ column, row, item }">
-          <div v-if="column.key === 'site'" class="flex items-center gap-3">
-            <!-- Icon -->
-            <div
-              class="place-items-center grid bg-surface-elevation-1 rounded-lg size-10 text-ink-gray-6 shrink-0"
-            >
-              <span class="size-5 lucide-globe" />
-            </div>
+          <div v-if="column.key === 'site'" class="flex items-center min-w-0">
             <RouterLink
               :to="{ name: 'SiteDetail', params: { name: row.site.name } }"
-              class="font-medium text-ink-gray-9 text-sm no-underline truncate"
+              class="font-medium text-ink-gray-9 text-base no-underline truncate"
             >
               {{ row.site.name }}
             </RouterLink>
@@ -123,7 +128,10 @@
               size="sm"
             />
           </div>
-          <div v-else-if="column.key === 'apps'" class="text-ink-gray-6 text-sm">
+          <div
+            v-else-if="column.key === 'storage' || column.key === 'apps'"
+            class="text-ink-gray-6 text-sm"
+          >
             {{ item }}
           </div>
           <div v-else-if="column.key === 'actions'" class="flex justify-end">
@@ -139,8 +147,17 @@
       </ListView>
     </div>
 
-    <!-- No s -->
-    <p v-else class="mt-16 text-ink-gray-5 text-sm text-center">No sites found.</p>
+    <EmptyState
+      v-else
+      class="mt-4"
+      icon="lucide-globe"
+      :title="isFiltered ? 'No matching sites' : 'No sites yet'"
+      :description="
+        isFiltered
+          ? 'No sites match your search or status filter.'
+          : 'Create a site to get started on this bench.'
+      "
+    />
   </div>
 
   <!-- New Site Button -->
@@ -161,7 +178,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watchEffect } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Badge,
@@ -170,23 +187,27 @@ import {
   ErrorMessage,
   FormControl,
   ListView,
-  LoadingText,
   TabButtons,
   toast,
 } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
 import NewSiteDialog from '@/components/sites/NewSiteDialog.vue'
+import SiteSkeleton from '@/components/sites/SiteSkeleton.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSites } from '@/composables/sites/useSites'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
+import { useSiteStorage } from '@/composables/sites/useSiteStorage'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 import { openSiteLogin } from '@/utils/siteLogin'
 
 const router = useRouter()
+const isMobile = useIsMobile()
 const { setBreadcrumbs } = useBreadcrumbs()
 const { sites, loading, error, load } = useSites()
-
-setBreadcrumbs([{ label: 'Sites', route: { name: 'Sites' } }])
+const { load: loadStorage, storageLabel } = useSiteStorage()
 
 const search = ref('')
 const statusFilter = ref('all')
@@ -198,7 +219,7 @@ const viewOptions = [
 ]
 
 const SITE_STATUS = {
-  online: { label: 'Active', theme: 'green' },
+  online: { label: 'Active', theme: 'gray' },
   broken: { label: 'Broken', theme: 'red' },
   offline: { label: 'Paused', theme: 'orange' },
   provisioning: { label: 'Creating', theme: 'blue' },
@@ -229,6 +250,14 @@ function appsLabel(site) {
   return count === 1 ? '1 app' : `${count} apps`
 }
 
+// Storage lands after the list, so a card shows its app count alone until then.
+function metaLabel(site) {
+  const used = storageLabel(site.name)
+  return used ? `${used} · ${appsLabel(site)}` : appsLabel(site)
+}
+
+const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
+
 const filteredSites = computed(() => {
   const query = search.value.toLowerCase().trim()
   return sites.value.filter((site) => {
@@ -238,9 +267,17 @@ const filteredSites = computed(() => {
   })
 })
 
+// After filteredSites: watchEffect runs immediately, so the computed must
+// exist first. Count is held back until the first load lands.
+watchEffect(() => {
+  const counted = !loading.value || sites.value.length
+  setBreadcrumbs([{ label: counted ? `Sites (${filteredSites.value.length})` : 'Sites' }])
+})
+
 const listColumns = [
   { label: 'Site', key: 'site', align: 'left', width: 3 },
   { label: 'Status', key: 'status', align: 'left', width: 1.5 },
+  { label: 'Storage', key: 'storage', align: 'left', width: 1.5 },
   { label: 'Apps', key: 'apps', align: 'left', width: 1.5 },
   { label: '', key: 'actions', align: 'right', width: '3rem' },
 ]
@@ -249,6 +286,7 @@ const listRows = computed(() =>
   filteredSites.value.map((site) => ({
     name: site.name,
     site,
+    storage: storageLabel(site.name),
     apps: appsLabel(site),
   })),
 )
@@ -280,6 +318,12 @@ function siteMenuOptions(site) {
     { label: 'Open site', icon: 'lucide-external-link', onClick: () => openSite(site) },
     { label: 'Back up now', icon: 'lucide-archive', onClick: () => backupNow(site) },
     {
+      label: 'View analytics',
+      icon: 'lucide-chart-line',
+      onClick: () =>
+        router.push({ name: 'Analytics', query: { view: 'site', site: site.name } }),
+    },
+    {
       label: 'View jobs',
       icon: 'lucide-list-checks',
       onClick: () => router.push({ name: 'Tasks', query: { site: site.name } }),
@@ -289,5 +333,8 @@ function siteMenuOptions(site) {
 
 const showCreate = ref(false)
 
-onMounted(load)
+onMounted(() => {
+  load()
+  loadStorage(true)
+})
 </script>
