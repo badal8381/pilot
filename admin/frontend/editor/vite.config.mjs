@@ -16,10 +16,12 @@ export default defineConfig({
     chunkSizeWarningLimit: 4000,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vue: ['vue', 'vue-router', 'pinia'],
-          monaco: ['monaco-editor'],
-          frappe: ['frappe-ui'],
+        codeSplitting: {
+          groups: [
+            { name: 'monaco', test: /node_modules[\\/]monaco-editor[\\/]/ },
+            { name: 'frappe', test: /node_modules[\\/]frappe-ui[\\/]/ },
+            { name: 'vue', test: /node_modules[\\/](vue|vue-router|pinia)[\\/]/ },
+          ],
         },
       },
     },
