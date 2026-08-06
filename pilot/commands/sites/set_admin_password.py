@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import getpass
 from dataclasses import dataclass
 from typing import Annotated, ClassVar
 
@@ -18,7 +17,7 @@ class SetAdminPasswordCommand(Command):
     def run(self) -> None:
         from pilot.config import BenchConfig
 
-        password = self.password or self._prompt()
+        password = self.resolve_password(self.password)
         if not password:
             raise BenchError("Password must not be empty.")
 
@@ -26,9 +25,3 @@ class SetAdminPasswordCommand(Command):
             data.setdefault("admin", {})["password"] = password
         self.bench.config.admin.password = password
         self.report("Admin password updated.")
-
-    def _prompt(self) -> str:
-        password = getpass.getpass("New admin password: ")
-        if password != getpass.getpass("Confirm admin password: "):
-            raise BenchError("Passwords do not match.")
-        return password

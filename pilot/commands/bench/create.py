@@ -27,6 +27,10 @@ class NewCommand(Command):
         Literal["mariadb", "postgres", "sqlite"],
         Arg(help="Database engine for this bench's sites (default: mariadb)."),
     ] = "mariadb"
+    admin_password: Annotated[
+        str | None,
+        Arg(help="Admin panel password. Prompted for on a terminal, else generated."),
+    ] = None
 
     def __post_init__(self) -> None:
         if self.target_directory is not None:
@@ -45,5 +49,6 @@ class NewCommand(Command):
             admin_domain=self.admin_domain,
             admin_tls=self.admin_tls,
             db_type=self.database,
+            admin_password=self.resolve_password(self.admin_password),
             on_progress=self.report,
         )

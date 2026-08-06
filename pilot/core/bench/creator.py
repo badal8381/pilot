@@ -25,6 +25,7 @@ class BenchCreator:
         admin_domain: str = "",
         admin_tls: bool | None = None,
         db_type: str = "mariadb",
+        admin_password: str = "",
     ) -> None:
         self.target_directory = target_directory
         self.name = name
@@ -32,6 +33,7 @@ class BenchCreator:
         self.admin_domain = admin_domain
         self.admin_tls = admin_tls
         self.db_type = db_type
+        self.admin_password = admin_password
 
     def run(self, on_progress: Callable[[str], None] = lambda message: None) -> "Bench":
         from pilot.config import BenchConfig
@@ -57,6 +59,9 @@ class BenchCreator:
 
         admin_port = BenchConfig.default_ports()["admin.port"] + offset
         on_progress(f"\nBench '{self.name}' created at {self.target_directory}")
+        if not self.admin_password:
+            on_progress(f"\nGenerated admin password: {settings['admin_password']}")
+            on_progress("  Change it any time with 'pilot set-admin-password'.")
         on_progress("\nNext step:")
         on_progress("  pilot start")
         on_progress(f"  Then open http://localhost:{admin_port} - the setup wizard takes it from there.")
@@ -64,8 +69,13 @@ class BenchCreator:
         return Bench(self.target_directory)
 
     def _initial_settings(self) -> dict:
+        import secrets
+
         settings = {
             "admin_enabled": True,
+            # The Admin needs a password from the start: the setup wizard authenticates
+            # like every other page, so there is no unprotected window to set one in.
+            "admin_password": self.admin_password or secrets.token_urlsafe(12),
             "admin_domain": self.admin_domain,
             # admin.tls is a per-bench choice, not inherited from siblings.
             "admin_tls": bool(self.admin_tls),
