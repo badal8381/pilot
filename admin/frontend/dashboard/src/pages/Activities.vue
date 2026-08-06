@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
-import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Select, Skeleton } from 'frappe-ui'
+import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Skeleton } from 'frappe-ui'
 import { useActivities } from '@/composables/activities/useActivities'
 import { useSites } from '@/composables/sites/useSites'
 import { commandLabel, relativeTime } from '@/utils/taskFormat'
@@ -143,8 +143,8 @@ const { activities, loading, loadingMore, error, hasMore, load, loadMore } = use
 const { sites, load: loadSites } = useSites()
 
 const siteOptions = computed(() => [
-  { label: 'All sites', value: '', icon: 'lucide-globe' },
-  ...sites.value.map((site) => ({ label: site.name, value: site.name, icon: 'lucide-globe' })),
+  { label: 'All sites', value: '' },
+  ...sites.value.map((site) => ({ label: site.name, value: site.name })),
 ])
 
 const activityTable = computed(() => ({
@@ -205,7 +205,12 @@ onMounted(() => {
     </div>
 
     <div class="flex flex-wrap items-center gap-3 shrink-0 mt-4">
-      <Select v-model="typeFilter" :options="activityTypeOptions" @update:modelValue="reload" />
+      <Combobox
+        v-model="typeFilter"
+        class="w-48"
+        :options="activityTypeOptions"
+        @update:modelValue="reload"
+      />
       <Combobox
         v-if="!siteName"
         v-model="siteFilterModel"
