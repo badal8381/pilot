@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 
 from pilot.exceptions import CommandError, RegistryUnavailableError
+from pilot.internal.git import GitRepo
 from pilot.managers.cron import CronManager
 from pilot.utils import run_command
 
@@ -137,6 +138,7 @@ class RegistryCache:
             )
             if remote_head == local_head:
                 return
+            GitRepo(self.path).prune_stale_temp_packs()
             run_command(["git", "-C", str(self.path), "fetch", "--depth", "1", "origin", "HEAD"])
             run_command(["git", "-C", str(self.path), "reset", "--hard", "FETCH_HEAD"])
         except CommandError:

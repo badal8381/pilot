@@ -204,6 +204,7 @@ class AppRepository:
             return
 
         self._sync_remote_url()
+        self.repo.prune_stale_temp_packs()
         cmd = [
             "git",
             "-c",
@@ -246,6 +247,7 @@ class AppRepository:
     def checkout_pinned_target(self, pin: RevisionPin) -> None:
         if pin.kind == "tag":
             self._sync_remote_url()
+            self.repo.prune_stale_temp_packs()
             run_command(["git", "-C", str(self.app.path), "fetch", *self.depth_flags, "origin", pin.ref])
             self._checkout_pinned_ref("FETCH_HEAD")
         else:
@@ -254,6 +256,7 @@ class AppRepository:
     def checkout_pinned_commit(self, sha: str) -> None:
         """Check out a specific commit SHA, staying on the app's configured branch."""
         self._sync_remote_url()
+        self.repo.prune_stale_temp_packs()
         try:
             run_command(["git", "-C", str(self.app.path), "fetch", *self.depth_flags, "origin", sha])
             self._checkout_pinned_ref("FETCH_HEAD")
