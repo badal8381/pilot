@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,10 @@ from pilot.tasks.uninstall_app import UninstallAppTask
 
 if TYPE_CHECKING:
     from pilot.core.app import App
+
+# frappe's CLI prints a traceback, so its reason arrives behind the exception class.
+_EXCEPTION_PREFIX = re.compile(r"^[\w.]+(?:Error|Exception): ")
+_COMMAND_FAILURE = re.compile(r"^Command '.+' (?:failed with exit code -?\d+|timed out)")
 
 
 @sites_bp.get("/<name>/apps")
@@ -120,7 +125,7 @@ def install_site_app(name: str):
     except BenchError as error:
         # Frappe refuses to enable an app whose dependency is still disabled - that is
         # the user's problem to fix, not a failure to start work.
-        return error_response("cannot_enable", _frappe_reason(error), 422)
+        return error_response("cannot_enable", _frappe_reason(error, "Could not enable the app."), 422)
     except Exception as error:
         return task_failure(error)
 
@@ -147,9 +152,12 @@ def _requested_install():
     return (app, repo, branch), None
 
 
-def _frappe_reason(error: Exception) -> str:
-    """The last line of a failed frappe command is its reason; the rest is plumbing."""
-    return str(error).strip().rsplit("\n", 1)[-1].strip() or "Could not enable the app."
+def _frappe_reason(error: Exception, fallback: str) -> str:
+    """The last line of a failed frappe command is its reason; the rest is plumbing.
+    A command that printed nothing leaves only the wrapper line, which names the bench
+    Python - the fallback says the same thing without the path."""
+    reason = _EXCEPTION_PREFIX.sub("", str(error).strip().rsplit("\n", 1)[-1].strip())
+    return fallback if not reason or _COMMAND_FAILURE.match(reason) else reason
 
 
 def _enable_disabled_app(bench: Bench, site: str, cloned: "App | None") -> str | None:
@@ -312,7 +320,7 @@ def delete_site_app(name: str, app: str):
         try:
             bench.site(name).disable_app(bench.app(app))
         except BenchError as error:
-            return error_response("cannot_disable", _frappe_reason(error), 422)
+            return error_response("cannot_disable", _frappe_reason(error, "Could not disable the app."), 422)
         except Exception as error:
             return task_failure(error)
         return jsonify({"app": app, "disabled": True})
