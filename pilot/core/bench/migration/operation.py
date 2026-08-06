@@ -15,7 +15,7 @@ from pilot.core.bench.migration.state import (
     get_state,
     validate_transition,
 )
-from pilot.exceptions import BenchError, MigrateError
+from pilot.exceptions import AppValidationError, BenchError, MigrateError
 
 if TYPE_CHECKING:
     from pilot.core.bench import Bench
@@ -215,6 +215,10 @@ class MigrationOperation:
                 "output_excerpt": getattr(error, "output", "") or "",
             }
             self._enter_needs_attention("updating", None)
+            if isinstance(error, AppValidationError):
+                # Validation runs before anything is installed and before any
+                # site is migrated, so going back is a checkout. No user call needed.
+                self._transition("reverting_apps")
             raise
         self.apps_updated = True
         self._transition("migrating")
