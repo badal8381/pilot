@@ -31,6 +31,17 @@ Use `Server().bench("name")`, `Bench("name")`, or `Bench(path)` to load an exist
 
 Commands and API handlers must not duplicate Frappe, systemd, nginx, database, or filesystem orchestration. Put that behavior on the closest core object.
 
+## Trust Model
+
+Pilot manages benches for one host user. Every bench under a benches directory runs as that user, shares its sudo grants, and can read the neighbouring bench directories. Benches are a unit of workload, not a security boundary.
+
+Assume from this:
+
+- Admin access to one bench is equivalent to shell access as the host user, and to the same access over every other bench in that directory.
+- Two workloads that must not reach each other belong on separate hosts, or under separate host users with their own benches directory.
+- The host user holds passwordless sudo for a fixed set of nginx and certbot commands (installed by `install.sh`) so production deploys and cert renewals need no prompt. These grants, and the bench-writable nginx config that root parses, mean the host user is effectively root-equivalent on the box; treat one bench's compromise as reaching the whole host, not just its own benches.
+- Whoever reaches the Admin port before setup finishes owns the bench, so serve the setup wizard only where you accept that.
+
 ## Configuration
 
 Each bench has `bench.toml`. It is read and written through the config model and the TOML store, not by ad hoc string edits.
