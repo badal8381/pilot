@@ -63,6 +63,12 @@ def decode_session_token(token: str, bench, ip: str = "unknown") -> dict | None:
     return Session(bench).verify_token(token, ip)
 
 
+def is_bench_scoped() -> bool:
+    """Whether this request holds a bench session rather than a single site's token."""
+    claims = getattr(g, "jwt_claims", None) or {}
+    return claims.get("scope") == "bench"
+
+
 def current_site_scope() -> str | None:
     claims = getattr(g, "jwt_claims", None)
     return claims.get("site") if claims else None

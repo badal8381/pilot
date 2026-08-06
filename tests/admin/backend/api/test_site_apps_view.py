@@ -28,6 +28,20 @@ def _client(bench_root: Path, password: str = "secret"):
     return client
 
 
+def _site_client(bench_root: Path, site: str):
+    """A client holding only that site's token, as a managed site does."""
+    from admin.backend.app import create_app
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
+
+    _write_bench_toml(bench_root, bench_root.name, admin_enabled=True, admin_password="secret")
+    app = create_app(bench_root)
+    app.config["TESTING"] = True
+    client = app.test_client()
+    client.set_cookie("sid", Session(Bench(bench_root)).issue_site_token(site))
+    return client
+
+
 def _make_site(bench_root: Path, name: str, installed_apps: list[str]) -> None:
     site_dir = bench_root / "sites" / name
     site_dir.mkdir(parents=True)
@@ -332,6 +346,32 @@ def test_install_app_treats_bare_name_as_marketplace_when_not_cloned(tmp_path: P
     assert response.status_code == 202
     assert body["command"] == "get-and-install-app"
     assert body["args"]["marketplace_app"] == "suite"
+
+
+def test_install_app_from_a_repo_needs_a_bench_session(tmp_path: Path) -> None:
+    """A clone lands in the bench every site shares, so one site's token must not
+    choose the code it runs."""
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site1.localhost", [])
+    client = _site_client(bench_root, "site1.localhost")
+
+    response = _post_install(
+        client, "site1.localhost", app="suite", repo="https://github.com/attacker/suite"
+    )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"]["code"] == "bench_scope_required"
+
+
+def test_install_app_by_name_still_works_for_a_site_session(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site1.localhost", [])
+    _make_cloned_app(bench_root, "suite")
+    client = _site_client(bench_root, "site1.localhost")
+
+    response = _post_install(client, "site1.localhost", app="suite")
+
+    assert response.status_code == 202
 
 
 def test_install_app_requires_app_or_repo(tmp_path: Path) -> None:
