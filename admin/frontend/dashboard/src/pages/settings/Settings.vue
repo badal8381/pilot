@@ -54,6 +54,18 @@ const themeOptions = computed(() => [
         <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
       </Button>
 
+      <Button
+        variant="ghost"
+        class="w-full !h-auto !justify-between !px-3 !py-2.5"
+        @click="router.push({ name: 'Activity' })"
+      >
+        <span class="flex items-center gap-3">
+          <span class="size-4 text-ink-gray-6 lucide-history" />
+          Activity
+        </span>
+        <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
+      </Button>
+
       <div class="flex items-center justify-between gap-3 px-3 py-2.5">
         <span class="flex items-center gap-3 text-ink-gray-8">
           <span class="size-4 text-ink-gray-6 lucide-sun-moon" />

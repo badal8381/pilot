@@ -29,6 +29,11 @@ export function useAppMenu() {
       icon: 'lucide-settings',
       onClick: () => router.push({ name: 'Settings' }),
     },
+    {
+      label: 'Activity',
+      icon: 'lucide-history',
+      onClick: () => router.push({ name: 'Activity' }),
+    },
 
     // Managing other benches is gated server-wide by admin.allow_bench_management.
     ...(session.allowBenchManagement
