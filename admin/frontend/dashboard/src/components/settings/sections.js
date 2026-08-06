@@ -7,6 +7,7 @@ import Waf from '@/components/settings/Waf.vue'
 import SshKeys from '@/components/settings/SshKeys.vue'
 import ChangeAdminPassword from '@/components/settings/ChangeAdminPassword.vue'
 import TwoFactor from '@/components/settings/TwoFactor.vue'
+import DatabaseQuickActions from '@/components/settings/DatabaseQuickActions.vue'
 
 // Single source of truth for id/label/component so SettingsDialog can resolve
 // a routed subsection id without each page owning its own private mapping.
@@ -34,6 +35,14 @@ export const GENERAL_SECTIONS = [
     label: 'Background workers',
     description: 'Configure background worker groups and queues.',
     component: Workers,
+  },
+]
+
+export const DATABASE_SECTIONS = [
+  {
+    id: 'quick-actions',
+    label: 'Quick actions',
+    component: DatabaseQuickActions,
   },
 ]
 
