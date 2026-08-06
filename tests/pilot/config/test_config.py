@@ -196,6 +196,15 @@ def test_rule_8_redis_ports_must_be_distinct() -> None:
     assert "redis.cache_port" in str(exc_info.value) or "redis.queue_port" in str(exc_info.value)
 
 
+def test_worker_queue_names_cannot_carry_a_service_directive() -> None:
+    """Queue names are rendered into a systemd ExecStart and a supervisor stanza."""
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    data["workers"] = [{"queues": ["default\nExecStart=/tmp/pwn.sh"], "count": 1}]
+    with pytest.raises(ConfigError) as exc_info:
+        load_from_dict(data)
+    assert "workers[0].queues" in str(exc_info.value)
+
+
 def test_rule_9_worker_counts_must_be_positive() -> None:
     data = copy.deepcopy(MINIMAL_VALID_DATA)
     data["workers"] = [{"queues": ["default"], "count": 0}]
