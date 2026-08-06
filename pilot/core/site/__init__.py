@@ -195,13 +195,14 @@ class Site:
         SiteApps(self).remove_app_if_not_on_any_site(app_name, on_progress)
 
     def drop(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
+        from pilot.core.site.commands import SiteCommands
         from pilot.managers.nginx import NginxManager
 
         provider_domains = self._provider_domains()
         cmd = [*self.bench.frappe_call, "frappe", "drop-site", "--force", self.config.name]
-        cmd += self.bench.db_root_args
         on_progress(f"Dropping site '{self.config.name}'...")
-        run_command(cmd, cwd=self.bench.sites_path, stream_output=True)
+        with SiteCommands(self).setup_credentials(self.bench.config.db_type) as credentials:
+            run_command(cmd + credentials, cwd=self.bench.sites_path, stream_output=True)
         self._remove_from_bench_toml()
         self._release_domains(provider_domains)
         on_progress(f"\nSite '{self.config.name}' dropped.")

@@ -114,6 +114,10 @@ Nginx has no per-bench `bench.toml` section - `config.nginx` always holds its co
 
 Unknown fields are ignored by normal loads for compatibility. Strict validation can report unknown config paths.
 
+## Database Credentials
+
+`mariadb.root_password` and `postgres.root_password` never reach a command line. Pilot's own client calls pass them through `MYSQL_PWD`/`PGPASSWORD`, and the frappe commands that set a site up (`new-site`, `restore`, `reinstall`, `drop-site`) get a throwaway MariaDB account instead: `MariaDBManager.temporary_setup_user` grants it `RELOAD`, `CREATE USER`, and full rights on that one site database, then drops it when the command returns. Pilot therefore names the site database itself (`_<16 hex>`) rather than letting frappe pick a random one. Postgres still passes the superuser credential, because frappe's Postgres setup needs privileges a scoped role cannot hold.
+
 ## Fetched Endpoints
 
 `admin.jwks_url`, `central.endpoint`, `datum.endpoint`, and `llm.api_base` are URLs this bench requests itself, so `BenchConfig.validate` sends each through `validate_external_url`: the scheme must be `http` or `https`, credentials must not be embedded, and the host must not be link-local or a cloud metadata name. Loopback and private addresses stay allowed - a self-hosted model or a local JWKS issuer is a normal setup. Validation reads the literal host only; a domain that resolves to a blocked address is not caught.

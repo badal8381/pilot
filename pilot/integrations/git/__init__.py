@@ -32,8 +32,8 @@ __all__ = [
     "provider_for_name",
     "provider_for_repo",
     "repo_host",
-    "without_credentials",
     "resolve_app_name_from_repo",
+    "without_credentials",
 ]
 
 PROVIDERS: dict[str, type[GitProvider]] = {

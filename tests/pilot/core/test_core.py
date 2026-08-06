@@ -871,6 +871,24 @@ def test_honcho_start_writes_per_process_pid_files(tmp_path: Path) -> None:
         assert pid_file.read_text().strip() == "12345"
 
 
+def _capture_admin_sql(monkeypatch) -> list[str]:
+    """Record the SQL the temporary setup account is created and dropped with."""
+    statements: list[str] = []
+    monkeypatch.setattr(
+        "pilot.managers.database.mariadb.MariaDBManager.run_admin_sql",
+        lambda self, sql: statements.append(sql),
+    )
+    return statements
+
+
+def _write_site_config(bench, site: str, db_name: str) -> None:
+    import json
+
+    site_dir = bench.sites_path / site
+    site_dir.mkdir(parents=True, exist_ok=True)
+    (site_dir / "site_config.json").write_text(json.dumps({"db_name": db_name}))
+
+
 def _capture_site_cmd(monkeypatch) -> dict:
     import subprocess
 
@@ -908,8 +926,11 @@ def test_site_create_postgres_builds_db_args(tmp_path: Path, monkeypatch: pytest
 
 
 def test_site_create_mariadb_when_bench_is_mariadb(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    bench = make_bench(tmp_path)  # bench db_type defaults to mariadb
+    """frappe reads its database credential from argv, where any local process can see
+    it, so it gets a throwaway account scoped to this site's database - never root."""
+    bench = make_bench(tmp_path)  # mariadb bench, root_password="root"
     captured = _capture_site_cmd(monkeypatch)
+    statements = _capture_admin_sql(monkeypatch)
     monkeypatch.setattr("pilot.managers.database.mariadb.MariaDBManager._detect_socket", lambda self: "")
 
     Site(SiteConfig(name="mdb.localhost", apps=["frappe"], admin_password="secret"), bench).create()
@@ -917,8 +938,13 @@ def test_site_create_mariadb_when_bench_is_mariadb(tmp_path: Path, monkeypatch: 
     cmd = captured["cmd"]
     # mariadb is frappe's default engine - no --db-type flag is passed
     assert "--db-type" not in cmd
-    assert cmd[cmd.index("--db-root-username") + 1] == "root"
     assert "--db-host" in cmd
+    database = cmd[cmd.index("--db-name") + 1]
+    user = cmd[cmd.index("--db-root-username") + 1]
+    assert user.startswith("pilot_setup_")
+    assert "root" not in (user, cmd[cmd.index("--db-root-password") + 1])
+    assert f"GRANT ALL PRIVILEGES ON `{database}`.*" in statements[0]
+    assert f"DROP USER IF EXISTS '{user}'@'%'" in statements[-1]
 
 
 def test_site_restore_uses_postgres_root_creds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -934,9 +960,13 @@ def test_site_restore_uses_postgres_root_creds(tmp_path: Path, monkeypatch: pyte
     assert cmd[cmd.index("--db-root-password") + 1] == "pgpw"
 
 
-def test_site_restore_uses_mariadb_root_creds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_site_restore_scopes_its_account_to_the_site_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     bench = make_bench(tmp_path)  # mariadb bench, root_password="root"
+    _write_site_config(bench, "m.localhost", "_restoredb")
     captured = _capture_site_cmd(monkeypatch)
+    statements = _capture_admin_sql(monkeypatch)
 
     Site(SiteConfig(name="m.localhost", apps=[]), bench).restore(
         "/tmp/db.sql.gz", public_files="/tmp/pub.tar", private_files="/tmp/priv.tar"
@@ -944,7 +974,8 @@ def test_site_restore_uses_mariadb_root_creds(tmp_path: Path, monkeypatch: pytes
 
     cmd = captured["cmd"]
     assert "--db-type" not in cmd
-    assert cmd[cmd.index("--db-root-username") + 1] == "root"
+    assert cmd[cmd.index("--db-root-username") + 1].startswith("pilot_setup_")
+    assert "GRANT ALL PRIVILEGES ON `_restoredb`.*" in statements[0]
     assert cmd[cmd.index("--with-public-files") + 1] == "/tmp/pub.tar"
     assert cmd[cmd.index("--with-private-files") + 1] == "/tmp/priv.tar"
 
@@ -962,14 +993,18 @@ def test_site_reinstall_postgres_root_creds(tmp_path: Path, monkeypatch: pytest.
     assert cmd[cmd.index("--db-root-password") + 1] == "pgpw"
 
 
-def test_site_reinstall_mariadb_root_creds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_site_reinstall_refuses_root_on_argv_without_a_site_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With no resolvable site database there is nothing to scope an account to; rather
+    than fall back to the root password on argv, the command fails loudly."""
+    from pilot.exceptions import BenchError
+
     bench = make_bench(tmp_path)
-    captured = _capture_site_cmd(monkeypatch)
+    _capture_site_cmd(monkeypatch)
 
-    Site(SiteConfig(name="m.localhost", apps=[]), bench).reinstall("secret")
-
-    cmd = captured["cmd"]
-    assert cmd[cmd.index("--db-root-username") + 1] == "root"
+    with pytest.raises(BenchError, match="root database password"):
+        Site(SiteConfig(name="m.localhost", apps=[]), bench).reinstall("secret")
 
 
 def test_site_create_and_reinstall_reject_empty_admin_password(tmp_path: Path) -> None:

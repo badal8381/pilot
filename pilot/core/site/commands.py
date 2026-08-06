@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import secrets
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 from pilot.exceptions import BenchError, MigrateError
@@ -19,6 +22,7 @@ class SiteCommands:
             or not self.site.config.admin_password.strip()
         ):
             raise BenchError("Site Administrator password must not be empty.")
+        engine = db_type or self.site.bench.config.db_type
         cmd = self.site._frappe_call(
             "frappe",
             "--site",
@@ -27,8 +31,14 @@ class SiteCommands:
             self.site.config.name,
         )
         cmd += ["--admin-password", self.site.config.admin_password]
-        cmd += self.db_args(db_type or self.site.bench.config.db_type)
-        run_command(cmd, cwd=self.site.bench.sites_path, stream_output=True)
+        cmd += self.db_args(engine)
+        # frappe would name the database itself, at random; pilot names it so the setup
+        # account can be granted that database and nothing else.
+        database = f"_{secrets.token_hex(8)}" if engine == "mariadb" else ""
+        if database:
+            cmd += ["--db-name", database]
+        with self.setup_credentials(engine, database) as credentials:
+            run_command(cmd + credentials, cwd=self.site.bench.sites_path, stream_output=True)
 
     def restore(
         self,
@@ -41,8 +51,8 @@ class SiteCommands:
             cmd += ["--with-public-files", public_files]
         if private_files:
             cmd += ["--with-private-files", private_files]
-        cmd += self.site.bench.db_root_args
-        run_command(cmd, cwd=self.site.bench.sites_path, stream_output=True)
+        with self.setup_credentials(self.site.bench.config.db_type) as credentials:
+            run_command(cmd + credentials, cwd=self.site.bench.sites_path, stream_output=True)
 
     def reinstall(self, admin_password: str) -> None:
         if not isinstance(admin_password, str) or not admin_password.strip():
@@ -56,8 +66,8 @@ class SiteCommands:
             "--admin-password",
             admin_password,
         )
-        cmd += self.site.bench.db_root_args
-        run_command(cmd, cwd=self.site.bench.sites_path, stream_output=True)
+        with self.setup_credentials(self.site.bench.config.db_type) as credentials:
+            run_command(cmd + credentials, cwd=self.site.bench.sites_path, stream_output=True)
 
     def migrate(self, skip_failing: bool) -> str:
         """Run migration, streaming output live and returning the full captured output."""
@@ -79,7 +89,36 @@ class SiteCommands:
         if result.returncode != 0:
             raise BenchError(f"Failed to clear cache for {self.site.config.name}")
 
+    @contextmanager
+    def setup_credentials(self, db_type: str, database: str = "") -> Iterator[list[str]]:
+        """Database credential arguments for one frappe setup command.
+
+        MariaDB gets a throwaway account scoped to that site's database, dropped as soon
+        as the command returns: frappe reads the credential from argv, where every local
+        process can see it, and the admin password is far too valuable for that.
+        """
+        if db_type != "mariadb":
+            yield self.site.bench.db_root_args
+            return
+        from pilot.core.database import site_database_name
+        from pilot.managers.database import MariaDBManager
+
+        if not database:
+            try:
+                database = site_database_name(self.site.bench.path, self.site.config.name)
+            except FileNotFoundError:
+                database = ""
+        if not database:
+            raise BenchError(
+                f"Cannot determine the database for site '{self.site.config.name}'; refusing to "
+                "run frappe with the root database password on the command line."
+            )
+        manager = MariaDBManager(self.site.bench.config.mariadb)
+        with manager.temporary_setup_user(database) as (user, password):
+            yield ["--db-root-username", user, "--db-root-password", password]
+
     def db_args(self, db_type: str) -> list[str]:
+        """How to reach the server. Credentials come from setup_credentials."""
         if db_type == "postgres":
             return self.postgres_db_args()
         if db_type == "sqlite":
@@ -92,15 +131,9 @@ class SiteCommands:
 
     def mariadb_db_args(self, socket_path: str) -> list[str]:
         mariadb = self.site.bench.config.mariadb
-        args = ["--db-root-username", mariadb.admin_user]
         if socket_path:
-            args += ["--db-socket", socket_path]
-            args += ["--db-root-password", mariadb.root_password or "socket_auth"]
-        else:
-            args += ["--db-host", mariadb.host, "--db-port", str(mariadb.port)]
-            if mariadb.root_password:
-                args += ["--db-root-password", mariadb.root_password]
-        return args
+            return ["--db-socket", socket_path]
+        return ["--db-host", mariadb.host, "--db-port", str(mariadb.port)]
 
     def postgres_db_args(self) -> list[str]:
         postgres = self.site.bench.config.postgres
@@ -111,8 +144,4 @@ class SiteCommands:
             postgres.host,
             "--db-port",
             str(postgres.port),
-            "--db-root-username",
-            postgres.admin_user,
-            "--db-root-password",
-            self.site.bench.postgres_root_password,
         ]
