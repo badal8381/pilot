@@ -202,7 +202,7 @@ watch(
 const isMobile = useIsMobile()
 
 function openSite() {
-  window.open(`https://${site.value.name}`, '_blank')
+  window.open(`https://${site.value.name}/desk`, '_blank')
 }
 
 const settingUpSite = ref(false)

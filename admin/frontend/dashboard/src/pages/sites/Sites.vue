@@ -246,7 +246,7 @@ const statusLabel = (site) => SITE_STATUS[siteStatus(site)].label
 const statusTheme = (site) => SITE_STATUS[siteStatus(site)].theme
 
 function appsLabel(site) {
-  const count = site.installed_apps?.length || 0
+  const count = site.active_apps?.length || 0
   return count === 1 ? '1 app' : `${count} apps`
 }
 

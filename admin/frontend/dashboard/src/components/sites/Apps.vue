@@ -26,7 +26,13 @@
     </div>
   </div>
 
-  <UninstallAppDialog v-model:open="showUninstall" :app="uninstallTarget" :site-name="siteName" />
+  <UninstallAppDialog
+    v-model:open="showUninstall"
+    :app="uninstallTarget"
+    :site-name="siteName"
+    :can-disable="canDisable(uninstallTarget)"
+    @disabled="refresh"
+  />
 </template>
 
 <script setup>
@@ -45,8 +51,9 @@ const props = defineProps({
 })
 const { session } = useSession()
 
-const { apps, installedApps, appsLoading, loadApps } = useSite(props.siteName)
+const { apps, canDisableApps, installedApps, appsLoading, loadApps, reload } = useSite(props.siteName)
 const {
+  registry,
   titleMap,
   descriptionMap,
   logoMap,
@@ -54,6 +61,17 @@ const {
   websiteMap,
   load: loadRegistry,
 } = useAppRegistry()
+
+// The list renders `installedApps`, which rides on the site payload - refreshing the
+// app metadata alone would leave a just-disabled app on screen.
+async function refresh() {
+  await Promise.all([reload(), loadApps()])
+}
+
+// Disabling needs a Frappe that supports it, and an app the catalog can reinstall.
+function canDisable(app) {
+  return canDisableApps.value && Boolean(app && registry.value.some((entry) => entry.name === app.name))
+}
 
 const appDetailMap = computed(() => Object.fromEntries(apps.value.map((a) => [a.name, a])))
 
@@ -96,7 +114,7 @@ function menuOptions(app) {
     ...(app.name !== 'frappe'
       ? [
           {
-            label: 'Uninstall',
+            label: canDisable(app) ? 'Remove' : 'Uninstall',
             icon: 'lucide-trash-2',
             theme: 'red',
             onClick: () => {
