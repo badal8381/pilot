@@ -156,8 +156,7 @@ class AppRepository:
                     self.remote_url,
                     "--branch",
                     target,
-                    "--depth",
-                    "1",
+                    *self.depth_flags,
                     str(self.app.path),
                 ],
                 stream_output=True,
@@ -167,6 +166,14 @@ class AppRepository:
     @property
     def is_shallow(self) -> bool:
         return self.repo.is_shallow
+
+    @property
+    def depth_flags(self) -> list[str]:
+        """Depth arguments for a clone or a single-ref fetch. Empty on a dev install,
+        where apps are checked out with their full history to work on."""
+        from pilot import is_dev_build
+
+        return [] if is_dev_build else ["--depth", "1"]
 
     @staticmethod
     def pack_threads() -> int:
@@ -208,7 +215,7 @@ class AppRepository:
             self.app.config.branch,
         ]
         if self.is_shallow:
-            cmd.append("--depth=1")
+            cmd.append("--depth=1")  # an app cloned before a dev install stays as it is
         run_command(cmd)
         run_command(
             [
@@ -239,7 +246,7 @@ class AppRepository:
     def checkout_pinned_target(self, pin: RevisionPin) -> None:
         if pin.kind == "tag":
             self._sync_remote_url()
-            run_command(["git", "-C", str(self.app.path), "fetch", "--depth", "1", "origin", pin.ref])
+            run_command(["git", "-C", str(self.app.path), "fetch", *self.depth_flags, "origin", pin.ref])
             self._checkout_pinned_ref("FETCH_HEAD")
         else:
             self.checkout_pinned_commit(pin.ref)
@@ -248,7 +255,7 @@ class AppRepository:
         """Check out a specific commit SHA, staying on the app's configured branch."""
         self._sync_remote_url()
         try:
-            run_command(["git", "-C", str(self.app.path), "fetch", "--depth", "1", "origin", sha])
+            run_command(["git", "-C", str(self.app.path), "fetch", *self.depth_flags, "origin", sha])
             self._checkout_pinned_ref("FETCH_HEAD")
             return
         except CommandError:
