@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from pilot.config import BenchConfig
@@ -48,7 +48,8 @@ class DatabaseDiagnosticsProvider:
         }
 
     def get_process_list(self, site: str = "") -> list[dict]:
-        return self._call(self._require_server().get_process_list, self._database_for(site))
+        processes = self._call(self._require_server().get_process_list, self._database_for(site))
+        return [asdict(process) for process in processes]
 
     def kill_process(self, process_id: int) -> None:
         self._call(self._require_server().kill_process, process_id)
@@ -58,7 +59,11 @@ class DatabaseDiagnosticsProvider:
         return [asdict(row) for row in rows]
 
     def get_database_size(self, site: str = "") -> dict:
-        return asdict(self._call(self._connection_for(site).get_database_size))
+        size = self._call(self._connection_for(site).get_database_size)
+        # A site's own user may not be allowed to read the server's data directory.
+        if site and size.free_bytes is None and self._db is not None:
+            size = replace(size, free_bytes=self._call(self._db.get_free_disk_bytes))
+        return asdict(size)
 
     def get_table_sizes(self, site: str) -> list[dict]:
         if not site:

@@ -8,6 +8,7 @@ from pilot.core.database.base import (
     BinlogFile,
     BinlogStatus,
     Database,
+    DatabaseProcess,
     DatabaseSize,
     LockWaitRow,
     LockWaitStatus,
@@ -26,6 +27,7 @@ __all__ = [
     "BinlogFile",
     "BinlogStatus",
     "Database",
+    "DatabaseProcess",
     "DatabaseSize",
     "LockWaitRow",
     "LockWaitStatus",
@@ -52,7 +54,7 @@ def make_database(config: "BenchConfig") -> Database:
             port=postgres.port,
             user=postgres.admin_user,
             password=postgres.root_password or "trust_auth",
-            database=postgres.admin_user,
+            database="",
         )
     mariadb = config.mariadb
     return MariaDB(
