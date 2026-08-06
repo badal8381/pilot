@@ -52,6 +52,15 @@ Task-starting endpoints should return:
 
 `created` is useful for idempotent submissions.
 
+### Site Apps
+
+`GET /sites/<name>/apps` returns the apps in use on the site, disabled ones excluded, plus `can_disable` for whether this bench's Frappe supports disabling at all.
+
+Two app operations answer inline instead of returning a task id, because both are flag flips on data that never left the site:
+
+- `DELETE /sites/<name>/apps/<app>?mode=disable` returns `{"app": ..., "disabled": true}`. Without the parameter the route queues an uninstall as before.
+- `POST /sites/<name>/apps` for an app the site only has disabled returns `{"app": ..., "enabled": true}`. It falls through to the install queue when a required app has to be installed first.
+
 ## Errors
 
 Raise HTTP errors at the route boundary. Core objects should raise domain exceptions such as config or bench errors.

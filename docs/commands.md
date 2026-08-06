@@ -28,17 +28,23 @@ Some runtime commands support all benches when invoked with the CLI option for a
 - `pilot new-app APP`: scaffold a new Frappe app under `apps/` and install it. Prompts for title, description, publisher, email, license, GitHub workflow, and branch; pass any of `--title/--description/--publisher/--email/--license/--branch/--github-workflow` to skip prompts (branch defaults to `develop`).
 - `pilot get-app REPO_OR_NAME`: clone and install an app into the bench.
 - `pilot list-apps`: list apps present in the bench.
-- `pilot install-app APP --site SITE`: install apps on a site.
-- `pilot uninstall-app APP --site SITE`: uninstall apps from a site.
+- `pilot install-app APP --site SITE`: install apps on a site. An app the site only has disabled is enabled instead, bringing back anything it requires first.
+- `pilot uninstall-app APP --site SITE`: uninstall apps from a site, dropping their data.
 - `pilot remove-app APP`: remove an app from the bench when no site needs it.
 
 Long app operations should use task classes from `pilot.tasks`.
+
+### Disabled Apps
+
+A disabled app keeps its schema and records on the site but stops taking effect, and Pilot reports it as uninstalled: `list-site-apps` and the Admin API leave it out. Disable state is read from Frappe's `disabled_apps` global rather than the `Installed Application` mirror column, which can drift.
+
+Disabling needs a Frappe that supports it and is exposed through the Admin UI only. The CLI can bring a disabled app back, through `install-app`, but not take one out of use.
 
 ## Site Commands
 
 - `pilot new-site SITE`: create a site and add it to bench config.
 - `pilot rename-site OLD NEW`: rename a site.
-- `pilot list-site-apps SITE`: list apps installed on a site.
+- `pilot list-site-apps SITE`: list the apps in use on a site, disabled ones excluded.
 - `pilot set-admin-password SITE`: update the site Administrator password.
 
 Site behavior belongs on `Site` or a module under `pilot/core/site`.
