@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -12,20 +13,27 @@ from pilot.integrations.git.base import (
     normalize_to_https,
 )
 
+GITHUB_HOST = "github.com"
+_OWNER_REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
 
 def parse_github_owner_repo(repo_url: str) -> tuple[str, str]:
-    """Extract (owner, repo) from a GitHub URL."""
+    """Extract (owner, repo) from a GitHub URL. Both land in an api.github.com path,
+    so only a plain owner and repository name are accepted."""
     url = normalize_to_https(repo_url).rstrip("/").removesuffix(".git")
     parts = url.split("/")
     # Expect ['https:', '', 'github.com', 'owner', 'repo']
-    if len(parts) < 5 or not parts[-2] or not parts[-1]:
+    if len(parts) < 5 or urllib.parse.urlsplit(url).hostname != GITHUB_HOST:
         raise GitProviderError(f"Cannot parse owner/repo from URL: {repo_url!r}")
-    return parts[-2], parts[-1]
+    owner, repository = parts[-2], parts[-1]
+    if not (_OWNER_REPO_RE.match(owner) and _OWNER_REPO_RE.match(repository)):
+        raise GitProviderError(f"Cannot parse owner/repo from URL: {repo_url!r}")
+    return owner, repository
 
 
 class GitHubProvider(GitProvider):
     name = "github"
-    host = "github.com"
+    host = GITHUB_HOST
     api_base = "https://api.github.com"
 
     def _headers(self) -> dict:

@@ -72,9 +72,18 @@ def test_parse_github_owner_repo(url: str, expected: tuple[str, str]) -> None:
     assert parse_github_owner_repo(url) == expected
 
 
-def test_parse_github_owner_repo_rejects_malformed_url() -> None:
+@pytest.mark.parametrize(
+    "url",
+    [
+        "not-a-url",
+        "https://evil.example.com/frappe/frappe",
+        "https://github.com/frappe/..%2f..%2fuser",
+        "https://github.com/frappe/repo?x=1",
+    ],
+)
+def test_parse_github_owner_repo_rejects_anything_but_a_github_owner_repo(url: str) -> None:
     with pytest.raises(GitProviderError):
-        parse_github_owner_repo("not-a-url")
+        parse_github_owner_repo(url)
 
 
 def test_resolve_app_name_requires_hooks_file(tmp_path: Path) -> None:
