@@ -10,6 +10,10 @@ _MIN_BUFFER_POOL_MB = 128
 _MIN_MEMORY_MAX_MB = 512
 _MIN_MEMORY_LIMIT_GAP_MB = 128
 _MAX_HOST_MEMORY_SHARE = 0.5
+_MIN_MAX_CONNECTIONS = 10
+_MIN_BUFFER_POOL_SHARE = 0.2
+_MAX_BUFFER_POOL_SHARE = 0.7
+_BUFFER_POOL_MAX_BLOCK_MB = 8
 
 
 @dataclass(frozen=True)
@@ -24,6 +28,18 @@ class MariaDBMemorySizing:
     innodb_log_file_mb: int
     memory_high_mb: int
     memory_max_mb: int
+
+
+@dataclass(frozen=True)
+class MariaDBVariableLimits:
+    """Safe user-configurable ranges within Pilot's MariaDB service budget."""
+
+    innodb_buffer_pool_min_mb: int
+    innodb_buffer_pool_max_mb: int
+    innodb_buffer_pool_recommended_mb: int
+    max_connections_min: int
+    max_connections_max: int
+    max_connections_recommended: int
 
 
 def calculate_mariadb_memory(total_memory_mb: int) -> MariaDBMemorySizing:
@@ -74,6 +90,39 @@ def calculate_mariadb_memory(total_memory_mb: int) -> MariaDBMemorySizing:
     )
 
 
+def calculate_mariadb_variable_limits(total_memory_mb: int) -> MariaDBVariableLimits:
+    """Adapt Press's MariaDB guards to Pilot's shared-VM memory ceiling."""
+    sizing = calculate_mariadb_memory(total_memory_mb)
+    pool_min_mb = min(
+        sizing.innodb_buffer_pool_mb,
+        max(
+            _MIN_BUFFER_POOL_MB,
+            _round_up(
+                int(sizing.memory_max_mb * _MIN_BUFFER_POOL_SHARE),
+                _BUFFER_POOL_MAX_BLOCK_MB,
+            ),
+        ),
+    )
+    pool_max_mb = max(
+        pool_min_mb,
+        _round_down(int(sizing.memory_max_mb * _MAX_BUFFER_POOL_SHARE), _BUFFER_POOL_MAX_BLOCK_MB),
+    )
+    return MariaDBVariableLimits(
+        innodb_buffer_pool_min_mb=pool_min_mb,
+        innodb_buffer_pool_max_mb=pool_max_mb,
+        innodb_buffer_pool_recommended_mb=min(
+            pool_max_mb,
+            max(pool_min_mb, sizing.innodb_buffer_pool_mb),
+        ),
+        max_connections_min=_MIN_MAX_CONNECTIONS,
+        max_connections_max=max(
+            sizing.max_connections,
+            sizing.memory_max_mb // _MEMORY_PER_CONNECTION_MB,
+        ),
+        max_connections_recommended=sizing.max_connections,
+    )
+
+
 def _innodb_log_file_size(total_memory_mb: int) -> int:
     ram_gb = round(total_memory_mb / 1024)
     if ram_gb > 16:
@@ -85,3 +134,11 @@ def _innodb_log_file_size(total_memory_mb: int) -> int:
     if ram_gb > 2:
         return 128
     return 48
+
+
+def _round_up(value: int, block: int) -> int:
+    return ((value + block - 1) // block) * block
+
+
+def _round_down(value: int, block: int) -> int:
+    return (value // block) * block
