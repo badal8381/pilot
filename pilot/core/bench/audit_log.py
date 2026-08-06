@@ -1,13 +1,49 @@
 """Bench-wide append-only audit log, sharded by ISO week."""
 
+from __future__ import annotations
+
 import json
 import re
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pilot.utils import open_private
 
 _FILE_RE = re.compile(r"^audit_\d{4}_\d{2}\.jsonl$")
+
+
+@dataclass
+class AuditEntry:
+    """Shape of one audit record. Every call site passes only the fields relevant to
+    its event, so everything but `type`/`logged_at` is optional - this is a type
+    contract for the TS generator, not a struct `append()` requires callers to build."""
+
+    type: str
+    logged_at: str
+    event: str | None = None
+    site: str | None = None
+    app: str | None = None
+    status: str | None = None
+    ip: str | None = None
+    actor: str | None = None
+    actor_jti: str | None = None
+    jti: str | None = None
+    command: str | None = None
+    task_id: str | None = None
+    provider: str | None = None
+    username: str | None = None
+    fingerprint: str | None = None
+    patch: str | None = None
+    operation: str | None = None
+    device: str | None = None
+    via: str | None = None
+    scope: str | None = None
+    timestamp: str | None = None
+    finished_at: str | None = None
+    with_files: bool | None = None
+    file: str | None = None
+    name: str | None = None
 
 # Extra fields merged into every audit entry. The admin backend registers a provider that
 # reads the current request (IP + actor); the CLI/worker leave the empty default.
