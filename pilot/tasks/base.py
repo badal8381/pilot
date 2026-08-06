@@ -101,6 +101,8 @@ class Task:
         safe = {key: args[key] for key in cls._AUDIT_ARG_KEYS if key in args}
         if safe:
             fields["args"] = safe
+        if "site" in safe:
+            fields["site"] = safe["site"]
         bench.audit_action("task", fields)
 
     @classmethod

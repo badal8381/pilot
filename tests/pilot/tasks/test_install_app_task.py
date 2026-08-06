@@ -39,6 +39,7 @@ def test_queue_audits_who_queued_the_task(tmp_path: Path) -> None:
     assert queued[0]["event"] == "queued"
     assert queued[0]["command"] == "install-app"
     assert queued[0]["args"] == {"site": "site1.localhost", "app": "helpdesk"}
+    assert queued[0]["site"] == "site1.localhost"
 
 
 def test_install_app_task_uses_site_install_app(tmp_path: Path) -> None:
