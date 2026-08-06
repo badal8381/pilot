@@ -84,7 +84,7 @@ class SiteProvider:
                 site_config = {}
 
         is_provisioning = site_name in provisioning
-        active = []
+        active: list = []
         broken = False
         setup_complete = False
 
