@@ -40,6 +40,7 @@ function isActive(to) {
     <SidebarHeader
       v-if="!isMobile"
       title="Pilot"
+      :subtitle="session.benchName"
       :menu-items="menuItems"
       :logo="PilotLogo"
     />
