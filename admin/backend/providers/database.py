@@ -60,8 +60,7 @@ class DatabaseDiagnosticsProvider:
 
     def get_database_size(self, site: str = "") -> dict:
         size = self._call(self._connection_for(site).get_database_size)
-        # Free space is the server's disk, the same one whatever the scope, but
-        # a site's own user may not be allowed to ask where the server keeps it.
+        # A site's own user may not be allowed to read the server's data directory.
         if site and size.free_bytes is None and self._db is not None:
             size = replace(size, free_bytes=self._call(self._db.get_free_disk_bytes))
         return asdict(size)

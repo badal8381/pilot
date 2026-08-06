@@ -780,8 +780,7 @@ def test_postgres_get_process_list_normalises_rows() -> None:
 
 def test_both_engines_report_the_same_process_shape() -> None:
     """The dashboard reads one shape, so neither engine's own column names may
-    reach it - PostgreSQL used to send pid/usename/datname where the page read
-    MariaDB's Id/User/db and rendered an empty table."""
+    reach it."""
     postgres = PostgreSQL(host="h", port=5432, user="u", password="p", database="d")
     mariadb = MariaDB(host="h", port=3306, user="u", password="p", database="")
     mariadb_rows = {"PROCESSLIST": (_MARIADB_PROCESS_COLUMNS, [[7, "app", "h:1", "db", "Query", 3, "", None]])}

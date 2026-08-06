@@ -18,10 +18,9 @@ class QueryResult:
 
 @dataclass
 class DatabaseProcess:
-    """One client connection to the server, in engine-neutral terms. `command`
-    is what the connection is doing (MariaDB's Command, PostgreSQL's state) and
-    `state` the finer step or wait inside it. `duration_seconds` is how long it
-    has been in that state. Fields an engine cannot report stay None."""
+    """One client connection. `command` is what it is doing (MariaDB's Command,
+    PostgreSQL's state), `state` the finer step within it, and
+    `duration_seconds` the time spent in that state."""
 
     id: int
     user: str | None
@@ -168,9 +167,8 @@ class Database(ABC):
         raise NotImplementedError
 
     def get_free_disk_bytes(self) -> int | None:
-        """Free space on the disk holding the server's data directory. None
-        when that directory cannot be reached from here - a remote server, or
-        a user without the privilege to ask the server where it is."""
+        """Free space on the disk holding the data directory, or None when that
+        directory cannot be reached from here."""
         import shutil
 
         directory = self.get_data_directory()

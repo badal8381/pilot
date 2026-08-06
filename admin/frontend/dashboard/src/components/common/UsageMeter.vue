@@ -6,9 +6,7 @@ interface UsagePart {
   label: string
   bytes: number | null
   color: string
-  // Set false for a part that belongs in the legend but not the bar, such as
-  // headroom that would otherwise scale every real segment out of sight.
-  inBar?: boolean
+  inBar?: boolean // false keeps the part in the legend only
 }
 
 interface Props {

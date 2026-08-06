@@ -14,10 +14,8 @@ const props = defineProps({
 
 const COLORS = { data: 'red-7', index: 'cyan-7', claimable: 'amber-7', free: 'gray-2' }
 
-// The bar shows what the database is made of. Disk headroom is orders of
-// magnitude larger, so as a segment it flattens every real part to nothing.
-// It is also the whole server's disk, shared by every database on it, so it is
-// named for the disk rather than reading as an allowance for one site.
+// Server scope reports one combined size, and free space is the whole
+// server's disk, which would dwarf every other segment.
 const parts = computed(() => {
   const databaseParts =
     props.size.data_bytes == null && props.size.index_bytes == null

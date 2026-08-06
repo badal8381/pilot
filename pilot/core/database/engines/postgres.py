@@ -134,10 +134,8 @@ class PostgreSQL(Database):
             conn.close()
 
     def get_process_list(self, database: str = "") -> list[DatabaseProcess]:
-        """Only client backends: PostgreSQL's background workers are not
-        connections and cannot be killed. `state_change` gives the same time in
-        the current state that MariaDB reports, and `wait_event` the same finer
-        detail as its State column."""
+        """Only client backends: background workers are not connections and
+        cannot be killed."""
         result = self.execute(
             "SELECT pid, usename, client_addr, client_port, datname, state, wait_event, "
             "EXTRACT(EPOCH FROM (now() - state_change)), query FROM pg_stat_activity "
@@ -148,7 +146,6 @@ class PostgreSQL(Database):
             DatabaseProcess(
                 id=int(row[0]),
                 user=row[1],
-                # A local socket connection has no client address at all.
                 host=f"{row[2]}:{row[3]}" if row[2] else None,
                 database=row[4],
                 command=row[5],

@@ -188,9 +188,8 @@ def test_get_database_size_uses_a_connection_bound_to_the_site(tmp_path) -> None
 
 
 def test_site_scoped_size_takes_free_space_from_the_server(tmp_path) -> None:
-    """A site's own database user need not be allowed to ask the server where
-    its data directory is - PostgreSQL hides that setting from non-superusers -
-    but the free space it measures is the same disk whatever the scope."""
+    """PostgreSQL hides the data directory from non-superusers, but the free
+    space it measures is the same disk whatever the scope."""
     from unittest.mock import patch
 
     from pilot.core.database import DatabaseSize
