@@ -9,6 +9,8 @@ import type { AuditEntry } from '@/types/audit'
 
 import Table from '@/components/common/Table.vue'
 
+const props = defineProps<{ siteName?: string }>()
+
 const typeMetaMap: any = {
   backup: { icon: 'lucide-database', bg: 'bg-surface-blue-2 text-ink-blue-8' },
   app: { icon: 'lucide-package', bg: 'bg-surface-purple-2 text-ink-purple-8' },
@@ -97,7 +99,7 @@ const activityResourceRoute = (entry: AuditEntry): RouteLocationRaw | null => {
 const activityActions = (entry: AuditEntry) => {
   const target = activityResourceRoute(entry)
   const options = [{ label: 'View details', icon: 'lucide-info', onClick: () => openDetail(entry) }]
-  if (target) {
+  if (target && !(props.siteName && entry.site)) {
     options.push({
       label: entry.site ? 'View site' : 'View task',
       icon: 'lucide-arrow-up-right',
@@ -148,7 +150,7 @@ const siteOptions = computed(() => [
 const activityTable = computed(() => ({
   columns: [
     { key: 'activity', label: 'Activity', class: 'flex items-center gap-3' },
-    { key: 'resource', label: 'Resource' },
+    ...(props.siteName ? [] : [{ key: 'resource', label: 'Resource' }]),
     { key: 'actor', label: 'Triggered by' },
     { key: 'time', label: 'Date/time', class: 'text-right whitespace-nowrap' },
     { key: 'actions', label: '', class: 'text-right' },
@@ -171,7 +173,9 @@ const activityTable = computed(() => ({
 
 const typeFilter = ref('')
 
-const siteFilter = computed(() => (typeof route.query.site === 'string' ? route.query.site : ''))
+const siteFilter = computed(
+  () => props.siteName || (typeof route.query.site === 'string' ? route.query.site : ''),
+)
 const siteFilterModel = computed({
   get: () => siteFilter.value,
   set: (value: string) =>
@@ -186,35 +190,32 @@ const reload = () => load(currentFilters.value)
 
 watch(siteFilter, reload)
 onMounted(reload)
-onMounted(loadSites)
+onMounted(() => {
+  if (!props.siteName) loadSites()
+})
 </script>
 
 <template>
-  <div class="flex flex-col mx-auto max-w-4xl h-[calc(100vh-5rem)]">
-    <div class="flex justify-between items-center gap-3 shrink-0">
-      <div>
-        <h1 class="font-semibold text-ink-gray-9 text-xl">Activity</h1>
-        <p class="mt-1 text-ink-gray-5 text-p-base">
-          A trail of actions taken on this bench - logins, backups, app changes and more.
-        </p>
-      </div>
-
-      <Button :loading icon-left="lucide-refresh-cw" @click="reload"> Refresh </Button>
+  <div class="flex flex-col" :class="siteName ? '' : 'mx-auto max-w-4xl h-[calc(100vh-5rem)]'">
+    <div v-if="!siteName">
+      <h1 class="font-semibold text-ink-gray-9 text-xl">Activity</h1>
+      <p class="mt-1 text-ink-gray-5 text-p-base">
+        A trail of actions taken on this bench - logins, backups, app changes and more.
+      </p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3 mt-4 shrink-0">
-      <Select
-        v-model="typeFilter"
-        class="w-48"
-        :options="activityTypeOptions"
-        @update:modelValue="reload"
-      />
+    <div class="flex flex-wrap items-center gap-3 shrink-0 mt-4">
+      <Select v-model="typeFilter" :options="activityTypeOptions" @update:modelValue="reload" />
       <Combobox
+        v-if="!siteName"
         v-model="siteFilterModel"
         class="w-48"
         :options="siteOptions"
         placeholder="All sites"
       />
+      <Button :loading icon-left="lucide-refresh-cw" class="md:ml-auto" @click="reload">
+        Refresh
+      </Button>
     </div>
 
     <div v-if="loading" class="flex flex-col gap-1 mt-4">
@@ -259,7 +260,8 @@ onMounted(loadSites)
     <!-- empty state -->
     <div
       v-else
-      class="flex flex-col justify-center items-center gap-3 mt-4 h-1/2 border border-dashed rounded-xl border-outline-gray-2"
+      class="flex flex-col justify-center items-center gap-3 mt-4 h-1/2 border border-dashed rounded-xl
+      border-outline-gray-2 py-10"
     >
       <div class="place-items-center grid bg-surface-gray-2 rounded-lg size-10">
         <span class="lucide-history size-5 text-ink-gray-5" />
