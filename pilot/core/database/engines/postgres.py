@@ -4,6 +4,7 @@ import time
 
 from pilot.core.database.base import (
     Database,
+    DatabaseProcess,
     DatabaseSize,
     LockWaitRow,
     LockWaitStatus,
@@ -14,9 +15,7 @@ from pilot.core.database.base import (
 from pilot.core.database.engines.helpers import (
     DEFAULT_CONNECT_TIMEOUT,
     MAX_ROWS,
-    disk_free,
     is_local_host,
-    rows_as_dicts,
     validated_process_id,
 )
 from pilot.exceptions import DatabaseError
@@ -40,6 +39,8 @@ class PostgreSQL(Database):
         self._connect_timeout = connect_timeout
 
     def _connect(self):
+        """Every connection is bound to one database, so a server-wide instance
+        (empty `database`) uses the maintenance database named after its user."""
         try:
             import psycopg2
         except ImportError as exc:
@@ -50,7 +51,7 @@ class PostgreSQL(Database):
                 port=self._port,
                 user=self._user,
                 password=self._password,
-                dbname=self._database,
+                dbname=self._database or self._user,
                 connect_timeout=self._connect_timeout,
             )
         except psycopg2.Error as exc:
@@ -132,17 +133,28 @@ class PostgreSQL(Database):
         finally:
             conn.close()
 
-    def get_process_list(self, database: str = "") -> list[dict]:
-        rows = rows_as_dicts(
-            self.execute(
-                'SELECT pid, usename AS "user", datname AS "database", state, '
-                "EXTRACT(EPOCH FROM (now() - query_start)) AS duration_seconds, query "
-                "FROM pg_stat_activity WHERE pid <> pg_backend_pid()"
-            )
+    def get_process_list(self, database: str = "") -> list[DatabaseProcess]:
+        """Only client backends: background workers are not connections and
+        cannot be killed."""
+        result = self.execute(
+            "SELECT pid, usename, client_addr, client_port, datname, state, wait_event, "
+            "EXTRACT(EPOCH FROM (now() - state_change)), query FROM pg_stat_activity "
+            "WHERE backend_type = 'client backend' AND pid <> pg_backend_pid()"
         )
-        if not database:
-            return rows
-        return [row for row in rows if row.get("database") == database]
+        rows = [row for row in result.rows if not database or row[4] == database]
+        return [
+            DatabaseProcess(
+                id=int(row[0]),
+                user=row[1],
+                host=f"{row[2]}:{row[3]}" if row[2] else None,
+                database=row[4],
+                command=row[5],
+                state=row[6],
+                duration_seconds=float(row[7]) if row[7] is not None else None,
+                query=row[8] or None,
+            )
+            for row in rows
+        ]
 
     def kill_process(self, process_id: int) -> None:
         """pg_terminate_backend reports a missing backend by returning false."""
@@ -168,19 +180,20 @@ class PostgreSQL(Database):
         """PostgreSQL has no lock-index concept and no per-transaction row
         counters, so index/rows_locked/rows_modified are always None."""
         result = self.execute(
-            "SELECT blocked.pid, blocked.locktype, blocked.mode, "
-            "blocked.relation::regclass::text, a.state, a.query_start, a.query, a.datname "
+            "SELECT blocked.pid, blocked.locktype, blocked.mode, blocked.relation, "
+            "a.state, a.query_start, a.query, a.datname "
             "FROM pg_locks blocked "
             "JOIN pg_stat_activity a ON a.pid = blocked.pid "
             "WHERE NOT blocked.granted"
         )
         rows = [row for row in result.rows if not database or row[7] == database]
+        tables = self._table_names(database, rows) if database else {}
         return [
             LockWaitRow(
                 id=str(row[0]),
                 type=row[1],
                 mode=row[2],
-                table=row[3],
+                table=self._relation_name(row[7], row[3], tables),
                 index=None,
                 state=row[4],
                 started=str(row[5]) if row[5] is not None else None,
@@ -191,6 +204,27 @@ class PostgreSQL(Database):
             for row in rows
         ]
 
+    def _table_names(self, database: str, rows: list[list]) -> dict[int, str]:
+        """Resolve relation OIDs only for a selected database. Server-wide
+        lock polling must not open one connection per affected database."""
+        wanted = {int(row[3]) for row in rows if row[3]}
+        if not wanted:
+            return {}
+        oids = ", ".join(str(oid) for oid in wanted)
+        catalog = self._scoped_to(database).execute(
+            "SELECT c.oid, n.nspname, c.relname FROM pg_class c "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+            f"WHERE c.oid IN ({oids})"
+        )
+        return {int(row[0]): f"{database}.{row[1]}.{row[2]}" for row in catalog.rows}
+
+    @staticmethod
+    def _relation_name(database: str | None, oid: int | None, names: dict[int, str]) -> str | None:
+        if not database or not oid:
+            return None
+        relation_oid = int(oid)
+        return names.get(relation_oid, f"{database} (relation OID {relation_oid})")
+
     # `pg_table_size` covers the heap and its TOAST, matching what MariaDB
     # reports as data_length. Reclaimable bloat needs the pgstattuple
     # extension, so claimable space stays None.
@@ -200,17 +234,44 @@ class PostgreSQL(Database):
     )
 
     def get_database_size(self) -> DatabaseSize:
+        """Return an exact split for one database or one combined server total.
+
+        PostgreSQL catalogs cannot split every database's size from one
+        connection. Reconnecting to every database makes this request linear in
+        the number of sites, so server scope uses pg_database_size instead.
+        """
+        data, index = self._table_size_totals() if self._database else (None, None)
+        return DatabaseSize(
+            data_bytes=data,
+            index_bytes=index,
+            claimable_bytes=None,
+            free_bytes=self.get_free_disk_bytes(),
+            total_bytes=None if self._database else self._server_database_bytes(),
+        )
+
+    def _server_database_bytes(self) -> int:
+        result = self.execute(
+            "SELECT COALESCE(SUM(size_bytes), 0), COUNT(*) FILTER (WHERE size_bytes IS NULL) "
+            "FROM (SELECT pg_database_size(datname) AS size_bytes FROM pg_database "
+            "WHERE NOT datistemplate) databases"
+        )
+        total, unavailable = result.rows[0] if result.rows else (0, 0)
+        if int(unavailable):
+            raise DatabaseError(f"Could not measure {int(unavailable)} database(s) on this server")
+        return int(total)
+
+    def _scoped_to(self, database: str) -> "PostgreSQL":
+        return PostgreSQL(
+            self._host, self._port, self._user, self._password, database, self._connect_timeout
+        )
+
+    def _table_size_totals(self) -> tuple[int, int]:
         result = self.execute(
             "SELECT COALESCE(SUM(pg_table_size(c.oid)), 0), COALESCE(SUM(pg_indexes_size(c.oid)), 0) "
             + self._TABLE_SIZE_SOURCE
         )
         data, index = result.rows[0] if result.rows else (0, 0)
-        return DatabaseSize(
-            data_bytes=int(data),
-            index_bytes=int(index),
-            claimable_bytes=None,
-            free_bytes=self._free_disk_bytes(),
-        )
+        return int(data), int(index)
 
     def get_table_sizes(self) -> list[TableSize]:
         result = self.execute(
@@ -227,10 +288,6 @@ class PostgreSQL(Database):
             )
             for row in result.rows
         ]
-
-    def _free_disk_bytes(self) -> int | None:
-        data_directory = self.get_data_directory()
-        return disk_free(data_directory) if data_directory else None
 
     def get_data_directory(self) -> str | None:
         if not is_local_host(self._host):
