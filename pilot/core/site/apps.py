@@ -25,7 +25,9 @@ class SiteApps:
         self._clear_cache()
         try:
             run_command(
-                self.site._frappe_call("frappe", "--site", self.site.config.name, "install-app", app.config.name),
+                self.site._frappe_call(
+                    "frappe", "--site", self.site.config.name, "install-app", app.config.name
+                ),
                 cwd=self.site.bench.sites_path,
                 stream_output=True,
             )
@@ -110,11 +112,12 @@ class SiteApps:
         self._toggle_app("disable-app", app)
 
     def _toggle_app(self, command: str, app: "App") -> None:
-        """Captured, not streamed: this runs inline for a waiting caller, and Frappe's
-        reason for refusing (a dependency still disabled, say) is worth more than a log."""
+        """Captured, not streamed: a waiting caller needs Frappe's reason for refusing.
+        Bounded under the admin gunicorn's 120s so a stuck toggle still answers."""
         run_command(
             self.site._frappe_call("frappe", "--site", self.site.config.name, command, app.config.name),
             cwd=self.site.bench.sites_path,
+            timeout=110,
         )
 
     def _clear_cache(self) -> None:
