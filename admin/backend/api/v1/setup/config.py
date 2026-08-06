@@ -14,7 +14,6 @@ _DB_FIELDS = ("admin_user", "existing", "host", "password", "port")
 
 SETTABLE_KEYS = frozenset(
     {
-        "admin_password",
         "app_branch",
         "app_repo",
         "db_mode",
@@ -42,7 +41,6 @@ def validate_configuration(data: dict) -> str | None:
 
 def _validate_field_types(data: dict) -> str | None:
     text_fields = (
-        "admin_password",
         "app_branch",
         "app_repo",
         "db_type",
@@ -69,8 +67,6 @@ def _validate_field_types(data: dict) -> str | None:
 
 
 def _validate_required_fields(data: dict) -> str | None:
-    if not data.get("admin_password"):
-        return "admin_password is required"
     db_type = data.get("db_type", "mariadb")
     if db_type not in ("mariadb", "postgres"):
         return "db_type must be 'mariadb' or 'postgres'"

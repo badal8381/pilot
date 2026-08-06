@@ -240,26 +240,6 @@ def test_login_cookie_uses_explicit_is_secure_cookie(tmp_path: Path) -> None:
     assert "Secure" in cookie
 
 
-def test_setup_session_cookie_uses_explicit_is_secure_cookie(tmp_path: Path) -> None:
-    from admin.backend.app import create_app
-
-    app = create_app(tmp_path)
-    app.config.update(TESTING=True, SESSION_COOKIE_SECURE=True)
-
-    response = app.test_client().put(
-        "/api/v1/setup/configuration",
-        json={"admin_password": "secret", "mariadb_password": "db-secret"},
-    )
-
-    cookie = next(
-        value for key, value in response.headers if key == "Set-Cookie" and value.startswith("sid=")
-    )
-    assert response.status_code == 200
-    assert "HttpOnly" in cookie
-    assert "Secure" in cookie
-    assert "SameSite=Lax" in cookie
-
-
 def test_is_secure_cookie_requires_tls_or_configured_proxy(monkeypatch) -> None:
     from admin.backend.app import is_secure_cookie
 

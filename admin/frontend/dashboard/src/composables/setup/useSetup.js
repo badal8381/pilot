@@ -2,7 +2,6 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useSetupHandoff } from './useSetupHandoff'
 import { apiErrorMessage } from '../../api/client'
 import { setupApi } from '../../api/setup'
-import { meetsPasswordRequirements } from '../../utils/passwordStrength'
 import { generateRandomPassword } from '../../utils/randomPassword'
 
 // Static dropdown options
@@ -11,7 +10,6 @@ const DB_TYPE_OPTIONS = [
   { label: 'PostgreSQL', value: 'postgres' },
 ]
 const STEP_TITLES = {
-  passwords: 'Admin password',
   database: 'Database',
   customize: 'Customize your bench',
   running: 'Setting up your bench',
@@ -32,7 +30,6 @@ export function useSetup() {
   const isLinux = ref(true)
   const isProductionHandoff = ref(false)
   const availableBranches = ref([])
-  const adminPasswordConfigured = ref(false)
   const mariadbPasswordConfigured = ref(false)
   const postgresPasswordConfigured = ref(false)
   const mariadbLocalAvailable = ref(false)
@@ -45,7 +42,6 @@ export function useSetup() {
   const showStreamDetails = ref(false)
 
   // User inputs
-  const adminPassword = ref('')
   const dbType = ref('mariadb')
   const dbUser = ref('')
   const dbPassword = ref('')
@@ -72,9 +68,6 @@ export function useSetup() {
   const dbHost = ref('')
   const dbPort = ref('')
 
-  const isAdminPasswordValid = computed(
-    () => adminPasswordConfigured.value || meetsPasswordRequirements(adminPassword.value),
-  )
   const dbPasswordConfigured = computed(() =>
     dbType.value === 'postgres'
       ? postgresPasswordConfigured.value
@@ -93,7 +86,7 @@ export function useSetup() {
   })
 
   // Steps
-  const stepSequence = computed(() => ['passwords', 'database', 'customize'])
+  const stepSequence = computed(() => ['database', 'customize'])
   const stepNumber = computed(() => stepSequence.value.indexOf(currentStep.value) + 1)
   const isConfiguring = computed(() => stepNumber.value > 0)
   const isInstalling = computed(() => currentStep.value === 'running')
@@ -115,7 +108,6 @@ export function useSetup() {
       const config = await setupApi.config()
       benchName.value = config.bench_name || ''
       isLinux.value = config.is_linux !== false
-      adminPasswordConfigured.value = config.admin_password_configured === true
       mariadbPasswordConfigured.value = config.mariadb_password_configured === true
       postgresPasswordConfigured.value = config.postgres_password_configured === true
       // Bench arrived with production already chosen (the admin UI's "New Bench"
@@ -149,9 +141,9 @@ export function useSetup() {
       }
 
       if (config.running_setup_task_id) startStream(config.running_setup_task_id)
-      else currentStep.value = 'passwords'
+      else currentStep.value = 'database'
     } catch {
-      if (currentStep.value === 'loading') currentStep.value = 'passwords'
+      if (currentStep.value === 'loading') currentStep.value = 'database'
     }
     loadBranches()
   }
@@ -198,14 +190,6 @@ export function useSetup() {
   }
 
   // Validation
-  function validatePasswordStep() {
-    if (!adminPassword.value && !adminPasswordConfigured.value) return 'Admin password is required'
-    if (!adminPassword.value) return null
-    if (!meetsPasswordRequirements(adminPassword.value))
-      return 'Password does not meet all requirements'
-    return null
-  }
-
   async function validateDatabaseStep() {
     if (dbMode.value !== 'external') return null
     const databaseName = dbType.value === 'postgres' ? 'PostgreSQL' : 'MariaDB'
@@ -240,7 +224,7 @@ export function useSetup() {
 
   // Navigation
   async function goToNextStep() {
-    const validators = { passwords: validatePasswordStep, database: validateDatabaseStep }
+    const validators = { database: validateDatabaseStep }
     const message = await validators[currentStep.value]?.()
     if (message) {
       errorMessage.value = message
@@ -266,7 +250,6 @@ export function useSetup() {
       db_type: dbType.value,
       app_repo: appRepo.value,
       app_branch: appBranch.value,
-      ...(adminPassword.value ? { admin_password: adminPassword.value } : {}),
     }
     if (dbMode.value === 'existing_local') {
       return { ...base, db_mode: 'existing_local' }
@@ -350,8 +333,6 @@ export function useSetup() {
     streamUrl,
     streamStatus,
     showStreamDetails,
-    isAdminPasswordValid,
-    adminPassword,
     dbType,
     dbUser,
     dbPassword,

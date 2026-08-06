@@ -111,19 +111,7 @@ def _update_configuration(bench_root: Path, data: dict):
             500,
         )
 
-    resp = jsonify(read_defaults(bench_root))
-    if settings.get("admin_password"):
-        _issue_setup_session(resp, toml_path)
-    return resp
-
-
-def _issue_setup_session(resp, toml_path: Path) -> None:
-    from admin.backend.internal.session import Session
-
-    bench = Bench(toml_path.parent)
-    token, jti = Session(bench).issue_session_token(ip=client_ip())
-    set_session_cookie(resp, token, current_app.config["SESSION_COOKIE_SECURE"])
-    bench.audit_action("session", {"event": "issued", "jti": jti, "scope": "bench", "via": "setup"})
+    return jsonify(read_defaults(bench_root))
 
 
 @setup_bp.post("/database-validations")
