@@ -455,6 +455,80 @@ def test_update_apps_checks_out_the_pin_captured_at_create_time(tmp_path: Path) 
     }
 
 
+def test_update_failure_arms_the_revert_chain_without_the_user(tmp_path: Path) -> None:
+    """Nothing in the update phase touches a site database, so a failure there
+    reverts on its own instead of parking on needs_attention."""
+    from pilot.exceptions import AppValidationError
+
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+    mock_bench._update_apps.side_effect = AppValidationError("hooks.py is missing app_name")
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    operation = MigrationStore(mock_bench)._create(
+        "update",
+        apps=[AppRevision("frappe", "1111111")],
+        apps_filter=None,
+        sites=[],
+    )
+    operation.state = get_state("updating")
+
+    with pytest.raises(AppValidationError):
+        operation.update_apps()
+
+    assert operation.state == "reverting_apps"
+    assert operation.diagnosis["message"] == "hooks.py is missing app_name"
+
+    with patch("pilot.tasks.revert_apps.RevertAppsTask.queue", return_value="task-201") as queue:
+        assert operation.enqueue_next() == "task-201"
+
+    assert queue.called
+
+
+def test_update_failure_after_the_install_step_also_auto_reverts(tmp_path: Path) -> None:
+    """A build or install failure is as database-safe as a validation failure."""
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+    mock_bench._rebuild_assets.side_effect = MigrateError("yarn build failed")
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    operation = MigrationStore(mock_bench)._create(
+        "update",
+        apps=[AppRevision("frappe", "1111111")],
+        apps_filter=None,
+        sites=[],
+    )
+    operation.state = get_state("updating")
+
+    with pytest.raises(MigrateError):
+        operation.update_apps()
+
+    assert operation.state == "reverting_apps"
+    assert operation.apps_updated is False
+
+
+def test_migrate_failure_still_waits_for_the_user(tmp_path: Path) -> None:
+    """The database is touched by then, so recovery stays an explicit decision."""
+    mock_bench = MagicMock()
+    mock_bench.path = tmp_path
+    site_mock = MagicMock()
+    site_mock.path = tmp_path / "sites" / "site1.localhost"
+    site_mock.migrate.side_effect = MigrateError("patch failed", output="")
+    mock_bench.site.return_value = site_mock
+
+    from pilot.core.bench.migration.store import MigrationStore
+
+    operation = MigrationStore(mock_bench).create_site_migrate("site1.localhost")
+    operation.state = get_state("migrating")
+
+    with pytest.raises(MigrateError):
+        operation.migrate_site("site1.localhost")
+
+    assert operation.state == "needs_attention"
+
+
 def test_backup_failure_restores_every_sites_original_settings(tmp_path: Path) -> None:
     mock_bench = MagicMock()
     mock_bench.path = tmp_path
@@ -482,6 +556,10 @@ def test_backup_failure_restores_every_sites_original_settings(tmp_path: Path) -
     operation.back_up_site("one.local")
     with pytest.raises(RuntimeError, match="dump failed"):
         operation.back_up_site("two.local")
+
+    # Nothing has changed yet, so there is nothing to revert - the user gets to
+    # fix the disk and retry instead.
+    assert operation.state == "needs_attention"
 
     for name, scheduler in (("one.local", 1), ("two.local", 0)):
         sites[name].set_maintenance_settings.assert_called_with(

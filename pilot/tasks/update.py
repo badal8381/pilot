@@ -19,6 +19,8 @@ class UpdateTask(Task):
             operation.update_apps(on_step=self.step, on_progress=self.report)
         except Exception:
             self.step_failed()
+            if operation.state == "reverting_apps":
+                operation.enqueue_next(handoff_from=operation.chain[-1]["task_id"])
             sys.exit(1)
         operation.enqueue_next(handoff_from=operation.chain[-1]["task_id"])
 
