@@ -701,6 +701,8 @@ def test_import_check_skips_test_files(tmp_path: Path) -> None:
             "myapp/hooks.py": "",
             "myapp/test_utils.py": "import dev_only_dependency\n",
             "myapp/conftest.py": "import dev_only_dependency\n",
+            "myapp/tests/helpers.py": "import dev_only_dependency\n",
+            "myapp/module/tests/fixtures.py": "import dev_only_dependency\n",
         },
     )
     check = ImportCheck()
