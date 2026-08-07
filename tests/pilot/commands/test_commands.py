@@ -620,6 +620,59 @@ def test_build_command_default_uses_prebuilt_per_app(tmp_path: Path) -> None:
         mock_build.assert_not_called()
 
 
+def fake_app(name: str) -> MagicMock:
+    app = MagicMock()
+    app.config.name = name
+    return app
+
+
+def test_build_command_builds_only_named_apps(tmp_path: Path) -> None:
+    from pilot.commands.runtime.build import BuildCommand
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    hrms = fake_app("hrms")
+
+    with (
+        patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(bench, "apps", return_value=[fake_app("frappe"), hrms]),
+    ):
+        BuildCommand(bench, apps=["hrms"]).run()
+        mock_build.assert_called_once_with(hrms, force=False)
+
+
+def test_build_command_named_apps_with_force_skips_prebuilt(tmp_path: Path) -> None:
+    from pilot.commands.runtime.build import BuildCommand
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    hrms = fake_app("hrms")
+
+    with (
+        patch("pilot.managers.environment.PythonEnvManager.build_assets") as mock_build_all,
+        patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(bench, "apps", return_value=[fake_app("frappe"), hrms]),
+    ):
+        BuildCommand(bench, apps=["hrms"], force=True).run()
+        mock_build.assert_called_once_with(hrms, force=True)
+        mock_build_all.assert_not_called()
+
+
+def test_build_command_rejects_unknown_app(tmp_path: Path) -> None:
+    from pilot.commands.runtime.build import BuildCommand
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+
+    with (
+        patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(bench, "apps", return_value=[fake_app("frappe")]),
+        pytest.raises(BenchError, match="nope"),
+    ):
+        BuildCommand(bench, apps=["nope"]).run()
+        mock_build.assert_not_called()
+
+
 def test_requirements_skips_app_without_python_setup_files(tmp_path: Path) -> None:
     from pilot.core.bench.runtime import BenchRuntime
 
