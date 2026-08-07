@@ -1,5 +1,8 @@
 import { apiUrl, request, unwrap } from './client'
 
+// App install and remove answer inline for a disabled app, so they wait on frappe.
+const INLINE_TIMEOUT = 120_000
+
 export const sitesApi = {
   list: () => request.get('sites').json(),
   detail: (name) => request.get(`sites/${encodeURIComponent(name)}`).json(),
@@ -27,11 +30,14 @@ export const sitesApi = {
   apps: {
     list: (name) => request.get(`sites/${encodeURIComponent(name)}/apps`).json(),
     install: (name, payload) =>
-      request.post(`sites/${encodeURIComponent(name)}/apps`, { json: payload }).json(),
-    remove: (name, app, { force = false } = {}) =>
+      request
+        .post(`sites/${encodeURIComponent(name)}/apps`, { json: payload, timeout: INLINE_TIMEOUT })
+        .json(),
+    remove: (name, app, { force = false, mode = '' } = {}) =>
       request
         .delete(`sites/${encodeURIComponent(name)}/apps/${encodeURIComponent(app)}`, {
-          searchParams: force ? { force: 'true' } : {},
+          searchParams: { ...(force ? { force: 'true' } : {}), ...(mode ? { mode } : {}) },
+          timeout: INLINE_TIMEOUT,
         })
         .json(),
   },

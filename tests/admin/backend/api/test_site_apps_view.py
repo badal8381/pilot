@@ -412,3 +412,35 @@ def test_install_app_queues_the_importable_module_name(tmp_path: Path) -> None:
     body = response.get_json()
     assert response.status_code == 202
     assert body["args"] == {"site": "site1.localhost", "app": "india_compliance"}
+
+
+def test_install_app_enables_it_inline_when_the_site_has_it_disabled(tmp_path: Path) -> None:
+    """A disabled app is already on the site - enabling is a flag flip, not a task."""
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site1.localhost", [])
+    _make_cloned_app(bench_root, "suite")
+    client = _client(bench_root)
+
+    with (
+        patch("pilot.core.site.Site.disabled_apps", return_value=["suite"]),
+        patch("pilot.core.site.Site.enable_app") as enable,
+    ):
+        response = _post_install(client, "site1.localhost", app="suite")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"app": "suite", "enabled": True}
+    assert enable.call_args.args[0].config.name == "suite"
+
+
+def test_delete_site_app_disables_inline_when_asked(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site1.localhost", ["suite"])
+    _make_cloned_app(bench_root, "suite")
+    client = _client(bench_root)
+
+    with patch("pilot.core.site.Site.disable_app") as disable:
+        response = _delete_app(client, "site1.localhost", "suite", mode="disable")
+
+    assert response.status_code == 200
+    assert response.get_json() == {"app": "suite", "disabled": True}
+    assert disable.call_args.args[0].config.name == "suite"

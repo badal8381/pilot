@@ -7,9 +7,12 @@ import pytest
 
 from admin.backend.providers.sites import SiteProvider
 from pilot.core.database.base import QueryResult
+from pilot.exceptions import DatabaseError
 
 
 class _FakeDatabase:
+    """Answers the Singles probe only - anything else reads as a table this site lacks."""
+
     def __init__(self, rows: list[list]) -> None:
         self._rows = rows
 
@@ -17,6 +20,8 @@ class _FakeDatabase:
         return f'"{name}"'
 
     def execute(self, query: str, read_only: bool = True) -> QueryResult:
+        if "tabSingles" not in query:
+            raise DatabaseError("no such table")
         return QueryResult(columns=["value"], rows=self._rows, duration_ms=0.0)
 
 

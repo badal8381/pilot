@@ -5,6 +5,7 @@ import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem, SidebarCollapseToggl
 import { sidebarSections } from './list'
 import { useAppMenu } from './useAppMenu'
 import PilotLogo from '@/components/icons/Pilot.vue'
+import { openSearch } from '@/composables/common/useSearch'
 
 const props = defineProps({
   isMobile: { type: Boolean, default: false },
@@ -40,11 +41,16 @@ function isActive(to) {
     <SidebarHeader
       v-if="!isMobile"
       title="Pilot"
+      :subtitle="session.benchName"
       :menu-items="menuItems"
       :logo="PilotLogo"
     />
 
     <nav class="flex-1 overflow-y-auto px-2 pt-2">
+      <SidebarItem icon="lucide-search" suffix="⌘ K" class="mb-2 text-sm" @click="openSearch">
+        Search
+      </SidebarItem>
+
       <template v-for="section in visibleSections" :key="section.label || 'main'">
         <!-- `divider`: collapsed, the section name has no room, so the label
              becomes a rule and the groups stay separated instead of running

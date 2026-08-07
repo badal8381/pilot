@@ -134,8 +134,8 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, ErrorMessage, Skeleton } from 'frappe-ui'
 import AddAppFromGithubDialog from '@/components/apps/AddAppFromGithubDialog.vue'
 import PageHero from '@/components/common/PageHero.vue'
@@ -149,6 +149,7 @@ import { useIsMobile } from '@/composables/common/useIsMobile'
 
 const isMobile = useIsMobile()
 const route = useRoute()
+const router = useRouter()
 
 const {
   loading,
@@ -185,6 +186,16 @@ const showChooseSite = ref(false)
 const showInstallApp = ref(false)
 const showAddFromGithub = ref(false)
 const installTarget = ref(null)
+
+watch(
+  () => route.query.addFromGithub,
+  (value) => {
+    if (!value) return
+    showAddFromGithub.value = true
+    router.replace({ name: 'Marketplace', query: { ...route.query, addFromGithub: undefined } })
+  },
+  { immediate: true },
+)
 
 function onInstall(app) {
   installTarget.value = app

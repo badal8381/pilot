@@ -49,12 +49,60 @@ _SENSITIVE_CONFIG_KEY_PARTS = (
 
 
 def list_installed_apps(site_config: dict, bench_root: Path, site_name: str) -> list[str]:
+    """Every app installed on the site, the disabled ones included."""
     if isinstance(site_config.get("installed_apps"), list):
         return site_config["installed_apps"]
     apps = query_installed_apps_via_db(bench_root, site_name)
     if apps is not None:
         return apps
     return query_installed_apps_via_frappe(bench_root, site_name)
+
+
+def list_active_apps(site_config: dict, bench_root: Path, site_name: str) -> list[str]:
+    """Installed apps the site actually runs - what the Admin UI shows as installed."""
+    installed = list_installed_apps(site_config, bench_root, site_name)
+    return exclude_disabled_apps(installed, bench_root, site_name)
+
+
+def exclude_disabled_apps(apps: list[str], bench_root: Path, site_name: str) -> list[str]:
+    """Drop the apps the site holds disabled - to Pilot those are not installed."""
+    disabled = set(query_disabled_apps_via_db(bench_root, site_name))
+    return [app for app in apps if app not in disabled]
+
+
+def query_disabled_apps_via_db(bench_root: Path, site_name: str) -> list[str]:
+    """Apps the site keeps but holds out of use, read from the `disabled_apps` global -
+    the same value Frappe itself gates on. The `disabled` column on Installed Application
+    only mirrors this and can drift, so it is not read here. Empty when unreadable."""
+    rows = _query_site_database(
+        bench_root,
+        site_name,
+        lambda database: (
+            f"SELECT defvalue FROM {database.quote_identifier('tabDefaultValue')} "
+            "WHERE parent = '__global' AND defkey = 'disabled_apps'"
+        ),
+    )
+    if not rows:
+        return []
+    try:
+        disabled = json.loads(str(rows[0][0]) or "[]")
+    except json.JSONDecodeError:
+        return []
+    return [app for app in disabled if isinstance(app, str)] if isinstance(disabled, list) else []
+
+
+def has_app_disabling(bench_root: Path, site_name: str) -> bool:
+    """Whether Frappe knows the Installed Application `disabled` field. No row means a
+    version that predates app disabling."""
+    rows = _query_site_database(
+        bench_root,
+        site_name,
+        lambda database: (
+            f"SELECT fieldname FROM {database.quote_identifier('tabDocField')} "
+            "WHERE parent = 'Installed Application' AND fieldname = 'disabled'"
+        ),
+    )
+    return bool(rows)
 
 
 def query_installed_apps_via_db(bench_root: Path, site_name: str) -> list[str] | None:
@@ -72,7 +120,40 @@ def query_installed_apps_via_db(bench_root: Path, site_name: str) -> list[str] |
 
 
 def is_setup_complete(bench_root: Path, site_name: str) -> bool | None:
-    """None means the site database was unreachable, so setup state is unknown."""
+    """Whether every app in use that ships a setup wizard has finished it. Read from the
+    same table `frappe.is_setup_complete()` reads, not the System Settings flag, which
+    only catches up when the app list is rewritten. A disabled app is skipped - it
+    contributes no wizard, so it can never finish one. None means the database was
+    unreachable, so setup state is unknown."""
+    apps = query_setup_wizard_apps_via_db(bench_root, site_name)
+    if not apps:
+        return _query_site_setup_flag(bench_root, site_name)
+    disabled = set(query_disabled_apps_via_db(bench_root, site_name))
+    return all(finished for app, finished in apps if app not in disabled)
+
+
+def query_setup_wizard_apps_via_db(bench_root: Path, site_name: str) -> list[tuple[str, bool]] | None:
+    """(app, finished) for each app that ships a setup wizard. None on a Frappe that does
+    not track setup per app, where the columns are missing and the query fails."""
+    rows = _query_site_database(
+        bench_root,
+        site_name,
+        lambda database: (
+            "SELECT app_name, is_setup_complete "
+            f"FROM {database.quote_identifier('tabInstalled Application')} WHERE has_setup_wizard = 1"
+        ),
+    )
+    if rows is None:
+        return None
+    return [
+        (str(row[0]).strip(), str(row[1]).strip().lower() in _TRUE_SINGLES_VALUES)
+        for row in rows
+        if row and str(row[0]).strip()
+    ]
+
+
+def _query_site_setup_flag(bench_root: Path, site_name: str) -> bool | None:
+    """The site-wide System Settings flag, for a Frappe that tracks no more than that."""
     rows = _query_site_database(
         bench_root,
         site_name,

@@ -79,10 +79,10 @@ export function useMarketplace(initialSiteName = '') {
   const currentSite = computed(
     () => sites.value.find((site) => site.name === currentSiteName.value) || null,
   )
-  const installedOnCurrentSite = computed(() => new Set(currentSite.value?.installed_apps || []))
+  const installedOnCurrentSite = computed(() => new Set(currentSite.value?.active_apps || []))
 
   function isInstalledOnAllSites(appName) {
-    return Boolean(sites.value.length) && sites.value.every((site) => site.installed_apps?.includes(appName))
+    return Boolean(sites.value.length) && sites.value.every((site) => site.active_apps?.includes(appName))
   }
 
   function isAppInstalled(appName) {

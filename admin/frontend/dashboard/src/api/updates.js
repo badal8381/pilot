@@ -1,3 +1,4 @@
+import { ACTIVE_STATES, ATTENTION_STATES } from '../utils/updateFormat.js'
 import { request } from './client'
 
 export const updatesApi = {
@@ -10,18 +11,6 @@ export const updatesApi = {
   bypassPatch: (id, patch) =>
     request.post(`migrations/${id}/actions/bypass-patch`, { json: { patch } }).json(),
 }
-
-export const ACTIVE_STATES = [
-  'preparing',
-  'backing_up',
-  'updating',
-  'migrating',
-  'retrying',
-  'reverting_apps',
-  'reverting_sites',
-  'restarting',
-]
-export const ATTENTION_STATES = ['needs_attention', 'revert_failed']
 
 export function isResolved(operation) {
   return !operation || operation.state === 'completed' || operation.state === 'reverted'

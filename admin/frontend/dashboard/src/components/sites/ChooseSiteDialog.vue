@@ -52,7 +52,7 @@ const open = defineModel('open')
 const site = defineModel('site')
 
 function siteMeta(s) {
-  const count = s.installed_apps?.length || 0
+  const count = s.active_apps?.length || 0
   return `${count} app${count === 1 ? '' : 's'}`
 }
 

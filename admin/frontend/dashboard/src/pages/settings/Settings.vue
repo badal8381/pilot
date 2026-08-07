@@ -1,8 +1,9 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, TabButtons, useTheme } from 'frappe-ui'
+import { Button, TabButtons } from 'frappe-ui'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
+import { useTheme } from '@/composables/common/useTheme'
 
 const router = useRouter()
 const { showBenches, logout, session } = useAppMenu()
@@ -50,6 +51,18 @@ const themeOptions = computed(() => [
         <span class="flex items-center gap-3">
           <span class="size-4 text-ink-gray-6 lucide-repeat" />
           Switch Bench
+        </span>
+        <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
+      </Button>
+
+      <Button
+        variant="ghost"
+        class="w-full !h-auto !justify-between !px-3 !py-2.5"
+        @click="router.push({ name: 'Activity' })"
+      >
+        <span class="flex items-center gap-3">
+          <span class="size-4 text-ink-gray-6 lucide-history" />
+          Activity
         </span>
         <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
       </Button>

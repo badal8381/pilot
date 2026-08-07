@@ -10,6 +10,7 @@ function getStore(name) {
     cache.set(name, {
       site: ref(null),
       apps: ref([]),
+      canDisableApps: ref(false),
       backups: ref([]),
       installable: ref([]),
       nginxEnabled: ref(false),
@@ -68,8 +69,10 @@ export function useSite(name) {
     try {
       const data = await sitesApi.apps.list(name)
       store.apps.value = data.apps || []
+      store.canDisableApps.value = data.can_disable ?? false
     } catch {
       store.apps.value = []
+      store.canDisableApps.value = false
     } finally {
       store.appsLoading.value = false
     }
@@ -127,7 +130,8 @@ export function useSite(name) {
     return sitesApi.configuration.update(name, config)
   }
 
-  const installedApps = computed(() => store.site.value?.installed_apps || [])
+  // Active apps are what the UI calls installed - a disabled app reads as uninstalled.
+  const installedApps = computed(() => store.site.value?.active_apps || [])
 
   const status = computed(() => {
     if (!store.site.value) return 'unknown'
@@ -149,6 +153,7 @@ export function useSite(name) {
   return {
     site: store.site,
     apps: store.apps,
+    canDisableApps: store.canDisableApps,
     backups: store.backups,
     installable: store.installable,
     nginxEnabled: store.nginxEnabled,

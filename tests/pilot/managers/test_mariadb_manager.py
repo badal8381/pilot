@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import stat
 import subprocess
-from unittest.mock import PropertyMock, patch
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 
 from pilot.config import MariaDBConfig
-from pilot.core.mariadb_memory import calculate_mariadb_memory
+from pilot.core.mariadb_memory import (
+    calculate_mariadb_memory,
+    calculate_mariadb_variable_limits,
+)
 from pilot.exceptions import DatabaseError
 from pilot.managers.database.mariadb import MariaDBManager
 
@@ -25,6 +28,18 @@ def test_socket_path_defaults_under_state_dir() -> None:
 
 def test_socket_path_honors_explicit_value() -> None:
     assert MariaDBManager(MariaDBConfig(socket_path="/tmp/custom.sock")).socket_path == "/tmp/custom.sock"
+
+
+def test_external_server_does_not_infer_pilot_managed_socket(tmp_path) -> None:
+    manager = MariaDBManager(MariaDBConfig(host="db.example.com", existing=True))
+    socket = tmp_path / "run" / "mysqld.sock"
+    socket.parent.mkdir()
+    socket.touch()
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+    ):
+        assert manager._detect_socket() == ""
 
 
 def test_default_port_avoids_standard_mysql_port() -> None:
@@ -52,6 +67,39 @@ def test_small_vm_limits_leave_memory_for_other_pilot_processes() -> None:
     assert sizing.memory_high_mb == 384
     assert sizing.memory_max_mb == 512
     assert sizing.memory_max_mb < sizing.total_memory_mb
+
+
+def test_small_vm_variable_limits_use_mariadb_ceiling_not_full_host() -> None:
+    limits = calculate_mariadb_variable_limits(2048)
+
+    assert limits.innodb_buffer_pool_min_mb == 128
+    assert limits.innodb_buffer_pool_max_mb == 352
+    assert limits.innodb_buffer_pool_recommended_mb == 128
+    assert limits.max_connections_min == 10
+    assert limits.max_connections_max == 50
+    assert limits.max_connections_recommended == 50
+
+
+def test_larger_vm_variable_limits_preserve_press_memory_guards() -> None:
+    limits = calculate_mariadb_variable_limits(8192)
+
+    assert limits.innodb_buffer_pool_min_mb == 640
+    assert limits.innodb_buffer_pool_max_mb == 2216
+    assert limits.innodb_buffer_pool_recommended_mb == 1692
+    assert limits.max_connections_min == 10
+    assert limits.max_connections_max == 90
+    assert limits.max_connections_recommended == 50
+
+
+@pytest.mark.parametrize("total_memory_mb", [1024, 2048, 3072, 4096, 8192, 16384, 32768])
+def test_startup_values_are_inside_configurable_ranges(total_memory_mb: int) -> None:
+    sizing = calculate_mariadb_memory(total_memory_mb)
+    limits = calculate_mariadb_variable_limits(total_memory_mb)
+
+    assert (
+        limits.innodb_buffer_pool_min_mb <= sizing.innodb_buffer_pool_mb <= limits.innodb_buffer_pool_max_mb
+    )
+    assert limits.max_connections_min <= sizing.max_connections <= limits.max_connections_max
 
 
 @pytest.mark.parametrize("total_memory_mb", [256, 512, 1024, 2048, 8192])
@@ -148,8 +196,12 @@ def test_write_config_contains_all_server_settings(tmp_path) -> None:
         sizing = manager._write_config()
 
     option_file = tmp_path / "config" / "my.cnf"
+    managed_file = tmp_path / "config" / "managed.cnf"
     content = option_file.read_text()
     assert stat.S_IMODE(option_file.stat().st_mode) == 0o600
+    assert stat.S_IMODE(managed_file.stat().st_mode) == 0o600
+    assert managed_file.read_text() == "# Managed by Pilot's database variable editor.\n[mysqld]\n"
+    assert f"!include {managed_file}" in content
     assert f"datadir = {tmp_path / 'data'}" in content
     assert f"socket = {tmp_path / 'run' / 'mysqld.sock'}" in content
     assert f"pid-file = {tmp_path / 'run' / 'mysqld.pid'}" in content
@@ -162,6 +214,8 @@ def test_write_config_contains_all_server_settings(tmp_path) -> None:
     assert "innodb-snapshot-isolation = OFF" in content
     assert "slave-connections-needed-for-purge = 0" in content
     assert f"innodb-buffer-pool-size = {sizing.innodb_buffer_pool_mb}M" in content
+    assert "innodb-buffer-pool-size-max = 2216M" in content
+    assert "innodb-buffer-pool-size-auto-min = 640M" in content
     assert f"innodb-log-file-size = {sizing.innodb_log_file_mb}M" in content
     assert f"key-buffer-size = {sizing.key_buffer_mb}M" in content
     assert f"max-connections = {sizing.max_connections}" in content
@@ -176,6 +230,361 @@ def test_write_config_contains_all_server_settings(tmp_path) -> None:
         "slow-query-log",
     ):
         assert unsupported_or_unmanaged_option not in content
+
+
+def test_write_config_creates_private_managed_option_file(tmp_path) -> None:
+    manager = _manager()
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch.object(manager, "_total_memory_mb", return_value=8192),
+    ):
+        manager._write_config()
+
+    managed_file = tmp_path / "config" / "managed.cnf"
+    assert stat.S_IMODE(managed_file.stat().st_mode) == 0o600
+    assert managed_file.read_text() == "# Managed by Pilot's database variable editor.\n[mysqld]\n"
+    assert f"!include {managed_file}" in (tmp_path / "config" / "my.cnf").read_text()
+
+
+def test_existing_option_file_is_migrated_to_managed_include_once(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    option_file = config_dir / "my.cnf"
+    option_file.write_text("# Managed by Pilot.\n[mysqld]\nport = 3310\n")
+
+    with patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path):
+        manager.ensure_managed_config()
+        manager.ensure_managed_config()
+
+    include = f"!include {config_dir / 'managed.cnf'}"
+    assert option_file.read_text().splitlines().count(include) == 1
+    assert stat.S_IMODE(option_file.stat().st_mode) == 0o600
+    assert stat.S_IMODE((config_dir / "managed.cnf").stat().st_mode) == 0o600
+
+
+def test_performance_schema_change_preserves_other_managed_options(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    (config_dir / "managed.cnf").write_text(
+        "# Managed by Pilot's database variable editor.\n" "[mysqld]\n" "max-connections = 50\n"
+    )
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "performance_schema_enabled", side_effect=[False, True]),
+        patch.object(manager, "_restart_and_wait_healthy") as restart,
+    ):
+        assert manager.set_performance_schema(True) is True
+
+    managed = (config_dir / "managed.cnf").read_text()
+    assert "max-connections = 50" in managed
+    assert "performance-schema = ON" in managed
+    restart.assert_called_once()
+
+
+def test_performance_schema_noop_does_not_restart_or_write(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    managed_file.write_text("# Managed by Pilot's database variable editor.\n[mysqld]\n")
+    before = managed_file.read_text()
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "performance_schema_enabled", return_value=True),
+        patch.object(manager, "_restart_and_wait_healthy") as restart,
+    ):
+        assert manager.set_performance_schema(True) is False
+
+    assert managed_file.read_text() == before
+    restart.assert_not_called()
+
+
+def test_performance_schema_uses_task_restart_executor(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    (config_dir / "managed.cnf").write_text("# Managed by Pilot's database variable editor.\n[mysqld]\n")
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "performance_schema_enabled", side_effect=[False, True]),
+        patch.object(manager, "_restart_and_wait_healthy") as restart,
+    ):
+        executor = Mock(side_effect=lambda callback: callback())
+        assert manager.set_performance_schema(True, restart_executor=executor) is True
+
+    executor.assert_called_once_with(restart)
+    restart.assert_called_once()
+
+
+def test_failed_performance_schema_change_restores_exact_previous_config(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    previous = "# Managed by Pilot's database variable editor.\n" "[mysqld]\n" "max-connections = 50\n"
+    managed_file.write_text(previous)
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "performance_schema_enabled", side_effect=[False, False, False]),
+        patch.object(manager, "_restart_and_wait_healthy") as restart,
+        pytest.raises(DatabaseError, match="previous configuration was restored"),
+    ):
+        manager.set_performance_schema(True)
+
+    assert managed_file.read_text() == previous
+    assert restart.call_count == 2
+
+
+def test_performance_schema_reports_when_automatic_rollback_also_fails(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    (config_dir / "managed.cnf").write_text("# Managed by Pilot's database variable editor.\n[mysqld]\n")
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "performance_schema_enabled", return_value=False),
+        patch.object(
+            manager,
+            "_restart_and_wait_healthy",
+            side_effect=[DatabaseError("apply failed"), DatabaseError("rollback failed")],
+        ),
+        pytest.raises(
+            DatabaseError, match="restoring the previous configuration also failed: rollback failed"
+        ),
+    ):
+        manager.set_performance_schema(True)
+
+
+def test_performance_schema_rejects_non_boolean_before_touching_server() -> None:
+    manager = _manager()
+    with (
+        patch.object(manager, "is_installed") as installed,
+        pytest.raises(DatabaseError, match="either enabled or disabled"),
+    ):
+        manager.set_performance_schema(1)
+    installed.assert_not_called()
+
+
+def test_innodb_buffer_pool_change_applies_live_and_persists_limits(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    managed_file.write_text("# Managed by Pilot's database variable editor.\n[mysqld]\n")
+    mib = 1024 * 1024
+    state = {
+        "innodb_buffer_pool_size": 128 * mib,
+        "innodb_buffer_pool_size_max": 352 * mib,
+    }
+
+    def set_global(variable: str, value: int) -> None:
+        state[variable] = value
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "_total_memory_mb", return_value=2048),
+        patch.object(manager, "_read_global_integer", side_effect=lambda variable: state[variable]),
+        patch.object(manager, "_set_global_integer", side_effect=set_global) as update,
+        patch.object(manager, "_restart_and_wait_healthy") as restart,
+    ):
+        assert manager.set_innodb_buffer_pool_size(256) is True
+
+    update.assert_called_once_with("innodb_buffer_pool_size", 256 * mib)
+    restart.assert_not_called()
+    assert "innodb-buffer-pool-size = 256M" in managed_file.read_text()
+    assert "innodb-buffer-pool-size-max = 352M" in managed_file.read_text()
+    assert "innodb-buffer-pool-size-auto-min = 128M" in managed_file.read_text()
+
+
+def test_innodb_buffer_pool_increase_restarts_when_live_ceiling_is_too_low(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    (config_dir / "managed.cnf").write_text("# Managed by Pilot's database variable editor.\n[mysqld]\n")
+    mib = 1024 * 1024
+    state = {
+        "innodb_buffer_pool_size": 128 * mib,
+        "innodb_buffer_pool_size_max": 128 * mib,
+    }
+
+    def restart() -> None:
+        state["innodb_buffer_pool_size"] = 256 * mib
+        state["innodb_buffer_pool_size_max"] = 352 * mib
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "_total_memory_mb", return_value=2048),
+        patch.object(manager, "_read_global_integer", side_effect=lambda variable: state[variable]),
+        patch.object(manager, "_set_global_integer") as update,
+        patch.object(manager, "_restart_and_wait_healthy", side_effect=restart) as restart_server,
+    ):
+        assert manager.set_innodb_buffer_pool_size(256) is True
+
+    restart_server.assert_called_once()
+    update.assert_not_called()
+
+
+def test_max_connections_change_applies_live_and_preserves_other_options(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    managed_file.write_text(
+        "# Managed by Pilot's database variable editor.\n" "[mysqld]\n" "performance-schema = ON\n"
+    )
+    state = {"max_connections": 50}
+
+    def set_global(variable: str, value: int) -> None:
+        state[variable] = value
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "_total_memory_mb", return_value=2048),
+        patch.object(manager, "_read_global_integer", side_effect=lambda variable: state[variable]),
+        patch.object(manager, "_set_global_integer", side_effect=set_global) as update,
+    ):
+        assert manager.set_max_connections(40) is True
+
+    update.assert_called_once_with("max_connections", 40)
+    assert "max-connections = 40" in managed_file.read_text()
+    assert "performance-schema = ON" in managed_file.read_text()
+
+
+def test_failed_dynamic_variable_change_restores_exact_config_and_runtime(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    previous = "# Managed by Pilot's database variable editor.\n" "[mysqld]\n" "performance-schema = OFF\n"
+    managed_file.write_text(previous)
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "_total_memory_mb", return_value=2048),
+        patch.object(manager, "_read_global_integer", return_value=50),
+        patch.object(manager, "_set_global_integer") as update,
+        pytest.raises(DatabaseError, match="previous configuration was restored"),
+    ):
+        manager.set_max_connections(40)
+
+    assert managed_file.read_text() == previous
+    update.assert_called_once_with("max_connections", 40)
+
+
+@pytest.mark.parametrize(
+    ("method", "value", "message"),
+    [
+        ("set_innodb_buffer_pool_size", True, "whole number"),
+        ("set_max_connections", "50", "whole number"),
+    ],
+)
+def test_sizing_actions_reject_non_integer_before_touching_server(
+    method: str,
+    value,
+    message: str,
+) -> None:
+    manager = _manager()
+    with (
+        patch.object(manager, "is_installed") as installed,
+        pytest.raises(DatabaseError, match=message),
+    ):
+        getattr(manager, method)(value)
+    installed.assert_not_called()
+
+
+def test_global_integer_helpers_allow_only_known_variables() -> None:
+    manager = _manager()
+    with (
+        patch.object(manager, "connect") as connect,
+        pytest.raises(DatabaseError, match="cannot change"),
+    ):
+        manager._set_global_integer("max_connections; DROP DATABASE mysql", 10)
+    connect.assert_not_called()
+
+
+def test_database_action_lock_is_released_after_action_failure(tmp_path) -> None:
+    manager = _manager()
+    with patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path):
+        with pytest.raises(RuntimeError, match="action failed"), manager.database_action_lock():
+            raise RuntimeError("action failed")
+
+        with manager.database_action_lock():
+            pass
+
+
+def test_database_action_lock_rejects_concurrent_host_action(tmp_path) -> None:
+    manager = _manager()
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        manager.database_action_lock(),
+        pytest.raises(DatabaseError, match="Another database action"),
+        manager.database_action_lock(),
+    ):
+        pass
+
+
+def test_restart_managed_server_verifies_health_under_action_lock(tmp_path) -> None:
+    manager = _manager()
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "_restart_and_wait_healthy") as restart,
+    ):
+        manager.restart_managed_server()
+    restart.assert_called_once()
 
 
 def test_data_directory_initialization_uses_pilot_option_file(tmp_path) -> None:

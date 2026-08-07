@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import contextlib
 import subprocess
+import time
 from pathlib import Path
+
+_STALE_TEMP_FILE_SECONDS = 24 * 60 * 60
 
 
 class GitRepo:
@@ -76,7 +80,22 @@ class GitRepo:
 
     def fetch(self, *refspecs: str, timeout: float | None = None) -> bool:
         """Best-effort fetch from origin; returns False instead of raising on failure."""
+        self.prune_stale_temp_packs()
         return self._run("fetch", "origin", *refspecs, "--quiet", timeout=timeout).returncode == 0
+
+    def prune_stale_temp_packs(self) -> None:
+        """Drop pack files left behind by a fetch that was killed mid-transfer.
+
+        A killed process runs no cleanup of its own, so this happens on the way
+        into the next fetch rather than on the way out of the last one. The
+        one-day floor is git's own staleness rule for these files, which keeps
+        it clear of a fetch running right now.
+        """
+        cutoff = time.time() - _STALE_TEMP_FILE_SECONDS
+        for temp_file in self.path.glob(".git/objects/pack/tmp_*"):
+            with contextlib.suppress(OSError):
+                if temp_file.stat().st_mtime < cutoff:
+                    temp_file.unlink()
 
     def abort_merge_rebase(self) -> None:
         """Best-effort cleanup of an in-progress merge/rebase, e.g. before switching branches."""

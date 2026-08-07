@@ -72,6 +72,7 @@
       <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
       <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
       <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />
+      <Activities v-else-if="activeTab === 'activity'" :site-name="siteName" />
       <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
     </div>
   </template>
@@ -99,6 +100,7 @@ import SiteBackups from '@/components/sites/Backups.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
 import PageHero from '@/components/common/PageHero.vue'
+import Activities from '@/pages/Activities.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
@@ -137,6 +139,7 @@ const tabs = [
   { value: 'apps', label: 'Apps' },
   { value: 'backups', label: 'Backups' },
   { value: 'config', label: 'Config' },
+  { value: 'activity', label: 'Activity' },
   { value: 'settings', label: 'Settings' },
 ]
 
@@ -184,7 +187,7 @@ watch(
 const isMobile = useIsMobile()
 
 function openSite() {
-  window.open(`https://${site.value.name}`, '_blank')
+  window.open(`https://${site.value.name}/desk`, '_blank')
 }
 
 const settingUpSite = ref(false)

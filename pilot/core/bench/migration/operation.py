@@ -215,6 +215,10 @@ class MigrationOperation:
                 "output_excerpt": getattr(error, "output", "") or "",
             }
             self._enter_needs_attention("updating", None)
+            # Nothing in this phase writes to a site database, so whatever failed
+            # here - a fetch, a check, an install, a build - leaves the sites
+            # untouched and going back is a checkout. No user call needed.
+            self._transition("reverting_apps")
             raise
         self.apps_updated = True
         self._transition("migrating")

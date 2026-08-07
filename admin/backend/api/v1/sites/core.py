@@ -64,7 +64,7 @@ def detail(name: str):
     # Installable = apps that are cloned but not yet installed on this site
     try:
         all_apps = [a.name for a in AppProvider(bench_root).get_all()]
-        installable = [a for a in all_apps if a not in site.installed_apps]
+        installable = [a for a in all_apps if a not in site.active_apps]
     except Exception:
         installable = []
 
@@ -255,7 +255,7 @@ def _site_resource(site: SiteInfo) -> dict:
     return {
         "name": site.name,
         "exists": site.exists,
-        "installed_apps": [app for app in site.installed_apps if isinstance(app, str)],
+        "active_apps": [app for app in site.active_apps if isinstance(app, str)],
         "framework_branch": framework_branch if isinstance(framework_branch, str) else "",
         "broken": site.broken,
         "provisioning": site.provisioning,

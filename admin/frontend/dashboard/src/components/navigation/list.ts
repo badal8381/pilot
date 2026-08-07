@@ -1,4 +1,16 @@
-export const sidebarSections = [
+interface SidebarNavItem {
+  label: string
+  icon: string
+  to: string
+  flag?: string
+}
+
+interface SidebarSection {
+  label?: string
+  items: SidebarNavItem[]
+}
+
+export const sidebarSections: SidebarSection[] = [
   {
     items: [
       { label: 'Sites', icon: 'lucide-globe', to: '/sites' },
@@ -11,8 +23,8 @@ export const sidebarSections = [
     items: [
       { label: 'Analytics', icon: 'lucide-chart-line', to: '/insights/analytics' },
       { label: 'Updates', icon: 'lucide-git-pull-request-arrow', to: '/updates' },
-      { label: 'Logs', icon: 'lucide-scroll-text', to: '/insights/logs' },
       { label: 'Tasks', icon: 'lucide-list-checks', to: '/insights/tasks' },
+      { label: 'Logs', icon: 'lucide-scroll-text', to: '/insights/logs' },
     ],
   },
   {
