@@ -2,32 +2,22 @@ export const STATUS_CONFIG = {
   queued: {
     label: 'Queued',
     theme: 'blue',
-    icon: 'lucide-clock-3',
-    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
   success: {
     label: 'Success',
     theme: 'green',
-    icon: 'lucide-check',
-    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
   failed: {
     label: 'Failed',
     theme: 'red',
-    icon: 'lucide-x',
-    iconBg: 'bg-surface-red-2 text-ink-red-8',
   },
   running: {
     label: 'Running',
     theme: 'amber',
-    icon: 'lucide-loader-circle animate-spin',
-    iconBg: 'bg-surface-amber-2 text-ink-amber-8',
   },
   killed: {
     label: 'Killed',
     theme: 'gray',
-    icon: 'lucide-square',
-    iconBg: 'bg-surface-gray-2 text-ink-gray-6',
   },
 }
 
@@ -154,15 +144,26 @@ const SITE_ARG_KEY = {
   'new-site-from-backup': 'name',
 }
 
+// Work with no site of its own belongs to the server. Doubles as the value the
+// site filter carries, so it has to read as a label.
+export const SERVER_SCOPE = 'Server'
+
 export function siteLabel(task) {
   const key = SITE_ARG_KEY[task.command]
-  return (key && task.args?.[key]) || 'Server-level'
+  return (key && task.args?.[key]) || SERVER_SCOPE
 }
 
 export function siteRoute(task) {
   const site = siteLabel(task)
-  if (site === 'Server-level') return null
+  if (site === SERVER_SCOPE) return null
   return { name: 'SiteDetail', params: { name: site } }
+}
+
+// What a task ran against, so a detail header reads the same either way.
+export function taskScope(task) {
+  const label = siteLabel(task)
+  if (label === SERVER_SCOPE) return { label, route: { name: 'Server' } }
+  return { label, route: siteRoute(task) }
 }
 
 const REDIRECT_ON_SUCCESS_COMMANDS = [
@@ -225,4 +226,20 @@ export function fmtDuration(seconds, { precise = false } = {}) {
 export function fmtDateTime(iso) {
   if (!iso) return '-'
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+/**
+ * The list's trailing column. A queued task has no duration, so its place in
+ * the queue takes that slot - it is the only thing worth knowing about a task
+ * that has not started.
+ */
+export function taskTiming(task) {
+  if (task.status === 'queued') {
+    const position = task.queue_position ? `#${task.queue_position} in queue` : ''
+    return [position, relativeTime(task.queued_at)].filter(Boolean).join(' · ')
+  }
+  const duration = fmtDuration(task.duration_seconds)
+  return [duration ? `took ${duration}` : '', relativeTime(task.started_at || task.queued_at)]
+    .filter(Boolean)
+    .join(' · ')
 }

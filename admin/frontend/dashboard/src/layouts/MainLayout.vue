@@ -95,7 +95,7 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
 
         <div id="header-badge" class="flex items-center" />
         <div id="header-actions" class="flex items-center gap-2 ml-auto">
-          <UpdateStatusButton v-if="route.name !== 'SiteDetail'" />
+          <UpdateStatusButton v-if="!['SiteDetail', 'UpdateDetail'].includes(route.name)" />
         </div>
       </div>
     </header>
@@ -136,7 +136,7 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
           <Breadcrumbs :items="breadcrumbs" />
           <div id="header-badge" class="flex items-center" />
           <div id="header-actions" class="flex items-center gap-2 ml-auto">
-            <UpdateStatusButton />
+            <UpdateStatusButton v-if="route.name !== 'UpdateDetail'" />
           </div>
         </div>
       </div>
