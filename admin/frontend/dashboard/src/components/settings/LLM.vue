@@ -20,9 +20,8 @@
         <p class="font-medium text-ink-gray-8 text-base">Connected to {{ providerLabel }}</p>
         <p class="text-ink-gray-5 text-p-sm">Model {{ model || '—' }} · API key set</p>
       </div>
+
       <Button
-        class="flex-1 sm:flex-none"
-        variant="subtle"
         theme="red"
         :loading="disconnecting"
         @click="disconnect"
