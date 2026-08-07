@@ -2,8 +2,8 @@
 import { Tree } from 'frappe-ui'
 import { computed, onMounted, reactive, ref } from 'vue'
 import { appsApi } from '@/api/apps'
+import AppIcon from '@/components/apps/AppIcon.vue'
 import UsageMeter from '@/components/common/UsageMeter.vue'
-import { hashColor } from '@/composables/apps/useAppRegistry'
 import type { BenchBreakdown, SiteStorage } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
 
@@ -29,7 +29,6 @@ const asStorageNode = (node: unknown) => node as StorageNode
 const props = defineProps<Props>()
 
 const logoByName = ref<Record<string, string>>({})
-const failedLogos = reactive(new Set<string>())
 
 onMounted(async () => {
   try {
@@ -141,20 +140,12 @@ const treeNodes = computed(() => reactive([
           class="rounded-full size-2 shrink-0"
           :style="{ backgroundColor: asStorageNode(rawNode).dot }"
         />
-        <img
-          v-else-if="asStorageNode(rawNode).logo && !failedLogos.has(asStorageNode(rawNode).label)"
-          :src="asStorageNode(rawNode).logo"
-          :alt="asStorageNode(rawNode).label"
-          class="rounded-sm size-4 shrink-0 object-contain"
-          @error="failedLogos.add(asStorageNode(rawNode).label)"
-        />
-        <span
+        <AppIcon
           v-else-if="'logo' in rawNode"
-          class="grid place-items-center rounded-sm size-4 font-bold text-[9px] text-white shrink-0"
-          :style="{ backgroundColor: hashColor(asStorageNode(rawNode).label) }"
-        >
-          {{ asStorageNode(rawNode).label[0]?.toUpperCase() }}
-        </span>
+          :name="asStorageNode(rawNode).label"
+          :logo="asStorageNode(rawNode).logo || ''"
+          size="xs"
+        />
         <span
           v-else-if="asStorageNode(rawNode).icon"
           class="size-3.5 text-ink-gray-4 shrink-0"

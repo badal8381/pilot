@@ -1,34 +1,35 @@
 <template>
   <div class="mx-auto max-w-3xl">
-    <div v-if="loading && !op" class="flex justify-center py-12">
-      <LoadingText />
+    <!-- Skeleton mirrors the page: meta row, then a card of rows. -->
+    <div v-if="loading && !op" class="px-2">
+      <div class="flex justify-between items-center py-2">
+        <Skeleton class="rounded w-44 h-4" />
+        <Skeleton class="rounded w-24 h-4" />
+      </div>
+      <div class="mt-6 p-1 border border-outline-gray-2 rounded-lg">
+        <div class="flex justify-between items-center px-2.5 py-2">
+          <Skeleton class="rounded w-24 h-4" />
+          <Skeleton class="rounded w-12 h-3" />
+        </div>
+        <div
+          v-for="index in 3"
+          :key="index"
+          class="px-2.5 py-2"
+          :style="{ opacity: 1 - index * 0.25 }"
+        >
+          <Skeleton class="rounded w-48 h-4" />
+        </div>
+      </div>
     </div>
     <ErrorMessage v-else-if="error && !op" class="mt-4" :message="error" />
 
     <template v-else-if="op">
-      <!-- Header -->
-      <div class="flex justify-between items-center gap-3">
-        <div class="flex items-center gap-2 min-w-0">
-          <Button
-            class="shrink-0"
-            variant="subtle"
-            size="sm"
-            icon="lucide-arrow-left"
-            label="Back to updates"
-            tooltip="Back to updates"
-            @click="router.push({ name: 'Updates' })"
-          />
-          <h1 class="flex-1 min-w-0 font-semibold text-ink-gray-9 text-xl truncate">{{ title }}</h1>
-          <Badge
-            v-if="pending"
-            class="shrink-0"
-            theme="amber"
-            variant="subtle"
-            size="md"
-            :label="pendingLabel"
-          />
-          <UpdateStateBadge v-else class="shrink-0" :state="op.state" />
-        </div>
+      <Teleport defer to="#header-badge">
+        <Badge v-if="pending" theme="amber" variant="subtle" size="md" :label="pendingLabel" />
+        <UpdateStateBadge v-else :state="op.state" />
+      </Teleport>
+
+      <Teleport defer to="#header-actions">
         <Button
           variant="subtle"
           size="sm"
@@ -38,235 +39,243 @@
           :loading="refreshing"
           @click="refresh"
         />
-      </div>
+      </Teleport>
 
-      <!-- Metadata -->
-      <div
-        class="gap-4 grid grid-cols-2 mt-4 px-0 py-4 rounded-xl sm:grid-cols-5"
-      >
-        <div v-for="item in metadata" :key="item.label">
-          <p class="text-xs text-ink-gray-4">{{ item.label }}</p>
-          <button
-            v-if="item.taskId"
-            type="button"
-            class="mt-1 block truncate text-sm text-ink-gray-8 hover:underline"
-            @click="openTaskLog({ id: item.taskId })"
-          >
-            {{ item.value }}
-          </button>
-          <p v-else class="mt-1 truncate text-sm text-ink-gray-8">{{ item.value }}</p>
-        </div>
-      </div>
+      <p class="mt-5 px-2 font-medium text-ink-gray-8 text-base truncate">{{ metaLine }}</p>
 
       <ErrorMessage v-if="error" class="mt-4" :message="error" />
 
       <!-- Unresolved failure -->
-      <section
-        v-if="isAttention"
-        class="mt-4 overflow-hidden rounded-xl border border-outline-red-2"
-      >
-        <div class="flex items-start gap-3 bg-surface-red-1 p-4 sm:p-5">
-          <span class="lucide-alert-triangle mt-0.5 size-5 shrink-0 text-ink-red-6" />
-          <div class="min-w-0 flex-1">
-            <h2 class="font-semibold text-sm">This update needs attention</h2>
-            <!-- Tool output indents and box-draws; keep it preformatted. -->
-            <pre
-              v-if="op.diagnosis?.message"
-              class="mt-1 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-ink-red-8"
-              >{{ op.diagnosis.message }}</pre
-            >
-            <p v-if="op.diagnosis?.patch" class="mt-2 text-p-sm text-ink-gray-7">
-              Failing patch
-              <code
-                class="ml-1 rounded bg-surface-red-2 px-1.5 py-0.5 font-mono text-xs text-ink-red-9"
-              >
-                {{ op.diagnosis.patch }}
-              </code>
-            </p>
-            <p
-              v-if="patchAlreadySkipped"
-              class="mt-2 flex items-center gap-1 text-p-sm font-medium text-ink-green-7"
-            >
-              <span class="lucide-check size-4" />
-              Patch Skipped
-            </p>
-            <p class="mt-3 text-p-sm text-ink-gray-6">
-              <template v-if="op.state === 'revert_failed'"
-                >Fix the cause and run the restore again.</template
-              >
-              <template v-else>
-                Fix the cause manually, then retry. Or restore everything back to its pre-update
-                state.
-              </template>
-            </p>
-
-            <p v-if="pending" class="mt-4 flex items-center gap-2 text-p-sm text-ink-gray-7">
-              <span class="lucide-loader-circle size-4 animate-spin text-ink-amber-7" />
-              {{ pendingLabel }}
-            </p>
-            <div v-else class="mt-4 flex flex-wrap gap-2">
-              <Button
-                v-if="op.state === 'needs_attention' && op.diagnosis?.patch && !patchAlreadySkipped"
-                variant="solid"
-                theme="red"
-                :loading="acting"
-                @click="confirmSkip = true"
-              >
-                Skip patch
-              </Button>
-              <Button
-                v-if="op.state === 'needs_attention'"
-                variant="outline"
-                theme="gray"
-                :loading="acting"
-                @click="doRetry"
-              >
-                Retry update
-              </Button>
-              <Button
-                v-if="op.can_restore"
-                variant="outline"
-                theme="gray"
-                :loading="acting"
-                @click="confirmRestore = true"
-              >
-                Restore backup
-              </Button>
-            </div>
+      <section v-if="isAttention" class="mt-4 overflow-hidden rounded-lg border border-outline-gray-2">
+        <div class="p-4">
+          <div class="flex items-center gap-2">
+            <span class="lucide-alert-triangle size-4 shrink-0 text-ink-red-6" />
+            <h2 class="font-medium text-ink-red-8 text-base">
+              {{ alertTitle }}
+            </h2>
           </div>
-        </div>
-
-        <details
-          v-if="op.diagnosis?.output_excerpt"
-          class="border-t border-outline-red-2 bg-surface-base"
-        >
-          <summary
-            class="cursor-pointer px-4 py-3 text-p-sm font-medium text-ink-gray-7 hover:bg-surface-gray-1 sm:px-5"
-          >
-            Show error output
-          </summary>
+          <!-- Tool output indents and box-draws; keep it preformatted. -->
           <pre
-            class="m-3 max-h-64 overflow-auto rounded-lg bg-surface-gray-9 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap text-ink-gray-1 sm:m-4"
-          >
-    {{ op.diagnosis.output_excerpt }}</pre>
-        </details>
-      </section>
-
-      <!-- Sites -->
-      <section class="mt-4 overflow-hidden rounded-xl border border-outline-gray-2">
-        <div
-          class="flex items-center justify-between border-b border-outline-gray-1 px-4 py-3.5 sm:px-5"
-        >
-          <div class="flex items-center gap-2">
-            <span class="lucide-server size-4 text-ink-gray-5" />
-            <h2 class="text-base font-semibold text-ink-gray-8">Sites</h2>
-          </div>
-          <span class="text-p-sm text-ink-gray-5">{{ countLabel(op.sites?.length, 'site') }}</span>
-        </div>
-
-        <div v-if="op.sites?.length" class="divide-y divide-outline-gray-1">
-          <div
-            v-for="site in op.sites"
-            :key="site.name"
-            class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5"
-          >
-            <RouterLink
-              :to="{ name: 'SiteDetail', params: { name: site.name } }"
-              class="min-w-0 flex-1 truncate font-medium text-ink-gray-9 text-sm no-underline hover:text-ink-gray-7"
+            v-if="op.diagnosis?.message"
+            class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-ink-gray-8"
+            >{{ op.diagnosis.message }}</pre>
+          <p v-if="op.diagnosis?.patch" class="mt-2 text-p-sm text-ink-gray-7">
+            Failing patch
+            <code
+              class="ml-1 rounded bg-surface-gray-2 px-1.5 py-0.5 font-mono text-xs text-ink-gray-8"
             >
-              {{ site.name }}
-            </RouterLink>
-            <div class="flex shrink-0 items-center gap-1.5">
-              <span
-                v-if="siteStatus(site).busy"
-                class="lucide-loader-circle size-3.5 animate-spin text-ink-amber-7"
-              />
-              <Badge
-                :theme="badgeTone(siteStatus(site).tone)"
-                variant="subtle"
-                :label="siteStatus(site).label"
-              />
-              <Dropdown :options="siteLogOptions(site.name)" placement="bottom-end">
-                <template #default="{ open }">
-                  <Button variant="ghost" size="sm" :active="open" tooltip="Site jobs">
-                    <span class="lucide-list-checks size-4" />
-                  </Button>
-                </template>
-              </Dropdown>
-            </div>
-          </div>
-        </div>
-        <p v-else class="px-5 py-8 text-center text-p-sm text-ink-gray-5">
-          No sites are part of this update.
-        </p>
-      </section>
-
-      <!-- Apps -->
-      <section
-        v-if="op.apps?.length"
-        class="mt-4 overflow-hidden rounded-xl border border-outline-gray-2"
-      >
-        <div
-          class="flex items-center justify-between border-b border-outline-gray-1 px-4 py-3.5 sm:px-5"
-        >
-          <div class="flex items-center gap-2">
-            <span class="lucide-git-branch size-4 text-ink-gray-5" />
-            <h2 class="text-base font-semibold text-ink-gray-8">Target apps</h2>
-          </div>
-          <span class="text-p-sm text-ink-gray-5">{{ countLabel(op.apps.length, 'app') }}</span>
-        </div>
-
-        <div class="divide-y divide-outline-gray-1">
-          <div
-            v-for="app in op.apps"
-            :key="app.name"
-            class="flex items-center justify-between gap-4 px-4 py-3 sm:px-5"
+              {{ op.diagnosis.patch }}
+            </code>
+          </p>
+          <p
+            v-if="patchAlreadySkipped"
+            class="mt-2 flex items-center gap-1 text-p-sm font-medium text-ink-green-7"
           >
-            <p class="min-w-0 flex-1 truncate font-medium text-ink-gray-9 text-sm">
-              {{ app.name }}
-            </p>
-            <div class="flex shrink-0 items-center gap-2 font-mono text-xs text-ink-gray-6">
-              <span>{{ shortSha(app.sha) }}</span>
-              <span class="lucide-arrow-right size-3.5 text-ink-gray-4" aria-hidden="true" />
-              <span :class="app.updated_sha ? 'text-ink-green-7' : 'text-ink-gray-5'">
-                {{ shortSha(app.updated_sha || app.target_sha) }}
-              </span>
-              <a
-                v-if="app.compare_url"
-                :href="app.compare_url"
-                target="_blank"
-                rel="noopener noreferrer"
-                class="lucide-external-link size-3.5 text-ink-gray-4 hover:text-ink-gray-7"
-                aria-label="Open diff"
-              />
-            </div>
+            <span class="lucide-check size-4" />
+            Patch skipped
+          </p>
+          <p class="mt-3 text-p-sm text-ink-gray-6">
+            <template v-if="op.state === 'revert_failed'"
+              >Fix the cause and run the restore again.</template
+            >
+            <template v-else>
+              Fix the cause manually, then retry. Or restore everything back to its pre-update
+              state.
+            </template>
+          </p>
+
+          <!-- Links to the running action task so the user can watch it. -->
+          <button
+            v-if="pending"
+            type="button"
+            class="mt-4 flex items-center gap-2 px-2 py-1 rounded transition-colors text-p-sm text-ink-gray-7 hover:bg-surface-gray-1"
+            @click="openTaskLog({ id: pending.task_id })"
+          >
+            <Spinner size="md" class="text-ink-amber-7" />
+            {{ pendingLabel }}
+            <span class="lucide-square-terminal size-4" />
+          </button>
+          <!-- Skip patch leads: it is the cheapest recovery, ahead of a restore. -->
+          <div v-else class="mt-4 flex flex-wrap gap-2">
+            <Button
+              v-if="op.state === 'needs_attention' && op.diagnosis?.patch && !patchAlreadySkipped"
+              variant="subtle"
+              theme="red"
+              :loading="acting"
+              @click="confirmSkip = true"
+            >
+              Skip patch
+            </Button>
+            <Button
+              v-if="op.state === 'needs_attention'"
+              variant="subtle"
+              :loading="acting"
+              @click="doRetry"
+            >
+              Retry update
+            </Button>
+            <Button
+              v-if="op.can_restore"
+              variant="subtle"
+              :loading="acting"
+              @click="confirmRestore = true"
+            >
+              Restore backup
+            </Button>
           </div>
         </div>
+
+        <div
+          v-if="op.diagnosis?.output_excerpt"
+          class="border-t border-outline-gray-1 px-2.5 py-1.5"
+        >
+          <Button variant="ghost" @click="showOutput = !showOutput">
+            {{ showOutput ? 'Hide error output' : 'Show error output' }}
+            <template #suffix>
+              <span
+                class="size-4 transition-transform lucide-chevron-down"
+                :class="showOutput ? 'rotate-180' : ''"
+              />
+            </template>
+          </Button>
+          <LogView v-if="showOutput" class="mt-1 mb-2" :lines="outputLines" wrap />
+        </div>
       </section>
+
+      <!-- Run order: apps update first, then sites migrate. -->
+      <div
+        v-if="op.sites?.length || op.apps?.length || serverJobs.length"
+        class="mt-3 space-y-2"
+      >
+        <UpdateSection
+          v-if="op.apps?.length"
+          v-model:open="appsOpen"
+          icon="lucide-box"
+          title="Target apps"
+          :count="op.apps.length"
+        >
+          <div>
+            <div
+              v-for="app in op.apps"
+              :key="app.name"
+              class="flex items-center justify-between gap-4 px-2.5 py-2"
+            >
+              <div class="flex items-center gap-2 min-w-0 flex-1">
+                <AppIcon :name="app.name" class="!rounded-sm size-5" initial-class="text-xs" />
+                <p class="min-w-0 truncate text-ink-gray-9 text-base">
+                  {{ app.name }}
+                </p>
+              </div>
+              <Tooltip :text="revisionHint(app)">
+                <component
+                  :is="app.compare_url ? 'a' : 'div'"
+                  :href="app.compare_url || undefined"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="flex shrink-0 items-center gap-2 font-mono text-xs text-ink-gray-6"
+                  :class="app.compare_url ? 'hover:text-ink-gray-8' : ''"
+                >
+                  <span>{{ shortSha(app.sha) }}</span>
+                  <span class="lucide-arrow-right size-3.5 text-ink-gray-4" aria-hidden="true" />
+                  <span :class="app.updated_sha ? 'text-ink-green-7' : 'text-ink-gray-5'">
+                    {{ shortSha(app.updated_sha || app.target_sha) }}
+                  </span>
+                  <span
+                    v-if="app.compare_url"
+                    class="lucide-external-link size-3.5 text-ink-gray-4"
+                    aria-hidden="true"
+                  />
+                </component>
+              </Tooltip>
+            </div>
+          </div>
+        </UpdateSection>
+
+        <!-- Bench-wide jobs, run before any site is touched. -->
+        <UpdateSection
+          v-if="serverJobs.length"
+          v-model:open="serverOpen"
+          icon="lucide-server"
+          title="Server"
+          :count="serverJobs.length"
+        >
+          <JobRow
+            v-for="job in serverJobs"
+            :key="job.id"
+            :job="job"
+            @click="openTaskLog(job)"
+          />
+        </UpdateSection>
+
+        <!-- Sites -->
+        <UpdateSection
+          v-if="op.sites?.length"
+          v-model:open="sitesOpen"
+          icon="lucide-globe"
+          title="Sites"
+          :count="sitesCount"
+        >
+          <div>
+            <div v-for="site in op.sites" :key="site.name">
+              <div
+                class="flex items-center gap-2 px-2.5 py-2 rounded transition-colors"
+                :class="siteJobs(site.name).length ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
+                @click="toggleSiteJobs(site.name)"
+              >
+                <!-- Hidden, not omitted: keeps job-less rows aligned. -->
+                <span
+                  class="size-4 text-ink-gray-5 transition-transform shrink-0 lucide-chevron-right"
+                  :class="[
+                    siteJobs(site.name).length ? '' : 'invisible',
+                    expandedSites.has(site.name) ? 'rotate-90' : '',
+                  ]"
+                />
+                <p class="flex-1 min-w-0 text-ink-gray-9 text-base truncate">
+                  {{ site.name }}
+                </p>
+                <span
+                  v-if="siteCaption(site)"
+                  class="flex items-center gap-1.5 text-sm shrink-0"
+                  :class="siteStatus(site).value === 'failed' ? 'text-ink-red-7' : 'text-ink-gray-5'"
+                >
+                  <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-7" />
+                  {{ siteCaption(site) }}
+                </span>
+              </div>
+              <div
+                v-if="expandedSites.has(site.name)"
+                class="mb-1 ml-4 pl-3 border-l border-outline-gray-2"
+              >
+                <JobRow
+                  v-for="job in siteJobs(site.name)"
+                  :key="job.id"
+                  :job="job"
+                  @click="openTaskLog(job)"
+                />
+              </div>
+            </div>
+          </div>
+        </UpdateSection>
+      </div>
 
       <!-- User decisions -->
-      <section
+      <UpdateSection
         v-if="op.decisions?.length"
-        class="mt-4 overflow-hidden rounded-xl border border-outline-gray-2"
+        class="mt-2"
+        icon="lucide-skip-forward"
+        title="Skipped patches"
+        :count="op.decisions.length"
       >
-        <div class="flex items-center gap-2 border-b border-outline-gray-1 px-4 py-3.5 sm:px-5">
-          <span class="lucide-gavel size-4 text-ink-gray-5" />
-          <h2 class="text-base font-semibold text-ink-gray-8">Decisions</h2>
+        <div
+          v-for="(decision, index) in op.decisions"
+          :key="index"
+          class="px-2.5 py-2 text-sm text-ink-gray-7"
+        >
+          <code class="rounded bg-surface-gray-2 px-1 font-mono text-xs">{{ decision.patch }}</code>
+          on
+          <span class="font-medium text-ink-gray-8">{{ decision.site }}</span>
         </div>
-        <div class="divide-y divide-outline-gray-1">
-          <div
-            v-for="(decision, index) in op.decisions"
-            :key="index"
-            class="px-4 py-3 text-sm text-ink-gray-7 sm:px-5"
-          >
-            Skipped patch
-            <code class="rounded bg-surface-gray-2 px-1 font-mono text-xs"
-              >{{ decision.patch }}</code
-            >
-            on <span class="font-medium text-ink-gray-8">{{ decision.site }}</span>
-          </div>
-        </div>
-      </section>
+      </UpdateSection>
 
       <!-- Skip patch confirmation -->
       <Dialog v-model="confirmSkip" :options="{ title: 'Skip this patch permanently?' }">
@@ -274,8 +283,9 @@
           <p class="text-p-sm text-ink-gray-6">
             Skipping marks
             <code class="rounded bg-surface-gray-2 px-1 font-mono">{{ op.diagnosis?.patch }}</code>
-            as completed for <b class="text-ink-gray-9">{{ op.failed_site }}</b> without running it.
-            This cannot be undone. Retry the update afterwards to continue.
+            as completed for
+            <b class="text-ink-gray-9">{{ op.failed_site }}</b> without running it. This cannot be
+            undone, and the migration carries on from where it stopped.
           </p>
         </template>
         <template #actions>
@@ -308,7 +318,22 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Badge, Button, Dialog, Dropdown, ErrorMessage, LoadingText } from 'frappe-ui'
+import {
+  Badge,
+  Button,
+  Dialog,
+  ErrorMessage,
+  Skeleton,
+  Spinner,
+  Tooltip,
+} from 'frappe-ui'
+import AppIcon from '@/components/apps/AppIcon.vue'
+import JobRow from '@/components/updates/JobRow.vue'
+import LogView from '@/components/logs/LogView.vue'
+import UpdateSection from '@/components/updates/UpdateSection.vue'
+import UpdateStateBadge from '@/components/updates/UpdateStateBadge.vue'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
+import { processLine } from '@/utils/ansi'
 import { updatesApi, isActive, isResolved, needsAttention } from '@/api/updates'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { fmtDateTime, fmtDuration } from '@/utils/taskFormat'
@@ -341,45 +366,57 @@ const durationSeconds = computed(() => {
   return Math.max(0, (end - new Date(op.value.started_at).getTime()) / 1000)
 })
 
-// The 'update' phase runs once per operation, so a single chain entry identifies it;
-// 'restore' is the task_ids role the restore/revert action is queued under (api/updates.js).
-const updateTaskId = computed(
-  () => op.value?.chain?.find((entry) => entry.command === 'update')?.task_id,
-)
-const revertTaskId = computed(() => op.value?.task_ids?.restore)
+// Bench-wide chain tasks (update, revert apps, restart); site-bound ones live in the site tree.
+const serverJobs = computed(() => (op.value?.task_logs || []).filter((log) => !log.site))
 
-const metadata = computed(() => [
-  { label: 'Started', value: fmtDateTime(op.value.started_at) },
-  { label: 'Finished', value: op.value.finished_at ? fmtDateTime(op.value.finished_at) : '-' },
-  { label: 'Duration', value: fmtDuration(durationSeconds.value) || '-' },
-  {
-    label: 'Update Task',
-    value: updateTaskId.value ? 'View task' : '-',
-    taskId: updateTaskId.value,
-  },
-  {
-    label: 'Revert Task',
-    value: revertTaskId.value ? 'View task' : '-',
-    taskId: revertTaskId.value,
-  },
-])
+const alertTitle = computed(() =>
+  op.value?.state === 'revert_failed' ? 'Restore failed' : 'This update needs attention',
+)
+
+const showOutput = ref(false)
+const outputLines = computed(() =>
+  (op.value?.diagnosis?.output_excerpt || '').split('\n').map(processLine),
+)
+
+const sitesCount = computed(() => {
+  const sites = op.value?.sites || []
+  if (sites.length > 1 && !isResolved(op.value)) {
+    const migrated = sites.filter((site) =>
+      ['success', 'recovered'].includes(site.migration_status),
+    ).length
+    return `${migrated}/${sites.length}`
+  }
+  return `${sites.length}`
+})
+
+const metaLine = computed(() => {
+  const parts = []
+  if (op.value.started_at) parts.push(`Started ${fmtDateTime(op.value.started_at)}`)
+  const duration = fmtDuration(durationSeconds.value)
+  if (duration) parts.push(isActive(op.value) ? `running for ${duration}` : `took ${duration}`)
+  return parts.join(' · ')
+})
 
 const openTaskLog = (log) => router.push({ name: 'TaskDetail', params: { taskId: log.id } })
 
-function siteLogOptions(siteName) {
-  const logs = (op.value?.task_logs || []).filter((log) => log.site === siteName)
-  if (!logs.length) return [{ label: 'No tasks yet', disabled: true }]
-  return logs.map((log) => ({
-    label: log.label,
-    icon: 'lucide-square-terminal',
-    onClick: () => openTaskLog(log),
-  }))
+const expandedSites = ref(new Set())
+
+function toggleSiteJobs(siteName) {
+  if (!siteJobs(siteName).length) return
+  const expanded = new Set(expandedSites.value)
+  if (!expanded.delete(siteName)) expanded.add(siteName)
+  expandedSites.value = expanded
+}
+
+function siteJobs(siteName) {
+  return (op.value?.task_logs || []).filter((log) => log.site === siteName)
 }
 
 async function load() {
   try {
     op.value = await updatesApi.detail(props.operationId)
     error.value = ''
+    applyOpenDefaults()
     setBreadcrumbs([{ label: 'Updates', route: { name: 'Updates' } }, { label: title.value }])
   } catch (e) {
     error.value = e?.message || 'Could not load this update.'
@@ -426,11 +463,44 @@ const doSkip = () => {
   return runAction(() => updatesApi.bypassPatch(props.operationId, op.value.diagnosis.patch))
 }
 
-const badgeTone = (tone) => (tone === 'orange' ? 'amber' : tone)
-const countLabel = (count = 0, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`
 const shortSha = (sha) => sha?.slice(0, 7) || '—'
 
+// Green sha = the checkout happened; gray = still just the plan.
+function revisionHint(app) {
+  const target = shortSha(app.updated_sha || app.target_sha)
+  return app.updated_sha ? `Updated to ${target}` : `Will update to ${target}`
+}
+
+const anythingFailed = computed(
+  () =>
+    (op.value?.sites || []).some((site) => siteStatus(site).value === 'failed') ||
+    serverJobs.value.some((job) => job.status === 'failed'),
+)
+
+// A settled run starts collapsed; anything unresolved or failed starts open.
+const sitesOpen = ref(true)
+const appsOpen = ref(true)
+const serverOpen = ref(true)
+let openDefaultsSet = false
+
+function applyOpenDefaults() {
+  if (openDefaultsSet || !op.value) return
+  openDefaultsSet = true
+  const settled = isResolved(op.value) && !anythingFailed.value
+  serverOpen.value = !settled
+  sitesOpen.value = !settled
+  appsOpen.value = !settled
+}
+
+function siteCaption(site) {
+  const status = siteStatus(site)
+  if (status.value === 'pending') return ''
+  if (status.value === 'success') return 'Migrated'
+  return status.label
+}
+
 onMounted(async () => {
+  useAppRegistry().load()
   loading.value = true
   try {
     await load()

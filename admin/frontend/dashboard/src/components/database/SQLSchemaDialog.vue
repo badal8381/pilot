@@ -18,7 +18,7 @@
             class="block px-2 py-1.5 rounded-md w-full text-sm text-left truncate transition-colors"
             :class="selected?.name === table.name
               ? 'bg-surface-gray-2 text-ink-gray-9 font-medium'
-              : 'text-ink-gray-7 hover:bg-surface-gray-1'"
+              : 'text-ink-gray-7 hover:bg-surface-alpha-gray-1'"
             @click="selected = table"
           >
             {{ table.name }}

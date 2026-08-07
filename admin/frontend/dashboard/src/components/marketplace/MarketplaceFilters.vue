@@ -1,5 +1,5 @@
 <template>
-  <StickyToolbar class="mt-1">
+  <StickyToolbar>
     <div class="flex sm:flex-row flex-col gap-2">
       <FormControl
         v-model="searchModel"
@@ -57,6 +57,7 @@
 <script setup>
 import { computed, h } from 'vue'
 import { Button, Dropdown, FormControl, TabButtons } from 'frappe-ui'
+import AppIcon from '@/components/apps/AppIcon.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import LucideSearch from '~icons/lucide/search'
 import GithubMark from '@/components/icons/GithubMark.vue'
@@ -76,11 +77,6 @@ const worksWithModel = defineModel('worksWith', { type: String })
 
 const pillOptions = PILLS.map((pill) => ({ label: pill, value: pill }))
 
-function appLogo(option) {
-  if (!option.logo_url) return null
-  return () => h('img', { src: option.logo_url, class: 'size-4 rounded object-contain' })
-}
-
 const worksWithMenu = computed(() => [
   {
     label: 'Any app',
@@ -89,7 +85,8 @@ const worksWithMenu = computed(() => [
   },
   ...props.worksWithOptions.map((option) => ({
     label: option.title,
-    icon: appLogo(option),
+    icon: () =>
+      h(AppIcon, { name: option.name, label: option.title, logo: option.logo_url, size: 'xs' }),
     onClick: () => (worksWithModel.value = option.name),
   })),
 ])

@@ -1,6 +1,6 @@
 <template>
   <div class="flex items-center gap-3">
-    <Skeleton class="rounded-[10px] size-9 shrink-0" />
+    <Skeleton class="rounded-[6px] size-8 shrink-0" />
 
     <div class="flex-1 py-2 min-w-0">
       <!-- Wrappers carry the real card's line-box heights so the swap shifts nothing. -->

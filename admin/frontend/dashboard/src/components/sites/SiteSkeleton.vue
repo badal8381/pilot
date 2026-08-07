@@ -6,9 +6,8 @@
     <Skeleton class="rounded size-8 shrink-0" />
     <div class="flex-1 min-w-0">
       <!-- 24px and 20px line boxes, matching the real card's two rows. -->
-      <div class="flex items-center gap-1.5 h-6">
+      <div class="flex items-center h-6">
         <Skeleton class="rounded h-3.5" :class="nameWidth" />
-        <Skeleton class="rounded-full w-12 h-4 shrink-0" />
       </div>
       <div class="flex items-center h-5">
         <Skeleton class="rounded w-12 h-2.5" />

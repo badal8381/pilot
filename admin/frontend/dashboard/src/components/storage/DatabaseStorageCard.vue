@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Badge } from 'frappe-ui'
 import { computed, ref } from 'vue'
-import BinlogPurgeAlert from '@/components/server/BinlogPurgeAlert.vue'
+import BinlogPurgeAlert from '@/components/storage/BinlogPurgeAlert.vue'
 import UsageMeter from '@/components/common/UsageMeter.vue'
 import type { DatabaseBreakdown } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
@@ -83,7 +83,6 @@ const isDatabaseListExpandable = computed(
       Storage breakdown is not available for the {{ data.engine }} engine.
     </p>
 
-    <!-- data -->
     <template v-else>
       <UsageMeter
         :parts="groupParts"
@@ -97,28 +96,33 @@ const isDatabaseListExpandable = computed(
         <Badge :label="String(data.databases.length)" />
       </div>
 
-      <div class="max-h-40 overflow-y-auto">
+      <div class="-mx-2 max-h-40 overflow-y-auto hover-merges-dividers">
         <component
           :is="row.site ? 'router-link' : 'div'"
           v-for="row in visibleDatabases"
           :key="row.schema"
           :to="row.site ? { path: '/database/analyzer', query: { site: row.site } } : undefined"
-          class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 last:border-b-0 no-underline"
+          class="group block px-2 rounded no-underline transition-colors"
+          :class="{ 'hover:bg-surface-gray-1': row.site }"
         >
-          <div class="flex items-center gap-2">
-            <span class="text-ink-gray-5" :class="row.site ? 'lucide-globe' : 'lucide-database'" />
-            <span
-              class="text-sm truncate"
-              :class="row.site ? 'text-ink-gray-8' : 'text-ink-gray-7'"
-            >
-              {{ row.site || row.schema }}
-            </span>
-            <Badge v-if="row.system" label="system" theme="gray" size="sm" />
-            <lucide-chevron-right v-if="row.site" class="size-3.5 text-ink-gray-5" />
-          </div>
+          <div
+            class="flex justify-between items-center gap-4 py-2 border-b border-outline-alpha-gray-1 transition-colors group-last:border-b-0"
+          >
+            <div class="flex items-center gap-2">
+              <span class="text-ink-gray-5" :class="row.site ? 'lucide-globe' : 'lucide-database'" />
+              <span
+                class="text-sm truncate"
+                :class="row.site ? 'text-ink-gray-8' : 'text-ink-gray-7'"
+              >
+                {{ row.site || row.schema }}
+              </span>
+              <Badge v-if="row.system" label="system" theme="gray" size="sm" />
+              <lucide-chevron-right v-if="row.site" class="size-3.5 text-ink-gray-5" />
+            </div>
 
-          <div class="text-ink-gray-8 text-sm tabular-nums shrink-0">
-            {{ formatBytes(row.bytes) }}
+            <div class="text-ink-gray-8 text-sm tabular-nums shrink-0">
+              {{ formatBytes(row.bytes) }}
+            </div>
           </div>
         </component>
       </div>

@@ -1,7 +1,7 @@
 <template>
   <div class="mx-auto max-w-3xl">
     <!-- Bar -->
-    <StickyToolbar class="flex items-center gap-2">
+    <StickyToolbar v-if="showToolbar" class="flex items-center gap-2">
       <!-- Search text bar -->
       <FormControl
         v-model="search"
@@ -74,8 +74,8 @@
 
                   <!-- Status -->
                   <Badge
-                    :label="statusLabel(site)"
-                    :theme="statusTheme(site)"
+                    v-if="statusBadge(site)"
+                    v-bind="statusBadge(site)"
                     variant="subtle"
                     size="sm"
                     class="shrink-0"
@@ -85,10 +85,14 @@
                 <div class="flex justify-end">
                   <!-- Actions Dropdown -->
                   <Dropdown :options="siteMenuOptions(site)" placement="bottom-end">
-                    <template #default="{ open }">
-                      <Button variant="ghost" size="xs" class="!px-1.5">
-                        <span class="size-4 lucide-more-horizontal" />
-                      </Button>
+                    <template #default>
+                      <Button
+                        variant="ghost"
+                        size="xs"
+                        icon="lucide-ellipsis"
+                        label="Site actions"
+                        tooltip="Actions"
+                      />
                     </template>
                   </Dropdown>
                 </div>
@@ -122,8 +126,8 @@
           </div>
           <div v-else-if="column.key === 'status'">
             <Badge
-              :label="statusLabel(row.site)"
-              :theme="statusTheme(row.site)"
+              v-if="statusBadge(row.site)"
+              v-bind="statusBadge(row.site)"
               variant="subtle"
               size="sm"
             />
@@ -137,9 +141,14 @@
           <div v-else-if="column.key === 'actions'" class="flex justify-end">
             <Dropdown :options="siteMenuOptions(row.site)" placement="bottom-end">
               <template #default="{ open }">
-                <Button variant="ghost" size="sm" :active="open">
-                  <span class="size-4 lucide-more-vertical" />
-                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  :active="open"
+                  icon="lucide-ellipsis"
+                  label="Site actions"
+                  tooltip="Actions"
+                />
               </template>
             </Dropdown>
           </div>
@@ -160,6 +169,10 @@
     />
   </div>
 
+  <Teleport v-if="hasCount" defer to="#header-badge">
+    <Badge :label="filteredSites.length" theme="gray" variant="subtle" size="md" />
+  </Teleport>
+
   <!-- New Site Button -->
   <Teleport defer to="#header-actions">
     <Button variant="solid" @click="showCreate = true">
@@ -178,7 +191,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch, watchEffect } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Badge,
@@ -220,7 +233,6 @@ const viewOptions = [
 ]
 
 const SITE_STATUS = {
-  online: { label: 'Active', theme: 'gray' },
   broken: { label: 'Broken', theme: 'red' },
   offline: { label: 'Paused', theme: 'orange' },
   provisioning: { label: 'Creating', theme: 'blue' },
@@ -243,8 +255,7 @@ function siteStatus(site) {
   return 'online'
 }
 
-const statusLabel = (site) => SITE_STATUS[siteStatus(site)].label
-const statusTheme = (site) => SITE_STATUS[siteStatus(site)].theme
+const statusBadge = (site) => SITE_STATUS[siteStatus(site)]
 
 function appsLabel(site) {
   const count = site.active_apps?.length || 0
@@ -259,6 +270,9 @@ function metaLabel(site) {
 
 const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
 
+// The total, not the filtered list: filtering down to ten must not hide the controls.
+const showToolbar = computed(() => sites.value.length > 10)
+
 const filteredSites = computed(() => {
   const query = search.value.toLowerCase().trim()
   return sites.value.filter((site) => {
@@ -268,12 +282,7 @@ const filteredSites = computed(() => {
   })
 })
 
-// After filteredSites: watchEffect runs immediately, so the computed must
-// exist first. Count is held back until the first load lands.
-watchEffect(() => {
-  const counted = !loading.value || sites.value.length
-  setBreadcrumbs([{ label: counted ? `Sites (${filteredSites.value.length})` : 'Sites' }])
-})
+const hasCount = computed(() => !loading.value || sites.value.length > 0)
 
 const listColumns = [
   { label: 'Site', key: 'site', align: 'left', width: 3 },
