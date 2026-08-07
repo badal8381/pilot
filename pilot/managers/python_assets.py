@@ -34,11 +34,11 @@ class PythonAssetBuilder:
             stream_output=True,
         )
 
-    def build_assets_for_app(self, app: "App") -> None:
+    def build_assets_for_app(self, app: "App", force: bool = False) -> None:
         app_public_dir = app.path / app.config.name / "public"
         dist_dir = app_public_dir / "dist"
 
-        if not git_has_local_changes(app.path):
+        if not force and not git_has_local_changes(app.path):
             if self.try_download_prebuilt_assets(app, app_public_dir, dist_dir):
                 return
             if self.has_prebuilt_assets(dist_dir):

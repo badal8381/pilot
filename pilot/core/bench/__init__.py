@@ -257,10 +257,10 @@ class Bench:
 
         BenchRuntime(self).rebuild_config()
 
-    def rebuild_assets(self, force: bool = False) -> None:
+    def rebuild_assets(self, apps: list[str] | None = None, force: bool = False) -> None:
         from pilot.core.bench.runtime import BenchRuntime
 
-        BenchRuntime(self).rebuild_assets(force)
+        BenchRuntime(self).rebuild_assets(apps, force)
 
     def install_requirements(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
         from pilot.core.bench.runtime import BenchRuntime
