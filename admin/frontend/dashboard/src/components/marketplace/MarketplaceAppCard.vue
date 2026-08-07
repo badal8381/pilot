@@ -1,12 +1,6 @@
 <template>
   <div class="flex items-center gap-3">
-    <AppIcon
-      :name="app.name"
-      :label="app.title"
-      :logo="app.logo_url || ''"
-      class="rounded-[10px] size-9"
-      initial-class="text-base"
-    />
+    <AppIcon :name="app.name" :label="app.title" :logo="app.logo_url || ''" size="xl" />
 
     <div class="flex flex-1 justify-between items-center gap-2 py-2 min-w-0">
       <div class="min-w-0">

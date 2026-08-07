@@ -5,7 +5,7 @@
   <div v-else class="space-y-6">
     <div>
       <p class="mb-1 font-medium text-ink-gray-5 text-xs uppercase tracking-wide">System</p>
-      <div class="divide-y divide-outline-gray-1">
+      <div class="divide-y divide-outline-alpha-gray-1">
         <div
           v-for="(value, label) in systemRows"
           :key="label"
@@ -19,7 +19,7 @@
 
     <div>
       <p class="mb-1 font-medium text-ink-gray-5 text-xs uppercase tracking-wide">Runtime</p>
-      <div class="divide-y divide-outline-gray-1">
+      <div class="divide-y divide-outline-alpha-gray-1">
         <div
           v-for="(value, label) in info.runtime"
           :key="label"

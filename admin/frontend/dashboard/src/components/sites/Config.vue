@@ -39,9 +39,14 @@
         <div v-if="column.key === 'actions'" class="flex justify-end">
           <Dropdown v-if="!row.readonly" :options="menuOptions(row)" placement="left">
             <template #default="{ open }">
-              <Button variant="ghost" size="sm" :active="open"
-                ><span class="size-4 lucide-ellipsis" /></Button
-              >
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="Config actions"
+                tooltip="Actions"
+              />
             </template>
           </Dropdown>
         </div>

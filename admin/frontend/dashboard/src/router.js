@@ -27,7 +27,7 @@ const routes = [
     path: '/sites',
     name: 'Sites',
     component: () => import('./pages/sites/Sites.vue'),
-    meta: { title: 'Sites' },
+    meta: { title: 'Sites', showUpdateStatus: true },
   },
   {
     path: '/sites/:name/:tab?',
@@ -35,17 +35,18 @@ const routes = [
     component: () => import('./pages/sites/SiteDetail.vue'),
     meta: { group: 'Sites' },
   },
+  { path: '/server', redirect: '/storage' },
   {
-    path: '/server',
-    name: 'Server',
-    component: () => import('./pages/server/Server.vue'),
-    meta: { title: 'Server' },
+    path: '/storage',
+    name: 'Storage',
+    component: () => import('./pages/storage/Storage.vue'),
+    meta: { title: 'Storage' },
   },
   {
     path: '/marketplace',
     name: 'Marketplace',
     component: () => import('./pages/marketplace/Marketplace.vue'),
-    meta: { title: 'Marketplace' },
+    meta: { title: 'Marketplace', showUpdateStatus: true },
   },
   {
     path: '/insights/analytics',
@@ -81,7 +82,7 @@ const routes = [
     path: '/updates',
     name: 'Updates',
     component: () => import('./pages/updates/Updates.vue'),
-    meta: { title: 'Updates', group: 'Insights' },
+    meta: { title: 'Updates', group: 'Insights', showUpdateStatus: true },
   },
   {
     path: '/updates/:operationId',

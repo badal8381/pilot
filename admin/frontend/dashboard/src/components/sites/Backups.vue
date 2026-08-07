@@ -51,9 +51,14 @@
           <div v-if="column.key === 'actions'" class="flex justify-end">
             <Dropdown :options="menuOptions(row.set)" placement="left">
               <template #default="{ open }">
-                <Button variant="ghost" size="sm" :active="open"
-                  ><span class="size-4 lucide-ellipsis" /></Button
-                >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  :active="open"
+                  icon="lucide-ellipsis"
+                  label="Backup actions"
+                  tooltip="Actions"
+                />
               </template>
             </Dropdown>
           </div>
@@ -84,8 +89,8 @@
     <template #body-content>
       <p class="text-ink-gray-7 text-sm">
         Delete the backup from
-        <strong>{{ deleteTarget ? fmt(deleteTarget.created_at) : '' }}</strong>? This cannot be
-        undone.
+        <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
+        be undone.
       </p>
       <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
       <div class="flex justify-end gap-2 mt-4">
@@ -118,6 +123,7 @@ import { sitesApi } from '@/api/sites'
 import { tasksApi } from '@/api/tasks'
 import { useSite } from '@/composables/sites/useSite'
 import { openTaskDetailPage } from '@/utils/taskRoute'
+import { fmtDateTime } from '@/utils/taskFormat'
 import { cronToLabel } from '@/utils/backup'
 
 const props = defineProps({ siteName: { type: String, required: true } })
@@ -186,7 +192,6 @@ const columns = [
   { label: '', key: 'actions', align: 'right', width: '3rem' },
 ]
 
-const fmt = (iso) => new Date(iso).toLocaleString()
 const fileOf = (set, kind) => set.files?.find((f) => f.kind === kind) ?? null
 const fmtSize = (b) =>
   !b ? '-' : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 ** 2).toFixed(1)} MB`
@@ -194,7 +199,7 @@ const fmtSize = (b) =>
 const rows = computed(() =>
   backups.value.map((set) => ({
     name: set.created_at,
-    timestamp: fmt(set.created_at),
+    timestamp: fmtDateTime(set.created_at),
     database: fmtSize(fileOf(set, 'database')?.size_bytes),
     public: fmtSize(fileOf(set, 'public-file')?.size_bytes),
     private: fmtSize(fileOf(set, 'private-file')?.size_bytes),

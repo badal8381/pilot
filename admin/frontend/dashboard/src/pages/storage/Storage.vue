@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Badge, Button, ErrorMessage, Skeleton } from 'frappe-ui'
+import { Button, ErrorMessage, Skeleton } from 'frappe-ui'
 
 import { h, onMounted, ref } from 'vue'
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 
 import FCLogo from '@/components/icons/FC.vue'
-import AppStorageCard from '@/components/server/AppStorageCard.vue'
-import DBStorageCard from '@/components/server/DatabaseStorageCard.vue'
+import AppStorageCard from '@/components/storage/AppStorageCard.vue'
+import DBStorageCard from '@/components/storage/DatabaseStorageCard.vue'
 
 import type { StorageBreakdown } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
@@ -34,19 +34,10 @@ onMounted(load)
 
 <template>
   <section class="mx-auto max-w-5xl">
-    <h2 class="text-lg mb-10">
-      Server
-      <Badge theme="amber">WIP</Badge>
-    </h2>
-  </section>
-
-  <!-- storgae -->
-  <section class="mx-auto max-w-5xl">
-    <!-- header -->
     <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
       <h2 class="flex items-center gap-2 font-medium text-ink-gray-8 text-lg">
         <span class="size-4 lucide-hard-drive" />
-        Storage
+        Disk usage
       </h2>
 
       <span v-if="storageData" class="-mr-0.5"> {{ formatBytes(storageData.disk_used) }} </span>
@@ -69,7 +60,6 @@ onMounted(load)
       <Button :iconLeft="h(FCLogo, { class: 'size-4' })"> Manage Storage </Button>
     </div>
 
-    <!-- loader -->
     <div
       v-if="loading && !storageData"
       class="bg-surface-base border border-outline-gray-2 rounded-xl overflow-hidden"

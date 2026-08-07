@@ -95,7 +95,7 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
 
         <div id="header-badge" class="flex items-center" />
         <div id="header-actions" class="flex items-center gap-2 ml-auto">
-          <UpdateStatusButton v-if="!['SiteDetail', 'UpdateDetail'].includes(route.name)" />
+          <UpdateStatusButton v-if="route.meta.showUpdateStatus" />
         </div>
       </div>
     </header>
@@ -132,11 +132,11 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
       class="sticky top-0 z-10 flex min-h-12 flex-col justify-center border-b bg-surface-base px-3 sm:px-5"
     >
       <div class="flex items-center justify-between">
-        <div class="flex flex-1 items-center gap-2">
+        <div class="flex flex-1 items-center gap-1">
           <Breadcrumbs :items="breadcrumbs" />
           <div id="header-badge" class="flex items-center" />
           <div id="header-actions" class="flex items-center gap-2 ml-auto">
-            <UpdateStatusButton v-if="route.name !== 'UpdateDetail'" />
+            <UpdateStatusButton v-if="route.meta.showUpdateStatus" />
           </div>
         </div>
       </div>

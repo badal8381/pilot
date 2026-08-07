@@ -14,7 +14,7 @@ export const sidebarSections: SidebarSection[] = [
   {
     items: [
       { label: 'Sites', icon: 'lucide-globe', to: '/sites' },
-      { label: 'Server', icon: 'lucide-server', to: '/server' },
+      { label: 'Storage', icon: 'lucide-hard-drive', to: '/storage' },
       { label: 'Marketplace', icon: 'lucide-store', to: '/marketplace' },
     ],
   },

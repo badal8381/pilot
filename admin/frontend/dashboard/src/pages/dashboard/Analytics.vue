@@ -1,52 +1,34 @@
 <template>
   <div class="mx-auto">
-    <!-- Teleports to the header bar on desktop; renders here below sm. -->
-    <Teleport defer to="#header-actions" :disabled="isMobile">
-      <!-- Sticky only in place: inside the pinned header it paints over the
-           header's own actions. -->
-      <StickyToolbar
-        :disabled="!isMobile"
-        class="flex items-center gap-2 mb-4 sm:mb-0 w-full sm:w-auto"
-      >
-        <div class="shrink-0">
-          <Dropdown :options="windowOptions" placement="bottom-end">
-            <template #default="{ open }">
-              <Button
-                variant="outline"
-                :size="isMobile ? 'md' : 'sm'"
-                :active="open"
-                class="[&>.truncate]:text-left text-base"
-              >
-                <template #prefix>
-                  <span
-                    v-if="!isHistorical"
-                    class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
-                  />
-                </template>
-                <template #suffix><span class="size-4 lucide-chevron-down" /></template>
-                {{ windowLabel }}
-              </Button>
-            </template>
-          </Dropdown>
-        </div>
-        <div class="flex-1 sm:flex-none min-w-0">
-          <Dropdown :options="scopeOptions" placement="bottom-end">
-            <template #default="{ open }">
-              <Button
-                variant="outline"
-                :size="isMobile ? 'md' : 'sm'"
-                :active="open"
-                class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto sm:max-w-[250px] overflow-hidden"
-              >
-                <template #prefix v-if="view === 'site'"><span class="size-4 lucide-globe" /></template>
-                <template #suffix><span class="size-4 lucide-chevron-down" /></template>
-                <span class="truncate">{{ scopeLabel }}</span>
-              </Button>
-            </template>
-          </Dropdown>
-        </div>
-      </StickyToolbar>
-    </Teleport>
+    <StickyToolbar class="flex items-center gap-2">
+      <div class="flex-1 sm:flex-none min-w-0">
+        <ToolbarSelect
+          :options="targetOptions"
+          class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto sm:max-w-[250px] overflow-hidden"
+        >
+          <template #prefix>
+            <span class="size-4" :class="isServerScope ? 'lucide-server' : 'lucide-globe'" />
+          </template>
+          <span class="truncate">{{ targetLabel }}</span>
+        </ToolbarSelect>
+      </div>
+      <div v-if="isServerScope" class="shrink-0">
+        <ToolbarSelect :options="metricOptions" class="[&>.truncate]:text-left text-base">
+          {{ viewLabel }}
+        </ToolbarSelect>
+      </div>
+      <div class="shrink-0">
+        <ToolbarSelect :options="windowOptions" class="[&>.truncate]:text-left text-base">
+          <template #prefix>
+            <span
+              v-if="!isHistorical"
+              class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
+            />
+          </template>
+          {{ windowLabel }}
+        </ToolbarSelect>
+      </div>
+    </StickyToolbar>
 
     <DatabaseInsights v-if="view === 'database'" :window="historyWindow" />
 
@@ -86,7 +68,7 @@
             </div>
             <div class="bg-surface-gray-2 rounded-full h-1 overflow-hidden">
               <div
-                class="bg-surface-gray-7 rounded-full h-full"
+                class="bg-surface-gray-9 rounded-full h-full"
                 :style="{ width: Math.min(meter.percent, 100) + '%' }"
               />
             </div>
@@ -130,20 +112,18 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dropdown, LoadingText, ErrorMessage, AxisChart, Skeleton } from 'frappe-ui'
+import { LoadingText, ErrorMessage, AxisChart, Skeleton } from 'frappe-ui'
 import ChartCard from '@/components/common/ChartCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
+import ToolbarSelect from '@/components/common/ToolbarSelect.vue'
 import WafAnalytics from '@/components/common/WafAnalytics.vue'
 import DatabaseInsights from '@/components/dashboard/DatabaseInsights.vue'
 import SiteInsights from '@/components/dashboard/SiteInsights.vue'
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 import { livePollDelayMs } from '@/utils/livePolling'
-import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSites } from '@/composables/sites/useSites'
-
-const isMobile = useIsMobile()
 
 const WINDOWS = [
   { key: 'live', label: 'Live' },
@@ -216,27 +196,60 @@ const activeWindow = ref(
 const isHistorical = computed(() => activeWindow.value !== 'live')
 
 const viewLabel = computed(() => VIEWS.find((v) => v.key === view.value)?.label ?? '')
-const scopeLabel = computed(() => (view.value === 'site' ? activeSite.value || 'Select site' : viewLabel.value))
-const scopeOptions = computed(() => [
-  ...VIEWS.filter((v) => v.key !== 'site').map((v) => ({ label: v.label, onClick: () => setView(v.key) })),
-  { group: 'Sites', options: sites.value.map((site) => ({ label: site.name, onClick: () => selectSite(site.name) })) },
+const isServerScope = computed(() => view.value !== 'site')
+
+const targetLabel = computed(() =>
+  view.value === 'site' ? activeSite.value || 'Select site' : 'Server',
+)
+const targetOptions = computed(() => [
+  // Target, not metric: returning to the server keeps the metric on show. A
+  // site has none of its own, so it has to land on System.
+  {
+    label: 'Server',
+    icon: 'lucide-server',
+    onClick: () => setView(isServerScope.value ? view.value : 'system'),
+  },
+  ...sites.value.map((site) => ({
+    label: site.name,
+    icon: 'lucide-globe',
+    onClick: () => selectSite(site.name),
+  })),
 ])
+
+// Server-level metrics only; a site has one chart set and needs no picker.
+const metricOptions = computed(() =>
+  VIEWS.filter((v) => v.key !== 'site').map((v) => ({
+    label: v.label,
+    onClick: () => setView(v.key),
+  })),
+)
 
 // Only the system view has a live mode, so hide it elsewhere.
 const windowLabel = computed(() => WINDOWS.find((w) => w.key === activeWindow.value)?.label ?? '')
 const windowOptions = computed(() =>
   WINDOWS.filter((w) => view.value === 'system' || w.key !== 'live').map((w) => ({
     label: w.label,
-    onClick: () => selectWindow(w.key),
+    onClick: () => chooseWindow(w.key),
   })),
 )
 // Database and site charts never receive 'live'.
 const historyWindow = computed(() => (activeWindow.value === 'live' ? '1h' : activeWindow.value))
 
+// Only the system view offers live, so leaving forces an hour; coming back
+// restores what the viewer actually picked.
+let preferredWindow = activeWindow.value
+
+function chooseWindow(key) {
+  preferredWindow = key
+  selectWindow(key)
+}
+
 function setView(key) {
+  // Re-picking would refetch and, in live mode, discard collected history.
+  if (view.value === key) return
   view.value = key
-  if (key !== 'system' && activeWindow.value === 'live') selectWindow('1h')
-  else if (key === 'system') setWindow(activeWindow.value)
+  if (key === 'system') setWindow(preferredWindow)
+  else if (activeWindow.value === 'live') selectWindow('1h')
 }
 
 function selectSite(name) {

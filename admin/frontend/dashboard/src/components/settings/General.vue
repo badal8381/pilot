@@ -7,7 +7,7 @@
   </div>
   <div v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
-    <div class="-mx-2.5 divide-y divide-outline-alpha-gray-1">
+    <div class="-mx-2.5 divide-y divide-outline-alpha-gray-1 hover-merges-dividers">
       <SettingsRow
         label="Allow developer mode"
         description="Enables per-site developer mode and code editor."

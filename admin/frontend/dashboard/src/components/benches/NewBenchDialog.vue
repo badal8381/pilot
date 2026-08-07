@@ -294,7 +294,7 @@ async function createBench() {
                 class="px-3 py-2 border rounded-lg text-left transition-colors"
                 :class="processManager === opt.value
                   ? 'border-outline-gray-3 bg-surface-gray-2'
-                  : 'border-outline-gray-2 hover:bg-surface-gray-1'"
+                  : 'border-outline-gray-2 hover:bg-surface-alpha-gray-1'"
                 @click="processManager = opt.value"
               >
                 <span class="block font-medium text-ink-gray-9 text-sm">{{ opt.label }}</span>

@@ -30,7 +30,7 @@
                 class="flex items-center gap-2.5 pr-2 text-left"
                 @click="toggle(name)"
               >
-                <AppIcon :name="name" class="rounded-md size-8 shrink-0" />
+                <AppIcon :name="name" size="xl" />
                 <span class="flex-1 min-w-0">
                   <p class="font-medium text-ink-gray-8 text-base truncate">
                     {{ titleMap[name] || name }}

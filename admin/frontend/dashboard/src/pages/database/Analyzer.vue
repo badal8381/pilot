@@ -133,9 +133,14 @@
               />
               <div v-else-if="column.key === 'actions'" class="flex justify-end">
                 <Tooltip v-if="!row.isActive" text="Delete this file and every older one">
-                  <Button variant="ghost" theme="red" size="sm" @click="confirmPurge(row.index)">
-                    <span class="size-4 lucide-trash-2" />
-                  </Button>
+                  <Button
+                    variant="ghost"
+                    theme="red"
+                    size="sm"
+                    icon="lucide-trash-2"
+                    label="Delete binary logs"
+                    @click="confirmPurge(row.index)"
+                  />
                 </Tooltip>
               </div>
               <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
