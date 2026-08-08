@@ -241,6 +241,7 @@ class BenchConfig:
         self._validate_ports()
         self._validate_socketio_backend()
         self._validate_db_type()
+        self._validate_external_urls()
         self.redis.validate()
         self.workers.validate()
         self.letsencrypt.validate()
@@ -296,6 +297,20 @@ class BenchConfig:
             raise ConfigError(
                 f"bench.socketio_backend '{self.socketio_backend}' is invalid. Must be 'python' or 'node'."
             )
+
+    def _validate_external_urls(self) -> None:
+        """Every endpoint this bench fetches from, checked before anything reaches it."""
+        from pilot.internal.validators import validate_external_url
+
+        endpoints = {
+            "admin.jwks_url": self.admin.jwks_url,
+            "central.endpoint": self.central.endpoint,
+            "datum.endpoint": self.datum.endpoint,
+            "llm.api_base": self.llm.api_base,
+        }
+        for name, url in endpoints.items():
+            if error := validate_external_url(url, name):
+                raise ConfigError(error)
 
     def _validate_db_type(self) -> None:
         if self.db_type not in ("mariadb", "postgres", "sqlite"):
@@ -611,7 +626,9 @@ class BenchConfig:
             self._apply_setting(key, value)
 
     def _apply_setting(self, key: str, value) -> None:
-        if key in FLAT_KEYS:
+        if key == "admin_password":
+            self.admin.set_password(str(value))
+        elif key in FLAT_KEYS:
             _set_path(self, FLAT_KEYS[key], value)
         elif key == "app_repo":
             self.apps[0].repo = str(value)

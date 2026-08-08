@@ -21,7 +21,7 @@ class AppRepository:
     def repo(self) -> "GitRepo":
         from pilot.internal.git import GitRepo
 
-        return GitRepo(self.app.path)
+        return GitRepo(self.app.path, self.git_config)
 
     @property
     def installed_hash(self) -> str:
@@ -102,20 +102,33 @@ class AppRepository:
 
     @property
     def remote_url(self) -> str:
-        """The clone URL to use, token-embedded when the repo is private."""
-        from pilot.integrations.git import authenticated_url_for
+        """The clone URL, always credential-free: the token rides in git_config."""
+        return self.app.config.repo
 
-        return authenticated_url_for(self.app.bench.path, self.app.config.repo)
+    @property
+    def git_config(self) -> dict[str, str]:
+        """Per-invocation git config authenticating this app's remote, if a token applies."""
+        from pilot.integrations.git import auth_config_for
+
+        return auth_config_for(self.app.bench.path, self.app.config.repo)
+
+    @property
+    def git_env(self) -> dict:
+        """Environment for a git call that talks to this app's remote."""
+        from pilot.internal.git import git_env
+
+        return git_env(self.git_config)
 
     def get_default_branch(self) -> str:
         import subprocess
 
-        remote = self.remote_url
+        remote, environment = self.remote_url, self.git_env
         result = subprocess.run(
             ["git", "ls-remote", "--symref", remote, "HEAD"],
             capture_output=True,
             text=True,
             timeout=10,
+            env=environment,
         )
         for line in result.stdout.splitlines():
             if line.startswith("ref: refs/heads/"):
@@ -125,6 +138,7 @@ class AppRepository:
             capture_output=True,
             text=True,
             timeout=10,
+            env=environment,
         ).stdout
         for candidate in ("develop", "master", "version-16", "version-15"):
             if f"refs/heads/{candidate}" in refs:
@@ -138,7 +152,11 @@ class AppRepository:
         return bool(re.fullmatch(r"[0-9a-f]{7,40}", ref))
 
     def clone_rev(self, commit: str) -> None:
-        run_command(["git", "clone", self.remote_url, str(self.app.path)], stream_output=True)
+        run_command(
+            ["git", "clone", self.remote_url, str(self.app.path)],
+            env=self.git_env,
+            stream_output=True,
+        )
         try:
             run_command(["git", "-C", str(self.app.path), "checkout", commit])
         except CommandError as exc:
@@ -159,6 +177,7 @@ class AppRepository:
                     *self.depth_flags,
                     str(self.app.path),
                 ],
+                env=self.git_env,
                 stream_output=True,
             )
             self.app.config.branch = target
@@ -186,16 +205,14 @@ class AppRepository:
         return max(1, cpus // 2)
 
     def _sync_remote_url(self) -> None:
-        """Refresh origin's URL with the current stored token before fetching.
+        """Drop credentials a clone from an older version embedded in origin. The token
+        now rides in git config per call, so .git/config never has to hold one."""
+        from pilot.integrations.git import without_credentials
 
-        No-op when no token is on file, so repos without stored credentials
-        keep whatever origin URL they were cloned with.
-        """
-        from pilot.integrations.git.credentials import GitCredentialStore
-
-        if not GitCredentialStore(self.app.bench.path).load():
-            return
-        self.repo.set_remote_url(self.remote_url)
+        current = self.repo.remote_url
+        clean = without_credentials(current)
+        if current and clean != current:
+            self.repo.set_remote_url(clean)
 
     def update(self, pin: RevisionPin | None = None) -> None:
         """Pull the latest code or move to a pinned revision."""
@@ -217,7 +234,7 @@ class AppRepository:
         ]
         if self.is_shallow:
             cmd.append("--depth=1")  # an app cloned before a dev install stays as it is
-        run_command(cmd)
+        run_command(cmd, env=self.git_env)
         run_command(
             [
                 "git",

@@ -6,8 +6,9 @@ Use `pilot --help` and `pilot <command> --help` for exact flags.
 
 ## Bench Commands
 
-- `pilot new NAME`: create a new bench.
-- `pilot init`: initialize a bench from `bench.toml`.
+- `pilot new NAME`: create a new bench. Sets the Admin password from `--admin-password`, else prompts on a terminal, else generates and prints one.
+- `pilot start` on an uninitialized bench serves the setup wizard and prints a one-hour `?sid=` sign-in link for it.
+- `pilot init`: initialize a bench from `bench.toml`. This is what the setup wizard runs.
 - `pilot ls`: list benches in the fixed benches directory.
 - `pilot drop --bench NAME`: remove a bench.
 
@@ -45,7 +46,7 @@ Disabling needs a Frappe that supports it and is exposed through the Admin UI on
 - `pilot new-site SITE`: create a site and add it to bench config.
 - `pilot rename-site OLD NEW`: rename a site.
 - `pilot list-site-apps SITE`: list the apps in use on a site, disabled ones excluded.
-- `pilot set-admin-password SITE`: update the site Administrator password.
+- `pilot set-admin-password`: set the Admin panel password in `bench.toml`; prompts when `--password` is omitted. The password must meet the same rules the dashboard enforces.
 
 Site behavior belongs on `Site` or a module under `pilot/core/site`.
 

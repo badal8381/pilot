@@ -5,23 +5,35 @@ from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
 _REDACTED = "[redacted]"
-_SECRET_ARGS = {
-    "new-site": frozenset({"admin_password"}),
-    "new-site-from-backup": frozenset({"admin_password"}),
-    "reinstall-site": frozenset({"admin_password"}),
-}
 _PRIVATE_ARGS = {
     "new-site-from-backup": frozenset({"db_file", "public_files", "private_files"}),
 }
-_SENSITIVE_KEY_PARTS = ("password", "secret", "token", "credential", "private_key")
+# Every task's args are matched against these, so a new command carrying a secret is
+# covered the day it is added. wrapper.py redacts task output with the same list.
+SENSITIVE_KEY_PARTS = (
+    "password",
+    "secret",
+    "token",
+    "credential",
+    "access_key",
+    "private_key",
+)
+_REPO_ARGS = frozenset({"repo", "repo_url"})
+_BRANCH_ARGS = frozenset({"branch", "target_branch"})
 
 
 def task_secret_args(command: str, args: dict) -> dict:
-    return {key: args[key] for key in _SECRET_ARGS.get(command, ()) if key in args}
+    """Args to keep in the task's private secrets file instead of its metadata."""
+    return {key: value for key, value in args.items() if is_sensitive_key(key)}
 
 
-def task_has_secrets(command: str) -> bool:
-    return bool(_SECRET_ARGS.get(command))
+def task_has_secrets(command: str, args: dict | None = None) -> bool:
+    return bool(task_secret_args(command, args or {}))
+
+
+def is_sensitive_key(key: str) -> bool:
+    normalized = key.lower().replace("-", "_")
+    return any(part in normalized for part in SENSITIVE_KEY_PARTS)
 
 
 def public_task_args(command: str, args: dict) -> dict:
@@ -43,6 +55,20 @@ def redact_task_args(args: dict) -> dict:
     return {key: _redact_value(key, value) for key, value in args.items()}
 
 
+def reject_unsafe_git_args(args: dict) -> None:
+    """A queued repo or branch ends up in git's argv, so hold it to the same rules the
+    CLI and the wizard use - `ext::sh -c ...` must never reach that far."""
+    from pilot.internal.validators import validate_branch_name, validate_repo_url
+
+    for key, value in args.items():
+        if not isinstance(value, str) or not value:
+            continue
+        if key in _REPO_ARGS and (error := validate_repo_url(value)):
+            raise ValueError(error)
+        if key in _BRANCH_ARGS and (error := validate_branch_name(value)):
+            raise ValueError(error)
+
+
 def reject_url_credentials(value) -> None:
     if isinstance(value, dict):
         for child in value.values():
@@ -55,8 +81,7 @@ def reject_url_credentials(value) -> None:
 
 
 def _redact_value(key: str, value):
-    normalized = key.lower().replace("-", "_")
-    if any(part in normalized for part in _SENSITIVE_KEY_PARTS):
+    if is_sensitive_key(key):
         return _REDACTED
     if isinstance(value, dict):
         return redact_task_args(value)

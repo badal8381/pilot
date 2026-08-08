@@ -20,20 +20,6 @@
           <LoadingText />
         </div>
 
-        <!-- Admin password -->
-        <div v-show="currentStep === 'passwords'" class="flex flex-col gap-4">
-          <div class="flex flex-col gap-2">
-            <Password
-              label="Admin password"
-              v-model="adminPassword"
-              placeholder="Choose a password"
-              @keydown.enter="goToNextStep"
-            />
-            <PasswordStrengthMeter :password="adminPassword" />
-          </div>
-          <ErrorMessage v-show="errorMessage" :message="errorMessage" />
-        </div>
-
         <!-- Database -->
         <div v-show="currentStep === 'database'" class="flex flex-col gap-4">
           <Select label="Database engine" v-model="dbType" :options="dbTypeOptions" />
@@ -161,15 +147,6 @@
           Back
         </Button>
         <Button
-          v-show="isConfiguring && currentStep === 'passwords'"
-          variant="solid"
-          class="w-full"
-          :disabled="!isAdminPasswordValid"
-          @click="goToNextStep"
-        >
-          Next
-        </Button>
-        <Button
           v-show="isConfiguring && currentStep === 'database' && dbMode === 'external'"
           variant="solid"
           :loading="isSubmitting"
@@ -187,7 +164,7 @@
           Next
         </Button>
         <Button
-          v-show="isConfiguring && currentStep !== 'passwords' && currentStep !== 'database' && !isLastConfigStep"
+          v-show="isConfiguring && currentStep !== 'database' && !isLastConfigStep"
           variant="solid"
           class="flex-1"
           @click="goToNextStep"
@@ -195,7 +172,7 @@
           Next
         </Button>
         <Button
-          v-show="isConfiguring && currentStep !== 'passwords' && currentStep !== 'database' && isLastConfigStep"
+          v-show="isConfiguring && currentStep !== 'database' && isLastConfigStep"
           variant="solid"
           :loading="isSubmitting"
           class="flex-1"
@@ -220,7 +197,6 @@ import {
   LoadingText,
 } from 'frappe-ui'
 import TaskStream from '../../components/tasks/TaskStream.vue'
-import PasswordStrengthMeter from '../../components/common/PasswordStrengthMeter.vue'
 import { useSetup } from '../../composables/setup/useSetup'
 
 const {
@@ -235,8 +211,6 @@ const {
   streamUrl,
   streamStatus,
   showStreamDetails,
-  isAdminPasswordValid,
-  adminPassword,
   dbType,
   dbUser,
   dbPassword,

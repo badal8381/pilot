@@ -10,6 +10,23 @@ from pilot.internal.validators import validate_branch_name, validate_repo_url
 
 _PASSWORD_KEYS = ("admin_password", "mariadb_password", "postgres_password")
 _DB_ENGINES = ("mariadb", "postgres")
+_DB_FIELDS = ("admin_user", "existing", "host", "password", "port")
+
+SETTABLE_KEYS = frozenset(
+    {
+        "app_branch",
+        "app_repo",
+        "db_mode",
+        "db_type",
+        *(f"{engine}_{field}" for engine in _DB_ENGINES for field in _DB_FIELDS),
+    }
+)
+
+
+def validate_settable_keys(data: dict) -> str | None:
+    """The wizard owns its own fields only. Every other setting needs the settings API."""
+    unknown = sorted(set(data) - SETTABLE_KEYS)
+    return f"Setup cannot change: {', '.join(unknown)}" if unknown else None
 
 
 def validate_configuration(data: dict) -> str | None:
@@ -24,7 +41,6 @@ def validate_configuration(data: dict) -> str | None:
 
 def _validate_field_types(data: dict) -> str | None:
     text_fields = (
-        "admin_password",
         "app_branch",
         "app_repo",
         "db_type",
@@ -51,8 +67,6 @@ def _validate_field_types(data: dict) -> str | None:
 
 
 def _validate_required_fields(data: dict) -> str | None:
-    if not data.get("admin_password"):
-        return "admin_password is required"
     db_type = data.get("db_type", "mariadb")
     if db_type not in ("mariadb", "postgres"):
         return "db_type must be 'mariadb' or 'postgres'"
