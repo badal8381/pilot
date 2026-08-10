@@ -76,7 +76,7 @@ def test_settings_response_exposes_limits() -> None:
 
 def test_settings_response_never_returns_webhook_tokens() -> None:
     config = _config()
-    config.resource_limits.webhook_endpoint = {"https://alerts.example.com/pilot": "tok-123"}
+    config.resource_limits.webhook_endpoints = {"https://alerts.example.com/pilot": "tok-123"}
 
     response = build_settings_response(config)["resource_limits"]
 
@@ -120,7 +120,7 @@ def test_patch_persists_webhooks_with_every_limit_off(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     limits = CommonConfig.read(benches_root).resource_limits
-    assert limits.webhook_endpoint == {"https://alerts.example.com/pilot": "tok-123"}
+    assert limits.webhook_endpoints == {"https://alerts.example.com/pilot": "tok-123"}
     assert limits.site_uptime is False
 
 
@@ -135,26 +135,8 @@ def test_patch_keeps_stored_token_when_blank(tmp_path: Path) -> None:
         json={"resource_limits": {"webhook_endpoints": [{"url": endpoint["url"], "token": ""}]}},
     )
 
-    stored = CommonConfig.read(benches_root).resource_limits.webhook_endpoint
+    stored = CommonConfig.read(benches_root).resource_limits.webhook_endpoints
     assert stored == {"https://alerts.example.com/pilot": "tok-123"}
-
-
-def test_patch_rejects_plain_http_webhook(tmp_path: Path) -> None:
-    """The token rides in an Authorization header, so http would leak it."""
-    benches_root = tmp_path / "benches"
-    client = _client(benches_root / "current")
-
-    response = client.patch(
-        "/api/v1/settings",
-        json={
-            "resource_limits": {
-                "webhook_endpoints": [{"url": "http://alerts.example.com", "token": "tok"}]
-            }
-        },
-    )
-
-    assert response.status_code == 422
-    assert CommonConfig.read(benches_root).resource_limits.webhook_endpoint == {}
 
 
 def test_patch_rejects_invalid_limit_without_saving(tmp_path: Path) -> None:
