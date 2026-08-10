@@ -2,13 +2,24 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from pilot.commands.apps.download import GetAppCommand
 from pilot.core.app import App
+from pilot.exceptions import BenchError
 from pilot.integrations.marketplace import Marketplace, Resolver
 from tests.pilot.commands.test_commands import make_bench
+
+
+def register_app_on_branch(bench, name: str, branch: str) -> None:
+    app_dir = bench.apps_path / name
+    app_dir.mkdir(parents=True)
+    subprocess.run(["git", "init", "-b", branch, str(app_dir)], check=True, capture_output=True)
+    (bench.sites_path / "apps.txt").write_text(f"frappe\n{name}\n")
 
 
 def make_resolver(name: str, deps: dict[str, str] | None = None) -> Resolver:
@@ -69,6 +80,33 @@ def test_run_short_circuits_when_app_already_registered(tmp_path: Path) -> None:
     mock_validate.assert_not_called()
     mock_install.assert_not_called()
     mock_build.assert_not_called()
+
+
+def test_reinstall_with_a_different_branch_fails_loudly(tmp_path: Path) -> None:
+    """Silently reusing the installed checkout delivered the wrong branch:
+    importing erpnext@version-16-hotfix over an existing version-16 clone
+    reported success while installing version-16."""
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    register_app_on_branch(bench, "myapp", "version-16")
+
+    cmd = GetAppCommand(bench, repo="https://github.com/frappe/myapp", branch="version-16-hotfix")
+
+    with pytest.raises(BenchError, match="already installed from branch 'version-16'"):
+        cmd.run()
+
+
+def test_reinstall_with_the_same_branch_still_short_circuits(tmp_path: Path) -> None:
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    register_app_on_branch(bench, "myapp", "version-16")
+
+    cmd = GetAppCommand(bench, repo="https://github.com/frappe/myapp", branch="version-16")
+
+    with patch.object(App, "clone") as mock_clone:
+        cmd.run()
+
+    mock_clone.assert_not_called()
 
 
 def test_short_circuit_adopts_real_on_disk_app_path(tmp_path: Path) -> None:
