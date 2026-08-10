@@ -61,9 +61,10 @@ class UptimeMonitor:
         incident worth waking someone for. One ping can fail for any reason."""
         alerting = self.bench.config.resource_limits.site_uptime
         down = [result["site"] for result in results if not result["up"]] if alerting else []
-        due = SustainedAlerts(self.alerts_path).due(down)
-        if due:
-            notify(self.bench.config, self._alert_payload(due, results))
+        alerts = SustainedAlerts(self.alerts_path)
+        due = alerts.due(down)
+        if due and notify(self.bench, self._alert_payload(due, results)):
+            alerts.mark_notified(due)
 
     def _alert_payload(self, down: list[str], results: list[dict]) -> dict:
         """Same event/message/context shape the resource alerts use."""

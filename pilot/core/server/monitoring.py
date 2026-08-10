@@ -142,10 +142,6 @@ class Monitor:
     def alerts_path(self) -> Path:
         return self.system_log_path.with_suffix(".alerts")
 
-    def _send_alert(self, breached: list[str], system_record: dict) -> None:
-        """These are custom alerts that central need not know about but the operator might them."""
-        notify(self.bench.config, self._alert_payload(breached, system_record))
-
     def _alert_payload(self, breached: list[str], system_record: dict) -> dict[str, typing.Any]:
         """Central's report_pilot_event schema: event, message, context."""
         limits = self.bench.config.resource_limits
@@ -168,9 +164,10 @@ class Monitor:
 
     def send_alert_if_required(self, system_record: dict) -> None:
         """Send system alerts if required based on the breach limits set"""
-        due = SustainedAlerts(self.alerts_path).due(self._breached_limits(system_record))
-        if due:
-            self._send_alert(due, system_record)
+        alerts = SustainedAlerts(self.alerts_path)
+        due = alerts.due(self._breached_limits(system_record))
+        if due and notify(self.bench, self._alert_payload(due, system_record)):
+            alerts.mark_notified(due)
 
     @staticmethod
     def _readings(system_record: dict) -> dict[str, float]:

@@ -6,10 +6,10 @@ import typing
 import urllib.request
 from pathlib import Path
 
-from pilot.integrations.central import CentralClient
+from pilot.integrations.central import CentralClient, CentralClientError
 
 if typing.TYPE_CHECKING:
-    from pilot.config import BenchConfig
+    from pilot.core.bench import Bench
 
 # How long a condition must hold before it is worth telling anyone about.
 ALERT_SUSTAINED_SECONDS = 300
@@ -33,20 +33,22 @@ def send_alert(endpoint: str, token: str, payload: dict[str, typing.Any]) -> Non
         pass
 
 
-def notify(config: "BenchConfig", payload: dict[str, typing.Any]) -> None:
-    """Notify first to configured webhooks if none are present send them to central."""
+def notify(bench: "Bench", payload: dict[str, typing.Any]) -> bool:
+    """If we made it to any of the webhooks we will mark this as a successful delivery."""
+    delivered = False
 
-    if config.resource_limits.webhook_endpoints:
-        for endpoint, token in config.resource_limits.webhook_endpoints.items():
-            try:
-                send_alert(endpoint, token, payload)
-            except OSError:
-                continue
-        return
+    for endpoint, token in bench.config.resource_limits.webhook_endpoints.items():
+        try:
+            send_alert(endpoint, token, payload)
+        except OSError:
+            continue
+        delivered = True
 
-    CentralClient("").notify_central(
-        payload.get("event"), message=payload.get("message"), context=payload.get("context")
-    )
+    try:
+        CentralClient(bench).notify_central(**payload)
+    except CentralClientError:
+        return delivered
+    return True
 
 
 class SustainedAlerts:
@@ -59,8 +61,9 @@ class SustainedAlerts:
         self.window_seconds = window_seconds
 
     def due(self, active: list[str]) -> list[str]:
-        """Record this round and return the names that just crossed the window.
-        A name alerts once and re-arms only after it has recovered."""
+        """Record this round and return the names that have crossed the window.
+        They stay due until mark_notified() confirms an alert actually went out,
+        so a round where every sink was down is retried on the next tick."""
         previous = self._read()
         now = time.time()
 
@@ -69,12 +72,20 @@ class SustainedAlerts:
         for name in sorted(active):
             entry = previous.get(name) or {"since": now, "notified": False}
             if not entry["notified"] and now - entry["since"] >= self.window_seconds:
-                entry["notified"] = True
                 due.append(name)
             state[name] = entry
 
         self._write(state)
         return due
+
+    def mark_notified(self, names: list[str]) -> None:
+        """Call only once an alert has been delivered. A name marked here does
+        not alert again until it recovers and breaks a second time."""
+        state = self._read()
+        for name in names:
+            if name in state:
+                state[name]["notified"] = True
+        self._write(state)
 
     def _read(self) -> dict[str, dict]:
         """A hand-edited or truncated file starts the window over rather than

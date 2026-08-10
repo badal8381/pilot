@@ -308,7 +308,12 @@ def _alerting_monitor(tmp_path: Path, **limits: int) -> Monitor:
     # is patched out here.
     monitor.alerts_path.parent.mkdir(parents=True, exist_ok=True)
     monitor._sent = []
-    monitor._send_alert = lambda breached, record: monitor._sent.append(breached)  # type: ignore[method-assign]
+
+    def _record_delivered(breached, system_record):
+        monitor._sent.append(breached)
+        return True
+
+    monitor._send_alert = _record_delivered  # type: ignore[method-assign]
     return monitor
 
 

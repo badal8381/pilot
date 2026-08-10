@@ -66,9 +66,7 @@ def test_a_site_down_for_the_whole_window_alerts_once(tmp_path: Path) -> None:
     assert len(payloads) == 1
     assert payloads[0]["event"] == "site_down"
     assert payloads[0]["message"] == "my-bench: a.test unreachable"
-    assert payloads[0]["context"]["sites"] == [
-        {"site": "a.test", "status_code": 502, "response_ms": 12}
-    ]
+    assert payloads[0]["context"]["sites"] == [{"site": "a.test", "status_code": 502, "response_ms": 12}]
 
 
 def test_only_the_sites_still_down_are_reported(tmp_path: Path) -> None:
@@ -131,3 +129,26 @@ def test_collect_logs_every_ping_and_then_alerts(tmp_path: Path) -> None:
     logged = json.loads(monitor._configurator.log_path.read_text().splitlines()[-1])
     assert logged["site"] == "a.test"
     assert list(json.loads(monitor.alerts_path.read_text())) == ["a.test"]
+
+
+def test_an_undelivered_alert_is_retried_on_the_next_tick(tmp_path: Path) -> None:
+    """Every sink being down is not a delivered alert, so the incident must not
+    be marked notified and silently forgotten."""
+    monitor = _monitor(tmp_path)
+    monitor.send_alert_if_required([_ping("a.test", up=False)])
+    _age_alerts(monitor)
+
+    def refuse(endpoint, token, payload):
+        raise OSError("connection refused")
+
+    with patch("pilot.core.alerts.send_alert", refuse):
+        monitor.send_alert_if_required([_ping("a.test", up=False)])
+
+    assert json.loads(monitor.alerts_path.read_text())["a.test"]["notified"] is False
+
+    delivered = []
+    with patch("pilot.core.alerts.send_alert", lambda endpoint, token, payload: delivered.append(endpoint)):
+        monitor.send_alert_if_required([_ping("a.test", up=False)])
+
+    assert delivered == ["https://alerts.example.com"]
+    assert json.loads(monitor.alerts_path.read_text())["a.test"]["notified"] is True
