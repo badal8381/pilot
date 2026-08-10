@@ -1,6 +1,6 @@
 import json
 import urllib.error
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import PropertyMock, patch
@@ -9,7 +9,7 @@ import psutil
 import pytest
 
 from pilot.config import BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig
-from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, ALERT_TIMEOUT_SECONDS, send_alert
+from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, ALERT_TIMEOUT_SECONDS, notify, send_alert
 from pilot.core.bench import Bench
 from pilot.core.server.monitoring import Monitor, MonitorConfigurator
 from pilot.core.server.monitoring_proc import CPU_STAT_FIELDS
@@ -307,14 +307,24 @@ def _alerting_monitor(tmp_path: Path, **limits: int) -> Monitor:
     # MonitorConfigurator.setup() makes this directory on a real host, and it
     # is patched out here.
     monitor.alerts_path.parent.mkdir(parents=True, exist_ok=True)
-    monitor._sent = []
-
-    def _record_delivered(breached, system_record):
-        monitor._sent.append(breached)
-        return True
-
-    monitor._send_alert = _record_delivered  # type: ignore[method-assign]
+    bench.config.resource_limits.webhook_endpoints = {"https://alerts.example.com": "tok"}
     return monitor
+
+
+@contextmanager
+def _captured_alerts():
+    """Collect what reaches the webhook sink. Central is not enrolled on a bare
+    test config, so notify() falls through to the webhooks alone."""
+    payloads: list[dict] = []
+    with patch(
+        "pilot.core.alerts.send_alert",
+        lambda endpoint, token, payload: payloads.append(payload),
+    ):
+        yield payloads
+
+
+def _breached(payloads: list[dict]) -> list[list[str]]:
+    return [[item["limit"] for item in payload["context"]["breached_limits"]] for payload in payloads]
 
 
 def _system_record(cpu: float = 10.0, memory: float = 10.0, disk: float = 10.0) -> dict:
@@ -329,9 +339,10 @@ def _system_record(cpu: float = 10.0, memory: float = 10.0, disk: float = 10.0) 
 def test_alert_waits_for_the_breach_to_be_sustained(tmp_path: Path) -> None:
     monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
 
-    monitor.send_alert_if_required(_system_record(cpu=95.0))
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
 
-    assert monitor._sent == []
+    assert payloads == []
     assert list(json.loads(monitor.alerts_path.read_text())) == ["cpu_usage_limit"]
 
 
@@ -340,10 +351,13 @@ def test_alert_fires_once_the_breach_outlives_the_window(tmp_path: Path) -> None
     monitor.send_alert_if_required(_system_record(cpu=95.0))
     _age_alerts(monitor)
 
-    monitor.send_alert_if_required(_system_record(cpu=95.0))
-    monitor.send_alert_if_required(_system_record(cpu=95.0))
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
 
-    assert monitor._sent == [["cpu_usage_limit"]], "a sustained breach alerts once, not every tick"
+    assert _breached(payloads) == [["cpu_usage_limit"]], (
+        "a sustained breach alerts once, not every tick"
+    )
 
 
 def test_alert_covers_only_the_limits_the_operator_set(tmp_path: Path) -> None:
@@ -352,20 +366,22 @@ def test_alert_covers_only_the_limits_the_operator_set(tmp_path: Path) -> None:
     monitor.send_alert_if_required(_system_record(cpu=95.0, memory=99.0))
     _age_alerts(monitor)
 
-    monitor.send_alert_if_required(_system_record(cpu=95.0, memory=99.0))
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0, memory=99.0))
 
-    assert monitor._sent == [["cpu_usage_limit"]]
+    assert _breached(payloads) == [["cpu_usage_limit"]]
 
 
 def test_recovering_below_the_threshold_clears_the_alerts_file(tmp_path: Path) -> None:
     monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80, disk_space_limit=90)
-    monitor.send_alert_if_required(_system_record(cpu=95.0, disk=95.0))
 
-    monitor.send_alert_if_required(_system_record(cpu=95.0, disk=10.0))
+    with _captured_alerts():
+        monitor.send_alert_if_required(_system_record(cpu=95.0, disk=95.0))
+        monitor.send_alert_if_required(_system_record(cpu=95.0, disk=10.0))
 
-    assert list(json.loads(monitor.alerts_path.read_text())) == ["cpu_usage_limit"]
+        assert list(json.loads(monitor.alerts_path.read_text())) == ["cpu_usage_limit"]
 
-    monitor.send_alert_if_required(_system_record(cpu=10.0, disk=10.0))
+        monitor.send_alert_if_required(_system_record(cpu=10.0, disk=10.0))
 
     assert not monitor.alerts_path.exists(), "nothing breaching means no file to keep"
 
@@ -376,16 +392,18 @@ def test_a_recovered_limit_starts_its_window_over(tmp_path: Path) -> None:
     _age_alerts(monitor)
     monitor.send_alert_if_required(_system_record(cpu=10.0))
 
-    monitor.send_alert_if_required(_system_record(cpu=95.0))
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
 
-    assert monitor._sent == [], "the second breach has to sustain on its own before alerting"
+    assert payloads == [], "the second breach has to sustain on its own before alerting"
 
 
 def test_a_corrupt_alerts_file_does_not_stop_the_tick(tmp_path: Path) -> None:
     monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
     monitor.alerts_path.write_text("not json")
 
-    monitor.send_alert_if_required(_system_record(cpu=95.0))
+    with _captured_alerts():
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
 
     assert list(json.loads(monitor.alerts_path.read_text())) == ["cpu_usage_limit"]
 
@@ -447,7 +465,6 @@ def test_alert_reaches_every_webhook_even_when_one_is_down(tmp_path: Path) -> No
         "https://down.example.com": "tok-a",
         "https://up.example.com": "tok-b",
     }
-    monitor = _make_monitor(bench)
     reached = []
 
     def fake_send(endpoint, token, payload):
@@ -456,22 +473,22 @@ def test_alert_reaches_every_webhook_even_when_one_is_down(tmp_path: Path) -> No
         reached.append(endpoint)
 
     with patch("pilot.core.alerts.send_alert", fake_send):
-        monitor._send_alert(["cpu_usage_limit"], _system_record(cpu=95.0))
+        delivered = notify(bench, {"event": "x", "message": "m", "context": {}})
 
     assert reached == ["https://up.example.com"]
+    assert delivered is True, "one sink answering is a delivered alert"
 
 
-def test_alert_reaches_the_configured_webhook(tmp_path: Path) -> None:
+def test_an_alert_no_sink_accepted_is_not_delivered(tmp_path: Path) -> None:
+    """The caller marks the condition notified off this, so a round where
+    everything was down must not count."""
     bench = _make_bench(tmp_path / "my-bench")
-    bench.config.resource_limits.cpu_usage_limit = 80
-    bench.config.resource_limits.webhook_endpoints = {"https://up.example.com": "tok"}
-    monitor = _make_monitor(bench)
-    reached = []
+    bench.config.resource_limits.webhook_endpoints = {"https://down.example.com": "tok"}
 
-    with patch(
-        "pilot.core.alerts.send_alert",
-        lambda endpoint, token, payload: reached.append(endpoint),
-    ):
-        monitor._send_alert(["cpu_usage_limit"], _system_record(cpu=95.0))
+    def refuse(endpoint, token, payload):
+        raise urllib.error.URLError("connection refused")
 
-    assert reached == ["https://up.example.com"]
+    with patch("pilot.core.alerts.send_alert", refuse):
+        delivered = notify(bench, {"event": "x", "message": "m", "context": {}})
+
+    assert delivered is False
