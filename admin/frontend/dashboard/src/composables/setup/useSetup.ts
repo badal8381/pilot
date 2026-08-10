@@ -83,7 +83,24 @@ export const useSetup = () => {
     const selected = appBranch.value
     const isKnown = availableBranches.value.includes(selected)
     const options = availableBranches.value.map((branch) => ({ label: branch, value: branch }))
-    return selected && !isKnown ? [{ label: selected, value: selected }, ...options] : options
+    if (selected && !isKnown) options.unshift({ label: selected, value: selected })
+    return [
+      ...options,
+      {
+        type: 'custom',
+        key: 'typed-branch',
+        label: 'Use typed branch',
+        slot: 'typed-branch',
+        condition: ({ query }) => {
+          const typed = query.trim()
+          return Boolean(typed) && !options.some((option) => option.value === typed)
+        },
+        onClick: ({ query }) => {
+          const typed = query.trim()
+          if (typed) appBranch.value = typed
+        },
+      },
+    ]
   })
 
   // Steps
