@@ -186,6 +186,20 @@ def llm_payload(config: BenchConfig) -> dict:
     }
 
 
+def resource_limits_payload(config: BenchConfig) -> dict:
+    limits = config.resource_limits
+    return {
+        "cpu_usage_limit": limits.cpu_usage_limit,
+        "memory_usage_limit": limits.memory_usage_limit,
+        "disk_space_limit": limits.disk_space_limit,
+        "site_uptime": limits.site_uptime,
+        # Tokens stay server-side; the UI only needs to know one is stored.
+        "webhook_endpoints": [
+            {"url": url, "token_set": bool(token)} for url, token in limits.webhook_endpoints.items()
+        ],
+    }
+
+
 def restart_trigger_values(config: BenchConfig) -> dict:
     return {
         "bench": {

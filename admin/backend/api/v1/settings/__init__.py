@@ -22,6 +22,7 @@ from pilot.core.bench.settings import (
     firewall_payload,
     is_restart_needed,
     llm_payload,
+    resource_limits_payload,
     restart_trigger_values,
     s3_payload,
     waf_payload,
@@ -45,6 +46,7 @@ __all__ = [
     "is_restart_needed",
     "llm_payload",
     "network_bp",
+    "resource_limits_payload",
     "restart_trigger_values",
     "s3_payload",
     "settings_bp",
@@ -113,6 +115,7 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
             "system_prompt": read_system_prompt(bench_root) if bench_root else "",
         },
         "llm_providers": llm_provider_options(),
+        "resource_limits": resource_limits_payload(config),
         "monitor": {
             "system_log_path": str(system_log_path()),
             "log_path": str(bench_log_path(config.name)),
