@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pilot.config import BenchConfig, FirewallRule, S3Config, WafCondition, WafRule, WorkerGroup
+from pilot.config.alert_limit import RESOURCE_LIMIT_FIELDS
 from pilot.config.llm import LLMConfig
 
 
@@ -25,6 +26,8 @@ class ConfigPatcher:
         if error := self._apply_llm():
             return error
         if error := self._apply_s3():
+            return error
+        if error := self._apply_resource_limits():
             return error
         try:
             self.config.validate()
@@ -58,6 +61,39 @@ class ConfigPatcher:
             groups.append(WorkerGroup(queues=queues, count=int(entry.get("count", 1))))
         if groups:
             self.config.workers.groups = groups
+
+    def _apply_resource_limits(self) -> str | None:
+        resource_limits = self.data.get("resource_limits")
+        if not resource_limits:
+            return None
+        limits = self.config.resource_limits
+        for name in RESOURCE_LIMIT_FIELDS:
+            if name in resource_limits:
+                setattr(limits, name, _coerce_int(resource_limits[name]))
+        if "site_uptime" in resource_limits:
+            limits.site_uptime = bool(resource_limits["site_uptime"])
+        if "webhook_endpoints" in resource_limits:
+            limits.webhook_endpoint = self._webhook_endpoints(
+                resource_limits["webhook_endpoints"] or [], limits.webhook_endpoint
+            )
+        try:
+            limits.validate()
+        except ValueError as error:
+            return str(error)
+        return None
+
+    @staticmethod
+    def _webhook_endpoints(entries: list[dict], stored: dict[str, str]) -> dict[str, str]:
+        """A blank token keeps the one already stored for that URL, so the UI
+        never has to read a secret back to re-save the rest of the form."""
+        endpoints: dict[str, str] = {}
+        for entry in entries:
+            url = str(entry.get("url", "")).strip()
+            if not url:
+                continue
+            token = str(entry.get("token", "")).strip()
+            endpoints[url] = token or stored.get(url, "")
+        return endpoints
 
     def _apply_firewall(self) -> None:
         firewall = self.data.get("firewall")
