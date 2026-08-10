@@ -72,11 +72,11 @@ class CentralClient:
         """Verify Central auth and return its identity echo."""
         return self._get("/api/method/central.api.pilot.heartbeat")
 
-    def notify_central(self, event: str, mesage: str, context: dict | None = None) -> dict[str, Any]:
-        """Send a notification to Central for a bench even."""
+    def notify_central(self, event: str, message: str, context: dict | None = None) -> dict[str, Any]:
+        """Send a notification to Central for a bench event."""
         return self._post(
             "/api/method/central.notification.api.report_pilot_event",
-            {"event": event, "message": mesage, "context": context or {}},
+            {"event": event, "message": message, "context": context or {}},
         )
 
     def forward(self, method_path: str, http_method: str, data: dict[str, Any] | None = None) -> Any:

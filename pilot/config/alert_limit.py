@@ -16,13 +16,7 @@ class ResourceLimitConfig:
     site_uptime: bool = (
         True  # This is boolean to check if site uptime alert is enabled or not. By default it is enabled.
     )
-    webhook_endpoint: dict[str, str] = field(default_factory=dict)
-
-    @property
-    def is_enabled(self) -> bool:
-        """True once anything here differs from the defaults - webhooks and a
-        disabled uptime alert have to reach the file too, not just limits."""
-        return self != ResourceLimitConfig()
+    webhook_endpoints: dict[str, str] = field(default_factory=dict)
 
     def validate(self) -> None:
         for name in RESOURCE_LIMIT_FIELDS:
@@ -32,6 +26,6 @@ class ResourceLimitConfig:
             if not 0 <= limit <= 100:
                 raise ValueError(f"resource_limits.{name} must be a percentage between 0 and 100.")
 
-        for url, token in self.webhook_endpoint.items():
+        for url, token in self.webhook_endpoints.items():
             if not url or not token:
-                raise ValueError("webhook_endpoint and token must be non-empty strings.")
+                raise ValueError("webhook_endpoints and token must be non-empty strings.")

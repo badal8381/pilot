@@ -73,8 +73,8 @@ class ConfigPatcher:
         if "site_uptime" in resource_limits:
             limits.site_uptime = bool(resource_limits["site_uptime"])
         if "webhook_endpoints" in resource_limits:
-            limits.webhook_endpoint = self._webhook_endpoints(
-                resource_limits["webhook_endpoints"] or [], limits.webhook_endpoint
+            limits.webhook_endpoints = self._webhook_endpoints(
+                resource_limits["webhook_endpoints"] or [], limits.webhook_endpoints
             )
         try:
             limits.validate()

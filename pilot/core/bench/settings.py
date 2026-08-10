@@ -195,7 +195,7 @@ def resource_limits_payload(config: BenchConfig) -> dict:
         "site_uptime": limits.site_uptime,
         # Tokens stay server-side; the UI only needs to know one is stored.
         "webhook_endpoints": [
-            {"url": url, "token_set": bool(token)} for url, token in limits.webhook_endpoint.items()
+            {"url": url, "token_set": bool(token)} for url, token in limits.webhook_endpoints.items()
         ],
     }
 

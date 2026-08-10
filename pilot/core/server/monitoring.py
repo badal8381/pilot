@@ -10,6 +10,7 @@ from pathlib import Path
 
 import psutil
 
+from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify_webhooks
 from pilot.core.server.monitoring_config import MonitorConfigurator
 from pilot.core.server.monitoring_datum import MetricShipper
 from pilot.core.server.monitoring_proc import ProcMetricsReader
@@ -21,6 +22,8 @@ if typing.TYPE_CHECKING:
 
 # Gap between the two samples used to turn cumulative counters into a rate.
 CPU_SAMPLE_INTERVAL = 1.0
+
+ALERT_EVENT = "resource_limit_breached"
 
 # Raw MariaDB status counters/gauges + variables logged per cycle; the provider
 # turns consecutive samples into rates.
@@ -135,6 +138,57 @@ class Monitor:
     def slow_query_log_path(self) -> Path:
         return self._configurator.slow_query_log_path
 
+    @property
+    def alerts_path(self) -> Path:
+        return self.system_log_path.with_suffix(".alerts")
+
+    def _send_alert(self, breached: list[str], system_record: dict) -> None:
+        """These are custom alerts that central need not know about but the operator might them."""
+        notify_webhooks(self.bench.config, self._alert_payload(breached, system_record))
+
+    def _alert_payload(self, breached: list[str], system_record: dict) -> dict[str, typing.Any]:
+        """Central's report_pilot_event schema: event, message, context."""
+        limits = self.bench.config.resource_limits
+        readings = self._readings(system_record)
+        crossed = [
+            {"limit": name, "threshold": getattr(limits, name), "reading": readings[name]}
+            for name in breached
+        ]
+        summary = ", ".join(f"{item['limit']} at {item['reading']}%" for item in crossed)
+        return {
+            "event": ALERT_EVENT,
+            "message": f"{self.bench.config.name}: {summary}",
+            "context": {
+                "bench": self.bench.config.name,
+                "time": system_record["time"],
+                "sustained_seconds": ALERT_SUSTAINED_SECONDS,
+                "breached_limits": crossed,
+            },
+        }
+
+    def send_alert_if_required(self, system_record: dict) -> None:
+        """Send system alerts if required based on the breach limits set"""
+        due = SustainedAlerts(self.alerts_path).due(self._breached_limits(system_record))
+        if due:
+            self._send_alert(due, system_record)
+
+    @staticmethod
+    def _readings(system_record: dict) -> dict[str, float]:
+        return {
+            "cpu_usage_limit": system_record["cpu_percent"],
+            "memory_usage_limit": system_record["memory"]["percent"],
+            "disk_space_limit": system_record["storage"]["disk"]["percent"],
+        }
+
+    def _breached_limits(self, system_record: dict) -> list[str]:
+        limits = self.bench.config.resource_limits
+        breached = []
+        for name, reading in self._readings(system_record).items():
+            limit = getattr(limits, name)
+            if limit and reading > limit:
+                breached.append(name)
+        return breached
+
     def collect_system_metrics(self) -> dict:
         record = {
             "time": datetime.now(UTC).isoformat(),
@@ -147,6 +201,7 @@ class Monitor:
             "disk_io": self._disk_io,
         }
         self._append(self.system_log_path, record)
+        self.send_alert_if_required(record)
         return record
 
     def collect_database_metrics(self) -> dict | None:

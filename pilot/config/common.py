@@ -91,7 +91,7 @@ class CommonConfig:
             data["central"] = self._central_section()
         if self.datum != DatumConfig():
             data["datum"] = {"endpoint": self.datum.endpoint, "token": self.datum.token}
-        if self.resource_limits.is_enabled:
+        if self.resource_limits != ResourceLimitConfig():
             data["resource_limits"] = self._resource_limits_section()
         if self.jwks_url:
             data["admin"] = {"jwks_url": self.jwks_url, "jwks_audience": self.jwks_audience}
@@ -103,7 +103,7 @@ class CommonConfig:
             "memory_usage_limit": self.resource_limits.memory_usage_limit,
             "disk_space_limit": self.resource_limits.disk_space_limit,
             "site_uptime": self.resource_limits.site_uptime,
-            "webhook_endpoint": self.resource_limits.webhook_endpoint,
+            "webhook_endpoints": self.resource_limits.webhook_endpoints,
         }
 
     def _central_section(self) -> ConfigDict:
