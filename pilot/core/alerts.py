@@ -6,6 +6,8 @@ import typing
 import urllib.request
 from pathlib import Path
 
+from pilot.integrations.central import CentralClient
+
 if typing.TYPE_CHECKING:
     from pilot.config import BenchConfig
 
@@ -31,14 +33,20 @@ def send_alert(endpoint: str, token: str, payload: dict[str, typing.Any]) -> Non
         pass
 
 
-def notify_webhooks(config: "BenchConfig", payload: dict[str, typing.Any]) -> None:
-    """Deliver to every endpoint the operator configured. One unreachable sink
-    must not cost the others their alert, or stop the tick that called this."""
-    for endpoint, token in config.resource_limits.webhook_endpoints.items():
-        try:
-            send_alert(endpoint, token, payload)
-        except OSError:
-            continue
+def notify(config: "BenchConfig", payload: dict[str, typing.Any]) -> None:
+    """Notify first to configured webhooks if none are present send them to central."""
+
+    if config.resource_limits.webhook_endpoints:
+        for endpoint, token in config.resource_limits.webhook_endpoints.items():
+            try:
+                send_alert(endpoint, token, payload)
+            except OSError:
+                continue
+        return
+
+    CentralClient("").notify_central(
+        payload.get("event"), message=payload.get("message"), context=payload.get("context")
+    )
 
 
 class SustainedAlerts:

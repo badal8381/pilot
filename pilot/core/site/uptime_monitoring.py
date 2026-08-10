@@ -12,7 +12,7 @@ import urllib.error
 import urllib.request
 from datetime import UTC, datetime
 
-from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify_webhooks
+from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify
 from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 from pilot.utils import cli_root, iter_sibling_benches
 
@@ -63,7 +63,7 @@ class UptimeMonitor:
         down = [result["site"] for result in results if not result["up"]] if alerting else []
         due = SustainedAlerts(self.alerts_path).due(down)
         if due:
-            notify_webhooks(self.bench.config, self._alert_payload(due, results))
+            notify(self.bench.config, self._alert_payload(due, results))
 
     def _alert_payload(self, down: list[str], results: list[dict]) -> dict:
         """Same event/message/context shape the resource alerts use."""

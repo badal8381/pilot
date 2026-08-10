@@ -10,7 +10,7 @@ from pathlib import Path
 
 import psutil
 
-from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify_webhooks
+from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify
 from pilot.core.server.monitoring_config import MonitorConfigurator
 from pilot.core.server.monitoring_datum import MetricShipper
 from pilot.core.server.monitoring_proc import ProcMetricsReader
@@ -144,7 +144,7 @@ class Monitor:
 
     def _send_alert(self, breached: list[str], system_record: dict) -> None:
         """These are custom alerts that central need not know about but the operator might them."""
-        notify_webhooks(self.bench.config, self._alert_payload(breached, system_record))
+        notify(self.bench.config, self._alert_payload(breached, system_record))
 
     def _alert_payload(self, breached: list[str], system_record: dict) -> dict[str, typing.Any]:
         """Central's report_pilot_event schema: event, message, context."""
