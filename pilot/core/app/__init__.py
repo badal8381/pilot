@@ -245,6 +245,20 @@ class App:
             return
         run_command(["yarn", "--cwd", str(self.path), "build"])
 
+    def _reject_branch_mismatch(self) -> None:
+        """A bench holds one checkout per app, so an install cannot deliver a
+        second branch. Refuse loudly instead of keeping the current one."""
+        requested = self.config.branch
+        if not requested or self.is_commit_hash(requested):
+            return
+        current = self.bench.app(self.module_name).current_branch
+        if current and requested != current:
+            raise BenchError(
+                f"'{self.config.name}' is already installed from branch '{current}', "
+                f"so this install cannot deliver '{requested}'. Remove the app and "
+                f"add it again to change its branch."
+            )
+
     def _skip_already_installed(
         self, on_progress: Callable[[str], None], install_dependencies: bool = False
     ) -> AppInstallResult:
@@ -262,6 +276,7 @@ class App:
     ) -> AppInstallResult:
         """Pinned commit based Clone, validate, install, register, and build app assets."""
         if self.bench.is_app_installed(self.config.name):
+            self._reject_branch_mismatch()
             return self._skip_already_installed(on_progress, install_dependencies)
 
         existing_clone = self.existing_clone_path

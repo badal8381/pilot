@@ -21,7 +21,8 @@ class GetAppCommand(Command):
     def __post_init__(self) -> None:
         from pilot.core.app import App
 
-        self.app = App.from_repo(self.bench, self.repo, self.branch or "main")
+        # No branch means the remote's default (see AppRepository.clone), not "main".
+        self.app = App.from_repo(self.bench, self.repo, self.branch)
         self.installed_dependencies: list[App] = []
 
     def run(self) -> None:
