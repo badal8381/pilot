@@ -15,6 +15,7 @@ from pilot.tasks.fetch_app_updates import FetchAppUpdatesTask
 from pilot.tasks.get_and_install_app import GetAndInstallAppTask
 from pilot.tasks.get_app import GetAppTask
 from pilot.tasks.remove_app import RemoveAppTask
+from pilot.tasks.switch_branch import SwitchBranchTask
 
 apps_bp = Blueprint("apps", __name__)
 marketplace_bp = Blueprint("marketplace", __name__)
@@ -170,6 +171,25 @@ def remove(name: str):
         task_id = RemoveAppTask.queue(Bench(bench_root), name=name)
     except Exception:
         return error_response("app_removal_failed", "Could not start app removal.", 500)
+
+    return accepted_task_response(bench_root, task_id)
+
+
+@apps_bp.post("/<name>/switch-branch")
+def switch_branch(name: str):
+    bench_root = Path(current_app.config["BENCH_ROOT"])
+    if not (bench_root / "apps" / name).exists():
+        return error_response("app_not_found", f"App '{name}' not found in bench.", 404)
+
+    data = request.get_json(silent=True)
+    branch = data.get("branch", "") if isinstance(data, dict) else ""
+    if not isinstance(branch, str) or not branch.strip():
+        return error_response("branch_required", "branch is required.", 422)
+
+    try:
+        task_id = SwitchBranchTask.queue(Bench(bench_root), name=name, branch=branch.strip())
+    except Exception:
+        return error_response("branch_switch_failed", "Could not start the branch switch.", 500)
 
     return accepted_task_response(bench_root, task_id)
 
