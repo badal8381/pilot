@@ -109,7 +109,14 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, Dropdown, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  Dropdown,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { sessionApi } from '@/api/session'
 import { auditApi } from '@/api/audit'

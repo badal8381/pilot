@@ -199,10 +199,10 @@ import {
   Dropdown,
   ErrorMessage,
   FormControl,
-  ListView,
   TabButtons,
   toast,
 } from 'frappe-ui'
+import { ListView } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import NewSiteDialog from '@/components/sites/NewSiteDialog.vue'
 import SiteSkeleton from '@/components/sites/SiteSkeleton.vue'

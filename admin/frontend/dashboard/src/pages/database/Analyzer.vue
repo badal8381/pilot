@@ -243,14 +243,16 @@ import {
   Dialog,
   ErrorMessage,
   FormControl,
-  ListHeader,
-  ListRowItem,
-  ListRows,
-  ListView,
   LoadingText,
   Tooltip,
   toast,
 } from 'frappe-ui'
+import {
+  ListHeader,
+  ListRowItem,
+  ListRows,
+  ListView,
+} from 'frappe-ui/experimental'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiErrorMessage } from '@/api/client'

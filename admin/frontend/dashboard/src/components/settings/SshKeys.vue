@@ -84,7 +84,15 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  ErrorMessage,
+  FormControl,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sshKeysApi } from '@/api/sshKeys'

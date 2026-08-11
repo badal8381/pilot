@@ -197,7 +197,15 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  ErrorMessage,
+  FormControl,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
 import QrcodeVue from 'qrcode.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'

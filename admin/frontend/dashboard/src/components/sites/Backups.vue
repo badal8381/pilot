@@ -111,11 +111,9 @@ import {
   Dialog,
   Dropdown,
   ErrorMessage,
-  ListFooter,
-  ListView,
-  ListRowItem,
   LoadingText,
 } from 'frappe-ui'
+import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
 import { apiErrorMessage } from '@/api/client'

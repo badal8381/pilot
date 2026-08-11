@@ -111,7 +111,14 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Button, Dialog, Dropdown, ErrorMessage, ListView, ListRowItem, TextInput } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  Dropdown,
+  ErrorMessage,
+  TextInput,
+} from 'frappe-ui'
+import { ListView, ListRowItem } from 'frappe-ui/experimental'
 import { sitesApi } from '@/api/sites'
 import { useSite } from '@/composables/sites/useSite'
 
