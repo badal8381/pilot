@@ -281,7 +281,7 @@ onMounted(() => {
     </div>
   </div>
 
-  <Dialog v-model="showDetail" :options="{ title: 'Activity details', size: 'md' }">
+  <Dialog v-model="showDetail" title="Activity details" size="md">
     <div class="space-y-2 max-h-96 overflow-y-auto">
       <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
         <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>

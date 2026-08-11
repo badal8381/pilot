@@ -254,7 +254,7 @@ watch(show, (open) => {
     </template>
   </Dialog>
 
-  <Dialog v-model="showDropConfirm" :options="{ title: 'Drop Bench', size: 'sm' }">
+  <Dialog v-model="showDropConfirm" title="Drop Bench" size="sm">
     <template #default>
       <div class="flex flex-col gap-4" @pointerdown.stop>
         <div class="flex flex-col gap-2 text-ink-gray-7 text-sm leading-relaxed">

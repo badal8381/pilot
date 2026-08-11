@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="show" :options="{ title: 'Remove domain', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="show" title="Remove domain" size="md">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">
         Remove <span class="font-semibold text-ink-gray-8 break-all">{{ domain }}</span> from this
         site? It will stop serving this domain.

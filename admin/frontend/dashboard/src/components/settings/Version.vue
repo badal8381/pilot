@@ -4,7 +4,7 @@
   </SettingsRow>
   <ErrorMessage v-if="versionError" :message="versionError" />
 
-  <Dialog v-model="dialogOpen" :options="{ title: 'Update', size: 'md' }">
+  <Dialog v-model="dialogOpen" title="Update" size="md">
     <div v-if="isDev" class="flex flex-col gap-3">
       <p class="text-ink-gray-7 text-p-base">
         This is a development install. Update it from a terminal:

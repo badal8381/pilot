@@ -194,8 +194,8 @@
       </div>
     </div>
 
-    <Dialog v-model="showRemove" :options="{ title: 'Delete rule', size: 'md' }">
-      <template #body-content>
+    <Dialog v-model="showRemove" title="Delete rule" size="md">
+      <template #default>
         <p class="text-ink-gray-7 text-p-base">
           Delete <strong>{{ removingLabel }}</strong
           >? Requests it was matching fall through to the managed ruleset.

@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="open" :options="{ title: 'Updates', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="open" title="Updates" size="md">
+    <template #default>
       <div class="flex flex-col gap-4">
         <div v-if="checking" class="flex justify-center py-8">
           <LoadingText />

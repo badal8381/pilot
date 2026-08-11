@@ -85,8 +85,8 @@
   </div>
 
   <!-- Delete backup dialog -->
-  <Dialog v-model="showDelete" :options="{ title: 'Delete Backup', size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showDelete" title="Delete Backup" size="sm">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">
         Delete the backup from
         <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot

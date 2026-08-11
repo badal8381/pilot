@@ -85,8 +85,8 @@
     </div>
   </div>
 
-  <Dialog v-model="showAdd" :options="{ title: 'Add device', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="showAdd" title="Add device" size="md">
+    <template #default>
       <div class="space-y-3">
         <FormControl
           v-if="!enrollment"
@@ -142,8 +142,8 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="showCodes" :options="{ title: 'Save your recovery codes', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="showCodes" title="Save your recovery codes" size="md">
+    <template #default>
       <p class="text-ink-gray-7 text-p-base">
         These are shown once. Store them somewhere safe — each one signs you in when no device
         is available, and works only once.
@@ -166,8 +166,8 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="showRemove" :options="{ title: 'Remove device', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="showRemove" title="Remove device" size="md">
+    <template #default>
       <p class="text-ink-gray-7 text-p-base">
         Remove <strong>{{ removing?.name }}</strong
         >? Its codes stop working. Removing the last device turns two-factor off.
@@ -180,8 +180,8 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="showRegenerate" :options="{ title: 'Regenerate recovery codes', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="showRegenerate" title="Regenerate recovery codes" size="md">
+    <template #default>
       <p class="text-ink-gray-7 text-p-base">
         This replaces all existing codes, including unused ones. Anything you saved earlier stops
         working.

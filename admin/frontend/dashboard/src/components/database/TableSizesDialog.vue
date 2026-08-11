@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="open" :options="{ title: `Table sizes on ${site}`, size: '3xl' }">
-    <template #body-content>
+  <Dialog v-model="open" :title="`Table sizes on ${site}`" size="3xl">
+    <template #default>
       <div v-if="loading" class="flex justify-center py-10">
         <LoadingText />
       </div>

@@ -81,10 +81,10 @@
 
     <Dialog
       v-model="showForgotPassword"
-      :options="{ title: 'Reset password' }"
+      title="Reset password"
       :position="isMobile ? 'top' : 'center'"
     >
-      <template #body-content>
+      <template #default>
         <ol class="space-y-2 pl-4 text-ink-gray-7 text-p-base list-decimal">
           <li>SSH into the server.</li>
           <li>

@@ -100,7 +100,7 @@
     </div>
   </div>
 
-  <Dialog v-model="confirmationOpen" :options="confirmationOptions">
+  <Dialog v-model="confirmationOpen" :title="confirmationTitle" size="sm">
     <template>
       <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
         {{ confirmation.message }}
@@ -117,7 +117,7 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="sizingOpen" :options="sizingOptions">
+  <Dialog v-model="sizingOpen" :title="sizingTitle" size="sm">
     <template>
       <div v-if="sizingAction" class="space-y-4">
         <FormControl
@@ -188,20 +188,14 @@ const confirmationOpen = computed({
     if (!value && !activeAction.value) confirmation.value = null
   },
 })
-const confirmationOptions = computed(() => ({
-  title: confirmation.value?.title || 'Database action',
-  size: 'sm',
-}))
+const confirmationTitle = computed(() => confirmation.value?.title || 'Database action')
 const sizingOpen = computed({
   get: () => Boolean(sizingAction.value),
   set: (value) => {
     if (!value && !activeAction.value) sizingAction.value = null
   },
 })
-const sizingOptions = computed(() => ({
-  title: sizingAction.value?.title || 'Update database setting',
-  size: 'sm',
-}))
+const sizingTitle = computed(() => sizingAction.value?.title || 'Update database setting')
 const sizingValidationError = computed(() => {
   if (!sizingAction.value) return ''
   if (!Number.isInteger(sizingValue.value)) return 'Enter a whole number.'

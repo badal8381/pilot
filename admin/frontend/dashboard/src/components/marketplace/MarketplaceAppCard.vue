@@ -42,8 +42,8 @@
       </slot>
     </div>
 
-    <Dialog v-model="showIncompatible" :options="{ title: 'Incompatible app', size: 'sm' }">
-      <template #body-content>
+    <Dialog v-model="showIncompatible" title="Incompatible app" size="sm">
+      <template #default>
         <p class="text-ink-gray-7 text-p-sm">{{ incompatibleReason }}</p>
         <div class="flex flex-col gap-1.5 mt-3 text-sm">
           <div class="flex justify-between">

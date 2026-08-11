@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="open" :options="{ title: 'Choose site', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="open" title="Choose site" size="md">
+    <template #default>
       <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-p-sm text-center">
         No sites on this bench yet. Create a site to install apps.
       </p>

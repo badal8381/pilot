@@ -110,8 +110,8 @@ const purge = async () => {
     </template>
   </Alert>
 
-  <Dialog v-model="dialogOpen" :options="{ title: 'Purge binary logs?', size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="dialogOpen" title="Purge binary logs?" size="sm">
+    <template #default>
       <p v-if="loading" class="text-ink-gray-6 text-sm">Loading binary logs…</p>
 
       <template v-else-if="!loadError">

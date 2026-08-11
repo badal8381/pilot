@@ -193,8 +193,8 @@
   <SQLSchemaDialog v-model="showSchema" :schema="schema" @preview="previewTable" />
 
   <!-- Confirm read/write execution -->
-  <Dialog v-model="showConfirm" :options="{ title: 'Run in Read/Write mode', size: 'lg' }">
-    <template #body-content>
+  <Dialog v-model="showConfirm" title="Run in Read/Write mode" size="lg">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">
         This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
         the database. Are you sure you want to continue?

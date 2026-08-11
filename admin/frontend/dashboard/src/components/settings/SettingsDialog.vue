@@ -86,8 +86,8 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="showDiscard" :options="{ title: 'Unsaved changes', size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showDiscard" title="Unsaved changes" size="sm">
+    <template #default>
       <p class="text-ink-gray-7 text-p-base">
         You have changes here that have not been saved. Leaving loses them.
       </p>

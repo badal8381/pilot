@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="show" :options="{ title: 'Tables', size: '3xl' }">
-    <template #body-content>
+  <Dialog v-model="show" title="Tables" size="3xl">
+    <template #default>
       <FormControl v-model="search" type="text" placeholder="Search tables" autocomplete="off">
         <template #prefix>
           <span class="size-4 text-ink-gray-5 lucide-search" />

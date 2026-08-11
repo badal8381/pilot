@@ -28,8 +28,8 @@
   </div>
 
   <!-- Custom schedule dialog -->
-  <Dialog v-model="showCustomDialog" :options="{ title: `Custom ${noun} schedule`, size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showCustomDialog" :title="`Custom ${noun} schedule`" size="sm">
+    <template #default>
       <div class="space-y-4">
         <div class="space-y-1.5">
           <p class="font-medium text-ink-gray-7 text-sm">Frequency</p>
@@ -60,8 +60,8 @@
   </Dialog>
 
   <!-- Disable confirmation -->
-  <Dialog v-model="showDisableConfirm" :options="{ title: `Disable ${noun}`, size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showDisableConfirm" :title="`Disable ${noun}`" size="sm">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">{{ disableBody }}</p>
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="ghost" @click="showDisableConfirm = false">Cancel</Button>

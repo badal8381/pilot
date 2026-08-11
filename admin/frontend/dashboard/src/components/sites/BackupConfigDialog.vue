@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="show" :options="{ title: 'Configure automated backups', size: 'lg' }">
-    <template #body-content>
+  <Dialog v-model="show" title="Configure automated backups" size="lg">
+    <template #default>
       <div class="space-y-5">
         <Checkbox v-model="isEnabled" label="Enable automated backups" />
 

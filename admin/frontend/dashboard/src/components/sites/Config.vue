@@ -56,8 +56,8 @@
   </div>
 
   <!-- Add dialog -->
-  <Dialog v-model="showAddDialog" :options="{ title: 'Add config', size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showAddDialog" title="Add config" size="sm">
+    <template #default>
       <div class="space-y-3">
         <div class="space-y-1.5">
           <p class="font-medium text-ink-gray-7 text-sm">Key</p>
@@ -77,8 +77,8 @@
   </Dialog>
 
   <!-- Edit dialog -->
-  <Dialog v-model="showEditDialog" :options="{ title: `Edit ${entryKey}`, size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
+    <template #default>
       <div class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Value</p>
         <TextInput v-model="entryValue" placeholder="value" class="w-full" />
@@ -92,8 +92,8 @@
   </Dialog>
 
   <!-- Delete dialog -->
-  <Dialog v-model="showDelete" :options="{ title: 'Remove config', size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showDelete" title="Remove config" size="sm">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">
         Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
         <code class="text-ink-gray-9">site_config.json</code>?

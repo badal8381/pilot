@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="show" :options="{ title: 'Debug with AI Assistant', size: '2xl' }">
-    <template #body-content>
+  <Dialog v-model="show" title="Debug with AI Assistant" size="2xl">
+    <template #default>
       <div class="space-y-3">
         <div v-if="streaming && !text" class="flex justify-center py-10">
           <LoadingText text="Analyzing the failure…" />

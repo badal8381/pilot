@@ -1,6 +1,6 @@
 <template>
-  <Dialog v-model="show" :options="{ title: 'Use your own domain', size: 'lg' }">
-    <template #body-content>
+  <Dialog v-model="show" title="Use your own domain" size="lg">
+    <template #default>
       <template v-if="step === 'input'">
         <p class="text-ink-gray-7 text-sm">
           To add a custom domain, you must already own it. If you don't have one, buy it and come

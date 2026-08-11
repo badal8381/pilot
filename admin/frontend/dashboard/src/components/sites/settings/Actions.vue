@@ -26,8 +26,8 @@
   </div>
 
   <!-- Let's Encrypt email dialog -->
-  <Dialog v-model="showSslEmail" :options="{ title: 'Enable SSL', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="showSslEmail" title="Enable SSL" size="md">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">
         A Let's Encrypt email is required to issue and renew certificates.
       </p>

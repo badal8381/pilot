@@ -173,8 +173,8 @@
 
   <TableSizesDialog v-model:open="showTableSizes" :site="selectedSite" />
 
-  <Dialog v-model="showKillDialog" :options="{ title: 'Kill database process', size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showKillDialog" title="Kill database process" size="sm">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">
         Close connection <strong>{{ killTarget?.id }}</strong> and roll back whatever it is running?
         Any bench sharing this server may own it.
@@ -205,8 +205,8 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="showPurgeDialog" :options="{ title: 'Delete binary logs', size: 'sm' }">
-    <template #body-content>
+  <Dialog v-model="showPurgeDialog" title="Delete binary logs" size="sm">
+    <template #default>
       <p class="text-ink-gray-7 text-sm">
         Permanently delete
         <strong

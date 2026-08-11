@@ -43,8 +43,8 @@
     </ListView>
   </div>
 
-  <Dialog v-model="showAdd" :options="{ title: 'Add SSH key', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="showAdd" title="Add SSH key" size="md">
+    <template #default>
       <FormControl
         type="textarea"
         label="Public key"
@@ -62,8 +62,8 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="showRemove" :options="{ title: 'Remove SSH key', size: 'md' }">
-    <template #body-content>
+  <Dialog v-model="showRemove" title="Remove SSH key" size="md">
+    <template #default>
       <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
         This is the last authorized key. It can't be removed, or you'd lose SSH access to this
         server.
