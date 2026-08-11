@@ -1,8 +1,8 @@
 import { computed } from 'vue'
 import { sidebarSections } from '@/components/navigation/list'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
+import { useColorScheme } from 'frappe-ui'
 import { useSession } from '@/composables/auth/useSession'
-import { useTheme } from '@/composables/common/useTheme'
 import {
   DATABASE_SECTIONS,
   GENERAL_SECTIONS,
@@ -20,7 +20,7 @@ export type SearchGroups = Record<string, { items: SearchItem[] }>
 
 export const useSearchIndex = () => {
   const { session } = useSession()
-  const { setTheme } = useTheme()
+  const { setColorScheme } = useColorScheme()
   const { showBenches, showNewBench } = useAppMenu()
 
   return computed((): SearchGroups => {
@@ -83,9 +83,9 @@ export const useSearchIndex = () => {
 
     groups.Theme = {
       items: [
-        { name: 'Light', icon: 'lucide-sun', onSelect: () => setTheme('light') },
-        { name: 'Dark', icon: 'lucide-moon', onSelect: () => setTheme('dark') },
-        { name: 'System', icon: 'lucide-monitor', onSelect: () => setTheme('system') },
+        { name: 'Light', icon: 'lucide-sun', onSelect: () => setColorScheme('light') },
+        { name: 'Dark', icon: 'lucide-moon', onSelect: () => setColorScheme('dark') },
+        { name: 'System', icon: 'lucide-monitor', onSelect: () => setColorScheme('system') },
       ],
     }
 

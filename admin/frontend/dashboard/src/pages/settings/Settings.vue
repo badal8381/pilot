@@ -1,23 +1,23 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, TabButtons } from 'frappe-ui'
+import { Button, TabButtons, useColorScheme } from 'frappe-ui'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
-import { useTheme } from '@/composables/common/useTheme'
 
 const router = useRouter()
 const { showBenches, logout, session } = useAppMenu()
-const { currentTheme, setTheme } = useTheme()
+const { colorScheme, setColorScheme } = useColorScheme()
 
-const themeOptions = computed(() => [
-  {
-    icon: 'lucide-monitor',
-    active: currentTheme.value === 'system',
-    onClick: () => setTheme('system'),
-  },
-  { icon: 'lucide-sun', active: currentTheme.value === 'light', onClick: () => setTheme('light') },
-  { icon: 'lucide-moon', active: currentTheme.value === 'dark', onClick: () => setTheme('dark') },
-])
+const themeModel = computed({
+  get: () => colorScheme.value,
+  set: setColorScheme,
+})
+
+const themeOptions = [
+  { value: 'system', label: 'System', icon: 'lucide-monitor' },
+  { value: 'light', label: 'Light', icon: 'lucide-sun' },
+  { value: 'dark', label: 'Dark', icon: 'lucide-moon' },
+]
 </script>
 
 <template>
@@ -72,7 +72,7 @@ const themeOptions = computed(() => [
           <span class="size-4 text-ink-gray-6 lucide-sun-moon" />
           Theme
         </span>
-        <TabButtons :options="themeOptions" />
+        <TabButtons v-model="themeModel" :options="themeOptions" />
       </div>
 
       <Button variant="ghost" class="w-full !h-auto !justify-between !px-3 !py-2.5" @click="logout">
