@@ -33,7 +33,7 @@
     <div class="space-y-2">
       <div class="flex justify-between items-center">
         <p class="font-medium text-ink-gray-8 text-base leading-normal">Webhook endpoints</p>
-        <Button variant="subtle" icon-left="plus" @click="addWebhook">Add endpoint</Button>
+        <Button variant="subtle" icon-left="lucide-plus" @click="addWebhook">Add endpoint</Button>
       </div>
       <p class="text-ink-gray-5 text-p-sm">
         Alerts go to Central. Endpoints listed here receive them too, as a POST carrying an
