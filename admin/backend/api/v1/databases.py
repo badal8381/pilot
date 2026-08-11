@@ -9,10 +9,12 @@ from flask.typing import ResponseReturnValue
 from admin.backend.api.responses import accepted_task_response, error_response
 from admin.backend.api.v1.benches.support import guard_bench_management
 from pilot.core.bench import Bench
+from pilot.core.database.configurations import DatabaseConfigurations
 from pilot.core.database.quick_actions import DatabaseQuickActions
 from pilot.exceptions import DatabaseError, TaskConflictError
 from pilot.tasks.restart_database import RestartDatabaseTask
 from pilot.tasks.set_innodb_buffer_pool_size import SetInnoDBBufferPoolSizeTask
+from pilot.tasks.set_mariadb_configuration import SetMariaDBConfigurationTask
 from pilot.tasks.set_max_database_connections import SetMaxDatabaseConnectionsTask
 from pilot.tasks.set_performance_schema import SetPerformanceSchemaTask
 
@@ -26,6 +28,10 @@ def _bench() -> Bench:
 
 def _quick_actions() -> DatabaseQuickActions:
     return DatabaseQuickActions(_bench().config)
+
+
+def _configurations() -> DatabaseConfigurations:
+    return DatabaseConfigurations(_bench().config)
 
 
 @database_bp.get("/sites")
@@ -115,6 +121,64 @@ def get_quick_actions():
         return error_response("quick_actions_unavailable", str(exc), 422)
     except Exception:
         return error_response("quick_actions_unavailable", "Could not read quick actions.", 500)
+
+
+@database_bp.get("/configurations")
+def get_database_configurations():
+    try:
+        return jsonify(_configurations().snapshot())
+    except DatabaseError as exc:
+        return error_response("database_configurations_unavailable", str(exc), 422)
+    except Exception:
+        return error_response(
+            "database_configurations_unavailable",
+            "Could not read database configurations.",
+            500,
+        )
+
+
+@database_bp.post("/configurations/<variable>")
+def set_database_configuration(variable: str):
+    forbidden = guard_bench_management()
+    if forbidden is not None:
+        return forbidden
+
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {"value"}:
+        return error_response(
+            "invalid_database_configuration",
+            "The request must contain exactly one value field.",
+            422,
+        )
+
+    try:
+        configurations = _configurations()
+        change = configurations.prepare_change(variable, data["value"])
+        if not change["changed"]:
+            return error_response(
+                "database_configuration_unchanged",
+                f"MariaDB variable '{variable}' already has the requested value.",
+                409,
+            )
+        bench = _bench()
+        task_id = SetMariaDBConfigurationTask.queue(
+            bench,
+            variable=variable,
+            value_json=json.dumps(change["value"], separators=(",", ":")),
+            idempotency_key=request.headers.get("Idempotency-Key"),
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+        return accepted_task_response(bench.path, task_id)
+    except ValueError as exc:
+        return error_response("invalid_database_configuration", str(exc), 422)
+    except (DatabaseError, TaskConflictError) as exc:
+        return error_response("database_configuration_unavailable", str(exc), 409)
+    except Exception:
+        return error_response(
+            "database_configuration_failed",
+            "Could not queue the database configuration change.",
+            500,
+        )
 
 
 @database_bp.post("/quick-actions/restart")
