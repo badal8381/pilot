@@ -103,6 +103,158 @@ def test_database_quick_actions_returns_capability_payload(tmp_path: Path) -> No
     assert response.get_json() == payload
 
 
+def test_database_configurations_returns_catalog_payload(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    payload = {
+        "engine": "mariadb",
+        "managed": True,
+        "readable": True,
+        "editable": True,
+        "reason": "",
+        "edit_reason": "",
+        "variables": [
+            {
+                "name": "connect_timeout",
+                "value": 10,
+                "editable": True,
+            }
+        ],
+    }
+    configurations = Mock()
+    configurations.snapshot.return_value = payload
+    with patch(
+        "admin.backend.api.v1.databases._configurations",
+        return_value=configurations,
+    ):
+        response = client.get("/api/v1/database/configurations")
+
+    assert response.status_code == 200
+    assert response.get_json() == payload
+
+
+def test_database_configuration_queues_typed_guarded_task(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    configurations = Mock()
+    configurations.prepare_change.return_value = {
+        "name": "connect_timeout",
+        "value": 20,
+        "current": 10,
+        "changed": True,
+    }
+    with (
+        patch(
+            "admin.backend.api.v1.databases._configurations",
+            return_value=configurations,
+        ),
+        patch(
+            "admin.backend.api.v1.databases.SetMariaDBConfigurationTask.queue",
+            return_value="task-config",
+        ) as queue,
+        patch(
+            "admin.backend.api.v1.databases.accepted_task_response",
+            return_value=({"task_id": "task-config"}, 202),
+        ),
+    ):
+        response = client.post(
+            "/api/v1/database/configurations/connect_timeout",
+            json={"value": 20},
+            headers={"Idempotency-Key": "connect-timeout-20"},
+        )
+
+    assert response.status_code == 202
+    configurations.prepare_change.assert_called_once_with("connect_timeout", 20)
+    assert queue.call_args.kwargs == {
+        "variable": "connect_timeout",
+        "value_json": "20",
+        "idempotency_key": "connect-timeout-20",
+        "resource_key": "database-server",
+    }
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [None, [], {}, {"other": 20}, {"value": 20, "other": True}],
+)
+def test_database_configuration_requires_exact_value_payload(
+    tmp_path: Path,
+    payload,
+) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    response = client.post(
+        "/api/v1/database/configurations/connect_timeout",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == "invalid_database_configuration"
+
+
+def test_unchanged_database_configuration_does_not_queue_task(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    configurations = Mock()
+    configurations.prepare_change.return_value = {
+        "name": "connect_timeout",
+        "value": 10,
+        "current": 10,
+        "changed": False,
+    }
+    with (
+        patch(
+            "admin.backend.api.v1.databases._configurations",
+            return_value=configurations,
+        ),
+        patch("admin.backend.api.v1.databases.SetMariaDBConfigurationTask.queue") as queue,
+    ):
+        response = client.post(
+            "/api/v1/database/configurations/connect_timeout",
+            json={"value": 10},
+        )
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["code"] == "database_configuration_unchanged"
+    queue.assert_not_called()
+
+
+def test_database_configuration_validation_error_is_unprocessable(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    configurations = Mock()
+    configurations.prepare_change.side_effect = ValueError(
+        "Connection handshake timeout must be at least 2 seconds."
+    )
+    with patch(
+        "admin.backend.api.v1.databases._configurations",
+        return_value=configurations,
+    ):
+        response = client.post(
+            "/api/v1/database/configurations/connect_timeout",
+            json={"value": 1},
+        )
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["message"] == (
+        "Connection handshake timeout must be at least 2 seconds."
+    )
+
+
+def test_database_configuration_policy_error_is_conflict(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    configurations = Mock()
+    configurations.prepare_change.side_effect = DatabaseError(
+        "External MariaDB configurations are read-only."
+    )
+    with patch(
+        "admin.backend.api.v1.databases._configurations",
+        return_value=configurations,
+    ):
+        response = client.post(
+            "/api/v1/database/configurations/connect_timeout",
+            json={"value": 20},
+        )
+
+    assert response.status_code == 409
+    assert response.get_json()["error"]["message"] == ("External MariaDB configurations are read-only.")
+
+
 def test_restart_database_queues_guarded_non_cancellable_task(tmp_path: Path) -> None:
     client = _client(tmp_path / "benches" / "current")
     actions = Mock()
@@ -378,6 +530,7 @@ def test_sizing_actions_return_range_errors_as_unprocessable(
 @pytest.mark.parametrize(
     "path",
     [
+        "/api/v1/database/configurations/connect_timeout",
         "/api/v1/database/quick-actions/restart",
         "/api/v1/database/quick-actions/performance-schema",
         "/api/v1/database/quick-actions/innodb-buffer-pool-size",
