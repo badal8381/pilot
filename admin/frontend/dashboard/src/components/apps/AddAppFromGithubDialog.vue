@@ -45,7 +45,7 @@
             />
             <template v-else>
               <div
-                class="flex items-center gap-2 bg-surface-gray-1 px-3 py-2 border rounded-lg border-outline-gray-2"
+                class="flex items-center gap-2 bg-surface-gray-1 px-3 py-2 border rounded-6 border-outline-gray-2"
               >
                 <span class="text-ink-gray-7 text-sm">
                   Connected as

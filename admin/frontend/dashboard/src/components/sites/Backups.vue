@@ -20,7 +20,7 @@
 
     <ErrorMessage v-if="error" :message="error" />
 
-    <div :class="backups.length ? '' : 'rounded-xl border border-dashed border-outline-gray-2'">
+    <div :class="backups.length ? '' : 'rounded-7 border border-dashed border-outline-gray-2'">
       <div v-if="backupsLoading" class="flex justify-center py-12">
         <LoadingText />
       </div>

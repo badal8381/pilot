@@ -24,7 +24,7 @@
     <!-- Config table -->
     <div
       v-if="!rows.length"
-      class="py-12 border border-dashed rounded-xl border-outline-gray-2 text-ink-gray-5 text-sm text-center"
+      class="py-12 border border-dashed rounded-7 border-outline-gray-2 text-ink-gray-5 text-sm text-center"
     >
       No config keys.
     </div>
