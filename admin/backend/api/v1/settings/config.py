@@ -84,15 +84,16 @@ class ConfigPatcher:
 
     @staticmethod
     def _webhook_endpoints(entries: list[dict], stored: dict[str, str]) -> dict[str, str]:
-        """A blank token keeps the one already stored for that URL, so the UI
-        never has to read a secret back to re-save the rest of the form."""
+        """A blank token keeps the stored one, found by the URL the row was loaded
+        with so editing the URL does not drop it."""
         endpoints: dict[str, str] = {}
         for entry in entries:
             url = str(entry.get("url", "")).strip()
             if not url:
                 continue
             token = str(entry.get("token", "")).strip()
-            endpoints[url] = token or stored.get(url, "")
+            loaded_as = str(entry.get("original_url", "")).strip() or url
+            endpoints[url] = token or stored.get(loaded_as, "")
         return endpoints
 
     def _apply_firewall(self) -> None:
