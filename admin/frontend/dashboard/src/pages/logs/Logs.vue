@@ -176,7 +176,7 @@
 
           <!-- Terminal area -->
           <div ref="viewer" class="flex flex-col flex-1 mt-2 sm:mt-0 overflow-hidden">
-            <div v-if="contentError" class="p-4 font-mono text-ink-red-6 text-sm">
+            <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
               Error: {{ contentError }}
             </div>
             <LogView

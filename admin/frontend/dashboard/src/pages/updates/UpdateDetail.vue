@@ -49,8 +49,8 @@
       <section v-if="isAttention" class="mt-4 overflow-hidden rounded-6 border border-outline-gray-2">
         <div class="p-4">
           <div class="flex items-center gap-2">
-            <span class="lucide-alert-triangle size-4 shrink-0 text-ink-red-6" />
-            <h2 class="font-medium text-ink-red-8 text-base">
+            <span class="lucide-alert-triangle size-4 shrink-0 text-ink-red-5" />
+            <h2 class="font-medium text-ink-red-7 text-base">
               {{ alertTitle }}
             </h2>
           </div>
@@ -69,7 +69,7 @@
           </p>
           <p
             v-if="patchAlreadySkipped"
-            class="mt-2 flex items-center gap-1 text-p-sm font-medium text-ink-green-7"
+            class="mt-2 flex items-center gap-1 text-p-sm font-medium text-ink-green-6"
           >
             <span class="lucide-check size-4" />
             Patch skipped
@@ -91,7 +91,7 @@
             class="mt-4 flex items-center gap-2 px-2 py-1 rounded-4 transition-colors text-p-sm text-ink-gray-7 hover:bg-surface-gray-1"
             @click="openTaskLog({ id: pending.task_id })"
           >
-            <Spinner size="md" class="text-ink-amber-7" />
+            <Spinner size="md" class="text-ink-amber-6" />
             {{ pendingLabel }}
             <span class="lucide-square-terminal size-4" />
           </button>
@@ -177,7 +177,7 @@
                 >
                   <span>{{ shortSha(app.sha) }}</span>
                   <span class="lucide-arrow-right size-3.5 text-ink-gray-4" aria-hidden="true" />
-                  <span :class="app.updated_sha ? 'text-ink-green-7' : 'text-ink-gray-5'">
+                  <span :class="app.updated_sha ? 'text-ink-green-6' : 'text-ink-gray-5'">
                     {{ shortSha(app.updated_sha || app.target_sha) }}
                   </span>
                   <span
@@ -236,9 +236,9 @@
                 <span
                   v-if="siteCaption(site)"
                   class="flex items-center gap-1.5 text-sm shrink-0"
-                  :class="siteStatus(site).value === 'failed' ? 'text-ink-red-7' : 'text-ink-gray-5'"
+                  :class="siteStatus(site).value === 'failed' ? 'text-ink-red-6' : 'text-ink-gray-5'"
                 >
-                  <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-7" />
+                  <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-6" />
                   {{ siteCaption(site) }}
                 </span>
               </div>

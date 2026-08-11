@@ -33,8 +33,8 @@
       v-if="siteFilter"
       class="flex items-center gap-2 bg-surface-blue-1 mt-4 px-3 py-2 rounded-4 shrink-0"
     >
-      <span class="lucide-filter size-4 text-ink-blue-7 shrink-0" />
-      <p class="flex-1 min-w-0 text-p-sm text-ink-blue-8 truncate">
+      <span class="lucide-filter size-4 text-ink-blue-6 shrink-0" />
+      <p class="flex-1 min-w-0 text-p-sm text-ink-blue-7 truncate">
         Activity on <span class="font-semibold">{{ siteFilter }}</span>
       </p>
       <Button variant="ghost" size="sm" icon="lucide-x" @click="clearSiteFilter" />

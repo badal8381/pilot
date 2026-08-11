@@ -45,7 +45,7 @@
           v-model="apiBase"
           placeholder="http://your-host:8000/v1"
         />
-        <p v-if="apiBaseError" class="text-ink-red-6 text-p-sm">{{ apiBaseError }}</p>
+        <p v-if="apiBaseError" class="text-ink-red-5 text-p-sm">{{ apiBaseError }}</p>
       </div>
       <FormControl
         label="API Key"
@@ -70,7 +70,7 @@
           :placeholder="modelPlaceholder"
           @update:model-value="(value) => (model = value || '')"
         />
-        <p v-if="modelsError" class="text-ink-red-6 text-p-sm">{{ modelsError }}</p>
+        <p v-if="modelsError" class="text-ink-red-5 text-p-sm">{{ modelsError }}</p>
         <p v-else-if="modelsHint" class="text-ink-gray-5 text-p-sm">{{ modelsHint }}</p>
       </div>
       <FormControl

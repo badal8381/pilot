@@ -139,7 +139,7 @@
             {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}
           </p>
         </div>
-        <p v-if="sizingRequiresRestart" class="text-ink-orange-7 text-sm">
+        <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-sm">
           MariaDB will restart because this value is above its current live Buffer Pool ceiling of
           {{ formatSizingValue(sizingAction.dynamicMax, 'MB') }}.
         </p>

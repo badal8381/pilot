@@ -76,7 +76,7 @@
               @click="removeWebhook(index)"
             />
           </div>
-          <p v-if="webhookError(webhook)" class="mt-1.5 text-ink-red-6 text-p-sm">
+          <p v-if="webhookError(webhook)" class="mt-1.5 text-ink-red-5 text-p-sm">
             {{ webhookError(webhook) }}
           </p>
         </div>

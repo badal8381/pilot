@@ -41,7 +41,7 @@
                   >
                     {{ updates[name].current }}
                     <span class="lucide-arrow-right size-3 shrink-0 text-ink-gray-4" />
-                    <span class="text-ink-green-7">{{ updates[name].target }}</span>
+                    <span class="text-ink-green-6">{{ updates[name].target }}</span>
                   </p>
                 </span>
                 <Checkbox

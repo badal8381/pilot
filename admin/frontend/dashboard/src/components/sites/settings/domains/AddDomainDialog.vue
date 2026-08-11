@@ -50,7 +50,7 @@
         </template>
         <div v-else class="flex flex-col items-center gap-3 py-8">
           <div class="flex justify-center items-center bg-surface-green-2 rounded-full size-12">
-            <span class="size-6 text-ink-green-3 lucide-check" />
+            <span class="size-6 text-ink-green-2 lucide-check" />
           </div>
           <p class="font-medium text-ink-gray-8 text-base">No DNS records needed</p>
         </div>

@@ -184,7 +184,7 @@
           </div>
           <p
             v-if="rule.action === 'skip'"
-            class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm"
+            class="flex items-start gap-1.5 text-ink-amber-6 text-p-sm"
           >
             <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
             Matching requests bypass the firewall entirely - no managed rules, no inspection.

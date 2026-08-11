@@ -115,7 +115,7 @@
             </summary>
             <div class="bg-surface-gray-2 mt-2 p-3 rounded-6">
               <p class="font-mono text-ink-gray-8 text-base break-all">{{ enrollment.secret }}</p>
-              <button class="mt-1 text-ink-blue-3 text-sm" @click="copy(enrollment.secret)">
+              <button class="mt-1 text-ink-blue-2 text-sm" @click="copy(enrollment.secret)">
                 Copy key
               </button>
             </div>

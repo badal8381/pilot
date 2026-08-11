@@ -5,7 +5,7 @@
       <h2 class="font-semibold text-ink-gray-9 text-base">Web application firewall</h2>
       <span
         v-if="data.mode === 'DetectionOnly'"
-        class="bg-surface-amber-2 px-2 py-0.5 rounded-full text-ink-amber-3 text-xs"
+        class="bg-surface-amber-2 px-2 py-0.5 rounded-full text-ink-amber-2 text-xs"
         >Detection only</span
       >
     </div>
@@ -19,7 +19,7 @@
         <div class="text-ink-gray-6 text-sm">
           {{ data.mode === 'On' ? 'Blocked' : 'Would block' }}
         </div>
-        <div class="mt-1 font-semibold text-ink-red-4 text-xl">
+        <div class="mt-1 font-semibold text-ink-red-3 text-xl">
           {{ data.mode === 'On' ? totals.blocked : totals.would_block }}
         </div>
       </div>

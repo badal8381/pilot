@@ -83,7 +83,7 @@
           <p v-else-if="resolving" class="mt-1.5 text-ink-gray-5 text-sm">Checking repository…</p>
           <p
             v-else-if="foundName"
-            class="mt-1.5 flex items-center gap-1 text-ink-green-8 text-sm"
+            class="mt-1.5 flex items-center gap-1 text-ink-green-7 text-sm"
           >
             <span class="size-3.5 shrink-0 lucide-check"></span>
             Found {{ foundName

@@ -12,12 +12,12 @@ import Table from '@/components/common/Table.vue'
 const props = defineProps<{ siteName?: string }>()
 
 const typeMetaMap: any = {
-  backup: { icon: 'lucide-database', bg: 'bg-surface-blue-2 text-ink-blue-8' },
-  app: { icon: 'lucide-package', bg: 'bg-surface-purple-2 text-ink-purple-8' },
+  backup: { icon: 'lucide-database', bg: 'bg-surface-blue-2 text-ink-blue-7' },
+  app: { icon: 'lucide-package', bg: 'bg-surface-purple-2 text-ink-purple-7' },
   ssh_key: { icon: 'lucide-key', bg: 'bg-surface-gray-2 text-ink-gray-7' },
   git: { icon: 'lucide-git-branch', bg: 'bg-surface-gray-2 text-ink-gray-7' },
-  task: { icon: 'lucide-list-checks', bg: 'bg-surface-blue-2 text-ink-blue-8' },
-  bypass_patch: { icon: 'lucide-wrench', bg: 'bg-surface-red-2 text-ink-red-8' },
+  task: { icon: 'lucide-list-checks', bg: 'bg-surface-blue-2 text-ink-blue-7' },
+  bypass_patch: { icon: 'lucide-wrench', bg: 'bg-surface-red-2 text-ink-red-7' },
 }
 const defaultTypeMeta = {
   icon: 'lucide-activity',
@@ -33,8 +33,8 @@ const activityTypeMeta = (entry: AuditEntry) => {
       icon: meta.icon,
       bg:
         entry.status === 'failed'
-          ? 'bg-surface-red-2 text-ink-red-8'
-          : 'bg-surface-green-2 text-ink-green-8',
+          ? 'bg-surface-red-2 text-ink-red-7'
+          : 'bg-surface-green-2 text-ink-green-7',
     }
   }
   return meta

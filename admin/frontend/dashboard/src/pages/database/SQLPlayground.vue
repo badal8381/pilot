@@ -102,7 +102,7 @@
           v-if="!currentResult.columns.length"
           class="flex justify-center items-center gap-2 py-8 text-ink-gray-6 text-sm"
         >
-          <span class="size-4 text-ink-green-4 lucide-check-circle" />
+          <span class="size-4 text-ink-green-3 lucide-check-circle" />
           Query executed successfully
           <span v-if="currentResult.affected_rows != null"
             >· {{ currentResult.affected_rows }} row(s) affected</span
