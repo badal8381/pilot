@@ -24,13 +24,14 @@
                 v-if="fetched"
                 label="Branch"
                 v-model="branch"
-                :options="branchOptions"
+                :options="typeableBranchOptions"
                 :loading="fetching"
-                allowCustomValue
                 placeholder="Search or type a branch…"
                 emptyText="No matching branch. Type one to use it."
                 class="w-40 shrink-0"
-              />
+              >
+                <template #item-use-typed="{ query }">Use "{{ query }}"</template>
+              </Combobox>
             </div>
           </template>
 
@@ -140,6 +141,17 @@ const fetched = ref(false)
 const fetching = ref(false)
 const branches = ref([])
 const branchOptions = computed(() => branches.value.map((b) => ({ label: b, value: b })))
+const typeableBranchOptions = computed(() => [
+  ...branchOptions.value,
+  {
+    type: 'custom',
+    key: 'use-typed',
+    label: 'Use typed branch',
+    slot: 'use-typed',
+    condition: ({ query }) => Boolean(query.trim()) && !branches.value.includes(query.trim()),
+    onClick: ({ query }) => (branch.value = query.trim()),
+  },
+])
 
 const gitStatus = ref(null)
 const gitConnected = computed(() =>
