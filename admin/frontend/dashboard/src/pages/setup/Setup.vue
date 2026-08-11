@@ -69,9 +69,9 @@
             class="flex items-center self-start gap-1 text-ink-gray-5 hover:text-ink-gray-7 text-sm"
             @click="toggleStreamDetails"
           >
-            <FeatherIcon
-              :name="showStreamDetails ? 'chevron-down' : 'chevron-right'"
-              class="w-4 h-4"
+            <span
+              class="size-4"
+              :class="showStreamDetails ? 'lucide-chevron-down' : 'lucide-chevron-right'"
             />
             {{ showStreamDetails ? 'Hide details' : 'Show details' }}
           </button>
@@ -193,7 +193,6 @@ import {
   FormLabel,
   Password,
   ErrorMessage,
-  FeatherIcon,
   LoadingText,
 } from 'frappe-ui'
 import TaskStream from '../../components/tasks/TaskStream.vue'
