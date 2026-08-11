@@ -33,7 +33,6 @@
           <Dropdown
             v-if="domainMenuOptions(row).length"
             :options="domainMenuOptions(row)"
-            placement="bottom-end"
           >
             <template #default="{ open }">
               <Button

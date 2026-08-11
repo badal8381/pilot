@@ -60,7 +60,7 @@
       >
         <template #cell="{ column, row, item }">
           <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row)" placement="left">
+            <Dropdown :options="menuOptions(row)">
               <template #default="{ open }">
                 <Button
                   variant="ghost"

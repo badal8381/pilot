@@ -12,7 +12,6 @@
           <Dropdown
             v-if="menuOptions(app).length"
             :options="menuOptions(app)"
-            placement="bottom-end"
           >
             <template #default="{ open }">
               <Button

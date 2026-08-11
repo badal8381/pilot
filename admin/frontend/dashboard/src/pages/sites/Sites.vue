@@ -84,7 +84,7 @@
 
                 <div class="flex justify-end">
                   <!-- Actions Dropdown -->
-                  <Dropdown :options="siteMenuOptions(site)" placement="bottom-end">
+                  <Dropdown :options="siteMenuOptions(site)">
                     <template #default>
                       <Button
                         variant="ghost"
@@ -139,7 +139,7 @@
             {{ item }}
           </div>
           <div v-else-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="siteMenuOptions(row.site)" placement="bottom-end">
+            <Dropdown :options="siteMenuOptions(row.site)">
               <template #default="{ open }">
                 <Button
                   variant="ghost"

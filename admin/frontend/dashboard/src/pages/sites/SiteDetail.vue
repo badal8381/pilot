@@ -47,7 +47,7 @@
           <template #prefix><span class="size-4 lucide-plus" /></template>
           Install app
         </Button>
-        <Dropdown :options="menuOptions" placement="bottom-end">
+        <Dropdown :options="menuOptions">
           <template #default="{ open }">
             <Button
               variant="subtle"

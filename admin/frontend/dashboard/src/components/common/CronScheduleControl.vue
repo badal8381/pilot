@@ -12,7 +12,7 @@
         <Button v-if="disabled" size="sm" :loading="loading" @click="enable"
           >Enable {{ noun }}</Button
         >
-        <Dropdown v-else :options="scheduleOptions" placement="bottom-end">
+        <Dropdown v-else :options="scheduleOptions">
           <template #default="{ open }">
             <Button variant="subtle" size="sm" :loading="loading" :active="open">
               <template #suffix><span class="size-4 lucide-chevron-down" /></template>
