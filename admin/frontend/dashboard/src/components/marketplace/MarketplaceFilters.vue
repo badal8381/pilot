@@ -47,7 +47,7 @@
       <TabButtons
         v-model="pillModel"
         :options="pillOptions"
-        type="ghost"
+        variant="ghost"
         :size="isMobile ? 'md' : 'sm'"
       />
     </div>
