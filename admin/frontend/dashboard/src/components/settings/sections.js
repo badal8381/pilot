@@ -9,6 +9,7 @@ import SshKeys from '@/components/settings/SshKeys.vue'
 import ChangeAdminPassword from '@/components/settings/ChangeAdminPassword.vue'
 import TwoFactor from '@/components/settings/TwoFactor.vue'
 import DatabaseQuickActions from '@/components/settings/DatabaseQuickActions.vue'
+import DatabaseConfigurations from '@/components/settings/DatabaseConfigurations.vue'
 
 // Single source of truth for id/label/component so SettingsDialog can resolve
 // a routed subsection id without each page owning its own private mapping.
@@ -46,6 +47,12 @@ export const GENERAL_SECTIONS = [
 ]
 
 export const DATABASE_SECTIONS = [
+  {
+    id: 'configurations',
+    label: 'Configurations',
+    description: 'Inspect MariaDB system variables and tune guarded dynamic settings.',
+    component: DatabaseConfigurations,
+  },
   {
     id: 'quick-actions',
     label: 'Quick actions',
