@@ -39,7 +39,7 @@
             <p v-if="!gitStatus" class="text-ink-gray-5 text-sm">Loading…</p>
             <Alert
               v-else-if="!gitConnected"
-              theme="yellow"
+              theme="amber"
               title="No GitHub account connected"
               :dismissible="false"
             />
