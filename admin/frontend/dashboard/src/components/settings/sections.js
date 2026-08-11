@@ -1,15 +1,15 @@
+import ChangeAdminPassword from '@/components/settings/ChangeAdminPassword.vue'
+import DatabaseConfigurations from '@/components/settings/DatabaseConfigurations.vue'
+import DatabaseQuickActions from '@/components/settings/DatabaseQuickActions.vue'
+import Firewall from '@/components/settings/Firewall.vue'
 import Git from '@/components/settings/Git.vue'
-import Workers from '@/components/settings/Workers.vue'
-import S3Bucket from '@/components/settings/S3Bucket.vue'
 import LLM from '@/components/settings/LLM.vue'
 import Notifications from '@/components/settings/Notifications.vue'
-import Firewall from '@/components/settings/Firewall.vue'
-import Waf from '@/components/settings/Waf.vue'
+import S3Bucket from '@/components/settings/S3Bucket.vue'
 import SshKeys from '@/components/settings/SshKeys.vue'
-import ChangeAdminPassword from '@/components/settings/ChangeAdminPassword.vue'
 import TwoFactor from '@/components/settings/TwoFactor.vue'
-import DatabaseQuickActions from '@/components/settings/DatabaseQuickActions.vue'
-import DatabaseConfigurations from '@/components/settings/DatabaseConfigurations.vue'
+import Waf from '@/components/settings/Waf.vue'
+import Workers from '@/components/settings/Workers.vue'
 
 // Single source of truth for id/label/component so SettingsDialog can resolve
 // a routed subsection id without each page owning its own private mapping.
@@ -49,7 +49,7 @@ export const GENERAL_SECTIONS = [
 export const DATABASE_SECTIONS = [
   {
     id: 'configurations',
-    label: 'Configurations',
+    label: 'Database configurations',
     description: 'Inspect MariaDB system variables and tune guarded dynamic settings.',
     component: DatabaseConfigurations,
   },

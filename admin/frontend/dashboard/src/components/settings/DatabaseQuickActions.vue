@@ -17,9 +17,9 @@
   <div v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
 
-    <div v-if="capabilities" class="pb-4">
+    <!-- <div v-if="capabilities" class="pb-4">
       <Badge :label="engineLabel" theme="gray" size="sm" />
-    </div>
+    </div> -->
 
     <div
       v-if="showManagedMariaDBDisclaimer"
@@ -30,6 +30,7 @@
 
     <div v-if="capabilities" class="divide-y divide-outline-alpha-gray-1">
       <SettingsRow
+        class="!ps-0"
         label="Performance Schema"
         description="Collect database instrumentation for deeper performance diagnostics."
       >
@@ -42,6 +43,7 @@
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Update InnoDB Buffer Pool Size"
         :description="bufferPoolDescription"
       >
@@ -56,6 +58,7 @@
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Update Max DB Connections"
         :description="maxConnectionsDescription"
       >
@@ -70,6 +73,7 @@
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Manage Binlogs"
         description="Inspect binary logs and safely purge complete log ranges."
       >
@@ -84,6 +88,7 @@
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Restart MariaDB"
         description="Restart the database service and verify that it accepts connections."
       >
