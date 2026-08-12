@@ -44,41 +44,37 @@
   </div>
 
   <Dialog v-model="showAdd" title="Add SSH key" size="md">
-    <template #default>
-      <FormControl
-        type="textarea"
-        label="Public key"
-        v-model="newKey"
-        :rows="3"
-        placeholder="ssh-ed25519 AAAA… user@host"
-      />
-      <ErrorMessage v-if="error" :message="error" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-        <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
-          Add key
-        </Button>
-      </div>
-    </template>
+    <FormControl
+      type="textarea"
+      label="Public key"
+      v-model="newKey"
+      :rows="3"
+      placeholder="ssh-ed25519 AAAA… user@host"
+    />
+    <ErrorMessage v-if="error" :message="error" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showAdd = false">Cancel</Button>
+      <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
+        Add key
+      </Button>
+    </div>
   </Dialog>
 
   <Dialog v-model="showRemove" title="Remove SSH key" size="md">
-    <template #default>
-      <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
-        This is the last authorized key. It can't be removed, or you'd lose SSH access to this
-        server.
-      </p>
-      <p v-else class="text-ink-gray-7 text-p-base">
-        Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
-        Whoever holds the matching private key loses SSH access.
-      </p>
-      <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
-          >Remove</Button
-        >
-      </div>
-    </template>
+    <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
+      This is the last authorized key. It can't be removed, or you'd lose SSH access to this
+      server.
+    </p>
+    <p v-else class="text-ink-gray-7 text-p-base">
+      Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
+      Whoever holds the matching private key loses SSH access.
+    </p>
+    <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
+        >Remove</Button
+      >
+    </div>
   </Dialog>
 </template>
 

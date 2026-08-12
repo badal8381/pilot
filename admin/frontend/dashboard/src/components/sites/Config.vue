@@ -57,55 +57,49 @@
 
   <!-- Add dialog -->
   <Dialog v-model="showAddDialog" title="Add config" size="sm">
-    <template #default>
-      <div class="space-y-3">
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-sm">Key</p>
-          <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
-        </div>
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-sm">Value</p>
-          <TextInput v-model="entryValue" placeholder="value" class="w-full" />
-        </div>
-        <ErrorMessage v-if="dialogError" :message="dialogError" />
+    <div class="space-y-3">
+      <div class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Key</p>
+        <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
       </div>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
-        <Button variant="solid" :loading="saving" @click="save">Save</Button>
-      </div>
-    </template>
-  </Dialog>
-
-  <!-- Edit dialog -->
-  <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
-    <template #default>
       <div class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Value</p>
         <TextInput v-model="entryValue" placeholder="value" class="w-full" />
       </div>
-      <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
-        <Button variant="solid" :loading="saving" @click="save">Save</Button>
-      </div>
-    </template>
+      <ErrorMessage v-if="dialogError" :message="dialogError" />
+    </div>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
+  </Dialog>
+
+  <!-- Edit dialog -->
+  <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
+    <div class="space-y-1.5">
+      <p class="font-medium text-ink-gray-7 text-sm">Value</p>
+      <TextInput v-model="entryValue" placeholder="value" class="w-full" />
+    </div>
+    <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
   </Dialog>
 
   <!-- Delete dialog -->
   <Dialog v-model="showDelete" title="Remove config" size="sm">
-    <template #default>
-      <p class="text-ink-gray-7 text-sm">
-        Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
-        <code class="text-ink-gray-9">site_config.json</code>?
-      </p>
-      <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-          >Remove</Button
-        >
-      </div>
-    </template>
+    <p class="text-ink-gray-7 text-sm">
+      Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
+      <code class="text-ink-gray-9">site_config.json</code>?
+    </p>
+    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+        >Remove</Button
+      >
+    </div>
   </Dialog>
 </template>
 

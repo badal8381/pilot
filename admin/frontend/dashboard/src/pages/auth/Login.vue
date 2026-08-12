@@ -84,17 +84,15 @@
       title="Reset password"
       :position="isMobile ? 'top' : 'center'"
     >
-      <template #default>
-        <ol class="space-y-2 pl-4 text-ink-gray-7 text-p-base list-decimal">
-          <li>SSH into the server.</li>
-          <li>
-            Run
-            <code class="bg-surface-gray-2 px-1 py-0.5 rounded-4 font-mono text-ink-gray-8"
-              >pilot -b {{ session.benchName }} set-admin-password</code
-            >
-          </li>
-        </ol>
-      </template>
+      <ol class="space-y-2 pl-4 text-ink-gray-7 text-p-base list-decimal">
+        <li>SSH into the server.</li>
+        <li>
+          Run
+          <code class="bg-surface-gray-2 px-1 py-0.5 rounded-4 font-mono text-ink-gray-8"
+            >pilot -b {{ session.benchName }} set-admin-password</code
+          >
+        </li>
+      </ol>
     </Dialog>
   </div>
 </template>

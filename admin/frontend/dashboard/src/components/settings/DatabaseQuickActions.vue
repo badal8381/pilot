@@ -101,65 +101,61 @@
   </div>
 
   <Dialog v-model="confirmationOpen" :title="confirmationTitle" size="sm">
-    <template>
-      <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
-        {{ confirmation.message }}
-      </p>
-      <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" :disabled="Boolean(activeAction)" @click="confirmationOpen = false">
-          Cancel
-        </Button>
-        <Button variant="solid" :loading="Boolean(activeAction)" @click="runConfirmedAction">
-          {{ confirmation?.buttonLabel }}
-        </Button>
-      </div>
-    </template>
+    <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
+      {{ confirmation.message }}
+    </p>
+    <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" :disabled="Boolean(activeAction)" @click="confirmationOpen = false">
+        Cancel
+      </Button>
+      <Button variant="solid" :loading="Boolean(activeAction)" @click="runConfirmedAction">
+        {{ confirmation?.buttonLabel }}
+      </Button>
+    </div>
   </Dialog>
 
   <Dialog v-model="sizingOpen" :title="sizingTitle" size="sm">
-    <template>
-      <div v-if="sizingAction" class="space-y-4">
-        <FormControl
-          v-model.number="sizingValue"
-          type="number"
-          :label="sizingAction.inputLabel"
-          :min="sizingAction.min"
-          :max="sizingAction.max"
-          step="1"
-          autocomplete="off"
-        />
-        <div class="text-ink-gray-6 text-sm">
-          <p>
-            Recommended:
-            {{ formatSizingValue(sizingAction.recommended, sizingAction.unit) }}
-          </p>
-          <p>
-            Allowed: {{ formatSizingValue(sizingAction.min, sizingAction.unit) }} to
-            {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}
-          </p>
-        </div>
-        <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-sm">
-          MariaDB will restart because this value is above its current live Buffer Pool ceiling of
-          {{ formatSizingValue(sizingAction.dynamicMax, 'MB') }}.
+    <div v-if="sizingAction" class="space-y-4">
+      <FormControl
+        v-model.number="sizingValue"
+        type="number"
+        :label="sizingAction.inputLabel"
+        :min="sizingAction.min"
+        :max="sizingAction.max"
+        step="1"
+        autocomplete="off"
+      />
+      <div class="text-ink-gray-6 text-sm">
+        <p>
+          Recommended:
+          {{ formatSizingValue(sizingAction.recommended, sizingAction.unit) }}
         </p>
-        <ErrorMessage v-if="sizingValidationError" :message="sizingValidationError" />
-        <ErrorMessage v-if="actionError" :message="actionError" />
-        <div class="flex justify-end gap-2">
-          <Button variant="ghost" :disabled="Boolean(activeAction)" @click="sizingOpen = false">
-            Cancel
-          </Button>
-          <Button
-            variant="solid"
-            :loading="Boolean(activeAction)"
-            :disabled="Boolean(sizingValidationError) || sizingUnchanged"
-            @click="runSizingAction"
-          >
-            {{ sizingRequiresRestart ? 'Update and restart' : 'Update' }}
-          </Button>
-        </div>
+        <p>
+          Allowed: {{ formatSizingValue(sizingAction.min, sizingAction.unit) }} to
+          {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}
+        </p>
       </div>
-    </template>
+      <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-sm">
+        MariaDB will restart because this value is above its current live Buffer Pool ceiling of
+        {{ formatSizingValue(sizingAction.dynamicMax, 'MB') }}.
+      </p>
+      <ErrorMessage v-if="sizingValidationError" :message="sizingValidationError" />
+      <ErrorMessage v-if="actionError" :message="actionError" />
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" :disabled="Boolean(activeAction)" @click="sizingOpen = false">
+          Cancel
+        </Button>
+        <Button
+          variant="solid"
+          :loading="Boolean(activeAction)"
+          :disabled="Boolean(sizingValidationError) || sizingUnchanged"
+          @click="runSizingAction"
+        >
+          {{ sizingRequiresRestart ? 'Update and restart' : 'Update' }}
+        </Button>
+      </div>
+    </div>
   </Dialog>
 </template>
 

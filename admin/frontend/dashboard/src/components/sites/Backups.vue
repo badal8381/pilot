@@ -86,20 +86,18 @@
 
   <!-- Delete backup dialog -->
   <Dialog v-model="showDelete" title="Delete Backup" size="sm">
-    <template #default>
-      <p class="text-ink-gray-7 text-sm">
-        Delete the backup from
-        <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
-        be undone.
-      </p>
-      <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-          >Delete</Button
-        >
-      </div>
-    </template>
+    <p class="text-ink-gray-7 text-sm">
+      Delete the backup from
+      <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
+      be undone.
+    </p>
+    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+        >Delete</Button
+      >
+    </div>
   </Dialog>
 </template>
 

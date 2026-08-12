@@ -1,60 +1,58 @@
 <template>
   <Dialog v-model="show" title="Configure automated backups" size="lg">
-    <template #default>
-      <div class="space-y-5">
-        <Checkbox v-model="isEnabled" label="Enable automated backups" />
+    <div class="space-y-5">
+      <Checkbox v-model="isEnabled" label="Enable automated backups" />
 
-        <template v-if="isEnabled">
-          <div
-            class="gap-4 grid grid-cols-1"
-            :class="frequency === 'daily' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'"
-          >
-            <Select label="Frequency" v-model="frequency" :options="FREQ_OPTIONS" />
-            <Select
-              v-if="frequency === 'weekly'"
-              label="Day of week"
-              v-model.number="weekday"
-              :options="weekdayOptions"
-            />
-            <Select
-              v-if="frequency === 'monthly'"
-              label="Day of month"
-              v-model.number="monthDay"
-              :options="monthDayOptions"
-            />
-            <Select label="Time" v-model.number="hour" :options="hourOptions" />
+      <template v-if="isEnabled">
+        <div
+          class="gap-4 grid grid-cols-1"
+          :class="frequency === 'daily' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'"
+        >
+          <Select label="Frequency" v-model="frequency" :options="FREQ_OPTIONS" />
+          <Select
+            v-if="frequency === 'weekly'"
+            label="Day of week"
+            v-model.number="weekday"
+            :options="weekdayOptions"
+          />
+          <Select
+            v-if="frequency === 'monthly'"
+            label="Day of month"
+            v-model.number="monthDay"
+            :options="monthDayOptions"
+          />
+          <Select label="Time" v-model.number="hour" :options="hourOptions" />
+        </div>
+
+        <div class="space-y-4 pt-5 border-t border-outline-gray-1">
+          <div class="space-y-1.5">
+            <Select label="Retention" v-model="scheme" :options="SCHEME_OPTIONS" />
+            <p class="text-ink-gray-5 text-p-sm">{{ schemeHint }}</p>
           </div>
 
-          <div class="space-y-4 pt-5 border-t border-outline-gray-1">
-            <div class="space-y-1.5">
-              <Select label="Retention" v-model="scheme" :options="SCHEME_OPTIONS" />
-              <p class="text-ink-gray-5 text-p-sm">{{ schemeHint }}</p>
-            </div>
-
-            <FormControl
-              v-if="scheme === 'fifo'"
-              label="Backups to keep"
-              type="number"
-              min="0"
-              v-model.number="keepLast"
-            />
-            <div v-else class="gap-4 grid grid-cols-2 sm:grid-cols-4">
-              <FormControl label="Daily" type="number" min="0" v-model.number="keepDaily" />
-              <FormControl label="Weekly" type="number" min="0" v-model.number="keepWeekly" />
-              <FormControl label="Monthly" type="number" min="0" v-model.number="keepMonthly" />
-              <FormControl label="Yearly" type="number" min="0" v-model.number="keepYearly" />
-            </div>
+          <FormControl
+            v-if="scheme === 'fifo'"
+            label="Backups to keep"
+            type="number"
+            min="0"
+            v-model.number="keepLast"
+          />
+          <div v-else class="gap-4 grid grid-cols-2 sm:grid-cols-4">
+            <FormControl label="Daily" type="number" min="0" v-model.number="keepDaily" />
+            <FormControl label="Weekly" type="number" min="0" v-model.number="keepWeekly" />
+            <FormControl label="Monthly" type="number" min="0" v-model.number="keepMonthly" />
+            <FormControl label="Yearly" type="number" min="0" v-model.number="keepYearly" />
           </div>
-        </template>
+        </div>
+      </template>
 
-        <ErrorMessage v-if="error" :message="error" />
-      </div>
+      <ErrorMessage v-if="error" :message="error" />
+    </div>
 
-      <div class="flex justify-end gap-2 mt-6">
-        <Button variant="ghost" @click="show = false">Cancel</Button>
-        <Button variant="solid" :loading="saving" @click="save">Save</Button>
-      </div>
-    </template>
+    <div class="flex justify-end gap-2 mt-6">
+      <Button variant="ghost" @click="show = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
   </Dialog>
 </template>
 

@@ -1,26 +1,24 @@
 <template>
   <Dialog v-model="open" :title="`Table sizes on ${site}`" size="3xl">
-    <template #default>
-      <div v-if="loading" class="flex justify-center py-10">
-        <LoadingText />
-      </div>
+    <div v-if="loading" class="flex justify-center py-10">
+      <LoadingText />
+    </div>
 
-      <ErrorMessage v-else-if="error" :message="error" />
+    <ErrorMessage v-else-if="error" :message="error" />
 
-      <p v-else-if="!tables.length" class="py-10 text-ink-gray-5 text-sm text-center">
-        No results to display
-      </p>
+    <p v-else-if="!tables.length" class="py-10 text-ink-gray-5 text-sm text-center">
+      No results to display
+    </p>
 
-      <div v-else class="max-h-[60vh] overflow-y-auto">
-        <ListView
-          class="!w-full"
-          :columns="columns"
-          :rows="rows"
-          row-key="name"
-          :options="{ selectable: false, showTooltip: false }"
-        />
-      </div>
-    </template>
+    <div v-else class="max-h-[60vh] overflow-y-auto">
+      <ListView
+        class="!w-full"
+        :columns="columns"
+        :rows="rows"
+        row-key="name"
+        :options="{ selectable: false, showTooltip: false }"
+      />
+    </div>
   </Dialog>
 </template>
 

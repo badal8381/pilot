@@ -85,15 +85,13 @@
                 <div class="flex justify-end">
                   <!-- Actions Dropdown -->
                   <Dropdown :options="siteMenuOptions(site)">
-                    <template #default>
-                      <Button
-                        variant="ghost"
-                        size="xs"
-                        icon="lucide-ellipsis"
-                        label="Site actions"
-                        tooltip="Actions"
-                      />
-                    </template>
+                    <Button
+                      variant="ghost"
+                      size="xs"
+                      icon="lucide-ellipsis"
+                      label="Site actions"
+                      tooltip="Actions"
+                    />
                   </Dropdown>
                 </div>
               </div>

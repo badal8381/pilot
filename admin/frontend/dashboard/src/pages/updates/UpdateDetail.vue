@@ -279,15 +279,13 @@
 
       <!-- Skip patch confirmation -->
       <Dialog v-model="confirmSkip" title="Skip this patch permanently?">
-        <template #default>
-          <p class="text-p-sm text-ink-gray-6">
-            Skipping marks
-            <code class="rounded-4 bg-surface-gray-2 px-1 font-mono">{{ op.diagnosis?.patch }}</code>
-            as completed for
-            <b class="text-ink-gray-9">{{ op.failed_site }}</b> without running it. This cannot be
-            undone, and the migration carries on from where it stopped.
-          </p>
-        </template>
+        <p class="text-p-sm text-ink-gray-6">
+          Skipping marks
+          <code class="rounded-4 bg-surface-gray-2 px-1 font-mono">{{ op.diagnosis?.patch }}</code>
+          as completed for
+          <b class="text-ink-gray-9">{{ op.failed_site }}</b> without running it. This cannot be
+          undone, and the migration carries on from where it stopped.
+        </p>
         <template #actions>
           <div class="flex flex-row justify-end">
             <Button variant="solid" theme="red" :loading="acting" @click="doSkip"
@@ -299,12 +297,10 @@
 
       <!-- Restore confirmation -->
       <Dialog v-model="confirmRestore" title="Restore this update?">
-        <template #default>
-          <p class="text-p-sm text-ink-gray-6">
-            Apps return to their previous revisions, and migrated sites get their pre-update data
-            back from the recovery backup. Sites that were not migrated yet are left untouched.
-          </p>
-        </template>
+        <p class="text-p-sm text-ink-gray-6">
+          Apps return to their previous revisions, and migrated sites get their pre-update data
+          back from the recovery backup. Sites that were not migrated yet are left untouched.
+        </p>
         <template #actions>
           <Button variant="solid" theme="red" :loading="acting" @click="doRestore"
             >Restore backup</Button

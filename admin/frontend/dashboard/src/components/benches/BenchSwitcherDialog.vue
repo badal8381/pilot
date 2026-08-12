@@ -194,93 +194,89 @@ watch(show, (open) => {
 
 <template>
   <Dialog v-model="show" title="Manage Benches" size="3xl" :showCloseButton="true">
-    <template #default>
-      <div class="flex flex-col" @pointerdown.stop>
-        <div class="flex justify-end items-center gap-1 mb-4">
-          <Button variant="ghost" size="sm" :loading="loading" @click="loadBenches" title="Refresh">
-            <template #icon>
-              <LucideRefreshCw class="w-4 h-4" />
-            </template>
-          </Button>
-          <Button variant="subtle" size="sm" @click="newBench">
-            <template #prefix>
-              <LucidePlus class="w-4 h-4" />
-            </template>
-            New Bench
-          </Button>
-        </div>
-
-        <ErrorMessage v-if="controlError" :message="controlError" class="mb-2" />
-
-        <div v-if="loading && !benches.length" class="py-10 text-ink-gray-5 text-sm text-center">
-          Loading…
-        </div>
-        <div v-else-if="!benches.length" class="py-10 text-ink-gray-4 text-sm text-center">
-          No benches found.
-        </div>
-        <ListView
-          v-else
-          :columns="columns"
-          :rows="rows"
-          row-key="name"
-          :options="{ selectable: false, showTooltip: false, rowHeight: 48 }"
-        >
-          <template #cell="{ column, row, item }">
-            <div
-              v-if="column.key === 'name'"
-              class="flex items-center gap-2 w-full min-w-0 text-left"
-            >
-              <span class="font-medium text-ink-gray-9 text-sm truncate">{{ row.name }}</span>
-              <Badge v-if="isCurrentBench(row.bench)" theme="green" size="sm" label="Current" />
-            </div>
-
-            <!-- Status badge -->
-            <div v-else-if="column.key === 'status'" class="flex justify-center w-full">
-              <Badge :theme="statusTheme(row.bench)" :label="row.status" />
-            </div>
-
-            <!-- Per-bench actions -->
-            <div v-else-if="column.key === 'actions'" class="flex justify-end w-full">
-              <span
-                v-if="controlLoading === row.name"
-                class="flex justify-center items-center w-7 h-7"
-              >
-                <Spinner size="md" class="text-ink-gray-5" />
-              </span>
-              <ActionMenu
-                v-else-if="menuOptions(row.bench).length"
-                :options="menuOptions(row.bench)"
-              />
-            </div>
-
-            <!-- Mode / Manager -->
-            <div v-else class="w-full text-ink-gray-6 text-sm truncate">{{ item }}</div>
+    <div class="flex flex-col" @pointerdown.stop>
+      <div class="flex justify-end items-center gap-1 mb-4">
+        <Button variant="ghost" size="sm" :loading="loading" @click="loadBenches" title="Refresh">
+          <template #icon>
+            <LucideRefreshCw class="w-4 h-4" />
           </template>
-        </ListView>
+        </Button>
+        <Button variant="subtle" size="sm" @click="newBench">
+          <template #prefix>
+            <LucidePlus class="w-4 h-4" />
+          </template>
+          New Bench
+        </Button>
       </div>
-    </template>
+
+      <ErrorMessage v-if="controlError" :message="controlError" class="mb-2" />
+
+      <div v-if="loading && !benches.length" class="py-10 text-ink-gray-5 text-sm text-center">
+        Loading…
+      </div>
+      <div v-else-if="!benches.length" class="py-10 text-ink-gray-4 text-sm text-center">
+        No benches found.
+      </div>
+      <ListView
+        v-else
+        :columns="columns"
+        :rows="rows"
+        row-key="name"
+        :options="{ selectable: false, showTooltip: false, rowHeight: 48 }"
+      >
+        <template #cell="{ column, row, item }">
+          <div
+            v-if="column.key === 'name'"
+            class="flex items-center gap-2 w-full min-w-0 text-left"
+          >
+            <span class="font-medium text-ink-gray-9 text-sm truncate">{{ row.name }}</span>
+            <Badge v-if="isCurrentBench(row.bench)" theme="green" size="sm" label="Current" />
+          </div>
+
+          <!-- Status badge -->
+          <div v-else-if="column.key === 'status'" class="flex justify-center w-full">
+            <Badge :theme="statusTheme(row.bench)" :label="row.status" />
+          </div>
+
+          <!-- Per-bench actions -->
+          <div v-else-if="column.key === 'actions'" class="flex justify-end w-full">
+            <span
+              v-if="controlLoading === row.name"
+              class="flex justify-center items-center w-7 h-7"
+            >
+              <Spinner size="md" class="text-ink-gray-5" />
+            </span>
+            <ActionMenu
+              v-else-if="menuOptions(row.bench).length"
+              :options="menuOptions(row.bench)"
+            />
+          </div>
+
+          <!-- Mode / Manager -->
+          <div v-else class="w-full text-ink-gray-6 text-sm truncate">{{ item }}</div>
+        </template>
+      </ListView>
+    </div>
   </Dialog>
 
   <Dialog v-model="showDropConfirm" title="Drop Bench" size="sm">
-    <template #default>
-      <div class="flex flex-col gap-4" @pointerdown.stop>
-        <div class="flex flex-col gap-2 text-ink-gray-7 text-sm leading-relaxed">
-          <p>
-            Permanently delete <strong class="text-ink-gray-9">{{ benchToDrop?.name }}</strong>?
-          </p>
-          <p>
-            This tears down its production services, nginx config and MariaDB instance, then removes
-            the bench directory. This action cannot be undone.
-          </p>
-        </div>
-        <ErrorMessage v-if="controlError" :message="controlError" />
-        <div class="flex justify-end gap-2">
-          <Button variant="ghost" @click="showDropConfirm = false">Cancel</Button>
-          <Button variant="solid" theme="red" :loading="dropping" @click="dropBench"
-            >Drop Bench</Button
-          >
-        </div>
+    <div class="flex flex-col gap-4" @pointerdown.stop>
+      <div class="flex flex-col gap-2 text-ink-gray-7 text-sm leading-relaxed">
+        <p>
+          Permanently delete <strong class="text-ink-gray-9">{{ benchToDrop?.name }}</strong>?
+        </p>
+        <p>
+          This tears down its production services, nginx config and MariaDB instance, then removes
+          the bench directory. This action cannot be undone.
+        </p>
       </div>
-    </template>
+      <ErrorMessage v-if="controlError" :message="controlError" />
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showDropConfirm = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="dropping" @click="dropBench"
+          >Drop Bench</Button
+        >
+      </div>
+    </div>
   </Dialog>
 </template>

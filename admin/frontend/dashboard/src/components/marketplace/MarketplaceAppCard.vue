@@ -43,19 +43,17 @@
     </div>
 
     <Dialog v-model="showIncompatible" title="Incompatible app" size="sm">
-      <template #default>
-        <p class="text-ink-gray-7 text-p-sm">{{ incompatibleReason }}</p>
-        <div class="flex flex-col gap-1.5 mt-3 text-sm">
-          <div class="flex justify-between">
-            <span class="text-ink-gray-5">Current version</span>
-            <span class="font-medium text-ink-gray-8">{{ app.frappe_version || 'Unknown' }}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-ink-gray-5">Required version</span>
-            <span class="font-medium text-ink-gray-8">{{ app.needs || 'Not specified' }}</span>
-          </div>
+      <p class="text-ink-gray-7 text-p-sm">{{ incompatibleReason }}</p>
+      <div class="flex flex-col gap-1.5 mt-3 text-sm">
+        <div class="flex justify-between">
+          <span class="text-ink-gray-5">Current version</span>
+          <span class="font-medium text-ink-gray-8">{{ app.frappe_version || 'Unknown' }}</span>
         </div>
-      </template>
+        <div class="flex justify-between">
+          <span class="text-ink-gray-5">Required version</span>
+          <span class="font-medium text-ink-gray-8">{{ app.needs || 'Not specified' }}</span>
+        </div>
+      </div>
     </Dialog>
   </div>
 </template>

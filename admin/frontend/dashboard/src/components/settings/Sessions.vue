@@ -80,30 +80,26 @@
   </div>
 
   <Dialog v-model="showRevoke" title="Revoke session" size="md">
-    <template #default>
-      <p class="text-ink-gray-7 text-p-base">
-        Revoke this session? Its token stops working immediately and whoever holds it must sign in
-        again.
-      </p>
-      <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
-          Revoke
-        </Button>
-      </div>
-    </template>
+    <p class="text-ink-gray-7 text-p-base">
+      Revoke this session? Its token stops working immediately and whoever holds it must sign in
+      again.
+    </p>
+    <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
+        Revoke
+      </Button>
+    </div>
   </Dialog>
 
   <Dialog v-model="showDetail" title="Activity details" size="md">
-    <template #default>
-      <div class="space-y-2 max-h-96 overflow-y-auto">
-        <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
-          <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
-          <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
-        </div>
+    <div class="space-y-2 max-h-96 overflow-y-auto">
+      <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
+        <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
+        <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
       </div>
-    </template>
+    </div>
   </Dialog>
 </template>
 

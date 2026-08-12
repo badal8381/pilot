@@ -194,20 +194,18 @@
 
   <!-- Confirm read/write execution -->
   <Dialog v-model="showConfirm" title="Run in Read/Write mode" size="lg">
-    <template #default>
-      <p class="text-ink-gray-7 text-sm">
-        This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
-        the database. Are you sure you want to continue?
-      </p>
-      <pre
-        class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-6 border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
-        style="font-family: ui-monospace, SFMono-Regular, monospace;"
-      >{{ pendingQuery }}</pre>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="outline" @click="showConfirm = false">Cancel</Button>
-        <Button variant="solid" @click="confirmRunQuery">Execute</Button>
-      </div>
-    </template>
+    <p class="text-ink-gray-7 text-sm">
+      This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
+      the database. Are you sure you want to continue?
+    </p>
+    <pre
+      class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-6 border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
+      style="font-family: ui-monospace, SFMono-Regular, monospace;"
+    >{{ pendingQuery }}</pre>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="outline" @click="showConfirm = false">Cancel</Button>
+      <Button variant="solid" @click="confirmRunQuery">Execute</Button>
+    </div>
   </Dialog>
 </template>
 

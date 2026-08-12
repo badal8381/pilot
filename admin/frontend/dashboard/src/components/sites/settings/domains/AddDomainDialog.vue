@@ -1,67 +1,65 @@
 <template>
   <Dialog v-model="show" title="Use your own domain" size="lg">
-    <template #default>
-      <template v-if="step === 'input'">
-        <p class="text-ink-gray-7 text-sm">
-          To add a custom domain, you must already own it. If you don't have one, buy it and come
-          back here.
-        </p>
-        <TextInput
-          v-model="domain"
-          placeholder="www.example.com"
-          class="mt-4 w-full"
-          @keydown.enter="continueAdd"
-        >
-          <template #label>
-            <span class="text-sm">Domain</span>
-          </template>
-        </TextInput>
-        <ErrorMessage v-if="error" :message="error" class="mt-2" />
-        <div class="flex justify-end gap-2 mt-4">
-          <Button variant="subtle" @click="show = false">Cancel</Button>
-          <Button
-            variant="solid"
-            :loading="continuing"
-            :disabled="!domain.trim()"
-            @click="continueAdd"
-          >
-            Continue
-          </Button>
-        </div>
-      </template>
-      <template v-else>
-        <template v-if="dnsRecordGroups.length">
-          <p class="text-ink-gray-7 text-sm">
-            <template v-if="dnsRecordGroups.length > 1">
-              Add <span class="font-medium text-ink-gray-8">either one</span> of these records at
-              your domain provider.
-            </template>
-            <template v-else>Add this record at your domain provider.</template>
-          </p>
-          <div v-for="(group, i) in dnsRecordGroups" :key="group.type" class="mt-3">
-            <p class="font-medium text-ink-gray-7 text-sm">
-              {{ dnsRecordGroups.length > 1 ? `Option ${i + 1}: ${group.type} record` : `${group.type} record` }}
-            </p>
-            <SimpleTable class="mt-2" :columns="DNS_RECORD_COLUMNS" :rows="group.records" />
-          </div>
-          <p class="mt-3 text-ink-gray-5 text-xs">
-            DNS changes can take a few minutes to propagate.
-          </p>
+    <template v-if="step === 'input'">
+      <p class="text-ink-gray-7 text-sm">
+        To add a custom domain, you must already own it. If you don't have one, buy it and come
+        back here.
+      </p>
+      <TextInput
+        v-model="domain"
+        placeholder="www.example.com"
+        class="mt-4 w-full"
+        @keydown.enter="continueAdd"
+      >
+        <template #label>
+          <span class="text-sm">Domain</span>
         </template>
-        <div v-else class="flex flex-col items-center gap-3 py-8">
-          <div class="flex justify-center items-center bg-surface-green-2 rounded-full size-12">
-            <span class="size-6 text-ink-green-2 lucide-check" />
-          </div>
-          <p class="font-medium text-ink-gray-8 text-base">No DNS records needed</p>
+      </TextInput>
+      <ErrorMessage v-if="error" :message="error" class="mt-2" />
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="subtle" @click="show = false">Cancel</Button>
+        <Button
+          variant="solid"
+          :loading="continuing"
+          :disabled="!domain.trim()"
+          @click="continueAdd"
+        >
+          Continue
+        </Button>
+      </div>
+    </template>
+    <template v-else>
+      <template v-if="dnsRecordGroups.length">
+        <p class="text-ink-gray-7 text-sm">
+          <template v-if="dnsRecordGroups.length > 1">
+            Add <span class="font-medium text-ink-gray-8">either one</span> of these records at
+            your domain provider.
+          </template>
+          <template v-else>Add this record at your domain provider.</template>
+        </p>
+        <div v-for="(group, i) in dnsRecordGroups" :key="group.type" class="mt-3">
+          <p class="font-medium text-ink-gray-7 text-sm">
+            {{ dnsRecordGroups.length > 1 ? `Option ${i + 1}: ${group.type} record` : `${group.type} record` }}
+          </p>
+          <SimpleTable class="mt-2" :columns="DNS_RECORD_COLUMNS" :rows="group.records" />
         </div>
-        <ErrorMessage v-if="error" :message="error" class="mt-2" />
-        <div class="flex justify-end gap-2 mt-4">
-          <Button variant="subtle" @click="show = false">Cancel</Button>
-          <Button variant="solid" :loading="adding" @click="confirmAdd">
-            {{ dnsRecordGroups.length ? 'Verify DNS' : 'Register' }}
-          </Button>
-        </div>
+        <p class="mt-3 text-ink-gray-5 text-xs">
+          DNS changes can take a few minutes to propagate.
+        </p>
       </template>
+      <div v-else class="flex flex-col items-center gap-3 py-8">
+        <div class="flex justify-center items-center bg-surface-green-2 rounded-full size-12">
+          <span class="size-6 text-ink-green-2 lucide-check" />
+        </div>
+        <p class="font-medium text-ink-gray-8 text-base">No DNS records needed</p>
+      </div>
+      <ErrorMessage v-if="error" :message="error" class="mt-2" />
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="subtle" @click="show = false">Cancel</Button>
+        <Button variant="solid" :loading="adding" @click="confirmAdd">
+          {{ dnsRecordGroups.length ? 'Verify DNS' : 'Register' }}
+        </Button>
+      </div>
     </template>
   </Dialog>
 </template>

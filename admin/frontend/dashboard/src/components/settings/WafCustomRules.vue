@@ -195,16 +195,14 @@
     </div>
 
     <Dialog v-model="showRemove" title="Delete rule" size="md">
-      <template #default>
-        <p class="text-ink-gray-7 text-p-base">
-          Delete <strong>{{ removingLabel }}</strong
-          >? Requests it was matching fall through to the managed ruleset.
-        </p>
-        <div class="flex justify-end gap-2 mt-4">
-          <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-          <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
-        </div>
-      </template>
+      <p class="text-ink-gray-7 text-p-base">
+        Delete <strong>{{ removingLabel }}</strong
+        >? Requests it was matching fall through to the managed ruleset.
+      </p>
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+        <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
+      </div>
     </Dialog>
   </div>
 </template>
