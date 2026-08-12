@@ -37,6 +37,11 @@ class SystemdProcessManager(SystemdUserMixin, ManagedProcessManager):
         GunicornManager(self.bench).generate_admin_config()
         self.systemd_conf_dir.mkdir(parents=True, exist_ok=True)
 
+        # Build the definitions before unlinking anything: an app with a broken
+        # declaration raises here, and a half-cleared directory would leave
+        # dangling symlinks that drop services on the next daemon-reload.
+        defs = self._prod_process_definitions()
+
         target_file = self._target_name()
         for path in list(self.systemd_conf_dir.iterdir()):
             if path.is_file() and (path.suffix in (".service", ".socket") or path.name == target_file):
@@ -44,7 +49,7 @@ class SystemdProcessManager(SystemdUserMixin, ManagedProcessManager):
 
         renderer = SystemdRenderer(self.bench.config.name)
         workload_units: list[str] = []
-        for pd in self._prod_process_definitions():
+        for pd in defs:
             if pd.name == "admin":
                 (self.systemd_conf_dir / self._unit_name("admin")).write_text(self._admin_service_text())
                 (self.systemd_conf_dir / self._admin_socket_name()).write_text(

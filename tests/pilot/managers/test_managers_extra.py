@@ -387,6 +387,28 @@ def test_systemd_generate_config_writes_unit_files(tmp_path: Path) -> None:
     assert (mgr.systemd_conf_dir / "test-bench.target").exists()
 
 
+def test_systemd_write_config_keeps_units_when_a_declaration_is_broken(tmp_path: Path) -> None:
+    """Definitions are built before anything is unlinked. Clearing first would
+    leave dangling symlinks and drop services on the next daemon-reload."""
+    import pytest
+
+    from pilot.exceptions import BenchError
+
+    mgr = _make_systemd_manager(tmp_path)
+    mgr.systemd_conf_dir.mkdir(parents=True, exist_ok=True)
+    existing = mgr.systemd_conf_dir / "test-bench-mail-stalwart.service"
+    existing.write_text("[Service]\nExecStart=/usr/bin/stalwart\n")
+
+    with (
+        patch("pilot.managers.processes.systemd.AdminEnvManager"),
+        patch.object(mgr, "_prod_process_definitions", side_effect=BenchError("broken app")),
+        pytest.raises(BenchError),
+    ):
+        mgr.write_config()
+
+    assert existing.exists()
+
+
 def test_systemd_admin_socket_listens_on_internal_port(tmp_path: Path) -> None:
     from pilot.managers.processes.systemd import SystemdRenderer
 
