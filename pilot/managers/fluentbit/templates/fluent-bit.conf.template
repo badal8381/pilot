@@ -209,7 +209,7 @@
     URI           {{ uri }}
     {% if tls %}
     tls           On
-    tls.verify    Off
+    tls.verify    On
     {% endif %}
 
     Header        Authorization Bearer ${DATUM_LOG_TOKEN}
