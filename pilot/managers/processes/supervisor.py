@@ -13,6 +13,7 @@ from pilot.managers.processes.base import (
     UnitGroup,
     override,
 )
+from pilot.managers.processes.definitions import hook_wrapped_argv
 from pilot.managers.processes.local import ProcessDefinition
 from pilot.managers.processes.systemd_render import reject_control_chars, supervisor_escape
 from pilot.utils import cli_root, run_command
@@ -36,10 +37,10 @@ class SupervisorRenderer(ServiceRenderer):
         stop = f"stopwaitsecs={pd.stop_timeout}\n" if pd.stop_timeout is not None else ""
         return (
             f"[program:{self.get_program_name(pd)}]\n"
-            f"command={supervisor_escape(shlex.join(pd.argv))}\n"
+            f"command={supervisor_escape(shlex.join(hook_wrapped_argv(pd)))}\n"
             f"{env}{directory}"
             f"autostart=true\n"
-            f"autorestart=true\n"
+            f"autorestart={'true' if pd.restart_on_failure else 'false'}\n"
             f"startretries=3\n"
             f"stdout_logfile={self.log_dir}/{pd.name}.log\n"
             f"stderr_logfile={self.log_dir}/{pd.name}.error.log\n"

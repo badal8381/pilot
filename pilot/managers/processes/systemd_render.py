@@ -12,7 +12,7 @@ _CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 def reject_control_chars(pd: ProcessDefinition) -> None:
     """Guard against unit-directive injection: a control char in any declared
     field would let an app inject arbitrary systemd directives into the unit."""
-    fields = [pd.name, str(pd.working_dir or ""), *pd.argv]
+    fields = [pd.name, str(pd.working_dir or ""), *pd.argv, *pd.pre_run, *pd.post_run]
     for key, value in pd.env.items():
         fields += [key, value]
     if any(_CONTROL_RE.search(field) for field in fields):
@@ -42,15 +42,19 @@ class SystemdRenderer(ServiceRenderer):
         working_dir = f"WorkingDirectory={pd.working_dir}\n" if pd.working_dir else ""
         env = _render_env(pd.env)
         stop = f"TimeoutStopSec={pd.stop_timeout}\n" if pd.stop_timeout is not None else ""
+        pre = f"ExecStartPre={shlex.join(pd.pre_run)}\n" if pd.pre_run else ""
+        post = f"ExecStopPost={shlex.join(pd.post_run)}\n" if pd.post_run else ""
+        restart = "on-failure" if pd.restart_on_failure else "no"
         return (
             f"[Unit]\n"
             f"Description={self.bench_name} {pd.name}\n"
             f"PartOf={self.bench_name}.target\n\n"
             f"[Service]\n"
             f"Type=simple\n"
-            f"{working_dir}{env}"
+            f"{working_dir}{env}{pre}"
             f"ExecStart={shlex.join(pd.argv)}\n"
-            f"Restart=on-failure\n"
+            f"{post}"
+            f"Restart={restart}\n"
             f"{stop}"
             f"StandardOutput=append:{pd.log_file}\n"
             f"StandardError=append:{pd.log_file}.error.log\n"

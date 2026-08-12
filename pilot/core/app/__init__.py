@@ -237,7 +237,6 @@ class App:
 
         on_progress(f"Installing {app.config.name}...")
         app._install_into_environment()
-        app._run_setup_scripts(on_progress)
         app._register()
         on_progress(f"\nSetting up assets for {app.config.name}...")
         app._build_assets_via_env_manager()
@@ -277,18 +276,6 @@ class App:
         from pilot.managers.environment import PythonEnvManager
 
         PythonEnvManager(self.bench).install_app(self)
-
-    def _run_setup_scripts(self, on_progress: Callable[[str], None]) -> None:
-        """Run each app-shipped setup script from the app directory, as the bench user."""
-        import stat
-        import subprocess
-
-        for script in self.requirements.setup_scripts():
-            if not script.is_file():
-                raise BenchError(f"'{self.config.name}' setup script '{script}' does not exist.")
-            on_progress(f"Running setup script '{script.name}' for {self.config.name}...")
-            script.chmod(script.stat().st_mode | stat.S_IXUSR)
-            subprocess.run([str(script)], cwd=self.path, check=True)
 
     def _register(self) -> None:
         existing = self.bench.registered_apps()

@@ -19,9 +19,7 @@ def _builder(bench) -> ProcessDefinitionBuilder:
     return ProcessDefinitionBuilder(bench, Path("/usr/bin/python3"), watch_admin_js=False)
 
 
-_GOOD = (
-    '[[tool.bench.processes]]\nname = "stalwart"\ncommand = ["/usr/bin/stalwart-mail"]\n'
-)
+_GOOD = '[tool.pilot.background_processes.stalwart]\ncmd = ["/usr/bin/stalwart-mail"]\n'
 
 
 def test_app_processes_appended(tmp_path: Path) -> None:
@@ -37,7 +35,7 @@ def test_app_processes_appended(tmp_path: Path) -> None:
 def test_one_bad_app_does_not_break_core(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
     bench.create_directories()
-    _make_app(bench, "broken", "[tool.bench\n")  # malformed TOML
+    _make_app(bench, "broken", "[tool.pilot\n")  # malformed TOML
     _make_app(bench, "mail", _GOOD)
 
     names = [d.name for d in _builder(bench).prod_process_definitions()]

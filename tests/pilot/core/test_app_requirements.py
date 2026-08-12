@@ -24,9 +24,7 @@ def _app_with_pyproject(tmp_path: Path, body: str, name: str = "mail"):
 
 def test_missing_section_yields_empty(tmp_path: Path) -> None:
     app = _app_with_pyproject(tmp_path, "[project]\nname = 'mail'\n")
-    reqs = AppRequirements(app)
-    assert reqs.process_definitions() == []
-    assert reqs.setup_scripts() == []
+    assert AppRequirements(app).process_definitions() == []
 
 
 def test_no_pyproject_yields_empty(tmp_path: Path) -> None:
@@ -37,56 +35,61 @@ def test_no_pyproject_yields_empty(tmp_path: Path) -> None:
     bench.create_directories()
     (bench.apps_path / "mail").mkdir(parents=True)
     app = App(AppConfig(name="mail", repo="https://github.com/frappe/mail", branch="main"), bench)
-    reqs = AppRequirements(app)
-    assert reqs.process_definitions() == []
-    assert reqs.setup_scripts() == []
+    assert AppRequirements(app).process_definitions() == []
 
 
-def test_reads_process_and_setup(tmp_path: Path) -> None:
+def test_reads_full_process(tmp_path: Path) -> None:
     app = _app_with_pyproject(
         tmp_path,
         """
-[[tool.bench.processes]]
-name = "stalwart"
-setup = "scripts/install_stalwart.sh"
-command = ["./stalwart", "--config", "config.toml"]
-working-dir = "/opt/stalwart"
-stop-timeout = 30
-[tool.bench.processes.env]
-STALWART_PATH = "/opt/stalwart"
+[tool.pilot.background_processes.stalwart]
+cmd = ["./stalwart", "--config", "config.toml"]
+restart_on_failure = false
+pre_run = ["bash", "-c", "./scripts/install_stalwart.sh"]
+post_run = ["bash", "-c", "rm -f stalwart.sock"]
+working_dir = "/opt/stalwart"
+stop_timeout = 30
+env = { STALWART_PATH = "/opt/stalwart" }
 """,
     )
-    reqs = AppRequirements(app)
-    (pd,) = reqs.process_definitions()
+    (pd,) = AppRequirements(app).process_definitions()
     assert pd.name == "mail-stalwart"
     assert pd.argv == ["./stalwart", "--config", "config.toml"]
+    assert pd.pre_run == ["bash", "-c", "./scripts/install_stalwart.sh"]
+    assert pd.post_run == ["bash", "-c", "rm -f stalwart.sock"]
+    assert pd.restart_on_failure is False
     assert pd.working_dir == Path("/opt/stalwart")
     assert pd.stop_timeout == 30
     assert pd.env == {"STALWART_PATH": "/opt/stalwart"}
     assert pd.log_file.name == "mail-stalwart.log"
-    assert reqs.setup_scripts() == [app.path / "scripts" / "install_stalwart.sh"]
 
 
-def test_no_setup_yields_no_scripts(tmp_path: Path) -> None:
+def test_minimal_process_defaults(tmp_path: Path) -> None:
     app = _app_with_pyproject(
         tmp_path,
-        '[[tool.bench.processes]]\nname = "p"\ncommand = ["/bin/true"]\n',
+        '[tool.pilot.background_processes.flow_server]\ncmd = ["flow", "serve"]\n',
     )
-    assert AppRequirements(app).setup_scripts() == []
+    (pd,) = AppRequirements(app).process_definitions()
+    assert pd.name == "mail-flow_server"
+    assert pd.restart_on_failure is True  # restarting is the default
+    assert pd.pre_run == []
+    assert pd.post_run == []
 
 
-@pytest.mark.parametrize("setup", ["/etc/evil.sh", "../../evil.sh", "a/../../b.sh", "x\ny.sh"])
-def test_setup_path_escaping_rejected(tmp_path: Path, setup: str) -> None:
+def test_multiple_processes_keep_declaration_order(tmp_path: Path) -> None:
     app = _app_with_pyproject(
         tmp_path,
-        f'[[tool.bench.processes]]\nname = "p"\ncommand = ["/bin/true"]\nsetup = "{setup}"\n',
+        '[tool.pilot.background_processes.chromium]\ncmd = ["/bin/chromium"]\n'
+        '[tool.pilot.background_processes.flow]\ncmd = ["flow", "serve"]\n',
     )
-    with pytest.raises(AppRequirementsError):
-        AppRequirements(app).setup_scripts()
+    assert [pd.name for pd in AppRequirements(app).process_definitions()] == [
+        "mail-chromium",
+        "mail-flow",
+    ]
 
 
 def test_malformed_toml_raises(tmp_path: Path) -> None:
-    app = _app_with_pyproject(tmp_path, "[tool.bench\n")
+    app = _app_with_pyproject(tmp_path, "[tool.pilot\n")
     with pytest.raises(AppRequirementsError):
         AppRequirements(app).process_definitions()
 
@@ -95,16 +98,36 @@ def test_malformed_toml_raises(tmp_path: Path) -> None:
 def test_bad_process_name_rejected(tmp_path: Path, name: str) -> None:
     app = _app_with_pyproject(
         tmp_path,
-        f'[[tool.bench.processes]]\nname = "{name}"\ncommand = ["/bin/true"]\n',
+        f'[tool.pilot.background_processes."{name}"]\ncmd = ["/bin/true"]\n',
     )
     with pytest.raises(AppRequirementsError):
         AppRequirements(app).process_definitions()
 
 
-def test_control_char_in_argv_rejected(tmp_path: Path) -> None:
+def test_control_char_in_cmd_rejected(tmp_path: Path) -> None:
     app = _app_with_pyproject(
         tmp_path,
-        '[[tool.bench.processes]]\nname = "p"\ncommand = ["/bin/true\\n[Service]"]\n',
+        '[tool.pilot.background_processes.p]\ncmd = ["/bin/true\\n[Service]"]\n',
+    )
+    with pytest.raises(AppRequirementsError):
+        AppRequirements(app).process_definitions()
+
+
+@pytest.mark.parametrize("hook", ["pre_run", "post_run"])
+def test_control_char_in_hook_rejected(tmp_path: Path, hook: str) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        f'[tool.pilot.background_processes.p]\ncmd = ["/bin/true"]\n{hook} = ["/bin/x\\n[Service]"]\n',
+    )
+    with pytest.raises(AppRequirementsError):
+        AppRequirements(app).process_definitions()
+
+
+@pytest.mark.parametrize("hook", ["pre_run", "post_run"])
+def test_hook_must_be_a_list(tmp_path: Path, hook: str) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        f'[tool.pilot.background_processes.p]\ncmd = ["/bin/true"]\n{hook} = "echo hi"\n',
     )
     with pytest.raises(AppRequirementsError):
         AppRequirements(app).process_definitions()
@@ -113,8 +136,7 @@ def test_control_char_in_argv_rejected(tmp_path: Path) -> None:
 def test_control_char_in_env_value_rejected(tmp_path: Path) -> None:
     app = _app_with_pyproject(
         tmp_path,
-        '[[tool.bench.processes]]\nname = "p"\ncommand = ["/bin/true"]\n'
-        '[tool.bench.processes.env]\nK = "v\\nExecStartPre=/x"\n',
+        '[tool.pilot.background_processes.p]\ncmd = ["/bin/true"]\nenv = { K = "v\\nExecStartPre=/x" }\n',
     )
     with pytest.raises(AppRequirementsError):
         AppRequirements(app).process_definitions()
@@ -123,14 +145,31 @@ def test_control_char_in_env_value_rejected(tmp_path: Path) -> None:
 def test_bad_env_key_rejected(tmp_path: Path) -> None:
     app = _app_with_pyproject(
         tmp_path,
-        '[[tool.bench.processes]]\nname = "p"\ncommand = ["/bin/true"]\n'
-        '[tool.bench.processes.env]\n"bad-key" = "v"\n',
+        '[tool.pilot.background_processes.p]\ncmd = ["/bin/true"]\nenv = { "bad-key" = "v" }\n',
     )
     with pytest.raises(AppRequirementsError):
         AppRequirements(app).process_definitions()
 
 
-def test_empty_command_rejected(tmp_path: Path) -> None:
-    app = _app_with_pyproject(tmp_path, '[[tool.bench.processes]]\nname = "p"\ncommand = []\n')
+def test_empty_cmd_rejected(tmp_path: Path) -> None:
+    app = _app_with_pyproject(tmp_path, "[tool.pilot.background_processes.p]\ncmd = []\n")
+    with pytest.raises(AppRequirementsError):
+        AppRequirements(app).process_definitions()
+
+
+def test_missing_cmd_rejected(tmp_path: Path) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        "[tool.pilot.background_processes.p]\nrestart_on_failure = true\n",
+    )
+    with pytest.raises(AppRequirementsError):
+        AppRequirements(app).process_definitions()
+
+
+def test_non_bool_restart_rejected(tmp_path: Path) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        '[tool.pilot.background_processes.p]\ncmd = ["/bin/true"]\nrestart_on_failure = "yes"\n',
+    )
     with pytest.raises(AppRequirementsError):
         AppRequirements(app).process_definitions()

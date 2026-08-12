@@ -15,7 +15,11 @@ from typing import TYPE_CHECKING
 from pilot.exceptions import BenchError
 from pilot.managers.environment import AdminEnvManager
 from pilot.managers.gunicorn import GunicornManager
-from pilot.managers.processes.definitions import ProcessDefinition, ProcessDefinitionBuilder
+from pilot.managers.processes.definitions import (
+    ProcessDefinition,
+    ProcessDefinitionBuilder,
+    hook_wrapped_argv,
+)
 from pilot.utils import cli_root
 
 if TYPE_CHECKING:
@@ -111,7 +115,7 @@ class ProcessManager:
         AdminEnvManager(cli_root()).ensure()
         self._ensure_redis_config()
         self._ensure_gunicorn_config()
-        lines = [f"{pd.name}: {shlex.join(pd.argv)}\n" for pd in self._process_definitions()]
+        lines = [f"{pd.name}: {shlex.join(hook_wrapped_argv(pd))}\n" for pd in self._process_definitions()]
         self.procfile_path.write_text("".join(lines))
 
     def _ensure_gunicorn_config(self) -> None:
@@ -197,7 +201,7 @@ class ProcessManager:
 
         for i, pd in enumerate(defs):
             proc = subprocess.Popen(
-                pd.argv,
+                hook_wrapped_argv(pd),
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 preexec_fn=os.setsid,

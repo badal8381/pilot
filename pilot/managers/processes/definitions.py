@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shlex
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -22,6 +23,27 @@ class ProcessDefinition:
     working_dir: Path | None = None  # was `cd {dir} &&`
     stop_timeout: int | None = None  # graceful-stop seconds (redis=300, web+companion=1600)
     critical: bool = True  # dev runner stops the whole bench when this process exits
+    restart_on_failure: bool = True
+    pre_run: list[str] = field(default_factory=list)  # argv run before the process starts
+    post_run: list[str] = field(default_factory=list)  # argv run after it stops
+
+
+def hook_wrapped_argv(pd: ProcessDefinition) -> list[str]:
+    """argv for managers with no native pre/post hooks (supervisor, dev runner).
+
+    Every part is shlex-quoted and control chars are already rejected at read
+    time, so an app cannot break out of the shell line it declared.
+    """
+    if not pd.pre_run and not pd.post_run:
+        return pd.argv
+    script = shlex.join(pd.argv)
+    if pd.pre_run:
+        script = f"{shlex.join(pd.pre_run)} && {script}"
+    if pd.post_run:
+        # ponytail: keeps the wrapping `sh` alive as the parent; both managers
+        # stop the whole process group, so nothing is left behind.
+        script = f"{script}; rc=$?; {shlex.join(pd.post_run)}; exit $rc"
+    return ["sh", "-c", script]
 
 
 class ProcessDefinitionBuilder:
