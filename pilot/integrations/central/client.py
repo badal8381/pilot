@@ -62,6 +62,10 @@ class CentralClient:
         """Verify Central auth and return its identity echo."""
         return self._get("/api/method/central.api.pilot.heartbeat")
 
+    def log_token(self) -> dict[str, Any]:
+        """The JWT to present to Datum when shipping logs, plus its TTL and resource id."""
+        return self.forward("central.api.pilot.log_token", "GET")
+
     def forward(self, method_path: str, http_method: str, data: dict[str, Any] | None = None) -> Any:
         """Proxy an arbitrary Central pilot-API method with the X-Pilot-Token, returning its
         result (the ``{"message": ...}`` envelope unwrapped). The caller decides what's reachable."""
