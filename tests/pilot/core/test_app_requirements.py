@@ -54,7 +54,7 @@ env = { STALWART_PATH = "/opt/stalwart" }
     )
     (pd,) = AppRequirements(app).process_definitions()
     assert pd.name == "mail-stalwart"
-    assert pd.argv == ["./stalwart", "--config", "config.toml"]
+    assert pd.argv == ["/opt/stalwart/stalwart", "--config", "config.toml"]
     assert pd.pre_run == ["bash", "-c", "./scripts/install_stalwart.sh"]
     assert pd.post_run == ["bash", "-c", "rm -f stalwart.sock"]
     assert pd.restart_on_failure is False
@@ -74,6 +74,67 @@ def test_minimal_process_defaults(tmp_path: Path) -> None:
     assert pd.restart_on_failure is True  # restarting is the default
     assert pd.pre_run == []
     assert pd.post_run == []
+
+
+def test_working_dir_defaults_to_the_app_directory(tmp_path: Path) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        '[tool.pilot.background_processes.p]\ncmd = ["flow", "serve"]\n',
+    )
+    (pd,) = AppRequirements(app).process_definitions()
+    assert pd.working_dir == app.path
+
+
+def test_relative_working_dir_is_read_from_the_app_directory(tmp_path: Path) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        '[tool.pilot.background_processes.p]\ncmd = ["flow"]\nworking_dir = "server"\n',
+    )
+    (pd,) = AppRequirements(app).process_definitions()
+    assert pd.working_dir == app.path / "server"
+
+
+@pytest.mark.parametrize("declared", ["./stalwart", "bin/stalwart"])
+def test_relative_executable_is_anchored_to_working_dir(tmp_path: Path, declared: str) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        f'[tool.pilot.background_processes.p]\ncmd = ["{declared}", "--config", "c.toml"]\n'
+        'working_dir = "/opt/stalwart"\n',
+    )
+    (pd,) = AppRequirements(app).process_definitions()
+    assert pd.argv[0] == str(Path("/opt/stalwart") / declared)
+    assert pd.argv[1:] == ["--config", "c.toml"]  # only the executable is rewritten
+
+
+def test_bare_executable_is_left_for_path_lookup(tmp_path: Path) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        '[tool.pilot.background_processes.p]\ncmd = ["flow", "serve"]\n',
+    )
+    (pd,) = AppRequirements(app).process_definitions()
+    assert pd.argv == ["flow", "serve"]
+
+
+def test_absolute_executable_is_untouched(tmp_path: Path) -> None:
+    app = _app_with_pyproject(
+        tmp_path,
+        '[tool.pilot.background_processes.p]\ncmd = ["/usr/bin/stalwart"]\nworking_dir = "/opt/x"\n',
+    )
+    (pd,) = AppRequirements(app).process_definitions()
+    assert pd.argv == ["/usr/bin/stalwart"]
+
+
+def test_hook_executables_are_anchored_too(tmp_path: Path) -> None:
+    """A hook that installs the binary is itself shipped by the app, so it is
+    resolved the same way - lexically, before the file exists."""
+    app = _app_with_pyproject(
+        tmp_path,
+        '[tool.pilot.background_processes.p]\ncmd = ["flow"]\n'
+        'pre_run = ["./scripts/install.sh", "--quiet"]\npost_run = ["./scripts/clean.sh"]\n',
+    )
+    (pd,) = AppRequirements(app).process_definitions()
+    assert pd.pre_run == [str(app.path / "./scripts/install.sh"), "--quiet"]
+    assert pd.post_run == [str(app.path / "./scripts/clean.sh")]
 
 
 def test_multiple_processes_keep_declaration_order(tmp_path: Path) -> None:

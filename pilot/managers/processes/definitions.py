@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import re
 import shlex
 from dataclasses import dataclass, field
@@ -82,14 +81,16 @@ class ProcessDefinitionBuilder:
         return defs
 
     def app_process_definitions(self) -> list[ProcessDefinition]:
+        """A malformed declaration raises instead of being skipped.
+
+        Skipping would drop that app's processes from the desired set, and
+        reconciliation reads a smaller set as "removed" - it would stop and
+        disable services that are running fine. Failing here leaves the bench
+        untouched until the app is fixed.
+        """
         defs: list[ProcessDefinition] = []
         for app in self.bench.apps():
-            try:
-                defs.extend(app.requirements.process_definitions())
-            except Exception as exc:
-                logging.getLogger(__name__).warning(
-                    "Skipping declared processes for app %s: %s", app.config.name, exc
-                )
+            defs.extend(app.requirements.process_definitions())
         return defs
 
     def process_definitions(self) -> list[ProcessDefinition]:

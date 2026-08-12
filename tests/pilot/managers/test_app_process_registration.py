@@ -5,6 +5,9 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
+from pilot.exceptions import BenchError
 from pilot.managers.processes.definitions import ProcessDefinitionBuilder
 from tests.pilot.commands.test_commands import make_bench
 
@@ -32,15 +35,16 @@ def test_app_processes_appended(tmp_path: Path) -> None:
     assert "web" in names  # core processes still present
 
 
-def test_one_bad_app_does_not_break_core(tmp_path: Path) -> None:
+def test_one_bad_app_fails_loudly(tmp_path: Path) -> None:
+    """A skipped app would look "removed" to systemd/supervisor, which then stop
+    its running services. Refusing to build the set leaves the bench alone."""
     bench = make_bench(tmp_path)
     bench.create_directories()
     _make_app(bench, "broken", "[tool.pilot\n")  # malformed TOML
     _make_app(bench, "mail", _GOOD)
 
-    names = [d.name for d in _builder(bench).prod_process_definitions()]
-    assert "web" in names  # core survives the bad app
-    assert "mail-stalwart" in names  # the good app still registers
+    with pytest.raises(BenchError):
+        _builder(bench).prod_process_definitions()
 
 
 def test_removed_app_drops_out_of_definitions(tmp_path: Path) -> None:

@@ -88,6 +88,18 @@ def test_systemd_renders_hooks_and_restart() -> None:
     assert "ExecStart=/bin/flow serve\n" in text
 
 
+def test_systemd_routes_bare_commands_through_env() -> None:
+    """systemd rejects a relative ExecStart, so a bare name needs `env` to get
+    the PATH lookup supervisor and the dev runner already do."""
+    pd = ProcessDefinition(name="mail-x", argv=["flow", "serve"], log_file=Path("/tmp/x.log"))
+    text = SystemdRenderer("bench").render(pd)
+    assert "ExecStart=/usr/bin/env flow serve\n" in text
+
+
+def test_systemd_leaves_absolute_commands_alone() -> None:
+    assert "ExecStart=/bin/flow serve\n" in SystemdRenderer("bench").render(_hooked())
+
+
 def test_systemd_defaults_to_restarting() -> None:
     assert "Restart=on-failure\n" in SystemdRenderer("bench").render(_hooked())
 

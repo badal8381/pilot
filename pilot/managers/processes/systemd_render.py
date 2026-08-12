@@ -19,6 +19,14 @@ def reject_control_chars(pd: ProcessDefinition) -> None:
         raise ValueError(f"process '{pd.name}' has a control character in a unit field")
 
 
+def _exec(argv: list[str]) -> str:
+    # systemd needs an absolute ExecStart, so a bare command name goes through
+    # `env` to get the PATH lookup supervisor and the dev runner do natively.
+    if "/" not in argv[0]:
+        argv = ["/usr/bin/env", *argv]
+    return shlex.join(argv)
+
+
 def supervisor_escape(value: str) -> str:
     # Double '%' (supervisord expands %(...)s) and escape '"' in quoted values.
     return value.replace("%", "%%").replace('"', '\\"')
@@ -42,8 +50,8 @@ class SystemdRenderer(ServiceRenderer):
         working_dir = f"WorkingDirectory={pd.working_dir}\n" if pd.working_dir else ""
         env = _render_env(pd.env)
         stop = f"TimeoutStopSec={pd.stop_timeout}\n" if pd.stop_timeout is not None else ""
-        pre = f"ExecStartPre={shlex.join(pd.pre_run)}\n" if pd.pre_run else ""
-        post = f"ExecStopPost={shlex.join(pd.post_run)}\n" if pd.post_run else ""
+        pre = f"ExecStartPre={_exec(pd.pre_run)}\n" if pd.pre_run else ""
+        post = f"ExecStopPost={_exec(pd.post_run)}\n" if pd.post_run else ""
         restart = "on-failure" if pd.restart_on_failure else "no"
         return (
             f"[Unit]\n"
@@ -52,7 +60,7 @@ class SystemdRenderer(ServiceRenderer):
             f"[Service]\n"
             f"Type=simple\n"
             f"{working_dir}{env}{pre}"
-            f"ExecStart={shlex.join(pd.argv)}\n"
+            f"ExecStart={_exec(pd.argv)}\n"
             f"{post}"
             f"Restart={restart}\n"
             f"{stop}"
