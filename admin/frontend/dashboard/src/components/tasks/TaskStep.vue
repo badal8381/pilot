@@ -1,7 +1,7 @@
 <template>
   <div>
     <div
-      class="flex items-center gap-3 px-2.5 py-2 rounded transition-colors"
+      class="flex items-center gap-3 px-2.5 py-2 rounded-4 transition-colors"
       :class="hasOutput ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
       @click="toggle"
     >
@@ -69,8 +69,8 @@ function toggle() {
 
 const STATUS_ICON_BG = {
   done: 'bg-surface-gray-2 text-ink-gray-6',
-  running: 'bg-surface-amber-2 text-ink-amber-8',
-  failed: 'bg-surface-red-2 text-ink-red-8',
+  running: 'bg-surface-amber-2 text-ink-amber-7',
+  failed: 'bg-surface-red-2 text-ink-red-7',
   pending: 'bg-surface-gray-2',
 }
 

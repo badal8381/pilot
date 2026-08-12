@@ -3,7 +3,7 @@
     <SiteUptime :site-name="siteName" :window="window" />
 
     <template v-if="loading">
-      <Skeleton v-for="i in 12" :key="i" class="rounded-lg h-[340px]" />
+      <Skeleton v-for="i in 12" :key="i" class="rounded-6 h-[340px]" />
     </template>
     <ErrorMessage v-else-if="error" :message="error" class="sm:col-span-2" />
 

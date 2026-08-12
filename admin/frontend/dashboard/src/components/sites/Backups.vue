@@ -20,7 +20,7 @@
 
     <ErrorMessage v-if="error" :message="error" />
 
-    <div :class="backups.length ? '' : 'rounded-xl border border-dashed border-outline-gray-2'">
+    <div :class="backups.length ? '' : 'rounded-7 border border-dashed border-outline-gray-2'">
       <div v-if="backupsLoading" class="flex justify-center py-12">
         <LoadingText />
       </div>
@@ -49,7 +49,7 @@
       >
         <template #cell="{ column, row, item }">
           <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row.set)" placement="left">
+            <Dropdown :options="menuOptions(row.set)">
               <template #default="{ open }">
                 <Button
                   variant="ghost"
@@ -85,21 +85,19 @@
   </div>
 
   <!-- Delete backup dialog -->
-  <Dialog v-model="showDelete" :options="{ title: 'Delete Backup', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Delete the backup from
-        <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
-        be undone.
-      </p>
-      <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-          >Delete</Button
-        >
-      </div>
-    </template>
+  <Dialog v-model="showDelete" title="Delete Backup" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Delete the backup from
+      <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
+      be undone.
+    </p>
+    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+        >Delete</Button
+      >
+    </div>
   </Dialog>
 </template>
 
@@ -111,11 +109,9 @@ import {
   Dialog,
   Dropdown,
   ErrorMessage,
-  ListFooter,
-  ListView,
-  ListRowItem,
   LoadingText,
 } from 'frappe-ui'
+import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
 import { apiErrorMessage } from '@/api/client'

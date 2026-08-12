@@ -3,7 +3,7 @@
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
-    <Alert v-if="!production" title="Not enforced yet" theme="yellow" :dismissible="false">
+    <Alert v-if="!production" title="Not enforced yet" theme="amber" :dismissible="false">
       <template #description>
         <span class="text-ink-gray-6 text-p-sm"
           >These rules take effect only in production (they're applied by nginx). This bench isn't
@@ -27,7 +27,7 @@
       @update:model-value="(v) => (defaultPolicy = v ? 'deny' : 'allow')"
     />
 
-    <Alert v-if="lockoutRisk" title="Heads up" theme="yellow" :dismissible="false">
+    <Alert v-if="lockoutRisk" title="Heads up" theme="amber" :dismissible="false">
       <template #description>
         <span class="text-ink-gray-6 text-p-sm"
           >Everyone is blocked by default. Add an <b>Allow</b> rule for your own IP<template
@@ -42,7 +42,7 @@
     <div class="space-y-2">
       <div class="flex justify-between items-center">
         <p class="font-medium text-ink-gray-8 text-base leading-normal">Rules</p>
-        <Button variant="subtle" icon-left="plus" @click="addRule">Add rule</Button>
+        <Button variant="subtle" icon-left="lucide-plus" @click="addRule">Add rule</Button>
       </div>
 
       <EmptyState
@@ -81,7 +81,7 @@
             />
           </div>
           <!-- Under the row it belongs to, not pooled at the bottom of the page. -->
-          <p v-if="ipError(rule)" class="mt-1.5 text-ink-red-6 text-p-sm">{{ ipError(rule) }}</p>
+          <p v-if="ipError(rule)" class="mt-1.5 text-ink-red-5 text-p-sm">{{ ipError(rule) }}</p>
         </div>
       </div>
     </div>

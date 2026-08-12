@@ -26,35 +26,33 @@
   </div>
 
   <!-- Let's Encrypt email dialog -->
-  <Dialog v-model="showSslEmail" :options="{ title: 'Enable SSL', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        A Let's Encrypt email is required to issue and renew certificates.
-      </p>
-      <TextInput
-        v-model="sslEmail"
-        type="email"
-        placeholder="you@example.com"
-        class="mt-4 w-full"
-        @keydown.enter="enableSsl(sslEmail)"
+  <Dialog v-model="showSslEmail" title="Enable SSL" size="md">
+    <p class="text-ink-gray-7 text-sm">
+      A Let's Encrypt email is required to issue and renew certificates.
+    </p>
+    <TextInput
+      v-model="sslEmail"
+      type="email"
+      placeholder="you@example.com"
+      class="mt-4 w-full"
+      @keydown.enter="enableSsl(sslEmail)"
+    >
+      <template #label>
+        <span class="text-sm">Let's Encrypt email</span>
+      </template>
+    </TextInput>
+    <ErrorMessage v-if="sslEmailError" :message="sslEmailError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="outline" @click="showSslEmail = false">Cancel</Button>
+      <Button
+        variant="solid"
+        :loading="sslLoading"
+        :disabled="!sslEmail"
+        @click="enableSsl(sslEmail)"
       >
-        <template #label>
-          <span class="text-sm">Let's Encrypt email</span>
-        </template>
-      </TextInput>
-      <ErrorMessage v-if="sslEmailError" :message="sslEmailError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="outline" @click="showSslEmail = false">Cancel</Button>
-        <Button
-          variant="solid"
-          :loading="sslLoading"
-          :disabled="!sslEmail"
-          @click="enableSsl(sslEmail)"
-        >
-          Enable SSL
-        </Button>
-      </div>
-    </template>
+        Enable SSL
+      </Button>
+    </div>
   </Dialog>
 </template>
 

@@ -38,7 +38,7 @@
   <div v-else class="space-y-5">
     <div
       v-if="loadError"
-      class="py-12 border border-dashed rounded-xl border-outline-red-2 text-ink-red-3 text-p-sm text-center"
+      class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
     >
       {{ loadError }}
     </div>
@@ -60,7 +60,7 @@
       >
         <template #cell="{ column, row, item }">
           <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row)" placement="left">
+            <Dropdown :options="menuOptions(row)">
               <template #default="{ open }">
                 <Button
                   variant="ghost"
@@ -79,37 +79,40 @@
     </template>
   </div>
 
-  <Dialog v-model="showRevoke" :options="{ title: 'Revoke session', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-base">
-        Revoke this session? Its token stops working immediately and whoever holds it must sign in
-        again.
-      </p>
-      <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
-          Revoke
-        </Button>
-      </div>
-    </template>
+  <Dialog v-model="showRevoke" title="Revoke session" size="md">
+    <p class="text-ink-gray-7 text-p-base">
+      Revoke this session? Its token stops working immediately and whoever holds it must sign in
+      again.
+    </p>
+    <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
+        Revoke
+      </Button>
+    </div>
   </Dialog>
 
-  <Dialog v-model="showDetail" :options="{ title: 'Activity details', size: 'md' }">
-    <template #body-content>
-      <div class="space-y-2 max-h-96 overflow-y-auto">
-        <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
-          <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
-          <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
-        </div>
+  <Dialog v-model="showDetail" title="Activity details" size="md">
+    <div class="space-y-2 max-h-96 overflow-y-auto">
+      <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
+        <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
+        <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
       </div>
-    </template>
+    </div>
   </Dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, Dropdown, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  Dropdown,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { sessionApi } from '@/api/session'
 import { auditApi } from '@/api/audit'

@@ -27,7 +27,7 @@
             v-else
             v-for="log in filteredLogs"
             :key="log.filename"
-            class="sm:px-3 py-2.5 rounded w-full text-left transition-colors shrink-0"
+            class="sm:px-3 py-2.5 rounded-4 w-full text-left transition-colors shrink-0"
             :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-1'"
             @click="selectedFile = log.filename"
           >
@@ -176,7 +176,7 @@
 
           <!-- Terminal area -->
           <div ref="viewer" class="flex flex-col flex-1 mt-2 sm:mt-0 overflow-hidden">
-            <div v-if="contentError" class="p-4 font-mono text-ink-red-6 text-sm">
+            <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
               Error: {{ contentError }}
             </div>
             <LogView

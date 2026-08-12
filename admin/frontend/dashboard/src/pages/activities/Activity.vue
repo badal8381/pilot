@@ -31,10 +31,10 @@
 
     <div
       v-if="siteFilter"
-      class="flex items-center gap-2 bg-surface-blue-1 mt-4 px-3 py-2 rounded shrink-0"
+      class="flex items-center gap-2 bg-surface-blue-1 mt-4 px-3 py-2 rounded-4 shrink-0"
     >
-      <span class="lucide-filter size-4 text-ink-blue-7 shrink-0" />
-      <p class="flex-1 min-w-0 text-p-sm text-ink-blue-8 truncate">
+      <span class="lucide-filter size-4 text-ink-blue-6 shrink-0" />
+      <p class="flex-1 min-w-0 text-p-sm text-ink-blue-7 truncate">
         Activity on <span class="font-semibold">{{ siteFilter }}</span>
       </p>
       <Button variant="ghost" size="sm" icon="lucide-x" @click="clearSiteFilter" />
@@ -49,7 +49,7 @@
 
     <div
       v-else-if="activities.length"
-      class="flex flex-col flex-1 border border-outline-gray-2 rounded mt-4 min-h-0 overflow-hidden"
+      class="flex flex-col flex-1 border border-outline-gray-2 rounded-4 mt-4 min-h-0 overflow-hidden"
     >
       <div class="flex-1 overflow-y-auto">
         <table class="w-full text-left">
