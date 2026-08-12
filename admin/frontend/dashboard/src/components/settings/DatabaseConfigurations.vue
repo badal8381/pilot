@@ -66,12 +66,12 @@
                 <Button
                   v-if="variable.editable"
                   size="sm"
-                  variant="subtle"
+                  variant="ghost"
+                  icon="lucide-pencil"
                   :disabled="saving"
+                  aria-label="Edit"
                   @click="openEditor(variable)"
-                >
-                  Edit
-                </Button>
+                />
                 <Tooltip v-else :text="variable.reason || 'Read-only in Pilot'">
                   <span
                     class="block size-4 text-ink-gray-4 lucide-lock"
@@ -124,9 +124,7 @@
         <ErrorMessage v-if="saveError" :message="saveError" />
 
         <div class="flex justify-end gap-2">
-          <Button variant="ghost" :disabled="saving" @click="editorOpen = false">
-            Cancel
-          </Button>
+          <Button variant="ghost" :disabled="saving" @click="editorOpen = false"> Cancel </Button>
           <Button
             variant="solid"
             :loading="saving"
@@ -142,9 +140,9 @@
 </template>
 
 <script setup>
+import { Button, Dialog, ErrorMessage, FormControl, Spinner, Switch, Tooltip } from 'frappe-ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, Dialog, ErrorMessage, FormControl, Spinner, Switch, Tooltip } from 'frappe-ui'
 import { databaseApi } from '@/api/database'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
@@ -196,9 +194,7 @@ const validationError = computed(() => {
   }
   return ''
 })
-const unchanged = computed(
-  () => editing.value !== null && draftValue.value === editing.value.value,
-)
+const unchanged = computed(() => editing.value !== null && draftValue.value === editing.value.value)
 
 function formatValue(variable) {
   if (!variable.supported || variable.value === null) return 'Unavailable'

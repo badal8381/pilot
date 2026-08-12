@@ -7,7 +7,7 @@
       <DatabaseQuickActions />
     </section>
 
-    <div class="mt-6 border-t border-outline-alpha-gray-1">
+    <div class="mt-2 border-t rounded border-outline-alpha-gray-1">
       <SettingsRow
         as="button"
         interactive
