@@ -43,6 +43,9 @@ markers = [
 "pilot.managers.gunicorn" = [
   "templates/*.template",
 ]
+"pilot.managers.fluentbit" = [
+  "templates/*",
+]
 
 [tool.mypy]
 python_version = "3.11"
