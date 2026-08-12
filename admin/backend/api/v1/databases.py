@@ -9,7 +9,10 @@ from flask.typing import ResponseReturnValue
 from admin.backend.api.responses import accepted_task_response, error_response
 from admin.backend.api.v1.benches.support import guard_bench_management
 from pilot.core.bench import Bench
-from pilot.core.database.configurations import DatabaseConfigurations
+from pilot.core.database.configurations import (
+    DatabaseConfigurationChange,
+    DatabaseConfigurations,
+)
 from pilot.core.database.quick_actions import DatabaseQuickActions
 from pilot.exceptions import DatabaseError, TaskConflictError
 from pilot.tasks.restart_database import RestartDatabaseTask
@@ -32,6 +35,53 @@ def _quick_actions() -> DatabaseQuickActions:
 
 def _configurations() -> DatabaseConfigurations:
     return DatabaseConfigurations(_bench().config)
+
+
+def _queue_configuration_change(
+    bench: Bench,
+    change: DatabaseConfigurationChange,
+    idempotency_key: str | None,
+) -> str:
+    action = change["action"]
+    if action == "configuration":
+        return SetMariaDBConfigurationTask.queue(
+            bench,
+            variable=change["name"],
+            value_json=json.dumps(change["value"], separators=(",", ":")),
+            idempotency_key=idempotency_key,
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+    if action == "performance_schema":
+        enabled = change["value"]
+        if type(enabled) is not bool:
+            raise ValueError("Performance Schema must be either enabled or disabled.")
+        return SetPerformanceSchemaTask.queue(
+            bench,
+            state="enabled" if enabled else "disabled",
+            idempotency_key=idempotency_key,
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+    if action == "innodb_buffer_pool_size":
+        size_mb = change["value"]
+        if type(size_mb) is not int:
+            raise ValueError("InnoDB Buffer Pool size must be a whole number.")
+        return SetInnoDBBufferPoolSizeTask.queue(
+            bench,
+            size_mb=size_mb,
+            idempotency_key=idempotency_key,
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+    if action == "max_connections":
+        max_connections = change["value"]
+        if type(max_connections) is not int:
+            raise ValueError("Maximum connections must be a whole number.")
+        return SetMaxDatabaseConnectionsTask.queue(
+            bench,
+            max_connections=max_connections,
+            idempotency_key=idempotency_key,
+            resource_key=_DATABASE_RESOURCE_KEY,
+        )
+    raise ValueError(f"Unknown database configuration action '{action}'.")
 
 
 @database_bp.get("/sites")
@@ -161,12 +211,10 @@ def set_database_configuration(variable: str):
                 409,
             )
         bench = _bench()
-        task_id = SetMariaDBConfigurationTask.queue(
+        task_id = _queue_configuration_change(
             bench,
-            variable=variable,
-            value_json=json.dumps(change["value"], separators=(",", ":")),
-            idempotency_key=request.headers.get("Idempotency-Key"),
-            resource_key=_DATABASE_RESOURCE_KEY,
+            change,
+            request.headers.get("Idempotency-Key"),
         )
         return accepted_task_response(bench.path, task_id)
     except ValueError as exc:

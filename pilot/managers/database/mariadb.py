@@ -10,7 +10,7 @@ from typing import NoReturn
 
 from pilot.config import MariaDBConfig
 from pilot.core.database.mariadb_variables import (
-    EDITABLE_MARIADB_VARIABLE_NAMES,
+    GENERIC_EDITABLE_MARIADB_VARIABLE_NAMES,
     MARIADB_VARIABLE_NAMES,
     MariaDBValue,
     mariadb_variable_spec,
@@ -550,7 +550,7 @@ class MariaDBManager(UserOwnedDBManager):
 
     @staticmethod
     def _configuration_variable_spec(name: str):
-        if name not in EDITABLE_MARIADB_VARIABLE_NAMES:
+        if name not in GENERIC_EDITABLE_MARIADB_VARIABLE_NAMES:
             raise DatabaseError(f"Pilot cannot change MariaDB variable '{name}'.")
         return mariadb_variable_spec(name)
 

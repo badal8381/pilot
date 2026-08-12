@@ -90,52 +90,59 @@
     </template>
   </div>
 
-  <Dialog v-model="editorOpen" :options="editorOptions">
-    <template #body-content>
-      <div v-if="editing" class="space-y-4">
-        <div
-          v-if="editing.value_type === 'boolean'"
-          class="flex items-center justify-between gap-4"
-        >
-          <p class="font-medium text-ink-gray-8 text-base">Enabled</p>
-          <Switch
-            class="[&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
-            :label="editing.name"
-            :model-value="Boolean(draftValue)"
-            @update:model-value="(value) => (draftValue = value)"
-          />
-        </div>
-        <FormControl
-          v-else
-          v-model.number="draftValue"
-          type="number"
-          :label="inputLabel"
-          :min="editing.min"
-          :max="editing.max"
-          :step="editing.step || 1"
-          autocomplete="off"
+  <Dialog
+    v-model="editorOpen"
+    :title="editing ? `Update ${editing.name}` : 'Update database configuration'"
+    size="sm"
+  >
+    <div v-if="editing && editor" class="space-y-4">
+      <div v-if="editor.value_type === 'boolean'" class="flex items-center justify-between gap-4">
+        <p class="font-medium text-ink-gray-8 text-base">Enabled</p>
+        <Switch
+          class="[&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
+          :label="editing.name"
+          :model-value="Boolean(draftValue)"
+          @update:model-value="(value) => (draftValue = value)"
         />
-
-        <p v-if="editing.value_type === 'integer'" class="text-ink-gray-6 text-sm">
-          Allowed: {{ formatConstraint(editing.min, editing.unit) }} to
-          {{ formatConstraint(editing.max, editing.unit) }}
-        </p>
-        <ErrorMessage v-if="validationError" :message="validationError" />
-        <ErrorMessage v-if="saveError" :message="saveError" />
-
-        <div class="flex justify-end gap-2">
-          <Button variant="ghost" :disabled="saving" @click="editorOpen = false"> Cancel </Button>
-          <Button
-            variant="solid"
-            :loading="saving"
-            :disabled="Boolean(validationError) || unchanged"
-            @click="save"
-          >
-            Update
-          </Button>
-        </div>
       </div>
-    </template>
+      <FormControl
+        v-else
+        v-model.number="draftValue"
+        type="number"
+        :label="inputLabel"
+        :min="editor.min"
+        :max="editor.max"
+        :step="editor.step || 1"
+        autocomplete="off"
+      />
+
+      <div v-if="editor.value_type === 'integer'" class="text-ink-gray-6 text-sm">
+        <p v-if="Number.isInteger(editor.recommended)">
+          Recommended: {{ formatConstraint(editor.recommended, editor.unit) }}
+        </p>
+        <p v-if="Number.isInteger(editor.min) && Number.isInteger(editor.max)">
+          Allowed: {{ formatConstraint(editor.min, editor.unit) }} to
+          {{ formatConstraint(editor.max, editor.unit) }}
+        </p>
+      </div>
+      <p v-if="restartWarning" class="text-ink-orange-6 text-sm">
+        {{ restartWarning }}
+      </p>
+      <ErrorMessage v-if="validationError" :message="validationError" />
+      <ErrorMessage v-if="saveError" :message="saveError" />
+
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" :disabled="saving" @click="editorOpen = false"> Cancel </Button>
+        <Button
+          variant="solid"
+          :loading="saving"
+          :disabled="Boolean(validationError) || unchanged"
+          @click="save"
+        >
+          {{ restartWarning ? 'Update and restart' : 'Update' }}
+        </Button>
+      </div>
+    </div>
   </Dialog>
 </template>
 
@@ -175,26 +182,40 @@ const editorOpen = computed({
     if (!value && !saving.value) editing.value = null
   },
 })
-const editorOptions = computed(() => ({
-  title: editing.value ? `Update ${editing.value.name}` : 'Update database configuration',
-  size: 'sm',
-}))
+const editor = computed(() => editing.value?.edit || null)
 const inputLabel = computed(() => {
-  if (!editing.value) return 'Value'
-  return editing.value.unit ? `Value (${editing.value.unit})` : 'Value'
+  if (!editor.value) return 'Value'
+  return editor.value.unit ? `Value (${editor.value.unit})` : 'Value'
 })
 const validationError = computed(() => {
-  if (!editing.value) return ''
-  if (editing.value.value_type === 'boolean') {
+  if (!editor.value) return ''
+  if (editor.value.value_type === 'boolean') {
     return typeof draftValue.value === 'boolean' ? '' : 'Choose enabled or disabled.'
   }
   if (!Number.isInteger(draftValue.value)) return 'Enter a whole number.'
-  if (draftValue.value < editing.value.min || draftValue.value > editing.value.max) {
-    return `Enter a value between ${editing.value.min} and ${editing.value.max}.`
+  if (Number.isInteger(editor.value.min) && draftValue.value < editor.value.min) {
+    return `Enter a value between ${editor.value.min} and ${editor.value.max}.`
+  }
+  if (Number.isInteger(editor.value.max) && draftValue.value > editor.value.max) {
+    return `Enter a value between ${editor.value.min} and ${editor.value.max}.`
   }
   return ''
 })
-const unchanged = computed(() => editing.value !== null && draftValue.value === editing.value.value)
+const unchanged = computed(() => editor.value !== null && draftValue.value === editor.value.value)
+const restartWarning = computed(() => {
+  if (!editor.value) return ''
+  if (editor.value.action === 'performance_schema') {
+    return 'MariaDB will restart to apply this change.'
+  }
+  if (
+    editor.value.action === 'innodb_buffer_pool_size' &&
+    Number.isInteger(editor.value.dynamic_max) &&
+    draftValue.value > editor.value.dynamic_max
+  ) {
+    return `MariaDB will restart because this value is above its current live Buffer Pool ceiling of ${formatConstraint(editor.value.dynamic_max, editor.value.unit)}.`
+  }
+  return editor.value.requires_restart ? 'MariaDB will restart to apply this change.' : ''
+})
 
 function formatValue(variable) {
   if (!variable.supported || variable.value === null) return 'Unavailable'
@@ -224,9 +245,9 @@ function formatConstraint(value, unit) {
 }
 
 function openEditor(variable) {
-  if (!variable.editable) return
+  if (!variable.editable || !variable.edit) return
   saveError.value = ''
-  draftValue.value = variable.value
+  draftValue.value = variable.edit.value
   editing.value = variable
 }
 

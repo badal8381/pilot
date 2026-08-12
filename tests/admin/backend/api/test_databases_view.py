@@ -136,6 +136,7 @@ def test_database_configuration_queues_typed_guarded_task(tmp_path: Path) -> Non
     client = _client(tmp_path / "benches" / "current")
     configurations = Mock()
     configurations.prepare_change.return_value = {
+        "action": "configuration",
         "name": "connect_timeout",
         "value": 20,
         "current": 10,
@@ -167,6 +168,82 @@ def test_database_configuration_queues_typed_guarded_task(tmp_path: Path) -> Non
         "variable": "connect_timeout",
         "value_json": "20",
         "idempotency_key": "connect-timeout-20",
+        "resource_key": "database-server",
+    }
+
+
+@pytest.mark.parametrize(
+    ("variable", "value", "current", "action", "task", "task_argument"),
+    [
+        (
+            "max_connections",
+            40,
+            50,
+            "max_connections",
+            "SetMaxDatabaseConnectionsTask",
+            {"max_connections": 40},
+        ),
+        (
+            "innodb_buffer_pool_size",
+            256,
+            128,
+            "innodb_buffer_pool_size",
+            "SetInnoDBBufferPoolSizeTask",
+            {"size_mb": 256},
+        ),
+        (
+            "performance_schema",
+            True,
+            False,
+            "performance_schema",
+            "SetPerformanceSchemaTask",
+            {"state": "enabled"},
+        ),
+    ],
+)
+def test_database_configuration_routes_guarded_variables_to_specialized_tasks(
+    tmp_path: Path,
+    variable: str,
+    value,
+    current,
+    action: str,
+    task: str,
+    task_argument: dict,
+) -> None:
+    client = _client(tmp_path / "benches" / "current")
+    configurations = Mock()
+    configurations.prepare_change.return_value = {
+        "action": action,
+        "name": variable,
+        "value": value,
+        "current": current,
+        "changed": True,
+    }
+    with (
+        patch(
+            "admin.backend.api.v1.databases._configurations",
+            return_value=configurations,
+        ),
+        patch(
+            f"admin.backend.api.v1.databases.{task}.queue",
+            return_value="task-database-configuration",
+        ) as queue,
+        patch(
+            "admin.backend.api.v1.databases.accepted_task_response",
+            return_value=({"task_id": "task-database-configuration"}, 202),
+        ),
+    ):
+        response = client.post(
+            f"/api/v1/database/configurations/{variable}",
+            json={"value": value},
+            headers={"Idempotency-Key": "config-guarded-variable"},
+        )
+
+    assert response.status_code == 202
+    configurations.prepare_change.assert_called_once_with(variable, value)
+    assert queue.call_args.kwargs == {
+        **task_argument,
+        "idempotency_key": "config-guarded-variable",
         "resource_key": "database-server",
     }
 

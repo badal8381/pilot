@@ -5,8 +5,16 @@ from typing import Literal
 
 MariaDBValue = bool | int | str
 VariableType = Literal["boolean", "integer", "string"]
+VariableEditAction = Literal[
+    "configuration",
+    "innodb_buffer_pool_size",
+    "max_connections",
+    "performance_schema",
+]
 
-_QUICK_ACTION = "Use Database Quick actions to change this setting with Pilot's host-aware safeguards."
+_BUFFER_POOL_COMPANION = (
+    "Managed automatically with InnoDB Buffer Pool size so Pilot can enforce the host memory budget."
+)
 _MEMORY_SENSITIVE = "Read-only because an unsafe value can exhaust memory shared by MariaDB and the bench."
 _STARTUP_SENSITIVE = "Read-only because Pilot owns this server-level startup setting."
 _WORKLOAD_SENSITIVE = (
@@ -34,7 +42,7 @@ class MariaDBVariableSpec:
     description: str
     value_type: VariableType = "string"
     dynamic: bool = False
-    editable: bool = False
+    edit_action: VariableEditAction | None = None
     minimum: int | None = None
     maximum: int | None = None
     step: int | None = None
@@ -44,6 +52,10 @@ class MariaDBVariableSpec:
     @property
     def option_name(self) -> str:
         return self.name.replace("_", "-")
+
+    @property
+    def editable(self) -> bool:
+        return self.edit_action is not None
 
     def parse_server_value(self, raw_value: object) -> MariaDBValue:
         if self.value_type == "integer":
@@ -61,8 +73,7 @@ class MariaDBVariableSpec:
         return str(raw_value)
 
     def validate_input(self, value: object) -> MariaDBValue:
-        if not self.editable:
-            raise ValueError(f"MariaDB variable '{self.name}' is read-only in Pilot.")
+        self._require_generic_edit_action()
         if self.value_type == "integer":
             if type(value) is not int:
                 raise ValueError(f"{self.label} must be a whole number.")
@@ -76,6 +87,14 @@ class MariaDBVariableSpec:
                 raise ValueError(f"{self.label} must be either enabled or disabled.")
             return value
         raise ValueError(f"MariaDB variable '{self.name}' is not editable in Pilot.")
+
+    def _require_generic_edit_action(self) -> None:
+        if self.edit_action is None:
+            raise ValueError(f"MariaDB variable '{self.name}' is read-only in Pilot.")
+        if self.edit_action != "configuration":
+            raise ValueError(
+                f"MariaDB variable '{self.name}' must be changed through its guarded database action."
+            )
 
     def option_value(self, value: object) -> str:
         validated = self.validate_input(value)
@@ -104,7 +123,7 @@ def _editable_integer(
         description=description,
         value_type="integer",
         dynamic=True,
-        editable=True,
+        edit_action="configuration",
         minimum=minimum,
         maximum=maximum,
         step=1,
@@ -173,14 +192,15 @@ MARIADB_VARIABLE_SPECS = (
         600,
         unit="seconds",
     ),
-    _read_only(
-        "max_connections",
-        "Maximum connections",
-        "Connections",
-        "Maximum number of simultaneous client connections.",
-        _QUICK_ACTION,
+    MariaDBVariableSpec(
+        name="max_connections",
+        label="Maximum connections",
+        section="Connections",
+        description="Maximum number of simultaneous client connections.",
         value_type="integer",
         dynamic=True,
+        edit_action="max_connections",
+        read_only_reason="",
     ),
     _read_only(
         "extra_max_connections",
@@ -271,7 +291,7 @@ MARIADB_VARIABLE_SPECS = (
         description="Write every InnoDB deadlock report to the MariaDB error log.",
         value_type="boolean",
         dynamic=True,
-        editable=True,
+        edit_action="configuration",
         read_only_reason="",
     ),
     _read_only(
@@ -292,22 +312,23 @@ MARIADB_VARIABLE_SPECS = (
         value_type="boolean",
         dynamic=True,
     ),
-    _read_only(
-        "innodb_buffer_pool_size",
-        "InnoDB Buffer Pool size",
-        "InnoDB",
-        "Memory reserved for caching InnoDB data and indexes.",
-        _QUICK_ACTION,
+    MariaDBVariableSpec(
+        name="innodb_buffer_pool_size",
+        label="InnoDB Buffer Pool size",
+        section="InnoDB",
+        description="Memory reserved for caching InnoDB data and indexes.",
         value_type="integer",
         dynamic=True,
+        edit_action="innodb_buffer_pool_size",
         unit="bytes",
+        read_only_reason="",
     ),
     _read_only(
         "innodb_buffer_pool_size_max",
         "InnoDB Buffer Pool live ceiling",
         "InnoDB",
         "MariaDB 11.8 ceiling for increasing the Buffer Pool without a restart.",
-        _QUICK_ACTION,
+        _BUFFER_POOL_COMPANION,
         value_type="integer",
         unit="bytes",
     ),
@@ -316,7 +337,7 @@ MARIADB_VARIABLE_SPECS = (
         "InnoDB Buffer Pool automatic minimum",
         "InnoDB",
         "MariaDB 11.8 lower boundary for automatic Buffer Pool resizing.",
-        _QUICK_ACTION,
+        _BUFFER_POOL_COMPANION,
         value_type="integer",
         unit="bytes",
     ),
@@ -492,13 +513,14 @@ MARIADB_VARIABLE_SPECS = (
         "Recovery behavior used when MariaDB opens a damaged MyISAM table.",
         _RECOVERY_SENSITIVE,
     ),
-    _read_only(
-        "performance_schema",
-        "Performance Schema",
-        "Performance Schema",
-        "Collects instrumentation used by database performance diagnostics.",
-        _PERFORMANCE_SCHEMA,
+    MariaDBVariableSpec(
+        name="performance_schema",
+        label="Performance Schema",
+        section="Performance Schema",
+        description="Collects instrumentation used by database performance diagnostics.",
         value_type="boolean",
+        edit_action="performance_schema",
+        read_only_reason="",
     ),
     _read_only(
         "performance_schema_instrument",
@@ -584,6 +606,9 @@ MARIADB_VARIABLE_SPECS = (
 MARIADB_VARIABLES_BY_NAME = {spec.name: spec for spec in MARIADB_VARIABLE_SPECS}
 MARIADB_VARIABLE_NAMES = frozenset(MARIADB_VARIABLES_BY_NAME)
 EDITABLE_MARIADB_VARIABLE_NAMES = frozenset(spec.name for spec in MARIADB_VARIABLE_SPECS if spec.editable)
+GENERIC_EDITABLE_MARIADB_VARIABLE_NAMES = frozenset(
+    spec.name for spec in MARIADB_VARIABLE_SPECS if spec.edit_action == "configuration"
+)
 
 
 def mariadb_variable_spec(name: str) -> MariaDBVariableSpec:

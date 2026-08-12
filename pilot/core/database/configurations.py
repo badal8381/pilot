@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from collections.abc import Mapping
+from typing import TYPE_CHECKING, TypedDict
 
 from pilot.core.database.mariadb_variables import (
     MARIADB_VARIABLE_SPECS,
     MariaDBValue,
+    MariaDBVariableSpec,
+    VariableEditAction,
+    VariableType,
     mariadb_variable_spec,
 )
+from pilot.core.database.quick_actions import DatabaseQuickActions
 from pilot.exceptions import DatabaseError
 from pilot.managers.database.mariadb import MariaDBManager
 from pilot.managers.platform import is_linux
@@ -21,6 +26,33 @@ _EXTERNAL_READ_ONLY = (
     "External MariaDB configurations are read-only. Pilot changes only the MariaDB instance it "
     "provisioned on this server."
 )
+_MEBIBYTE = 1024 * 1024
+
+
+class DatabaseConfigurationEditor(TypedDict):
+    action: VariableEditAction
+    value: MariaDBValue | None
+    value_type: VariableType
+    unit: str
+    min: int | None
+    max: int | None
+    step: int | None
+    recommended: int | None
+    dynamic_max: int | None
+    requires_restart: bool
+
+
+class DatabaseConfigurationChange(TypedDict):
+    action: VariableEditAction
+    name: str
+    value: MariaDBValue
+    current: MariaDBValue
+    changed: bool
+
+
+class GuardedEditor(TypedDict):
+    edit: DatabaseConfigurationEditor | None
+    reason: str
 
 
 class DatabaseConfigurations:
@@ -30,6 +62,7 @@ class DatabaseConfigurations:
         self,
         config: BenchConfig,
         manager: MariaDBManager | None = None,
+        quick_actions: DatabaseQuickActions | None = None,
     ) -> None:
         self.config = config
         self.manager = (
@@ -37,6 +70,7 @@ class DatabaseConfigurations:
             if manager is not None
             else (MariaDBManager(config.mariadb) if config.db_type == "mariadb" else None)
         )
+        self.quick_actions = quick_actions
 
     def snapshot(self) -> dict:
         read_reason = self._read_reason()
@@ -53,24 +87,34 @@ class DatabaseConfigurations:
             }
 
         manager = self._manager()
-        values = manager.global_variable_values(spec.name for spec in MARIADB_VARIABLE_SPECS)
+        raw_values = manager.global_variable_values(spec.name for spec in MARIADB_VARIABLE_SPECS)
         edit_reason = self._edit_reason()
+        values = self._parse_values(raw_values)
+        guarded_editors = self._guarded_editors(values) if not edit_reason else {}
         variables = []
         for spec in MARIADB_VARIABLE_SPECS:
-            raw_value = values.get(spec.name)
-            supported = raw_value is not None
-            try:
-                value = spec.parse_server_value(raw_value) if supported else None
-            except ValueError as exc:
-                raise DatabaseError(str(exc)) from exc
+            supported = spec.name in values
+            value = values.get(spec.name)
 
-            editable = supported and spec.editable and not edit_reason
+            edit = self._editor(spec, value, guarded_editors) if supported and not edit_reason else None
+            editable = edit is not None
             if not supported:
                 variable_reason = "This variable is not exposed by the installed MariaDB version."
             elif not spec.editable:
                 variable_reason = spec.read_only_reason
-            else:
+            elif edit_reason:
                 variable_reason = edit_reason
+            elif not editable:
+                guarded_editor = (
+                    guarded_editors.get(spec.edit_action) if spec.edit_action is not None else None
+                )
+                variable_reason = (
+                    guarded_editor["reason"]
+                    if guarded_editor is not None
+                    else "This variable cannot be changed on the current MariaDB server."
+                )
+            else:
+                variable_reason = ""
 
             variables.append(
                 {
@@ -85,6 +129,7 @@ class DatabaseConfigurations:
                     "requires_restart": not spec.dynamic,
                     "supported": supported,
                     "editable": editable,
+                    "edit": edit,
                     "reason": variable_reason,
                     "min": spec.minimum,
                     "max": spec.maximum,
@@ -95,18 +140,24 @@ class DatabaseConfigurations:
             "engine": self.config.db_type,
             "managed": managed,
             "readable": True,
-            "editable": not edit_reason,
+            "editable": any(variable["editable"] for variable in variables),
             "reason": "",
             "edit_reason": edit_reason,
             "variables": variables,
         }
 
-    def prepare_change(self, name: str, value: object) -> dict:
+    def prepare_change(self, name: str, value: object) -> DatabaseConfigurationChange:
         spec = mariadb_variable_spec(name)
-        requested = spec.validate_input(value)
+        if not spec.editable:
+            spec.validate_input(value)
         edit_reason = self._edit_reason(require_reachable=True)
         if edit_reason:
             raise DatabaseError(edit_reason)
+
+        if spec.edit_action != "configuration":
+            return self._prepare_guarded_change(spec, value)
+
+        requested = spec.validate_input(value)
 
         raw_value = self._manager().global_variable_values((name,)).get(name)
         if raw_value is None:
@@ -116,6 +167,7 @@ class DatabaseConfigurations:
         except ValueError as exc:
             raise DatabaseError(str(exc)) from exc
         return {
+            "action": "configuration",
             "name": name,
             "value": requested,
             "current": current,
@@ -129,6 +181,169 @@ class DatabaseConfigurations:
         if edit_reason:
             raise DatabaseError(edit_reason)
         return self._manager().set_configuration_variable(name, requested)
+
+    def _editor(
+        self,
+        spec: MariaDBVariableSpec,
+        value: MariaDBValue | None,
+        guarded_editors: Mapping[VariableEditAction, GuardedEditor],
+    ) -> DatabaseConfigurationEditor | None:
+        action = spec.edit_action
+        if action is None:
+            return None
+        if action == "configuration":
+            return self._editor_contract(
+                action=action,
+                value=value,
+                value_type=spec.value_type,
+                unit=spec.unit,
+                minimum=spec.minimum,
+                maximum=spec.maximum,
+                step=spec.step,
+                requires_restart=not spec.dynamic,
+            )
+
+        guarded_editor = guarded_editors.get(action)
+        return guarded_editor["edit"] if guarded_editor is not None else None
+
+    def _parse_values(self, raw_values: Mapping[str, object]) -> dict[str, MariaDBValue]:
+        values: dict[str, MariaDBValue] = {}
+        for spec in MARIADB_VARIABLE_SPECS:
+            if spec.name not in raw_values:
+                continue
+            try:
+                values[spec.name] = spec.parse_server_value(raw_values[spec.name])
+            except ValueError as exc:
+                raise DatabaseError(str(exc)) from exc
+        return values
+
+    def _guarded_editors(
+        self,
+        values: Mapping[str, MariaDBValue],
+    ) -> dict[VariableEditAction, GuardedEditor]:
+        editors: dict[VariableEditAction, GuardedEditor] = {}
+        if "performance_schema" in values:
+            editors["performance_schema"] = {
+                "edit": self._editor_contract(
+                    action="performance_schema",
+                    value=values["performance_schema"],
+                    value_type="boolean",
+                    requires_restart=True,
+                ),
+                "reason": "",
+            }
+
+        sizing_actions: tuple[VariableEditAction, ...] = (
+            "innodb_buffer_pool_size",
+            "max_connections",
+        )
+        if not any(action in values for action in sizing_actions):
+            return editors
+        try:
+            limits = self._manager().variable_limits()
+        except DatabaseError as exc:
+            for action in sizing_actions:
+                editors[action] = {"edit": None, "reason": str(exc)}
+            return editors
+
+        if "max_connections" in values:
+            editors["max_connections"] = {
+                "edit": self._editor_contract(
+                    action="max_connections",
+                    value=values["max_connections"],
+                    value_type="integer",
+                    minimum=limits.max_connections_min,
+                    maximum=limits.max_connections_max,
+                    step=1,
+                    recommended=limits.max_connections_recommended,
+                    requires_restart=False,
+                ),
+                "reason": "",
+            }
+
+        if "innodb_buffer_pool_size" in values:
+            buffer_pool_size = values["innodb_buffer_pool_size"]
+            dynamic_max = values.get("innodb_buffer_pool_size_max")
+            if type(buffer_pool_size) is not int or type(dynamic_max) is not int:
+                editors["innodb_buffer_pool_size"] = {
+                    "edit": None,
+                    "reason": "The installed MariaDB version does not expose the live Buffer Pool ceiling.",
+                }
+            else:
+                editors["innodb_buffer_pool_size"] = {
+                    "edit": self._editor_contract(
+                        action="innodb_buffer_pool_size",
+                        value=buffer_pool_size // _MEBIBYTE,
+                        value_type="integer",
+                        unit="MB",
+                        minimum=limits.innodb_buffer_pool_min_mb,
+                        maximum=limits.innodb_buffer_pool_max_mb,
+                        step=1,
+                        recommended=limits.innodb_buffer_pool_recommended_mb,
+                        dynamic_max=dynamic_max // _MEBIBYTE,
+                        requires_restart=False,
+                    ),
+                    "reason": "",
+                }
+        return editors
+
+    @staticmethod
+    def _editor_contract(
+        *,
+        action: VariableEditAction,
+        value: MariaDBValue | None,
+        value_type: VariableType,
+        unit: str = "",
+        minimum: int | None = None,
+        maximum: int | None = None,
+        step: int | None = None,
+        recommended: int | None = None,
+        dynamic_max: int | None = None,
+        requires_restart: bool,
+    ) -> DatabaseConfigurationEditor:
+        return {
+            "action": action,
+            "value": value,
+            "value_type": value_type,
+            "unit": unit,
+            "min": minimum,
+            "max": maximum,
+            "step": step,
+            "recommended": recommended,
+            "dynamic_max": dynamic_max,
+            "requires_restart": requires_restart,
+        }
+
+    def _prepare_guarded_change(
+        self,
+        spec: MariaDBVariableSpec,
+        value: object,
+    ) -> DatabaseConfigurationChange:
+        actions = self._quick_actions()
+        if spec.edit_action == "performance_schema":
+            if type(value) is not bool:
+                raise ValueError("Performance Schema must be either enabled or disabled.")
+            capability = actions.require_performance_schema()
+            current = capability["enabled"]
+        elif spec.edit_action == "innodb_buffer_pool_size":
+            if type(value) is not int:
+                raise ValueError("InnoDB Buffer Pool size must be a whole number.")
+            capability = actions.require_innodb_buffer_pool_size(value)
+            current = capability["current_mb"]
+        elif spec.edit_action == "max_connections":
+            if type(value) is not int:
+                raise ValueError("Maximum connections must be a whole number.")
+            capability = actions.require_max_connections(value)
+            current = capability["current"]
+        else:
+            raise ValueError(f"MariaDB variable '{spec.name}' is read-only in Pilot.")
+        return {
+            "action": spec.edit_action,
+            "name": spec.name,
+            "value": value,
+            "current": current,
+            "changed": current != value,
+        }
 
     def _read_reason(self) -> str:
         if self.config.db_type != "mariadb":
@@ -160,3 +375,8 @@ class DatabaseConfigurations:
         if self.manager is None:
             raise DatabaseError(_MARIADB_ONLY)
         return self.manager
+
+    def _quick_actions(self) -> DatabaseQuickActions:
+        if self.quick_actions is None:
+            self.quick_actions = DatabaseQuickActions(self.config, self._manager())
+        return self.quick_actions

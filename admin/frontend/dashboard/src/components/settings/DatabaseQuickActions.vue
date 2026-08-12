@@ -163,7 +163,7 @@
 </template>
 
 <script setup>
-import { Badge, Button, Dialog, ErrorMessage, FormControl, Switch, Tooltip } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, FormControl, Switch, Tooltip } from 'frappe-ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { databaseApi } from '@/api/database'
@@ -217,10 +217,6 @@ const showManagedMariaDBDisclaimer = computed(
     capabilities.value !== null &&
     (capabilities.value.engine !== 'mariadb' || !capabilities.value.managed),
 )
-const engineLabel = computed(() => {
-  const labels = { mariadb: 'MariaDB', postgres: 'PostgreSQL', sqlite: 'SQLite' }
-  return labels[capabilities.value?.engine] || 'Database'
-})
 const bufferPoolDescription = computed(() => {
   const capability = action('innodb_buffer_pool_size')
   const description = ''
