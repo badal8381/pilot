@@ -21,13 +21,10 @@ class MigrationStore:
         self.root = bench.path / "migrations"
 
     def create_update(self, apps_filter: set[str] | None = None) -> MigrationOperation:
-        from pilot.integrations.marketplace import Marketplace
-
-        marketplace_by_name = {entry["name"]: entry for entry in Marketplace.registry()}
         selected = [
             app for app in self.bench.apps() if apps_filter is None or app.config.name in apps_filter
         ]
-        apps = [self._revision(app, marketplace_by_name.get(app.config.name)) for app in selected]
+        apps = [self._revision(app) for app in selected]
         sites = self._sites_for_apps({app.config.name for app in selected})
         return self._create(
             "update",
@@ -37,19 +34,19 @@ class MigrationStore:
         )
 
     def _sites_for_apps(self, names: set[str]) -> list[str]:
-        """Sites where at least one of `names` is installed, plus any site whose installed-apps lookup came back empty (every real site has 'frappe', so empty means the lookup failed, not that nothing applies)."""
+        """Sites where at least one of `names` is installed, plus any site whose active-apps lookup came back empty (every real site has 'frappe', so empty means the lookup failed, not that nothing applies)."""
         result = []
         for site in self.bench.sites():
-            installed = set(site.installed_apps())
-            if not installed or names & installed:
+            active = set(site.active_apps())
+            if not active or names & active:
                 result.append(site.config.name)
         return result
 
-    def _revision(self, app, marketplace_entry: dict | None) -> AppRevision:
+    def _revision(self, app) -> AppRevision:
         """Snapshot an app's current + target revision so the update deploys that
         exact revision instead of whatever the marketplace/branch tip is by the
         time the update phase actually runs."""
-        pin = app.update_target(marketplace_entry)
+        pin = app.update_target()
         return AppRevision(
             app.config.name,
             app.installed_hash,

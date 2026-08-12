@@ -26,10 +26,10 @@ class InstallAppCommand(Command):
         if not self.site.exists:
             raise BenchError(f"Site '{self.site_name}' does not exist.")
 
-        installed = self.site.list_apps()
+        active = self.site.active_apps()
         for app_name in self.app_names:
             app = self.bench.app(app_name)
-            if not self.force and app.config.name in installed:
+            if not self.force and app.config.name in active:
                 self.report(f"'{app_name}' is already installed on '{self.site_name}', skipping.")
                 continue
             self.report(f"Installing '{app_name}' on '{self.site_name}'...")

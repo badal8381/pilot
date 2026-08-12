@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 from pilot.exceptions import BenchError
 
 if TYPE_CHECKING:
+    from pilot.core.app import App
     from pilot.core.bench import Bench
     from pilot.managers.processes.base import ManagedProcessManager
     from pilot.managers.processes.local import ProcessManager
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
 _DEV_RESTART_MESSAGE = (
     "Restart is available only for production benches managed by\n"
     "systemd or Supervisor.\n\n"
-    "For development, stop the runner and execute `bench start` again."
+    "For development, stop the runner and execute `pilot start` again."
 )
 
 
@@ -90,17 +91,28 @@ class BenchRuntime:
         if self.bench.config.production.enabled:
             NginxManager(self.bench).generate_config()
 
-    def rebuild_assets(self, force: bool = False) -> None:
+    def rebuild_assets(self, apps: list[str] | None = None, force: bool = False) -> None:
         from pilot.managers.environment import PythonEnvManager
         from pilot.managers.processes.local import ProcessManager
 
         manager = PythonEnvManager(self.bench)
-        if force:
+        if force and not apps:
             manager.build_assets()
         else:
-            for app in self.bench.apps():
-                manager.build_assets_for_app(app)
+            for app in self.apps_to_build(apps):
+                manager.build_assets_for_app(app, force=force)
         ProcessManager.for_bench(self.bench).reload_workers(web_only=True)
+
+    def apps_to_build(self, names: list[str] | None) -> list["App"]:
+        """Bench apps matching `names`; every app when no names are given."""
+        apps = self.bench.apps()
+        if not names:
+            return apps
+        by_name = {app.config.name: app for app in apps}
+        missing = [name for name in names if name not in by_name]
+        if missing:
+            raise BenchError(f"App(s) not found in bench: {', '.join(missing)}")
+        return [by_name[name] for name in names]
 
     def install_requirements(self, on_progress: Callable[[str], None]) -> None:
         self._install_python_requirements(on_progress)
@@ -154,7 +166,7 @@ class BenchRuntime:
 
         if not (dist / "assets").exists() and not can_build:
             raise BenchError(
-                "Admin UI is missing from this release. Reinstall bench-cli, "
+                "Admin UI is missing from this release. Reinstall Pilot, "
                 "or run it from a source checkout."
             )
         if can_build:
@@ -183,7 +195,8 @@ class BenchRuntime:
 
         port = self._admin_port()
         on_progress("\nBench not initialized. Starting setup wizard...")
-        on_progress(f"  Open http://localhost:{port} in your browser\n")
+        on_progress(f"  Open http://localhost:{port}/?sid={self.bench.issue_setup_link()} in your browser")
+        on_progress("  The link signs you in and expires in an hour.\n")
 
         env = {**os.environ, "PYTHONPATH": str(root)}
         subprocess.run(
@@ -203,7 +216,7 @@ class BenchRuntime:
         )
 
         if self._is_initialized():
-            on_progress("\nSetup complete. Run 'bench start' to start your bench.\n")
+            on_progress("\nSetup complete. Run 'pilot start' to start your bench.\n")
 
     def _admin_port(self) -> int:
         import tomllib
@@ -219,11 +232,10 @@ class BenchRuntime:
         return self.bench.python.exists()
 
     def _install_python_requirements(self, on_progress: Callable[[str], None]) -> None:
-        from pilot.managers.environment import PythonEnvManager
+        from pilot.managers.environment import ensure_uv
         from pilot.utils import run_command
 
-        manager = PythonEnvManager(self.bench)
-        uv = manager._ensure_uv()
+        uv = ensure_uv()
         python = str(self.bench.python)
 
         for app in self.bench.apps():
@@ -251,5 +263,5 @@ def incomplete_production_message(bench: "Bench") -> str:
         f"Bench {bench.config.name} is configured for production, but its {pm}\n"
         f"deployment is incomplete.\n\n"
         f"Repair it with:\n"
-        f"  bench -b {bench.config.name} setup production"
+        f"  pilot -b {bench.config.name} setup production"
     )

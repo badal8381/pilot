@@ -12,6 +12,9 @@ if TYPE_CHECKING:
 @dataclass(kw_only=True)
 class InstallAppTask(Task):
     command: ClassVar[str] = "install-app"
+    # frappe writes module defs and doctypes before recording the app as
+    # installed, so a kill mid-run leaves rows behind that fail every retry.
+    is_cancellable_while_running: ClassVar[bool] = False
 
     site: str
     app: str
@@ -19,8 +22,10 @@ class InstallAppTask(Task):
     def run(self) -> None:
         app = self.bench.app(self.app)
         site = self.bench.site(self.site)
-        dependencies = self.install(site, app)
-        self.build_assets([app, *dependencies])
+        with site.under_maintenance():
+            dependencies = self.install(site, app)
+            self.build_assets([app, *dependencies])
+        site.clear_cache()
         self.bench.audit_action("app", {"event": "installed", "app": self.app, "site": self.site})
 
     @step("install", lambda self: f"Install {self.app} into {self.site}")

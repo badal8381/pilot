@@ -1,18 +1,18 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else-if="jti">
     <div v-if="activityLoading" class="flex justify-center items-center h-40">
-      <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+      <Spinner size="lg" class="text-ink-gray-4" />
     </div>
-    <div
+    <EmptyState
+      compact
       v-else-if="!activity.length"
-      class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
-    >
-      <p class="font-medium text-ink-gray-7 text-sm">No activity recorded</p>
-      <p class="max-w-xs text-ink-gray-5 text-xs">Actions taken by this session will show up here.</p>
-    </div>
+      icon="lucide-history"
+      title="No activity recorded"
+      description="Actions taken by this session will show up here."
+    />
     <ListView
       v-else
       :columns="activityColumns"
@@ -22,7 +22,14 @@
     >
       <template #cell="{ column, row, item }">
         <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Button variant="ghost" size="sm" icon="lucide-info" @click="openDetail(row)" />
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="lucide-info"
+            label="Activity details"
+            tooltip="Details"
+            @click="openDetail(row)"
+          />
         </div>
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
@@ -31,21 +38,18 @@
   <div v-else class="space-y-5">
     <div
       v-if="loadError"
-      class="py-12 border border-dashed rounded-xl border-outline-red-2 text-ink-red-3 text-p-sm text-center"
+      class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
     >
       {{ loadError }}
     </div>
     <template v-else>
-      <div
+      <EmptyState
+        compact
         v-if="!activeTokens.length"
-        class="flex flex-col items-center gap-2.5 py-10 border border-dashed rounded-lg border-outline-gray-2 text-center"
-      >
-        <div class="flex justify-center items-center bg-surface-gray-2 rounded-full size-11">
-          <span class="size-5 text-ink-gray-5 lucide-key-round"></span>
-        </div>
-        <p class="font-medium text-ink-gray-7 text-sm">No active sessions</p>
-        <p class="max-w-xs text-ink-gray-5 text-xs">Sign-ins appear here while their tokens are valid.</p>
-      </div>
+        icon="lucide-key-round"
+        title="No active sessions"
+        description="Sign-ins appear here while their tokens are valid."
+      />
 
       <ListView
         v-else
@@ -56,9 +60,16 @@
       >
         <template #cell="{ column, row, item }">
           <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row)" placement="left">
+            <Dropdown :options="menuOptions(row)">
               <template #default="{ open }">
-                <Button variant="ghost" size="sm" :active="open" icon="lucide-ellipsis" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  :active="open"
+                  icon="lucide-ellipsis"
+                  label="Session actions"
+                  tooltip="Actions"
+                />
               </template>
             </Dropdown>
           </div>
@@ -68,37 +79,41 @@
     </template>
   </div>
 
-  <Dialog v-model="showRevoke" :options="{ title: 'Revoke session', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-sm">
-        Revoke this session? Its token stops working immediately and whoever holds it must sign in
-        again.
-      </p>
-      <p class="mt-2 font-mono text-ink-gray-5 text-xs">{{ revoking?.ip }}</p>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
-          Revoke
-        </Button>
-      </div>
-    </template>
+  <Dialog v-model="showRevoke" title="Revoke session" size="md">
+    <p class="text-ink-gray-7 text-p-base">
+      Revoke this session? Its token stops working immediately and whoever holds it must sign in
+      again.
+    </p>
+    <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
+        Revoke
+      </Button>
+    </div>
   </Dialog>
 
-  <Dialog v-model="showDetail" :options="{ title: 'Activity details', size: 'md' }">
-    <template #body-content>
-      <div class="space-y-2 max-h-96 overflow-y-auto">
-        <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
-          <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
-          <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
-        </div>
+  <Dialog v-model="showDetail" title="Activity details" size="md">
+    <div class="space-y-2 max-h-96 overflow-y-auto">
+      <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
+        <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
+        <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
       </div>
-    </template>
+    </div>
   </Dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, Dropdown, ListView, ListRowItem, toast } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  Dropdown,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
+import EmptyState from '@/components/common/EmptyState.vue'
 import { sessionApi } from '@/api/session'
 import { auditApi } from '@/api/audit'
 import { commandLabel, fmtDateTime, relativeTime } from '@/utils/taskFormat'

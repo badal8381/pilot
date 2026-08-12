@@ -18,6 +18,7 @@ from pilot.core.bench import Bench
 from pilot.core.server import Server
 from pilot.core.site import Site
 from pilot.exceptions import BenchError
+from pilot.internal.git import GitRepo
 from pilot.managers.processes.local import ProcessDefinition, ProcessManager
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
@@ -126,19 +127,14 @@ def _tag(path: Path, tag: str) -> None:
     subprocess.run(["git", "-C", str(path), "tag", tag], check=True)
 
 
-def test_revision_pin_from_marketplace_target_tag() -> None:
-    pin = RevisionPin.from_marketplace_target({"target_type": "tag", "target": "v1.0.0"})
-    assert pin == RevisionPin(kind="tag", ref="v1.0.0")
-
-
-def test_revision_pin_from_marketplace_target_commit() -> None:
-    pin = RevisionPin.from_marketplace_target({"target_type": "commit", "target": "abc123"})
+def test_revision_pin_from_marketplace_release_is_a_commit() -> None:
+    pin = RevisionPin.from_marketplace_release({"version": "1.0.0", "branch": "main", "commit": "abc123"})
     assert pin == RevisionPin(kind="commit", ref="abc123")
 
 
-def test_revision_pin_from_marketplace_target_branch_is_none() -> None:
-    # A branch is not a fixed revision to pin to - no RevisionPin for it.
-    assert RevisionPin.from_marketplace_target({"target_type": "branch", "target": "main"}) is None
+def test_revision_pin_from_marketplace_release_without_commit_is_none() -> None:
+    # Nothing to pin to - a release that advertises no commit is unusable.
+    assert RevisionPin.from_marketplace_release({"version": "1.0.0", "branch": "main"}) is None
 
 
 def test_app_is_on_revision_tag_matches(tmp_path: Path) -> None:
@@ -196,16 +192,18 @@ def test_app_is_on_revision_commit_mismatch(tmp_path: Path) -> None:
     assert app.is_on_revision(RevisionPin(kind="commit", ref="0" * 40)) is False
 
 
-def test_app_has_remote_update_false_without_tracked_branch(tmp_path: Path) -> None:
+def test_app_update_target_is_none_without_tracked_branch(tmp_path: Path) -> None:
     bench = make_bench(tmp_path)
     app = App(AppConfig(name="myapp", repo="r", branch=""), bench)
     app.path.mkdir(parents=True)
     _init_git_repo(app.path)
     _commit(app.path, "c1")
 
-    # No configured remote at all - must not crash, and detached HEAD has
-    # no branch tip to compare against.
-    assert app.has_remote_update() is False
+    # No configured remote at all - must not crash, and an app with no branch
+    # has no tip to compare against.
+    _publish(None)
+
+    assert app.update_target() is None
 
 
 def _clone_at_tag(remote: Path, clone_dir: Path, tag: str, shallow: bool = True) -> None:
@@ -219,24 +217,24 @@ def _clone_at_tag(remote: Path, clone_dir: Path, tag: str, shallow: bool = True)
     subprocess.run(["git", "-C", str(clone_dir), "checkout", "-q", tag], check=True)
 
 
-def test_sync_remote_url_refreshes_origin_with_stored_token(tmp_path: Path) -> None:
-    from pilot.integrations.git.credentials import GitCredentialStore
-
+def test_sync_remote_url_scrubs_a_token_an_older_clone_left_in_origin(tmp_path: Path) -> None:
+    """.git/config is world-readable in a bench directory, so no token may live there.
+    Requests are authenticated by git config passed per call instead."""
     bench = make_bench(tmp_path)
     repo_url = "https://github.com/frappe/myapp"
     app = App(AppConfig(name="myapp", repo=repo_url, branch="master"), bench)
     app.path.mkdir(parents=True)
     _init_git_repo(app.path)
-    subprocess.run(["git", "-C", str(app.path), "remote", "add", "origin", repo_url], check=True)
-
-    GitCredentialStore(tmp_path).save("github", "fresh-token")
+    embedded = "https://x-access-token:stale-token@github.com/frappe/myapp"
+    subprocess.run(["git", "-C", str(app.path), "remote", "add", "origin", embedded], check=True)
 
     app._repository._sync_remote_url()
 
     origin_url = subprocess.run(
         ["git", "-C", str(app.path), "remote", "get-url", "origin"], capture_output=True, text=True, check=True
     ).stdout.strip()
-    assert "fresh-token" in origin_url
+    assert origin_url == repo_url
+    assert "stale-token" not in origin_url
 
 
 def test_sync_remote_url_leaves_origin_untouched_without_stored_token(tmp_path: Path) -> None:
@@ -300,41 +298,156 @@ def test_app_update_with_commit_target_checks_out_advertised_commit(tmp_path: Pa
     assert app.installed_hash == target_sha
 
 
-def test_app_has_marketplace_update_false_when_pinned_tag_matches(
+def test_app_update_with_commit_target_stays_on_configured_branch(tmp_path: Path) -> None:
+    """A pinned-commit update should land at that commit without detaching HEAD."""
+    remote = tmp_path / "remote"
+    remote.mkdir()
+    _init_git_repo(remote)
+    _commit(remote, "c1")
+    _commit(remote, "c2")
+
+    import subprocess
+
+    target_sha = subprocess.run(
+        ["git", "-C", str(remote), "rev-parse", "HEAD^"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+    bench = make_bench(tmp_path)
+    app = App(AppConfig(name="myapp", repo="r", branch="develop"), bench)
+    subprocess.run(["git", "clone", "-q", str(remote), str(app.path)], check=True)
+    subprocess.run(["git", "-C", str(app.path), "checkout", "-q", "-B", "develop"], check=True)
+
+    app.update(pin=RevisionPin(kind="commit", ref=target_sha))
+
+    assert app.installed_hash == target_sha
+    assert GitRepo(app.path).branch == "develop"
+
+    assert app.installed_hash == target_sha
+
+
+def _publish(entry: dict | None) -> None:
+    """Make the marketplace registry advertise `entry`, and nothing else."""
+    from tests.pilot.marketplace_registry import publish
+
+    publish([entry] if entry else [])
+
+
+def test_app_has_marketplace_update_false_when_advertised_commit_is_checked_out(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    bench = make_bench(tmp_path)
-    app = App(AppConfig(name="myapp", repo="https://github.com/frappe/myapp", branch=""), bench)
-    app.path.mkdir(parents=True)
-    _init_git_repo(app.path)
-    _commit(app.path, "c1")
-    _tag(app.path, "v1.0.0")
+    app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
     monkeypatch.setattr("pilot.core.app.installed_app_version", lambda *_: "1.0.0")
     entry = {
+        "name": "myapp",
         "repo": "https://github.com/frappe/myapp",
-        "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v1.0.0"}],
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": app.installed_hash}],
     }
 
-    assert app.has_marketplace_update(entry) is False
+    _publish(entry)
+
+    assert app.has_marketplace_update() is False
 
 
-def test_app_has_marketplace_update_true_when_marketplace_tag_moved(
+def test_app_has_marketplace_update_true_when_advertised_commit_is_unrelated(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    bench = make_bench(tmp_path)
-    app = App(AppConfig(name="myapp", repo="https://github.com/frappe/myapp", branch=""), bench)
-    app.path.mkdir(parents=True)
-    _init_git_repo(app.path)
-    _commit(app.path, "c1")
-    _tag(app.path, "v0.9.0")  # installed at the version's old tag
+    """git can't relate a commit this clone has never seen and can't fetch, so the
+    advertised release wins - the registry only ever advertises newer code."""
+    app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
     monkeypatch.setattr("pilot.core.app.installed_app_version", lambda *_: "1.0.0")
     entry = {
+        "name": "myapp",
         "repo": "https://github.com/frappe/myapp",
-        # Entries only ever advance - the tag for 1.0.0 has since moved.
-        "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v1.0.0"}],
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": "0" * 40}],
     }
 
-    assert app.has_marketplace_update(entry) is True
+    _publish(entry)
+
+    assert app.has_marketplace_update() is True
+
+
+def test_app_is_marketplace_matches_the_registry_entry_for_its_repository(tmp_path: Path) -> None:
+    app = _app_on_branch(tmp_path, "https://token:x@github.com/frappe/myapp.git")
+
+    _publish({"name": "myapp", "repo": "https://github.com/frappe/myapp", "releases": []})
+
+    assert app.is_marketplace is True
+    assert app.marketplace_entry == {"name": "myapp", "repo": "https://github.com/frappe/myapp"}
+
+
+def test_app_is_marketplace_false_for_a_fork_of_a_listed_app(tmp_path: Path) -> None:
+    app = _app_on_branch(tmp_path, "https://github.com/someone/fork")
+
+    _publish({"name": "myapp", "repo": "https://github.com/frappe/myapp", "releases": []})
+
+    assert app.is_marketplace is False
+    assert app.marketplace_entry is None
+
+
+def test_app_is_marketplace_false_when_unlisted(tmp_path: Path) -> None:
+    app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
+
+    _publish(None)
+
+    assert app.is_marketplace is False
+
+
+def test_app_update_target_prefers_the_release_on_the_apps_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp", branch="version-15")
+    monkeypatch.setattr("pilot.core.app.installed_app_version", lambda *_: "1.0.0")
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [
+            {"version": "1.0.0", "branch": "main", "commit": "a" * 40},
+            {"version": "1.0.0", "branch": "version-15", "commit": "b" * 40},
+        ],
+    }
+
+    _publish(entry)
+
+    assert app.update_target() == RevisionPin(kind="commit", ref="b" * 40)
+
+
+def test_app_install_checks_out_the_pinned_commit_before_validating(tmp_path: Path) -> None:
+    """A marketplace install validates the advertised commit, not the branch tip."""
+    from unittest.mock import patch
+
+    remote = tmp_path / "remote"
+    remote.mkdir()
+    _init_git_repo(remote)
+    _commit(remote, "c1")
+    published = GitRepo(remote).head_sha
+    _commit(remote, "c2")  # branch has moved on since publication
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    app = App(AppConfig(name="myapp", repo=str(remote), branch="master"), bench)
+    seen_at_validation = {}
+
+    with (
+        patch.object(App, "validate", lambda self: seen_at_validation.update(sha=self.installed_hash)),
+        patch.object(App, "_install_into_environment"),
+        patch.object(App, "_build_assets_via_env_manager"),
+    ):
+        app.install(commit=published)
+
+    assert seen_at_validation["sha"] == published
+    assert app.installed_hash == published
+    assert GitRepo(app.path).branch == "master"
+
+
+def _commit_ahead_of_head(app: App) -> str:
+    """A commit on top of the app's HEAD, left unchecked-out."""
+    import subprocess
+
+    head = app.installed_hash
+    _commit(app.path, "published")
+    ahead = app.installed_hash
+    subprocess.run(["git", "-C", str(app.path), "reset", "--hard", "-q", head], check=True)
+    return ahead
 
 
 def _app_on_branch(tmp_path: Path, repo: str, branch: str = "main") -> App:
@@ -354,11 +467,14 @@ def test_app_has_marketplace_update_falls_back_to_branch_tip_on_repo_mismatch(
     app = _app_on_branch(tmp_path, "https://github.com/someone/fork")
     monkeypatch.setattr("pilot.internal.git.GitRepo.remote_branch_sha", lambda self, branch: "0" * 40)
     entry = {
+        "name": "myapp",
         "repo": "https://github.com/frappe/myapp",
-        "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v1.0.0"}],
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": "a" * 40}],
     }
 
-    assert app.has_marketplace_update(entry) is True
+    _publish(entry)
+
+    assert app.has_marketplace_update() is True
 
 
 def test_app_has_marketplace_update_false_when_branch_tip_matches(
@@ -368,22 +484,75 @@ def test_app_has_marketplace_update_false_when_branch_tip_matches(
     monkeypatch.setattr(
         "pilot.internal.git.GitRepo.remote_branch_sha", lambda self, branch: app.installed_hash
     )
+    _publish(None)
 
-    assert app.has_marketplace_update(None) is False
+    assert app.has_marketplace_update() is False
 
 
-def test_app_has_marketplace_update_falls_back_to_branch_tip_for_branch_target(
+def test_app_update_target_offers_a_release_ahead_of_head(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """git decides, not the version label: HEAD is behind the advertised commit."""
     app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
-    monkeypatch.setattr("pilot.core.app.installed_app_version", lambda *_: "3.0.0")
-    monkeypatch.setattr("pilot.internal.git.GitRepo.remote_branch_sha", lambda self, branch: "0" * 40)
+    ahead = _commit_ahead_of_head(app)
     entry = {
+        "name": "myapp",
         "repo": "https://github.com/frappe/myapp",
-        "targets": [{"version": "3.0.0", "target_type": "branch", "target": "main"}],
+        "releases": [{"version": "1.1.0", "branch": "main", "commit": ahead}],
     }
 
-    assert app.has_marketplace_update(entry) is True
+    _publish(entry)
+
+    assert app.update_target() == RevisionPin(kind="commit", ref=ahead)
+
+
+def test_app_update_target_ignores_a_release_behind_head(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The advertised commit is an ancestor of HEAD - nothing to move to, and the
+    branch tip is never a candidate for a registry app."""
+    app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp")
+    behind = app.installed_hash
+    _commit(app.path, "c2")  # HEAD moves past the advertised release
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [{"version": "1.0.0", "branch": "main", "commit": behind}],
+    }
+
+    _publish(entry)
+
+    assert app.update_target() is None
+    assert app.has_marketplace_update() is False
+
+
+def test_app_update_target_ignores_a_newer_release_on_another_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    app = _app_on_branch(tmp_path, "https://github.com/frappe/myapp", branch="version-15")
+    entry = {
+        "name": "myapp",
+        "repo": "https://github.com/frappe/myapp",
+        "releases": [
+            {"version": "16.0.0", "branch": "version-16", "commit": _commit_ahead_of_head(app)},
+            {"version": "15.1.0", "branch": "version-15", "commit": app.installed_hash},
+        ],
+    }
+
+    _publish(entry)
+
+    assert app.update_target() is None
+
+
+def test_app_update_target_follows_the_branch_tip_outside_the_registry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-marketplace app updates branch-wide, to whatever the tip is."""
+    app = _app_on_branch(tmp_path, "https://github.com/someone/private-app")
+    monkeypatch.setattr("pilot.internal.git.GitRepo.remote_branch_sha", lambda self, branch: "e" * 40)
+    _publish(None)
+
+    assert app.update_target() == RevisionPin(kind="commit", ref="e" * 40)
 
 
 def test_app_path_is_under_apps_directory(tmp_path: Path) -> None:
@@ -520,7 +689,7 @@ def test_bench_sites_scans_filesystem(tmp_path: Path) -> None:
 
 
 def test_bench_init_apps_comes_from_config(tmp_path: Path) -> None:
-    """bench.init_apps() returns apps from bench.toml (used during bench init)."""
+    """bench.init_apps() returns apps from bench.toml (used during pilot init)."""
     bench = make_bench(tmp_path)
     init_apps = bench.init_apps()
     assert len(init_apps) == 1
@@ -702,6 +871,24 @@ def test_honcho_start_writes_per_process_pid_files(tmp_path: Path) -> None:
         assert pid_file.read_text().strip() == "12345"
 
 
+def _capture_admin_sql(monkeypatch) -> list[str]:
+    """Record the SQL the temporary setup account is created and dropped with."""
+    statements: list[str] = []
+    monkeypatch.setattr(
+        "pilot.managers.database.mariadb.MariaDBManager.run_admin_sql",
+        lambda self, sql: statements.append(sql),
+    )
+    return statements
+
+
+def _write_site_config(bench, site: str, db_name: str) -> None:
+    import json
+
+    site_dir = bench.sites_path / site
+    site_dir.mkdir(parents=True, exist_ok=True)
+    (site_dir / "site_config.json").write_text(json.dumps({"db_name": db_name}))
+
+
 def _capture_site_cmd(monkeypatch) -> dict:
     import subprocess
 
@@ -739,8 +926,11 @@ def test_site_create_postgres_builds_db_args(tmp_path: Path, monkeypatch: pytest
 
 
 def test_site_create_mariadb_when_bench_is_mariadb(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    bench = make_bench(tmp_path)  # bench db_type defaults to mariadb
+    """frappe reads its database credential from argv, where any local process can see
+    it, so it gets a throwaway account scoped to this site's database - never root."""
+    bench = make_bench(tmp_path)  # mariadb bench, root_password="root"
     captured = _capture_site_cmd(monkeypatch)
+    statements = _capture_admin_sql(monkeypatch)
     monkeypatch.setattr("pilot.managers.database.mariadb.MariaDBManager._detect_socket", lambda self: "")
 
     Site(SiteConfig(name="mdb.localhost", apps=["frappe"], admin_password="secret"), bench).create()
@@ -748,8 +938,13 @@ def test_site_create_mariadb_when_bench_is_mariadb(tmp_path: Path, monkeypatch: 
     cmd = captured["cmd"]
     # mariadb is frappe's default engine - no --db-type flag is passed
     assert "--db-type" not in cmd
-    assert cmd[cmd.index("--db-root-username") + 1] == "root"
     assert "--db-host" in cmd
+    database = cmd[cmd.index("--db-name") + 1]
+    user = cmd[cmd.index("--db-root-username") + 1]
+    assert user.startswith("pilot_setup_")
+    assert "root" not in (user, cmd[cmd.index("--db-root-password") + 1])
+    assert f"GRANT ALL PRIVILEGES ON `{database}`.*" in statements[0]
+    assert f"DROP USER IF EXISTS '{user}'@'%'" in statements[-1]
 
 
 def test_site_restore_uses_postgres_root_creds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -765,9 +960,13 @@ def test_site_restore_uses_postgres_root_creds(tmp_path: Path, monkeypatch: pyte
     assert cmd[cmd.index("--db-root-password") + 1] == "pgpw"
 
 
-def test_site_restore_uses_mariadb_root_creds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_site_restore_scopes_its_account_to_the_site_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     bench = make_bench(tmp_path)  # mariadb bench, root_password="root"
+    _write_site_config(bench, "m.localhost", "_restoredb")
     captured = _capture_site_cmd(monkeypatch)
+    statements = _capture_admin_sql(monkeypatch)
 
     Site(SiteConfig(name="m.localhost", apps=[]), bench).restore(
         "/tmp/db.sql.gz", public_files="/tmp/pub.tar", private_files="/tmp/priv.tar"
@@ -775,7 +974,8 @@ def test_site_restore_uses_mariadb_root_creds(tmp_path: Path, monkeypatch: pytes
 
     cmd = captured["cmd"]
     assert "--db-type" not in cmd
-    assert cmd[cmd.index("--db-root-username") + 1] == "root"
+    assert cmd[cmd.index("--db-root-username") + 1].startswith("pilot_setup_")
+    assert "GRANT ALL PRIVILEGES ON `_restoredb`.*" in statements[0]
     assert cmd[cmd.index("--with-public-files") + 1] == "/tmp/pub.tar"
     assert cmd[cmd.index("--with-private-files") + 1] == "/tmp/priv.tar"
 
@@ -793,14 +993,18 @@ def test_site_reinstall_postgres_root_creds(tmp_path: Path, monkeypatch: pytest.
     assert cmd[cmd.index("--db-root-password") + 1] == "pgpw"
 
 
-def test_site_reinstall_mariadb_root_creds(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_site_reinstall_refuses_root_on_argv_without_a_site_database(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """With no resolvable site database there is nothing to scope an account to; rather
+    than fall back to the root password on argv, the command fails loudly."""
+    from pilot.exceptions import BenchError
+
     bench = make_bench(tmp_path)
-    captured = _capture_site_cmd(monkeypatch)
+    _capture_site_cmd(monkeypatch)
 
-    Site(SiteConfig(name="m.localhost", apps=[]), bench).reinstall("secret")
-
-    cmd = captured["cmd"]
-    assert cmd[cmd.index("--db-root-username") + 1] == "root"
+    with pytest.raises(BenchError, match="root database password"):
+        Site(SiteConfig(name="m.localhost", apps=[]), bench).reinstall("secret")
 
 
 def test_site_create_and_reinstall_reject_empty_admin_password(tmp_path: Path) -> None:

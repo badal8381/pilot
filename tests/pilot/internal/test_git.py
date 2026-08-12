@@ -80,3 +80,48 @@ def test_fetch_and_count_track_new_remote_commits(tmp_path: Path) -> None:
     repo = GitRepo(clone)
     assert repo.fetch(repo.branch) is True
     assert repo.count("HEAD..FETCH_HEAD") == 1
+
+
+def test_has_commit_and_is_ancestor_relate_two_commits(tmp_path: Path) -> None:
+    repo_path = _init_repo(tmp_path / "repo")
+    _commit(repo_path, "first")
+    repo = GitRepo(repo_path)
+    first = repo.head_sha
+    _commit(repo_path, "second")
+    second = repo.head_sha
+
+    assert repo.has_commit(first) is True
+    assert repo.has_commit("0" * 40) is False
+    assert repo.is_ancestor(first, second) is True
+    assert repo.is_ancestor(second, first) is False
+    # A commit this clone has never seen can't be related either way.
+    assert repo.is_ancestor("0" * 40, second) is False
+
+
+def test_prune_stale_temp_packs_spares_recent_files_and_real_packs(tmp_path: Path) -> None:
+    """Only a killed fetch's leftovers go; a fetch in flight and real packs stay."""
+    import os
+    import time
+
+    repo_path = _init_repo(tmp_path / "repo")
+    _commit(repo_path)
+    pack_dir = repo_path / ".git" / "objects" / "pack"
+    pack_dir.mkdir(parents=True, exist_ok=True)
+    stale = pack_dir / "tmp_pack_abandoned"
+    in_flight = pack_dir / "tmp_pack_running"
+    real_pack = pack_dir / "pack-1234.pack"
+    for path in (stale, in_flight, real_pack):
+        path.write_text("x")
+    two_days_ago = time.time() - 2 * 24 * 60 * 60
+    os.utime(stale, (two_days_ago, two_days_ago))
+    os.utime(real_pack, (two_days_ago, two_days_ago))
+
+    GitRepo(repo_path).prune_stale_temp_packs()
+
+    assert not stale.exists()
+    assert in_flight.exists()
+    assert real_pack.exists()
+
+
+def test_prune_stale_temp_packs_is_quiet_on_a_missing_repo(tmp_path: Path) -> None:
+    GitRepo(tmp_path / "nope").prune_stale_temp_packs()

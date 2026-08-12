@@ -1,38 +1,40 @@
 <template>
-  <div class="border rounded-lg border-outline-gray-2 min-w-0 overflow-hidden">
+  <div>
     <div
-      class="flex items-center gap-3 bg-surface-white p-2.5 transition-colors"
+      class="flex items-center gap-3 px-2.5 py-2 rounded-4 transition-colors"
       :class="hasOutput ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
       @click="toggle"
     >
       <span class="place-items-center grid rounded-full size-6 shrink-0" :class="iconBg">
         <span v-if="status === 'done'" class="size-3.5 lucide-check" />
-        <span v-else-if="status === 'running'" class="size-3.5 animate-spin lucide-loader-circle" />
+        <Spinner v-else-if="status === 'running'" size="sm" />
         <span v-else-if="status === 'failed'" class="size-3.5 lucide-x" />
         <span v-else class="bg-ink-gray-3 rounded-full size-1.5" />
       </span>
       <span
-        class="flex-1 min-w-0 text-sm truncate"
+        class="flex-1 min-w-0 text-base truncate"
         :class="status === 'pending' ? 'text-ink-gray-4' : 'font-medium text-ink-gray-9'"
       >
         {{ label }}
       </span>
-      <span class="text-ink-gray-5 text-xs shrink-0">
+      <span class="w-16 text-ink-gray-5 text-sm text-right tabular-nums shrink-0">
         <template v-if="duration">{{ duration }}</template>
         <span v-else-if="status === 'running'" class="animate-pulse">running</span>
       </span>
+      <!-- Hidden, not omitted: keeps the chevron's space so durations stay aligned. -->
       <span
-        v-if="hasOutput"
         class="size-4 text-ink-gray-4 transition-transform shrink-0 lucide-chevron-down"
-        :class="{ 'rotate-180': expanded }"
+        :class="[hasOutput ? '' : 'invisible', expanded ? 'rotate-180' : '']"
       />
     </div>
-    <LogView v-if="expanded && hasOutput" :lines="lines" :streaming="streaming" :rounded="false" />
+    <!-- The step list insets this by p-1, so its rounding never reaches here. -->
+    <LogView v-if="expanded && hasOutput" class="mt-1" :lines="lines" :streaming="streaming" />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { Spinner } from 'frappe-ui'
 import LogView from '../logs/LogView.vue'
 
 const props = defineProps({
@@ -44,15 +46,18 @@ const props = defineProps({
   streaming: { type: Boolean, default: false },
 })
 
-// Auto-expanded while running, auto-collapsed once it settles - unless the
-// user has manually toggled it, in which case their choice sticks.
-const expanded = ref(props.status === 'running')
+// Open while running or failed; anything else settles closed unless toggled.
+function shouldExpand(status) {
+  return status === 'running' || status === 'failed'
+}
+
+const expanded = ref(shouldExpand(props.status))
 let userOverridden = false
 
 watch(
   () => props.status,
   (status) => {
-    if (!userOverridden) expanded.value = status === 'running'
+    if (!userOverridden) expanded.value = shouldExpand(status)
   },
 )
 
@@ -63,10 +68,10 @@ function toggle() {
 }
 
 const STATUS_ICON_BG = {
-  done: 'bg-surface-green-2 text-ink-green-8',
-  running: 'bg-surface-amber-2 text-ink-amber-8',
-  failed: 'bg-surface-red-2 text-ink-red-8',
-  pending: 'bg-ink-gray-1',
+  done: 'bg-surface-gray-2 text-ink-gray-6',
+  running: 'bg-surface-amber-2 text-ink-amber-7',
+  failed: 'bg-surface-red-2 text-ink-red-7',
+  pending: 'bg-surface-gray-2',
 }
 
 const iconBg = computed(() => STATUS_ICON_BG[props.status] || STATUS_ICON_BG.pending)

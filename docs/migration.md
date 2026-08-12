@@ -40,7 +40,7 @@ Tasks are small workers. Each task performs one job and then stops:
 | Task | Job |
 | --- | --- |
 | `MigrationBackupTask` | Create a recovery snapshot for one site |
-| `UpdateTask` | Update apps, reinstall dependencies, and rebuild assets |
+| `UpdateTask` | Update apps, validate them, reinstall dependencies, and rebuild assets |
 | `MigrateTask` | Migrate one site |
 | `RetryUpdateTask` | Restart the workflow from the failed step |
 | `RevertMigrationTask` | Re-arm a failed operation for restore and start the revert chain |
@@ -213,6 +213,10 @@ Pilot stops before updating code, records the failed site, and restores every si
 
 Pilot moves the operation to `needs_attention`. Sites remain protected while the user investigates or chooses a recovery action.
 
+Every app is checked out to its target revision first, then validated as a group, before anything is installed or built.
+A failure there means no app has been reinstalled yet, so `RevertAppsTask` only has commits to check back out. See
+[App Dependencies](app-dependencies.md) for which checks an update runs.
+
 For migration failures, Pilot stores useful details when available:
 
 - the failed phase and site;
@@ -251,7 +255,9 @@ Successful sites are not migrated again. If the retry succeeds, Pilot continues 
 
 This action is available only when Pilot identified a failing patch.
 
-The API and operation both verify that the requested patch exactly matches the current diagnosis. Pilot then runs Frappe's `bypass-patch` command and records the decision. It does not retry automatically; the user must still choose Retry.
+The API and operation both verify that the requested patch exactly matches the current diagnosis. Pilot then runs Frappe's `bypass-patch` command and records the decision.
+
+`bypass_patch` re-arms the chain before returning: the failed site goes back to pending and the operation returns to `migrating`, so `BypassPatchTask` queues the next step itself. The migration resumes on its own — the user does not choose Retry afterwards.
 
 The normal update form never enables broad `--skip-failing` behavior.
 
@@ -287,7 +293,9 @@ Starting an update or standalone migration returns both an operation identity an
 
 The global migration status button shows unresolved failures before active work, and active work before ordinary update availability.
 
-Each site row links to its retained backup and migration task attempts. The Target Apps card shows the original and updated commit and offers a GitHub comparison link when the app uses a GitHub repository.
+The list page filters by status through five tabs — All, Running, Attention, Completed, Reverted — held in the `status` query parameter so a filtered view survives a reload. Running covers every in-flight state and Attention covers both `needs_attention` and `revert_failed`, groupings the `status` API parameter cannot express because it matches one state exactly; the list therefore filters client-side over the page it already fetched.
+
+The detail page groups the chain into a Server section and a Sites section, split on whether a `task_logs` entry names a site: bench-level tasks (`update`, `revert-apps`, `restart-services`) on one side, per-site ones under their site row on the other. Every entry carries the task's own `status`, which is how the UI marks the attempt that failed; it is `null` only when the task is no longer readable. The Target Apps card shows the original and updated commit and offers a GitHub comparison link when the app uses a GitHub repository.
 
 ## Code Map
 

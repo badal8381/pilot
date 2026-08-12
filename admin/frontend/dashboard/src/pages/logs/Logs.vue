@@ -1,21 +1,23 @@
 <template>
-  <div class="flex flex-col h-full">
-    <!-- Header: hidden on mobile once a log is open, to leave more room for the viewer -->
-    <div class="mb-4 shrink-0" :class="selectedFile ? 'hidden md:block' : ''">
-      <h1 class="font-semibold text-ink-gray-9 text-xl">Logs</h1>
-      <p class="mt-1 text-ink-gray-5 text-sm">Output from {{ benchName }}'s services.</p>
-    </div>
-
-    <div class="flex flex-1 sm:gap-4 min-h-0">
+  <!-- 5rem = 3rem sticky header + the shell's 2rem vertical page padding -->
+  <div class="flex flex-col h-[calc(100dvh-5rem)]">
+    <div class="flex flex-1 sm:gap-4 min-h-0 overflow-hidden">
       <!-- Sidebar: log list -->
       <div
-        class="md:flex flex-col sm:border sm:rounded-xl sm:border-outline-gray-2 w-full md:w-64 overflow-hidden shrink-0"
+        class="md:flex flex-col w-full md:w-64 overflow-hidden shrink-0"
         :class="selectedFile ? 'hidden' : 'flex'"
       >
-        <div class="sm:px-2 py-2 sm:border-b border-outline-gray-2 shrink-0">
-          <FormControl type="text" v-model="fileSearch" placeholder="Search log files" />
+        <div class="sm:px-2 pt-2 shrink-0">
+          <FormControl
+            type="text"
+            v-model="fileSearch"
+            placeholder="Search log files"
+            :size="isSinglePane ? 'md' : 'sm'"
+          >
+            <template #prefix><span class="size-4 text-ink-gray-5 lucide-search" /></template>
+          </FormControl>
         </div>
-        <div class="flex-1 p-1.5 sm:p-2 overflow-y-auto">
+        <div class="flex flex-col flex-1 gap-1 p-1.5 sm:p-2 overflow-y-auto">
           <LoadingText v-if="logsLoading" class="p-2" />
           <ErrorMessage v-else-if="logsError" :message="logsError" class="p-2" />
           <p v-else-if="!filteredLogs.length" class="p-2 text-ink-gray-4 text-sm">
@@ -25,133 +27,156 @@
             v-else
             v-for="log in filteredLogs"
             :key="log.filename"
-            class="sm:px-3 py-2.5 rounded-lg w-full text-left transition-colors"
-            :class="selectedFile === log.filename ? 'bg-surface-gray-2' : 'hover:bg-surface-gray-1'"
+            class="sm:px-3 py-2.5 rounded-4 w-full text-left transition-colors shrink-0"
+            :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-1'"
             @click="selectedFile = log.filename"
           >
-            <div class="flex justify-between items-center gap-2">
-              <span class="font-medium text-ink-gray-8 text-sm truncate">{{ log.filename }}</span>
-              <span v-if="hasErrors(log)" class="bg-red-500 rounded-full size-1.5 shrink-0" />
+            <div class="flex items-center gap-2">
+              <span class="flex-1 font-medium text-ink-gray-8 text-base truncate">
+                {{ log.filename }}
+              </span>
+              <Tooltip v-if="hasErrors(log)" text="Contains errors">
+                <span
+                  class="bg-surface-red-5 rounded-full size-1.5 shrink-0"
+                  role="img"
+                  aria-label="Contains errors"
+                />
+              </Tooltip>
+              <span class="text-ink-gray-4 text-xs shrink-0">
+                {{ shortRelativeTime(log.last_modified) }}
+              </span>
             </div>
-            <div class="flex justify-between items-center mt-0.5 text-ink-gray-4 text-xs">
-              <span>{{ formatBytes(log.size_bytes) }}</span>
-              <span>{{ shortRelativeTime(log.last_modified) }}</span>
-            </div>
+            <div class="mt-0.5 text-ink-gray-4 text-p-sm">{{ formatBytes(log.size_bytes) }}</div>
           </button>
         </div>
       </div>
 
       <!-- Viewer -->
       <div
-        class="md:flex flex-col flex-1 sm:border sm:rounded-xl sm:border-outline-gray-2 overflow-hidden"
+        class="md:flex flex-col flex-1 min-w-0 overflow-hidden"
         :class="selectedFile ? 'flex' : 'hidden'"
       >
+        <!-- Already inside a bordered panel, so no dashed box of its own. -->
         <div v-if="!selectedFile" class="flex flex-1 justify-center items-center">
-          <span class="text-ink-gray-4 text-sm">Select a log file</span>
+          <EmptyState
+            :bordered="false"
+            icon="lucide-scroll-text"
+            title="Select a log file"
+            :description="`Output from ${benchName}'s services.`"
+          />
         </div>
 
         <template v-else>
-          <!-- Toolbar -->
-          <div
-            class="flex sm:flex-row flex-col sm:flex-wrap sm:items-center gap-2 sm:px-2 py-2 sm:border-b border-outline-gray-2 shrink-0"
-          >
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 py-2 shrink-0">
             <!-- Mobile-only: back + filename, replacing the standalone filename bar -->
             <div class="md:hidden flex items-center gap-2">
-              <Button variant="subtle" tooltip="Back to logs" @click="selectedFile = ''">
-                <span class="lucide-arrow-left size-4" />
-              </Button>
-              <span class="flex-1 min-w-0 font-mono text-ink-gray-8 text-sm truncate"
-                >{{ truncateFilename(selectedFile) }}</span
-              >
-            </div>
-            <div class="flex items-center gap-2">
-              <div class="w-28 sm:w-32 min-w-0 shrink-0">
-                <FormControl
-                  type="select"
-                  v-model="linesCount"
-                  :disabled="liveMode"
-                  :options="[
-                  { label: '100 lines', value: 100 },
-                  { label: '200 lines', value: 200 },
-                  { label: '500 lines', value: 500 },
-                  { label: '1000 lines', value: 1000 },
-                ]"
-                />
-              </div>
-              <FormControl
-                type="text"
-                v-model="search"
-                placeholder="Search this log…"
-                class="flex-1 sm:flex-none sm:w-44 min-w-0"
-                @keydown.enter.exact.prevent="gotoMatch(1)"
-                @keydown.enter.shift.prevent="gotoMatch(-1)"
+              <Button
+                variant="subtle"
+                icon="lucide-arrow-left"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Back to logs"
+                tooltip="Back to logs"
+                @click="selectedFile = ''"
               />
+              <span class="flex-1 min-w-0 font-medium text-ink-gray-8 text-lg truncate">
+                {{ selectedFile }}
+              </span>
             </div>
+            <FormControl
+              type="text"
+              v-model="search"
+              placeholder="Search this log"
+              :size="isSinglePane ? 'md' : 'sm'"
+              class="flex-1 min-w-0"
+              @keydown.enter.exact.prevent="gotoMatch(1)"
+              @keydown.enter.shift.prevent="gotoMatch(-1)"
+            />
             <div
               v-if="search.trim()"
-              class="hidden sm:flex items-center gap-1 text-ink-gray-5 text-xs"
+              class="flex items-center gap-1 text-ink-gray-5 text-xs shrink-0"
             >
               <span class="tabular-nums"
                 >{{ matchTotal ? activeMatch + 1 : 0 }}/{{ matchTotal }}</span
               >
               <Button
                 variant="subtle"
-                :disabled="!matchTotal"
+                icon="lucide-chevron-up"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Previous match"
                 tooltip="Previous (Shift+Enter)"
+                :disabled="!matchTotal"
                 @click="gotoMatch(-1)"
-              >
-                <span class="size-4 lucide-chevron-up" />
-              </Button>
+              />
               <Button
                 variant="subtle"
-                :disabled="!matchTotal"
+                icon="lucide-chevron-down"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Next match"
                 tooltip="Next (Enter)"
+                :disabled="!matchTotal"
                 @click="gotoMatch(1)"
-              >
-                <span class="size-4 lucide-chevron-down" />
-              </Button>
+              />
             </div>
 
-            <div class="sm:flex sm:items-center gap-2 grid grid-cols-3 sm:ml-auto sm:w-auto">
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="w-28 sm:w-32 min-w-0 shrink-0">
+                <FormControl
+                  type="select"
+                  v-model="linesCount"
+                  :size="isSinglePane ? 'md' : 'sm'"
+                  :disabled="liveMode"
+                  :options="[
+                    { label: '100 lines', value: 100 },
+                    { label: '200 lines', value: 200 },
+                    { label: '500 lines', value: 500 },
+                    { label: '1000 lines', value: 1000 },
+                  ]"
+                />
+              </div>
               <Button
+                class="ml-auto sm:ml-0"
                 variant="subtle"
-                class="w-full sm:w-auto"
-                icon-left="lucide-refresh-cw"
+                icon="lucide-refresh-cw"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Refresh"
+                tooltip="Refresh"
                 :loading="contentLoading"
                 @click="loadContent"
-              >
-                Refresh
-              </Button>
+              />
               <Button
                 v-if="!liveMode"
                 variant="subtle"
-                class="w-full sm:w-auto"
-                icon-left="lucide-radio"
+                icon="lucide-radio"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Live tail"
+                tooltip="Live tail"
                 @click="startLive"
-              >
-                Live tail
-              </Button>
+              />
               <Button
                 v-else
                 variant="subtle"
                 theme="red"
-                class="w-full sm:w-auto"
-                icon-left="lucide-radio"
+                icon="lucide-radio"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Stop live tail"
+                tooltip="Stop live tail"
                 @click="() => { stopLive(); loadContent() }"
-              >
-                Stop
-              </Button>
+              />
               <a :href="logsApi.downloadUrl(selectedFile)" class="contents">
-                <Button variant="subtle" class="w-full sm:w-auto" tooltip="Download">
-                  <span class="size-4 lucide-download" />
-                </Button>
+                <Button
+                  variant="subtle"
+                  icon="lucide-download"
+                  :size="isSinglePane ? 'md' : 'sm'"
+                  label="Download"
+                  tooltip="Download"
+                />
               </a>
             </div>
           </div>
 
           <!-- Terminal area -->
           <div ref="viewer" class="flex flex-col flex-1 mt-2 sm:mt-0 overflow-hidden">
-            <div v-if="contentError" class="p-4 font-mono text-ink-red-4 text-sm">
+            <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
               Error: {{ contentError }}
             </div>
             <LogView
@@ -161,16 +186,17 @@
               :streaming="liveMode"
               fill
               wrap
-              divided
-              :rounded="isMobile"
+              rows
+              rounded
+              class="border border-outline-gray-2"
               :empty-text="contentLoading ? 'Loading…' : 'Log file is empty.'"
             />
 
             <div
               v-if="rawLines.length"
-              class="sm:px-4 py-1.5 sm:py-2 sm:border-t border-outline-gray-2 text-ink-gray-4 text-xs shrink-0"
+              class="sm:px-4 pt-2 text-ink-gray-4 text-xs shrink-0"
             >
-              Showing the last {{ linesCount }} of {{ totalLineCount }}
+              {{ totalLineCount }} lines in file
               <template v-if="search.trim()">
                 · {{ matchTotal }} match{{ matchTotal !== 1 ? 'es' : '' }}</template
               >
@@ -185,7 +211,8 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, ErrorMessage, FormControl, LoadingText } from 'frappe-ui'
+import { Button, ErrorMessage, FormControl, LoadingText, Tooltip } from 'frappe-ui'
+import EmptyState from '@/components/common/EmptyState.vue'
 import LogView from '@/components/logs/LogView.vue'
 import { logsApi } from '@/api/logs'
 import { escapeHtml, processLine } from '@/utils/ansi'
@@ -206,10 +233,6 @@ function shortRelativeTime(iso) {
   const hours = Math.floor(minutes / 60)
   if (hours < 24) return `${hours}h ago`
   return `${Math.floor(hours / 24)}d ago`
-}
-
-function truncateFilename(name, max = 32) {
-  return name.length > max ? `${name.slice(0, max - 1)}…` : name
 }
 
 function hasErrors(log) {
@@ -263,18 +286,12 @@ const matchTotal = ref(0)
 let eventSource = null
 let lastTerm = ''
 
-// Below sm, the prev/next match controls are hidden (no room, no keyboard) -
-// this intentionally shares the `sm` (640px) breakpoint with that template
-// class, so it stays in sync with when those controls are actually visible.
-const isMobile = useIsMobile()
-// Above md (768px) both panes show side by side, matching the `md:` classes
-// that switch the list/viewer layout - a separate breakpoint from isMobile above.
+// Matches the `md:` classes that switch the list/viewer layout.
 const isSinglePane = useIsMobile(768)
 
 const isSearching = computed(() => search.value.trim().length > 0)
 
-// ANSI processing only depends on the fetched content; re-run it once per
-// fetch/live-tail update, not on every search keystroke.
+// Re-run ANSI processing per fetch, not per search keystroke.
 const processedLines = computed(() => rawLines.value.map(processLine))
 
 const searchPattern = computed(() => {
@@ -282,8 +299,7 @@ const searchPattern = computed(() => {
   return term ? new RegExp(escapeRegExp(escapeHtml(term)), 'gi') : null
 })
 
-// Keep every line for context; search only highlights matches in place. Each
-// match is tagged with data-mi so we can jump between them.
+// Search highlights in place; data-mi tags matches for jumping.
 const visibleLines = computed(() => {
   const pattern = searchPattern.value
   return pattern
@@ -326,20 +342,10 @@ function matchEls() {
   return viewer.value ? [...viewer.value.querySelectorAll('mark[data-mi]')] : []
 }
 
-// On mobile there's no way to act on an "active" match (see isMobile above) -
-// highlight everything the same instead of singling one out and auto-scrolling.
 function paintMatches(scroll) {
-  if (isMobile.value) {
-    matchEls().forEach((el) => {
-      el.style.background = '#f9e2af'
-      el.style.boxShadow = 'none'
-    })
-    return
-  }
   matchEls().forEach((el, index) => {
     const active = index === activeMatch.value
-    el.style.background = active ? '#fab387' : '#f9e2af'
-    el.style.boxShadow = active ? '0 0 0 2px #fab387' : 'none'
+    el.classList.toggle('log-match--active', active)
     if (active && scroll) el.scrollIntoView({ block: 'center' })
   })
 }
@@ -378,7 +384,6 @@ function startLive() {
     const data = JSON.parse(event.data)
     rawLines.value.push(data.error ? `ERROR: ${data.error}` : data.line)
     if (rawLines.value.length > 2000) rawLines.value.shift()
-    terminal.value?.scrollToBottom()
   }
   eventSource.onerror = () => stopLive()
 }
@@ -391,20 +396,14 @@ function stopLive() {
   }
 }
 
-// Wrap matches of a precompiled `pattern` in already-rendered HTML, touching
-// only text between tags so the ANSI colour <span>s stay intact. Line text is
-// HTML-escaped, so the pattern is built from an HTML-escaped term (see
-// searchPattern) before matching.
+// Wrap matches in rendered HTML, touching only text between tags so ANSI
+// <span>s stay intact; the pattern is built from an HTML-escaped term.
 function highlight(html, pattern) {
   return html.replace(
     /(<[^>]+>)|([^<]+)/g,
     (_, tag, text) =>
       tag ||
-      text.replace(
-        pattern,
-        (match) =>
-          `<mark data-mi style="background:#f9e2af;color:#1e1e2e;border-radius:2px;padding:0 1px;">${match}</mark>`,
-      ),
+      text.replace(pattern, (match) => `<mark data-mi class="log-match">${match}</mark>`),
   )
 }
 
@@ -426,3 +425,17 @@ onMounted(async () => {
 
 onUnmounted(() => stopLive())
 </script>
+
+<!-- Unscoped: the <mark>s are injected via v-html and never get the scope attribute. -->
+<style>
+.log-match {
+  background: var(--surface-amber-3);
+  color: var(--ink-gray-9);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+.log-match--active {
+  background: var(--surface-amber-5);
+  box-shadow: 0 0 0 2px var(--surface-amber-5);
+}
+</style>

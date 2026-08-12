@@ -12,7 +12,7 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pilot.exceptions import BenchError
+from pilot.exceptions import BenchError, CommandError
 from pilot.managers.environment import AdminEnvManager
 from pilot.managers.gunicorn import GunicornManager
 from pilot.managers.processes.definitions import (
@@ -20,7 +20,7 @@ from pilot.managers.processes.definitions import (
     ProcessDefinitionBuilder,
     hook_wrapped_argv,
 )
-from pilot.utils import cli_root
+from pilot.utils import cli_root, run_command
 
 if TYPE_CHECKING:
     from pilot.core.bench import Bench
@@ -50,6 +50,11 @@ def _pids_listening(port: int) -> set[int]:
     return {int(m) for m in re.findall(r"pid=(\d+)", result.stdout)}
 
 
+_RELOAD_REQUEST_FILE = "reload.request"
+# Redis holds the job queue, and the admin plane is what issues the reload.
+# Both must survive it, so only app-code processes are restarted.
+_NON_RELOADABLE = frozenset({"admin", "admin-ui", "redis_cache", "redis_queue", "watch"})
+
 _COLORS = [
     "\033[36m",
     "\033[32m",
@@ -68,6 +73,7 @@ class ProcessManager:
         self.bench = bench
         self.watch_admin_js = bench.config.watch_admin_js if watch_admin_js is None else watch_admin_js
         self._procs: dict[str, subprocess.Popen] = {}
+        self._colors: dict[str, str] = {}
         self._stopping = False
 
     @classmethod
@@ -104,6 +110,10 @@ class ProcessManager:
         return self.bench.pids_path / "bench.pid"
 
     @property
+    def reload_request_file(self) -> Path:
+        return self.bench.pids_path / _RELOAD_REQUEST_FILE
+
+    @property
     def python(self) -> Path:
         return self.bench.env_path / "bin" / "python"
 
@@ -131,7 +141,7 @@ class ProcessManager:
 
     def start(self) -> None:
         if not self.is_configured():
-            raise BenchError(f"Procfile not found at {self.procfile_path}. Run 'bench init' first.")
+            raise BenchError(f"Procfile not found at {self.procfile_path}. Run 'pilot init' first.")
         self.write_config()
         self.pid_file.write_text(str(os.getpid()))
         try:
@@ -186,7 +196,68 @@ class ProcessManager:
         return _tcp_port_open(self.bench.config.admin.port)
 
     def reload_workers(self, web_only: bool = False) -> None:
-        pass
+        """Ask the running dev supervisor to restart its workload processes.
+
+        Callers are separate processes (tasks, CLI), so this leaves a request
+        the supervisor picks up rather than signalling processes it does not own."""
+        self._clear_frappe_cache()
+        if not self.is_running():
+            return
+        self.bench.pids_path.mkdir(parents=True, exist_ok=True)
+        self.reload_request_file.write_text("web" if web_only else "workload")
+
+    def _clear_frappe_cache(self) -> None:
+        """Drop the cached app/module map and asset manifest, so restarted
+        processes read apps.txt instead of importing a removed app."""
+        if not self.bench.sites():
+            return
+        with contextlib.suppress(BenchError, CommandError, OSError):
+            run_command(
+                [*self.bench.frappe_call, "frappe", "--site", "all", "clear-cache"],
+                cwd=self.bench.sites_path,
+                timeout=120,
+            )
+
+    def _apply_reload_request(self, defs_by_name: dict[str, ProcessDefinition]) -> None:
+        """Restart the processes a queued reload asked for, leaving admin alone."""
+        try:
+            scope = self.reload_request_file.read_text().strip()
+        except OSError:
+            return
+        self.reload_request_file.unlink(missing_ok=True)
+        names = ["web"] if scope == "web" else [n for n in self._procs if n not in _NON_RELOADABLE]
+        for name in names:
+            definition = defs_by_name.get(name)
+            if definition is None or name not in self._procs:
+                continue
+            print(f"[{name}] reloading", file=sys.stderr)
+            self._terminate(self._procs[name])
+            self._spawn(definition)
+
+    def _terminate(self, proc: subprocess.Popen) -> None:
+        with contextlib.suppress(ProcessLookupError, OSError):
+            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            with contextlib.suppress(ProcessLookupError, OSError):
+                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+
+    def _spawn(self, pd: ProcessDefinition) -> None:
+        proc = subprocess.Popen(
+            hook_wrapped_argv(pd),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            preexec_fn=os.setsid,
+            cwd=str(pd.working_dir) if pd.working_dir else None,
+            env={**os.environ, **pd.env} if pd.env else None,
+        )
+        self._procs[pd.name] = proc
+        (self.bench.pids_path / f"{pd.name}.pid").write_text(str(proc.pid))
+        threading.Thread(target=self._stream, args=(pd.name, proc, self._color(pd.name)), daemon=True).start()
+
+    def _color(self, name: str) -> str:
+        return self._colors.setdefault(name, _COLORS[len(self._colors) % len(_COLORS)])
 
     def _run_processes(self, defs: list[ProcessDefinition]) -> None:
         original_sigterm = signal.getsignal(signal.SIGTERM)
@@ -199,20 +270,11 @@ class ProcessManager:
         signal.signal(signal.SIGTERM, _stop)
         signal.signal(signal.SIGINT, _stop)
 
-        for i, pd in enumerate(defs):
-            proc = subprocess.Popen(
-                hook_wrapped_argv(pd),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                preexec_fn=os.setsid,
-                cwd=str(pd.working_dir) if pd.working_dir else None,
-                env={**os.environ, **pd.env} if pd.env else None,
-            )
-            color = _COLORS[i % len(_COLORS)]
-            self._procs[pd.name] = proc
-            (self.bench.pids_path / f"{pd.name}.pid").write_text(str(proc.pid))
-            threading.Thread(target=self._stream, args=(pd.name, proc, color), daemon=True).start()
+        self.reload_request_file.unlink(missing_ok=True)
+        for pd in defs:
+            self._spawn(pd)
 
+        defs_by_name = {pd.name: pd for pd in defs}
         is_critical = {pd.name: pd.critical for pd in defs}
         while not self._stopping:
             for name, proc in list(self._procs.items()):
@@ -226,6 +288,7 @@ class ProcessManager:
                 del self._procs[name]
                 (self.bench.pids_path / f"{name}.pid").unlink(missing_ok=True)
             if not self._stopping:
+                self._apply_reload_request(defs_by_name)
                 time.sleep(0.5)
 
         self._stop_all()
@@ -249,6 +312,7 @@ class ProcessManager:
             except subprocess.TimeoutExpired:
                 with contextlib.suppress(ProcessLookupError, OSError):
                     os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        self.reload_request_file.unlink(missing_ok=True)
 
     def _cleanup_proc_pid_files(self) -> None:
         for name in self._procs:

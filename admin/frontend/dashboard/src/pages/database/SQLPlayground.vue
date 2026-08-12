@@ -1,6 +1,5 @@
 <template>
-  <!-- Site selector on the right of the header -->
-  <Teleport defer to="#header-actions">
+  <Teleport v-if="selectedSite" defer to="#header-actions">
     <FormControl
       type="select"
       v-model="selectedSite"
@@ -9,19 +8,31 @@
     />
   </Teleport>
 
-  <!-- No site selected -->
   <div
     v-if="!selectedSite"
-    class="flex flex-col justify-center items-center gap-2 text-center"
+    class="flex flex-col justify-center items-center gap-4 text-center"
     style="height: 75vh;"
   >
-    <span class="size-8 text-ink-gray-3 lucide-database" />
-    <p class="text-ink-gray-5 text-sm">Select a site from the dropdown to get started.</p>
+    <span
+      class="place-items-center grid bg-surface-gray-2 rounded-6 size-10 text-ink-gray-5 shrink-0"
+    >
+      <span class="size-5 lucide-database" />
+    </span>
+    <div>
+      <p class="font-medium text-ink-gray-7 text-base">Select a site to get started</p>
+      <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
+        Queries run against that site's database.
+      </p>
+    </div>
+    <!-- Wrapped: FormControl's own w-full beats a width utility passed to it. -->
+    <div class="w-56">
+      <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
+    </div>
   </div>
 
   <div v-else class="flex flex-col gap-3">
     <!-- Editor card -->
-    <div class="border rounded-lg border-outline-gray-2 overflow-hidden transition-colors">
+    <div class="border rounded-6 border-outline-gray-2 overflow-hidden transition-colors">
       <div class="h-44 sm:h-[220px]">
         <SQLCodeEditor
           ref="editorRef"
@@ -85,13 +96,13 @@
         <TabButtons v-model="activeTab" type="underline" :options="tabOptions" />
       </div>
 
-      <div v-if="currentResult" class="border rounded-lg border-outline-gray-2 overflow-hidden">
+      <div v-if="currentResult" class="border rounded-6 border-outline-gray-2 overflow-hidden">
         <!-- Write query success (no result set) -->
         <div
           v-if="!currentResult.columns.length"
           class="flex justify-center items-center gap-2 py-8 text-ink-gray-6 text-sm"
         >
-          <span class="size-4 text-ink-green-4 lucide-check-circle" />
+          <span class="size-4 text-ink-green-3 lucide-check-circle" />
           Query executed successfully
           <span v-if="currentResult.affected_rows != null"
             >· {{ currentResult.affected_rows }} row(s) affected</span
@@ -124,7 +135,7 @@
               <div
                 class="hidden sm:flex items-center gap-1.5 pr-3 border-r-2 border-outline-gray-2"
               >
-                <span class="text-ink-gray-5 text-xs">Per Page</span>
+                <span class="text-ink-gray-5 text-xs shrink-0">Per Page</span>
                 <FormControl
                   type="select"
                   v-model="perPage"
@@ -137,7 +148,7 @@
                 of {{ currentResult.row_count }} rows
                 <span v-if="currentResult.truncated">(truncated)</span>
               </span>
-              <div class="flex items-center gap-1">
+              <div class="flex items-center ">
                 <Button
                   variant="ghost"
                   size="xs"
@@ -171,7 +182,7 @@
         </button>
         <pre
           v-if="showSql"
-          class="bg-surface-gray-1 mt-1.5 px-3 py-2 border rounded-lg border-outline-gray-2 overflow-x-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
+          class="bg-surface-gray-1 mt-1.5 px-3 py-2 border rounded-6 border-outline-gray-2 overflow-x-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
           style="font-family: ui-monospace, SFMono-Regular, monospace;"
         >{{ currentResult.query }}</pre>
       </div>
@@ -182,21 +193,19 @@
   <SQLSchemaDialog v-model="showSchema" :schema="schema" @preview="previewTable" />
 
   <!-- Confirm read/write execution -->
-  <Dialog v-model="showConfirm" :options="{ title: 'Run in Read/Write mode', size: 'lg' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
-        the database. Are you sure you want to continue?
-      </p>
-      <pre
-        class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-lg border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
-        style="font-family: ui-monospace, SFMono-Regular, monospace;"
-      >{{ pendingQuery }}</pre>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="outline" @click="showConfirm = false">Cancel</Button>
-        <Button variant="solid" @click="confirmRunQuery">Execute</Button>
-      </div>
-    </template>
+  <Dialog v-model="showConfirm" title="Run in Read/Write mode" size="lg">
+    <p class="text-ink-gray-7 text-sm">
+      This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
+      the database. Are you sure you want to continue?
+    </p>
+    <pre
+      class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-6 border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
+      style="font-family: ui-monospace, SFMono-Regular, monospace;"
+    >{{ pendingQuery }}</pre>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="outline" @click="showConfirm = false">Cancel</Button>
+      <Button variant="solid" @click="confirmRunQuery">Execute</Button>
+    </div>
   </Dialog>
 </template>
 

@@ -13,6 +13,7 @@ class GetAndInstallAppTask(Task):
     """Fetch an app and optionally install it on sites."""
 
     command: ClassVar[str] = "get-and-install-app"
+    is_cancellable_while_running: ClassVar[bool] = False
 
     repo: str = ""
     branch: str = ""
@@ -27,33 +28,34 @@ class GetAndInstallAppTask(Task):
 
     def run(self) -> None:
         result = self.fetch()
-        # Frappe cascades dependency installs on sites, but not asset builds.
+        self.reload_for_new_app()
         self.install_on_sites(result.app)
-        self.build_assets([result.app, *result.installed_dependencies])
+
+    @step("reload", "Reload workers for the new app")
+    def reload_for_new_app(self) -> None:
+        """install-app enqueues jobs that import the app, and the running workers
+        were started before it existed - they must restart before the site install."""
+        self.bench.reload_workers()
 
     @step("fetch", lambda self: f"Fetch {self.marketplace_app or self.repo}")
     def fetch(self) -> AppInstallResult:
         # Marketplace apps can bring dependency apps; raw repos do not.
+        commit = ""
         if self.marketplace_app:
             resolver = Marketplace(self.bench).find_app(self.marketplace_app)
-            app = App(AppConfig(name=resolver.app, repo=resolver.repo, branch=resolver.target), self.bench)
+            commit = resolver.commit
+            app = App(AppConfig(name=resolver.app, repo=resolver.repo, branch=resolver.branch), self.bench)
         else:
             app = App.from_repo(self.bench, self.repo, self.branch)
-        return app.install(install_dependencies=bool(self.marketplace_app), on_progress=self.report)
+        return app.install(
+            install_dependencies=bool(self.marketplace_app), commit=commit, on_progress=self.report
+        )
 
     def install_on_sites(self, app: App) -> None:
         for site in self.sites:
             safe_key = site.replace(".", "_").replace("-", "_")
             with self.step(f"install_{safe_key}_{app.config.name}", f"Install {app.config.name} on {site}"):
                 self.bench.site(site).install_app(app)
-
-    def build_assets(self, apps: list[App]) -> None:
-        from pilot.managers.environment import PythonEnvManager
-
-        env = PythonEnvManager(self.bench)
-        for app in apps:
-            with self.step(f"build_{app.config.name}", f"Build assets for {app.config.name}"):
-                env.build_assets_for_app(app)
 
 
 if __name__ == "__main__":

@@ -112,3 +112,20 @@ def test_prunes_local_and_offsite_when_healthy(tmp_path) -> None:
     assert {ts for ts, _ in fake.deleted} == {"20260101_020000", "20260102_020000"}
     assert not (backups / "20260101_020000-site1-database.sql.gz").exists()
     assert (backups / "20260103_020000-site1-database.sql.gz").exists()
+
+
+def test_backup_file_names_from_a_request_stay_inside_the_site(tmp_path) -> None:
+    """A delete or download names the file, so nothing may point outside the directory."""
+    import pytest
+
+    from pilot.exceptions import BenchError
+
+    bench = _bench(tmp_path)
+    backups = _setup_site(bench, "site1.localhost")
+    site = Site(SiteConfig(name="site1.localhost", apps=[]), bench)
+    good = f"{_RUNS[0]}-site1.localhost-database.sql.gz"
+
+    assert site.backups.resolve_file(good) == (backups / good).resolve()
+    for bad in ("../../../bench.toml", "/etc/passwd", "..", ".hidden", ""):
+        with pytest.raises(BenchError):
+            site.backups.resolve_file(bad)

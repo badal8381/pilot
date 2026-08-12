@@ -27,7 +27,7 @@ const routes = [
     path: '/sites',
     name: 'Sites',
     component: () => import('./pages/sites/Sites.vue'),
-    meta: { title: 'Sites' },
+    meta: { title: 'Sites', showUpdateStatus: true },
   },
   {
     path: '/sites/:name/:tab?',
@@ -35,17 +35,18 @@ const routes = [
     component: () => import('./pages/sites/SiteDetail.vue'),
     meta: { group: 'Sites' },
   },
+  { path: '/server', redirect: '/storage' },
   {
-    path: '/server',
-    name: 'Server',
-    component: () => import('./pages/server/Server.vue'),
-    meta: { title: 'Server' },
+    path: '/storage',
+    name: 'Storage',
+    component: () => import('./pages/storage/Storage.vue'),
+    meta: { title: 'Storage' },
   },
   {
     path: '/marketplace',
     name: 'Marketplace',
     component: () => import('./pages/marketplace/Marketplace.vue'),
-    meta: { title: 'Marketplace' },
+    meta: { title: 'Marketplace', showUpdateStatus: true },
   },
   {
     path: '/insights/analytics',
@@ -60,16 +61,16 @@ const routes = [
     meta: { title: 'Logs', group: 'Insights' },
   },
   {
+    path: '/insights/activity',
+    name: 'Activity',
+    component: () => import('./pages/Activities.vue'),
+    meta: { title: 'Activity', group: 'Insights' },
+  },
+  {
     path: '/insights/tasks',
     name: 'Tasks',
     component: () => import('./pages/tasks/Tasks.vue'),
     meta: { title: 'Tasks', group: 'Insights' },
-  },
-  {
-    path: '/insights/processes',
-    name: 'Processes',
-    component: () => import('./pages/processes/Processes.vue'),
-    meta: { title: 'Processes', group: 'Insights' },
   },
   {
     path: '/insights/tasks/:taskId',
@@ -78,17 +79,17 @@ const routes = [
     meta: { group: 'Insights' },
   },
   {
-    path: '/migrations',
-    name: 'Migrations',
-    component: () => import('./pages/migrations/Migrations.vue'),
-    meta: { title: 'Migrations', group: 'Insights' },
+    path: '/updates',
+    name: 'Updates',
+    component: () => import('./pages/updates/Updates.vue'),
+    meta: { title: 'Updates', group: 'Insights', showUpdateStatus: true },
   },
   {
-    path: '/migrations/:operationId',
-    name: 'MigrationDetail',
-    component: () => import('./pages/migrations/MigrationDetail.vue'),
+    path: '/updates/:operationId',
+    name: 'UpdateDetail',
+    component: () => import('./pages/updates/UpdateDetail.vue'),
     props: true,
-    meta: { title: 'Migration', group: 'Insights' },
+    meta: { title: 'Update', group: 'Insights' },
   },
   {
     path: '/database/analyzer',
@@ -146,6 +147,10 @@ router.beforeEach(async (to) => {
 
   const { session, ensureSession } = useSession()
   await ensureSession()
+  // Setup authenticates like every other page. Without a session the sign-in page is
+  // the only stop; the wizard's own link (printed by `pilot start`) carries a ?sid=.
+  if (session.wizard && !session.authenticated)
+    return to.name === 'Login' ? true : { name: 'Login' }
   if (session.wizard) return to.name === 'Setup' ? true : { name: 'Setup' }
   if (to.name === 'Setup') return { path: '/' }
   if (!session.authenticated && to.name !== 'Login')

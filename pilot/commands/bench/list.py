@@ -20,7 +20,7 @@ class ListCommand(Command):
         benches_dir = cli_root() / "benches"
         rows = self._collect(benches_dir)
         if not rows:
-            self.report("No benches yet. Create one with: bench new <name>")
+            self.report("No benches yet. Create one with: pilot new <name>")
             return
 
         # Column widths sized to content (with sensible minimums).
@@ -63,16 +63,11 @@ class ListCommand(Command):
             config = BenchConfig.read(toml_path, validate=False)
             name = config.name or name
             prod = config.production
-            if prod.enabled:
-                mode = "production"
-                manager = prod.process_manager or "-"
-            else:
-                mode = "development"
-                manager = "foreground"
-            from pilot.utils import admin_url
-
-            address = admin_url(config)
-            state = self._state(Bench(config, bench_dir), prod.enabled)
+            bench = Bench(config, bench_dir)
+            mode = "production" if prod.enabled else "development"
+            manager = prod.process_manager or "foreground"
+            address = self._address(bench)
+            state = self._state(bench, prod.enabled)
             sites = self._site_count(bench_dir)
         except Exception as exc:
             logging.debug("Failed to describe bench %s: %s", bench_dir, exc)
@@ -84,6 +79,17 @@ class ListCommand(Command):
             "state": state,
             "sites": sites,
         }
+
+    def _address(self, bench) -> str:
+        from pilot.utils import admin_url
+
+        admin = bench.config.admin
+        if not admin.domain:
+            return admin_url(bench.config)
+        from pilot.managers.nginx import NginxManager
+
+        scheme = "https" if admin.tls and NginxManager(bench).has_admin_cert else "http"
+        return f"{scheme}://{admin.domain}"
 
     def _site_count(self, bench_dir: Path) -> int:
         """A sites/ subdir counts as a site iff it has a site_config.json."""

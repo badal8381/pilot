@@ -22,12 +22,14 @@ from pilot.core.bench.settings import (
     firewall_payload,
     is_restart_needed,
     llm_payload,
+    resource_limits_payload,
     restart_trigger_values,
     s3_payload,
     waf_payload,
     worker_groups_payload,
 )
 from pilot.integrations.llm import clear_system_prompt, read_system_prompt, write_system_prompt
+from pilot.internal.validators import validate_external_url
 from pilot.managers.platform import is_linux, native_process_manager
 from pilot.managers.redis import RedisManager
 from pilot.managers.waf import WafManager
@@ -44,6 +46,7 @@ __all__ = [
     "is_restart_needed",
     "llm_payload",
     "network_bp",
+    "resource_limits_payload",
     "restart_trigger_values",
     "s3_payload",
     "settings_bp",
@@ -112,6 +115,7 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
             "system_prompt": read_system_prompt(bench_root) if bench_root else "",
         },
         "llm_providers": llm_provider_options(),
+        "resource_limits": resource_limits_payload(config),
         "monitor": {
             "system_log_path": str(system_log_path()),
             "log_path": str(bench_log_path(config.name)),
@@ -142,6 +146,15 @@ def _saved_llm_api_key() -> str:
         return ""
 
 
+def _saved_llm_api_base() -> str:
+    """The endpoint already stored in bench.toml - listing models must hit the same
+    server the assistant will, not the provider's default."""
+    try:
+        return BenchConfig.read(Path(current_app.config["BENCH_ROOT"])).llm.api_base
+    except Exception:
+        return ""
+
+
 @settings_bp.post("/llm/models")
 def llm_models():
     """Models available for a provider — powers the model combobox. POST so the
@@ -157,8 +170,12 @@ def llm_models():
     if not api_key and models_need_api_key(provider):
         api_key = _saved_llm_api_key()
 
+    api_base = str(payload.get("api_base", "")).strip() or _saved_llm_api_base()
+    if error := validate_external_url(api_base, "api_base"):
+        return error_response("invalid_api_base", error, 422)
+
     try:
-        return jsonify(models_for(provider, api_key))
+        return jsonify(models_for(provider, api_key, api_base))
     except ValueError as exc:
         return error_response("llm_models_unavailable", str(exc), 400)
 

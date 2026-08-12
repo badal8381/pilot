@@ -1,57 +1,70 @@
 <template>
-  <div class="mt-6">
+  <StickyToolbar>
     <div class="flex sm:flex-row flex-col gap-2">
       <FormControl
         v-model="searchModel"
         class="flex-1"
         type="text"
         placeholder="Search for any app"
+        :size="isMobile ? 'md' : 'sm'"
       >
         <template #prefix>
           <LucideSearch class="size-4 text-ink-gray-5" />
         </template>
       </FormControl>
 
-      <div class="flex gap-2">
-        <Dropdown :options="worksWithMenu" placement="bottom-end">
-          <template #default="{ open }">
-            <Button class="w-32 [&>.truncate]:flex-1 [&>.truncate]:text-left" :active="open">
-              <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-              {{ worksWithLabel }}
-            </Button>
-          </template>
-        </Dropdown>
+      <!-- Width-bound row: flex-1 must resolve against the row, not content. -->
+      <div class="flex gap-2 w-full sm:w-auto">
+        <div class="flex-1 sm:flex-none min-w-0">
+          <Dropdown :options="worksWithMenu">
+            <template #default="{ open }">
+              <Button
+                class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto"
+                :size="isMobile ? 'md' : 'sm'"
+                :active="open"
+              >
+                <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
+                {{ worksWithLabel }}
+              </Button>
+            </template>
+          </Dropdown>
+        </div>
 
-        <Button variant="subtle" @click="$emit('add-from-github')">
+        <Button
+          variant="subtle"
+          class="text-base"
+          :size="isMobile ? 'md' : 'sm'"
+          @click="$emit('add-from-github')"
+        >
           <template #prefix><GithubMark class="size-4" /></template>
           Import app
         </Button>
       </div>
     </div>
 
-    <div class="flex flex-wrap gap-1.5 mt-3">
-      <button
-        v-for="pill in PILLS"
-        :key="pill"
-        type="button"
-        class="px-3 py-0.5 border rounded-full text-p-sm transition duration-150 ease-[var(--ease-out)] active:scale-[0.97]"
-        :class="pill === pillModel
-          ? 'bg-surface-gray-3 border-outline-gray-2 text-ink-gray-9'
-          : 'border-outline-gray-2 text-ink-gray-6 hover:bg-surface-gray-1 hover:text-ink-gray-8'"
-        @click="pillModel = pill"
-      >
-        {{ pill }}
-      </button>
+    <!-- Scrolls rather than clips: TabButtons' rail is overflow-hidden and does not wrap. -->
+    <div class="mt-3 overflow-x-auto">
+      <TabButtons
+        v-model="pillModel"
+        :options="pillOptions"
+        variant="ghost"
+        :size="isMobile ? 'md' : 'sm'"
+      />
     </div>
-  </div>
+  </StickyToolbar>
 </template>
 
 <script setup>
 import { computed, h } from 'vue'
-import { Button, Dropdown, FormControl } from 'frappe-ui'
+import { Button, Dropdown, FormControl, TabButtons } from 'frappe-ui'
+import AppIcon from '@/components/apps/AppIcon.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import LucideSearch from '~icons/lucide/search'
 import GithubMark from '@/components/icons/GithubMark.vue'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 import { PILLS } from '@/utils/marketplaceCategories'
+
+const isMobile = useIsMobile()
 
 const props = defineProps({
   worksWithOptions: { type: Array, default: () => [] },
@@ -62,10 +75,7 @@ const searchModel = defineModel('search', { type: String })
 const pillModel = defineModel('pill', { type: String })
 const worksWithModel = defineModel('worksWith', { type: String })
 
-function appLogo(option) {
-  if (!option.logo_url) return null
-  return () => h('img', { src: option.logo_url, class: 'size-4 rounded object-contain' })
-}
+const pillOptions = PILLS.map((pill) => ({ label: pill, value: pill }))
 
 const worksWithMenu = computed(() => [
   {
@@ -75,13 +85,14 @@ const worksWithMenu = computed(() => [
   },
   ...props.worksWithOptions.map((option) => ({
     label: option.title,
-    icon: appLogo(option),
+    icon: () =>
+      h(AppIcon, { name: option.name, label: option.title, logo: option.logo_url, size: 'xs' }),
     onClick: () => (worksWithModel.value = option.name),
   })),
 ])
 
 const worksWithLabel = computed(() => {
   const selected = props.worksWithOptions.find((option) => option.name === worksWithModel.value)
-  return selected ? `Works with ${selected.title}` : 'Works with'
+  return selected ? selected.title : 'Works with'
 })
 </script>

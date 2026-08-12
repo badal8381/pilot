@@ -1,22 +1,20 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
-    <Alert v-if="!connected" theme="blue" title="Why connect GitHub?" :dismissible="false">
+    <Alert v-if="!connected" theme="blue" title="Connect GitHub" :dismissible="false">
       <template #description>
         <p class="text-ink-gray-6 text-p-sm">
-          Connecting a GitHub account lets you install private apps and browse your repositories
-          from the "Add app from GitHub" dialog. Generate a
+          Install private apps and browse your repos. Paste a
           <a
             :href="tokenHelpUrl"
             target="_blank"
             rel="noopener"
             class="underline underline-offset-2"
+            >token</a
           >
-            personal access token</a
-          >
-          with <code class="text-xs">repo</code> scope, then paste it below.
+          with <code class="text-xs">repo</code> scope below.
         </p>
       </template>
     </Alert>
@@ -26,7 +24,7 @@
       class="flex sm:flex-row sm:justify-between sm:items-center flex-col gap-3"
     >
       <div>
-        <p class="font-medium text-ink-gray-8 text-sm">Connected as {{ username }}</p>
+        <p class="font-medium text-ink-gray-8 text-base">Connected as {{ username }}</p>
         <p class="text-ink-gray-5 text-p-sm">GitHub · Personal access token</p>
       </div>
       <div class="flex items-center gap-2">
@@ -54,7 +52,8 @@
       />
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="connecting" @click="verifyAndConnect">
+        <!-- The token is the one required field; Enter still hits the guard. -->
+        <Button variant="solid" :loading="connecting" :disabled="!token.trim()" @click="verifyAndConnect">
           {{ connected ? 'Update Token' : 'Verify & Connect' }}
         </Button>
       </div>
@@ -64,7 +63,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, toast } from 'frappe-ui'
+import { Alert, Button, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { gitApi } from '@/api/git'
 

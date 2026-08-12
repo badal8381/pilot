@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -79,6 +80,17 @@ class Site:
             config.update(settings)
             replace_private_text_locked(config_path, json.dumps(config, indent=1))
 
+    @contextmanager
+    def under_maintenance(self) -> Iterator[None]:
+        """Hold the site in maintenance mode for a schema change, restoring the
+        settings it had before - a site already down stays down afterwards."""
+        original = self.maintenance_settings
+        self.set_maintenance_mode(True)
+        try:
+            yield
+        finally:
+            self.set_maintenance_settings(original)
+
     def _frappe_call(self, *args: str) -> list[str]:
         """Build a frappe bench_helper command."""
         return [*self.bench.frappe_call, *args]
@@ -116,16 +128,45 @@ class Site:
 
         SiteApps(self).uninstall_app(app, force)
 
+    def enable_app(self, app: "App") -> None:
+        from pilot.core.site.apps import SiteApps
+
+        SiteApps(self).enable_app(app)
+
+    def disable_app(self, app: "App") -> None:
+        from pilot.core.site.apps import SiteApps
+
+        SiteApps(self).disable_app(app)
+
+    def disabled_apps(self) -> list[str]:
+        from pilot.core.site.apps import SiteApps
+
+        return SiteApps(self).disabled_apps()
+
+    def get_missing_dependencies(self, app: "App") -> list[str]:
+        """Apps `app` requires that this site does not have at all."""
+        from pilot.core.site.apps import SiteApps
+
+        return SiteApps(self).get_missing_dependencies(app)
+
     def list_apps(self) -> list[str]:
+        """Every app the site holds data for, disabled ones included."""
         from pilot.core.site.apps import SiteApps
 
         return SiteApps(self).list_apps()
 
     def installed_apps(self) -> list[str]:
-        """Return installed apps using cache, DB, then Frappe as fallback."""
+        """Every app installed on the site, disabled ones included. Read from cache,
+        DB, then Frappe as fallback."""
         from pilot.core.site.apps import SiteApps
 
         return SiteApps(self).installed_apps()
+
+    def active_apps(self) -> list[str]:
+        """Installed apps the site actually runs - what the Admin UI shows as installed."""
+        from pilot.core.site.apps import SiteApps
+
+        return SiteApps(self).active_apps()
 
     def migrate(self, skip_failing: bool = False) -> str:
         """Run migration through the shared path, returning the full captured output."""
@@ -154,13 +195,14 @@ class Site:
         SiteApps(self).remove_app_if_not_on_any_site(app_name, on_progress)
 
     def drop(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
+        from pilot.core.site.commands import SiteCommands
         from pilot.managers.nginx import NginxManager
 
         provider_domains = self._provider_domains()
         cmd = [*self.bench.frappe_call, "frappe", "drop-site", "--force", self.config.name]
-        cmd += self.bench.db_root_args
         on_progress(f"Dropping site '{self.config.name}'...")
-        run_command(cmd, cwd=self.bench.sites_path, stream_output=True)
+        with SiteCommands(self).setup_credentials(self.bench.config.db_type) as credentials:
+            run_command(cmd + credentials, cwd=self.bench.sites_path, stream_output=True)
         self._remove_from_bench_toml()
         self._release_domains(provider_domains)
         on_progress(f"\nSite '{self.config.name}' dropped.")
@@ -282,16 +324,30 @@ def list_installed_apps(site_config: dict, bench_root: Path, site_name: str) -> 
     return _list_installed_apps(site_config, bench_root, site_name)
 
 
-def query_installed_apps_via_db(site_config: dict) -> list[str] | None:
+def list_active_apps(site_config: dict, bench_root: Path, site_name: str) -> list[str]:
+    """Installed apps the site actually runs, disabled ones dropped."""
+    from pilot.core.site.config import list_active_apps as _list_active_apps
+
+    return _list_active_apps(site_config, bench_root, site_name)
+
+
+def query_installed_apps_via_db(bench_root: Path, site_name: str) -> list[str] | None:
     from pilot.core.site.config import query_installed_apps_via_db as _query_installed_apps_via_db
 
-    return _query_installed_apps_via_db(site_config)
+    return _query_installed_apps_via_db(bench_root, site_name)
 
 
-def is_setup_complete(site_config: dict) -> bool | None:
+def exclude_disabled_apps(apps: list[str], bench_root: Path, site_name: str) -> list[str]:
+    """Drop apps the site holds disabled - Pilot reports those as uninstalled."""
+    from pilot.core.site.config import exclude_disabled_apps as _exclude_disabled_apps
+
+    return _exclude_disabled_apps(apps, bench_root, site_name)
+
+
+def is_setup_complete(bench_root: Path, site_name: str) -> bool | None:
     from pilot.core.site.config import is_setup_complete as _is_setup_complete
 
-    return _is_setup_complete(site_config)
+    return _is_setup_complete(bench_root, site_name)
 
 
 def set_site_ssl_flag(sites_root: Path, site_name: str, enabled: bool) -> None:

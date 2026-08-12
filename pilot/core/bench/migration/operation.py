@@ -215,6 +215,10 @@ class MigrationOperation:
                 "output_excerpt": getattr(error, "output", "") or "",
             }
             self._enter_needs_attention("updating", None)
+            # Nothing in this phase writes to a site database, so whatever failed
+            # here - a fetch, a check, an install, a build - leaves the sites
+            # untouched and going back is a checkout. No user call needed.
+            self._transition("reverting_apps")
             raise
         self.apps_updated = True
         self._transition("migrating")
@@ -246,8 +250,8 @@ class MigrationOperation:
         if self.next_migrate_site() is None:
             self._complete(on_step)
 
-    def retry_arm(self) -> None:
-        """Re-arm the chain from needs_attention so the failed unit runs again."""
+    def retry(self) -> None:
+        """Resume the chain from needs_attention so the failed unit runs again."""
         if self.state != "needs_attention":
             raise MigrationStateError(f"Retry is not allowed from state {self.state}")
         phase = self.return_state or "migrating"
@@ -263,8 +267,8 @@ class MigrationOperation:
     def bypass_patch(self, patch: str, on_progress: OnProgress = _NO_PROGRESS) -> None:
         """Permanently mark one patch as completed for the failed site via Frappe.
 
-        Never auto-retries; the operation stays in needs_attention so the user
-        must explicitly choose Retry to continue.
+        Re-arms the chain so the caller can resume migration immediately: the
+        failed site goes back to pending and the operation returns to migrating.
         """
         from pilot.utils import run_command
 
@@ -298,9 +302,10 @@ class MigrationOperation:
         self.bench.audit_action(
             "bypass_patch", {"operation": self.id, "site": self.failed_site, "patch": patch}
         )
+        self.retry()
 
-    def revert_arm(self) -> None:
-        """Re-arm from needs_attention/revert_failed and enter the next revert phase."""
+    def revert(self) -> None:
+        """Resume from needs_attention/revert_failed and enter the next revert phase."""
         if self.state not in ("needs_attention", "revert_failed"):
             raise MigrationStateError(f"Restore is not allowed from state {self.state}")
         if not self.can_revert:

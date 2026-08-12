@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import hmac
+import time
 from pathlib import Path
 
 from flask import Blueprint, current_app, g, jsonify, request, url_for
@@ -27,10 +27,10 @@ from pilot.core.bench.settings import active_tokens_payload
 auth_bp = Blueprint("auth", __name__)
 
 
-def _validate_new_password(new_password: str, current_password: str) -> str | None:
+def _validate_new_password(bench: Bench, new_password: str) -> str | None:
     from pilot.internal.validators import validate_admin_password
 
-    if hmac.compare_digest(new_password, current_password):
+    if bench.config.admin.verify_password(new_password):
         return "New password must differ from the current password."
     return validate_admin_password(new_password)
 
@@ -82,34 +82,32 @@ def create_session():
             "Bench configuration is unavailable.",
             503,
         )
-    if not bench.config.admin.password:
-        return error_response(
-            "session_unavailable",
-            "No admin password configured in bench.toml",
-            503,
-        )
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response("malformed_request", "Expected a JSON object.", 400)
-    error, redeemed_jti = _validate_login(data, bench)
+    error, redeemed = _validate_login(data, bench)
     if error is not None:
         return error
 
-    # A sign-in link is minted on the server by `pilot generate-session`, so whoever holds
-    # one already had shell access. Requiring a device there would only lock out recovery.
-    if not redeemed_jti and (blocked := _second_factor_error(bench, str(data.get("otp", "")))):
+    # A sign-in link is minted on the server (a setup link, or `pilot start`), so whoever
+    # holds one already had shell access. Requiring a device there would only lock out
+    # recovery.
+    if not redeemed and (blocked := _second_factor_error(bench, str(data.get("otp", "")))):
         return blocked
 
-    if redeemed_jti:
-        bench.audit_action("session", {"event": "login_redeemed", "jti": redeemed_jti})
-    token, jti = Session(bench).issue_session_token(ip=client_ip())
+    if redeemed:
+        bench.audit_action("session", {"event": "login_redeemed", "jti": redeemed["jti"]})
+    # A redeemed link's session lasts only as long as the link had left; a password
+    # login gets the full session.
+    ttl = max(60, int(redeemed["exp"]) - int(time.time())) if redeemed else Session.DEFAULT_TTL
+    token, jti = Session(bench).issue_session_token(ip=client_ip(), ttl=ttl)
     bench.audit_action(
         "session",
         {
             "event": "issued",
             "jti": jti,
             "scope": "bench",
-            "via": "login_link" if redeemed_jti else "password",
+            "via": "login_link" if redeemed else "password",
         },
     )
     response = created_response(
@@ -146,7 +144,7 @@ def delete_session():
 
 
 def _validate_login(data: dict, bench):
-    """Return (error_response_or_None, redeemed_login_jti_or_None)."""
+    """Return (error_response_or_None, redeemed_link_claims_or_None)."""
     sid = data.get("sid")
     if sid is not None:
         payload = decode_session_token(sid, bench, client_ip())
@@ -165,8 +163,14 @@ def _validate_login(data: dict, bench):
                 "Invalid or expired sign-in link.",
                 401,
             ), None
-        return None, jti
-    if not hmac.compare_digest(str(data.get("password", "")), bench.config.admin.password):
+        return None, payload
+    if not bench.config.admin.password:
+        return error_response(
+            "session_unavailable",
+            "No admin password configured in bench.toml",
+            503,
+        ), None
+    if not bench.config.admin.verify_password(str(data.get("password", ""))):
         return error_response("invalid_credentials", "Incorrect password.", 401), None
     return None, None
 
@@ -183,11 +187,11 @@ def change_admin_password():
         return error_response("malformed_request", "Expected a JSON object.", 400)
 
     new_password = str(data.get("new_password", ""))
-    if error := _validate_new_password(new_password, bench.config.admin.password):
+    if error := _validate_new_password(bench, new_password):
         return error_response("invalid_password", error, 422)
 
     with BenchConfig.open(bench_root) as config:
-        config.admin.password = new_password
+        config.admin.set_password(new_password)
 
     bench.audit_action("session", {"event": "admin_password_changed"})
     return jsonify({})

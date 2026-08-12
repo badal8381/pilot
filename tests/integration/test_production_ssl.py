@@ -20,7 +20,7 @@ ADMIN_DOMAIN_2 = "bench-admin2.localhost"
 ADMIN_PASSWORD = "admin"
 HTTP_PORT = 80
 HTTPS_PORT = 443
-CERT_ORG = "bench-cli-e2e"  # baked into our certs to prove nginx served ours
+CERT_ORG = "pilot-e2e"  # baked into our certs to prove nginx served ours
 LETSENCRYPT_LIVE = Path("/etc/letsencrypt/live")
 ALL_DOMAINS = (SITE, RENAMED_SITE, ADMIN_DOMAIN, ADMIN_DOMAIN_2)
 
@@ -347,8 +347,7 @@ class TestProductionSSL:
         assert status == "200", f"/api/v1/bootstrap returned {status}: {body!r}"
         data = json.loads(body)
         assert data.get("name"), f"admin bootstrap missing bench name: {data}"
-        assert data.get("production") is True, f"admin does not report production: {data}"
-        assert "native_process_manager" in data, data
+        assert data.get("mode") == "admin", f"admin not in admin mode: {data}"
 
     def test_admin_login_works(self, production: Path) -> None:
         status, body = _request(
@@ -440,7 +439,7 @@ class TestProductionSSL:
         assert ADMIN_DOMAIN_2 in admin_conf
         status, body = _request_ok(ADMIN_DOMAIN_2, "/api/v1/bootstrap")
         assert status == "200", f"new admin domain /api/v1/bootstrap returned {status}: {body!r}"
-        assert json.loads(body).get("production") is True, f"admin not live on new domain: {body!r}"
+        assert json.loads(body).get("mode") == "admin", f"admin not live on new domain: {body!r}"
 
     def test_remove_production(self, production: Path, bench_bin: str) -> None:
         # Runs last; teardown's remove production is then a no-op.
@@ -495,7 +494,7 @@ class TestProductionNoTLS:
     def test_admin_served_over_http(self, http_only_production: Path) -> None:
         status, body = _request_ok(ADMIN_DOMAIN, "/api/v1/bootstrap", scheme="http")
         assert status == "200", f"admin /api/v1/bootstrap over http returned {status}: {body!r}"
-        assert json.loads(body).get("production") is True, body
+        assert json.loads(body).get("mode") == "admin", body
 
     def test_admin_not_served_over_https(self, http_only_production: Path) -> None:
         assert _https_status(ADMIN_DOMAIN) == "000", "admin answered HTTPS with TLS disabled"

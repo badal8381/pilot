@@ -1,75 +1,81 @@
 <template>
-  <div v-if="loading" class="flex justify-center py-12">
-    <LoadingText />
-  </div>
+  <template v-if="loading">
+    <PageHero>
+      <template #icon><Skeleton class="rounded-6 size-9 sm:size-10 shrink-0" /></template>
+      <template #title>
+        <Skeleton class="rounded-4 w-40 h-4" />
+        <Skeleton class="rounded-full w-14 h-5 shrink-0" />
+      </template>
+      <template #actions>
+        <Skeleton class="hidden sm:block rounded-4 w-28 h-7" />
+        <Skeleton class="hidden sm:block rounded-4 w-24 h-7" />
+        <Skeleton class="rounded-4 size-7" />
+      </template>
+    </PageHero>
+    <div class="mx-auto w-full max-w-3xl">
+      <StickyToolbar>
+        <Skeleton class="rounded-4 w-64 h-7 sm:h-8" />
+      </StickyToolbar>
+    </div>
+  </template>
+
   <div v-else-if="error" class="py-12">
     <ErrorMessage :message="error" />
   </div>
-  <div v-else-if="site" class="mx-auto w-full max-w-3xl">
-    <!-- Hero -->
-    <div class="relative -mx-4 sm:-mx-6 -mt-6 px-4 sm:px-6 pt-6 pb-7 overflow-hidden">
-      <div class="absolute inset-0 pointer-events-none dot-field" aria-hidden="true" />
-      <div
-        class="relative flex justify-between items-center gap-3 bg-surface-base p-2 sm:p-4 border rounded-xl border-outline-gray-2"
-      >
-        <div class="flex items-center gap-3 min-w-0">
-          <span
-            class="place-items-center grid bg-surface-elevation-1 border rounded-xl border-outline-gray-2 size-10 sm:size-12 text-ink-gray-6 shrink-0"
-          >
-            <span class="size-5 sm:size-6 lucide-globe" />
-          </span>
-          <div class="min-w-0">
-            <div class="flex items-center gap-2 min-w-0">
-              <h1 class="font-semibold text-ink-gray-9 text-base sm:text-xl truncate">
-                {{ site.name }}
-              </h1>
-              <Badge
-                :label="statusLabel"
-                :theme="statusBadgeTheme"
-                variant="subtle"
-                size="md"
-                class="shrink-0"
-              />
-            </div>
-            <div class="hidden sm:flex items-center gap-1.5 mt-1 text-ink-gray-5 text-sm">
-              <span class="size-3.5 lucide-box" />
-              {{ version || 'Version -' }}
-            </div>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <Button size="sm" class="hidden sm:flex" @click="goToMarketplace">
-            <template #prefix><span class="size-4 lucide-plus" /></template>
-            Install app
-          </Button>
-          <Dropdown :options="menuOptions" placement="bottom-end">
-            <template #default="{ open }">
-              <Button variant="subtle" size="sm" :active="open">
-                <span class="size-4 lucide-ellipsis" />
-              </Button>
-            </template>
-          </Dropdown>
-        </div>
-      </div>
+
+  <template v-else-if="site">
+    <PageHero icon="lucide-globe">
+      <template #title>
+        <h1 class="font-medium text-ink-gray-9 text-lg truncate">
+          {{ site.name }}
+        </h1>
+        <Badge
+          :label="statusLabel"
+          :theme="statusBadgeTheme"
+          variant="subtle"
+          size="md"
+          class="shrink-0"
+        />
+      </template>
+      <template v-if="storageUsed" #subtitle>{{ storageUsed }} used</template>
+      <template #actions>
+        <Button variant="ghost" size="sm" class="hidden sm:flex" @click="goToAnalytics">
+          <template #prefix><span class="size-4 lucide-chart-line" /></template>
+          View analytics
+        </Button>
+        <Button size="sm" class="hidden sm:flex" @click="goToMarketplace">
+          <template #prefix><span class="size-4 lucide-plus" /></template>
+          Install app
+        </Button>
+        <Dropdown :options="menuOptions">
+          <template #default="{ open }">
+            <Button
+              variant="subtle"
+              size="sm"
+              :active="open"
+              icon="lucide-ellipsis"
+              label="Site actions"
+              tooltip="Site actions"
+            />
+          </template>
+        </Dropdown>
+      </template>
+    </PageHero>
+
+    <div class="mx-auto w-full max-w-3xl">
+      <!-- Tabs -->
+      <StickyToolbar>
+        <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
+      </StickyToolbar>
+
+      <!-- Sections -->
+      <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
+      <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
+      <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />
+      <Activities v-else-if="activeTab === 'activity'" :site-name="siteName" />
+      <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
     </div>
-
-    <!-- Tabs -->
-    <TabButtons v-model="activeTab" :options="tabs" />
-
-    <!-- Sections -->
-    <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
-    <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
-    <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />
-    <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
-  </div>
-
-  <AppActionDialog
-    v-if="appAction"
-    v-model:open="showAppAction"
-    :app-name="appAction.app"
-    :action="appAction.action"
-    :site-name="siteName"
-  />
+  </template>
 
   <Teleport defer to="#header-actions">
     <Button
@@ -88,32 +94,39 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, ErrorMessage, LoadingText, TabButtons, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, ErrorMessage, Skeleton, TabButtons, toast } from 'frappe-ui'
 import SiteApps from '@/components/sites/Apps.vue'
 import SiteBackups from '@/components/sites/Backups.vue'
 import SiteConfig from '@/components/sites/Config.vue'
 import SiteSettings from '@/components/sites/Settings.vue'
-import AppActionDialog from '@/components/sites/AppActionDialog.vue'
+import PageHero from '@/components/common/PageHero.vue'
+import Activities from '@/pages/Activities.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
-import { useBench } from '@/composables/benches/useBench'
+import { useSiteStorage } from '@/composables/sites/useSiteStorage'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { openTaskDetailPage } from '@/utils/taskRoute'
+import { toSentenceCase } from '@/utils/format'
 
 const route = useRoute()
 const router = useRouter()
 const siteName = route.params.name
 
 const { setBreadcrumbs } = useBreadcrumbs()
-const { site, loading, error, status, load, login, backup } = useSite(siteName)
-const { version, load: loadBench } = useBench()
+const { site, loading, error, status, load, reload, login, backup, apps, loadApps } =
+  useSite(siteName)
+
+const { load: loadStorage, storageLabel } = useSiteStorage()
+const storageUsed = computed(() => storageLabel(siteName))
 
 setBreadcrumbs([{ label: 'Sites', route: { name: 'Sites' } }, { label: siteName }])
 
-const STATUS_THEMES = { online: 'green', broken: 'red', offline: 'orange', provisioning: 'blue' }
+const STATUS_THEMES = { online: 'gray', broken: 'red', offline: 'orange', provisioning: 'blue' }
 const STATUS_LABELS = {
-  online: 'Live',
+  online: 'Active',
   broken: 'Broken',
   offline: 'Paused',
   provisioning: 'Creating',
@@ -126,6 +139,7 @@ const tabs = [
   { value: 'apps', label: 'Apps' },
   { value: 'backups', label: 'Backups' },
   { value: 'config', label: 'Config' },
+  { value: 'activity', label: 'Activity' },
   { value: 'settings', label: 'Settings' },
 ]
 
@@ -148,30 +162,32 @@ watchEffect(() => {
   if (site.value) document.title = `${site.value.name} | ${tabLabel.value}`
 })
 
-const APP_ACTIONS = ['install-app', 'uninstall-app']
+const APP_ACTIONS = { 'install-app': 'installed', 'uninstall-app': 'uninstalled' }
+const appRegistry = useAppRegistry()
 const appAction = computed(() => {
   const app = route.query.app
   const action = route.query.action
-  if (typeof app !== 'string' || !APP_ACTIONS.includes(action)) return null
+  if (typeof app !== 'string' || !(action in APP_ACTIONS)) return null
   return { app, action }
 })
-const showAppAction = ref(false)
 watch(
   appAction,
-  (value) => {
-    showAppAction.value = Boolean(value)
+  async (value) => {
+    if (!value) return
+    await Promise.all([appRegistry.load(), loadApps()])
+    const appDetail = apps.value.find((app) => app.name === value.app)
+    const title =
+      appRegistry.titleMap.value[value.app] || toSentenceCase(appDetail?.title) || value.app
+    toast.success(`${title} ${APP_ACTIONS[value.action]} on ${siteName}`)
+    router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
   },
   { immediate: true },
 )
-watch(showAppAction, (open) => {
-  if (open) return
-  router.replace({ name: 'SiteDetail', params: { name: siteName, tab: activeTab.value } })
-})
 
 const isMobile = useIsMobile()
 
 function openSite() {
-  window.open(`https://${site.value.name}`, '_blank')
+  window.open(`https://${site.value.name}/desk`, '_blank')
 }
 
 const settingUpSite = ref(false)
@@ -188,6 +204,10 @@ async function setupSite() {
 
 function goToMarketplace() {
   router.push({ path: '/marketplace', query: { site: siteName } })
+}
+
+function goToAnalytics() {
+  router.push({ name: 'Analytics', query: { view: 'site', window: '24h', site: siteName } })
 }
 
 function loginAsAdmin() {
@@ -210,16 +230,13 @@ async function backupNow() {
 
 const menuOptions = computed(() => [
   ...(isMobile.value
-    ? [{ label: 'Install app', icon: 'lucide-plus', onClick: goToMarketplace }]
+    ? [
+        { label: 'View analytics', icon: 'lucide-chart-line', onClick: goToAnalytics },
+        { label: 'Install app', icon: 'lucide-plus', onClick: goToMarketplace },
+      ]
     : []),
   { label: 'Login as admin', icon: 'lucide-log-in', onClick: loginAsAdmin },
   { label: 'Back up now', icon: 'lucide-archive', onClick: backupNow },
-  {
-    label: 'View analytics',
-    icon: 'lucide-chart-line',
-    onClick: () =>
-      router.push({ name: 'Analytics', query: { view: 'site', window: '24h', site: siteName } }),
-  },
   {
     label: 'View jobs',
     icon: 'lucide-list-checks',
@@ -227,32 +244,40 @@ const menuOptions = computed(() => [
   },
 ])
 
-// Provisioning is a transient state (a new-site/reinstall task still running);
-// poll until it clears instead of leaving the badge stuck on "Creating".
-let provisioningPoll = null
-watch(status, (value) => {
-  if (value === 'provisioning' && !provisioningPoll) {
-    provisioningPoll = setInterval(load, 3000)
-  } else if (value !== 'provisioning' && provisioningPoll) {
-    clearInterval(provisioningPoll)
-    provisioningPoll = null
-  }
-})
+// Provisioning and a pending setup wizard both resolve without us: poll quietly
+// until they do, so the badge and the header button settle on their own.
+const POLL_INTERVAL_MS = 5000
+const isSettling = computed(
+  () => status.value === 'provisioning' || (status.value === 'online' && !site.value.setup_complete),
+)
+
+let poll = null
+watch(
+  isSettling,
+  (settling) => {
+    if (settling && !poll) {
+      poll = setInterval(reload, POLL_INTERVAL_MS)
+    } else if (!settling && poll) {
+      clearInterval(poll)
+      poll = null
+    }
+  },
+  { immediate: true },
+)
+
+watch(
+  () => site.value?.setup_complete,
+  (complete, wasComplete) => {
+    if (complete && wasComplete === false) toast.success('Site setup is complete')
+  },
+)
+
 onUnmounted(() => {
-  if (provisioningPoll) clearInterval(provisioningPoll)
+  if (poll) clearInterval(poll)
 })
 
 onMounted(() => {
   load()
-  loadBench()
+  loadStorage(true)
 })
 </script>
-
-<style scoped>
-.dot-field {
-  background-image: radial-gradient(var(--outline-gray-3) 1.1px, transparent 1.3px);
-  background-size: 20px 20px;
-  background-position: -8px -8px;
-  mask-image: linear-gradient(to bottom, rgb(0 0 0 / 0.95), transparent 90%);
-}
-</style>

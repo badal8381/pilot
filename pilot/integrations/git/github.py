@@ -1,37 +1,46 @@
 from __future__ import annotations
 
+import re
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from pilot.integrations.git.base import (
     GitAuthError,
     GitProvider,
     GitProviderError,
-    inject_https_token,
+    basic_auth_config,
     normalize_to_https,
 )
 
+GITHUB_HOST = "github.com"
+_OWNER_REPO_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
 
 def parse_github_owner_repo(repo_url: str) -> tuple[str, str]:
-    """Extract (owner, repo) from a GitHub URL."""
+    """Extract (owner, repo) from a GitHub URL. Both land in an api.github.com path,
+    so only a plain owner and repository name are accepted."""
     url = normalize_to_https(repo_url).rstrip("/").removesuffix(".git")
     parts = url.split("/")
     # Expect ['https:', '', 'github.com', 'owner', 'repo']
-    if len(parts) < 5 or not parts[-2] or not parts[-1]:
+    if len(parts) < 5 or urllib.parse.urlsplit(url).hostname != GITHUB_HOST:
         raise GitProviderError(f"Cannot parse owner/repo from URL: {repo_url!r}")
-    return parts[-2], parts[-1]
+    owner, repository = parts[-2], parts[-1]
+    if not (_OWNER_REPO_RE.match(owner) and _OWNER_REPO_RE.match(repository)):
+        raise GitProviderError(f"Cannot parse owner/repo from URL: {repo_url!r}")
+    return owner, repository
 
 
 class GitHubProvider(GitProvider):
     name = "github"
-    host = "github.com"
+    host = GITHUB_HOST
     api_base = "https://api.github.com"
 
     def _headers(self) -> dict:
         headers = {
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
-            "User-Agent": "bench-cli",
+            "User-Agent": "pilot",
         }
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
@@ -68,13 +77,21 @@ class GitHubProvider(GitProvider):
                 break
         return repos
 
-    def authenticated_clone_url(self, repo_url: str) -> str:
-        return inject_https_token(repo_url, "x-access-token", self.token)
+    def auth_config(self, repo_url: str) -> dict[str, str]:
+        return basic_auth_config(repo_url, "x-access-token", self.token)
 
     def list_branches(self, full_name: str) -> list[str]:
         url = f"{self.api_base}/repos/{full_name}/branches?per_page=100"
         data, _ = self._get_json(url, self._headers())
         return [b["name"] for b in data]
+
+    def has_branch(self, full_name: str, branch: str) -> bool:
+        url = f"{self.api_base}/repos/{full_name}/branches/{urllib.parse.quote(branch, safe='')}"
+        try:
+            self._get_json(url, self._headers())
+        except GitProviderError:
+            return False
+        return True
 
     def get_default_branch(self, full_name: str) -> str:
         url = f"{self.api_base}/repos/{full_name}"
@@ -84,7 +101,7 @@ class GitHubProvider(GitProvider):
     def fetch_raw_file(self, repo_url: str, path: str, ref: str = "HEAD") -> str:
         owner, repo = parse_github_owner_repo(repo_url)
         url = f"https://raw.githubusercontent.com/{owner}/{repo}/{ref}/{path}"
-        headers = {"User-Agent": "bench"}
+        headers = {"User-Agent": "pilot"}
         if self.token:
             headers["Authorization"] = f"Bearer {self.token}"
         req = urllib.request.Request(url, headers=headers)

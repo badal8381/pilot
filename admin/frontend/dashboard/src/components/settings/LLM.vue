@@ -1,6 +1,6 @@
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+    <Spinner size="lg" class="text-ink-gray-4" />
   </div>
   <div v-else class="space-y-6">
     <Alert v-if="!connected" theme="blue" title="Why connect an AI assistant?" :dismissible="false">
@@ -17,12 +17,11 @@
       class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3"
     >
       <div>
-        <p class="font-medium text-ink-gray-8 text-sm">Connected to {{ providerLabel }}</p>
+        <p class="font-medium text-ink-gray-8 text-base">Connected to {{ providerLabel }}</p>
         <p class="text-ink-gray-5 text-p-sm">Model {{ model || '—' }} · API key set</p>
       </div>
+
       <Button
-        class="flex-1 sm:flex-none"
-        variant="subtle"
         theme="red"
         :loading="disconnecting"
         @click="disconnect"
@@ -31,12 +30,28 @@
     </div>
 
     <div class="space-y-4">
-      <Autocomplete
+      <Combobox
         label="Provider"
         :options="providerOptions"
-        :model-value="providerSelection"
+        :model-value="provider"
         placeholder="Search providers…"
         @update:model-value="onProviderSelect"
+      />
+
+      <div v-if="needsApiBase" class="space-y-1.5">
+        <FormControl
+          label="API Base URL"
+          type="text"
+          v-model="apiBase"
+          placeholder="http://your-host:8000/v1"
+        />
+        <p v-if="apiBaseError" class="text-ink-red-5 text-p-sm">{{ apiBaseError }}</p>
+      </div>
+      <FormControl
+        label="API Key"
+        type="password"
+        v-model="apiKey"
+        :placeholder="apiKeySet ? '••••••••' : 'Provider API key'"
       />
 
       <FormControl
@@ -47,31 +62,17 @@
         placeholder="Your served model name"
       />
       <div v-else class="space-y-1.5">
-        <Autocomplete
+        <Combobox
           label="Model"
           :options="modelOptions"
-          :model-value="modelSelection"
+          :model-value="model"
           :loading="modelsLoading"
           :placeholder="modelPlaceholder"
-          @update:model-value="(o) => (model = o?.value || '')"
+          @update:model-value="(value) => (model = value || '')"
         />
-        <p v-if="modelsError" class="text-ink-red-6 text-p-sm">{{ modelsError }}</p>
+        <p v-if="modelsError" class="text-ink-red-5 text-p-sm">{{ modelsError }}</p>
         <p v-else-if="modelsHint" class="text-ink-gray-5 text-p-sm">{{ modelsHint }}</p>
       </div>
-
-      <FormControl
-        v-if="needsApiBase"
-        label="API Base URL"
-        type="text"
-        v-model="apiBase"
-        placeholder="http://your-host:8000/v1"
-      />
-      <FormControl
-        label="API Key"
-        type="password"
-        v-model="apiKey"
-        :placeholder="apiKeySet ? '••••••••' : 'Provider API key'"
-      />
       <FormControl
         label="System Prompt"
         type="textarea"
@@ -82,7 +83,7 @@
 
       <details class="group">
         <summary
-          class="flex items-center gap-1.5 text-ink-gray-6 text-sm cursor-pointer select-none"
+          class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
         >
           <span
             class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
@@ -103,7 +104,7 @@
 
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="saving" @click="save">
+        <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
           {{ connected ? 'Update' : 'Connect' }}
         </Button>
       </div>
@@ -113,7 +114,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Alert, Autocomplete, Button, ErrorMessage, FormControl, toast } from 'frappe-ui'
+import { Alert, Button, Combobox, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 
@@ -144,36 +145,46 @@ const hasApiKey = computed(() => Boolean(apiKey.value.trim() || apiKeySet.value)
 const providerOptions = computed(() =>
   providers.value.map((p) => ({ label: p.label, value: p.value })),
 )
-const providerSelection = computed(
-  () => providerOptions.value.find((o) => o.value === provider.value) || null,
-)
 const modelOptions = computed(() => models.value.map((m) => ({ label: m, value: m })))
-const modelSelection = computed(() =>
-  model.value ? { label: model.value, value: model.value } : null,
+const hasApiBase = computed(() => Boolean(apiBase.value.trim()))
+const apiBaseError = computed(() => {
+  if (!provider.value || !needsApiBase.value || hasApiBase.value) return ''
+  return `${providerLabel.value} needs the endpoint of your server, e.g. http://your-host:8000/v1`
+})
+
+// Connect stays dead until every required field is filled.
+const canSave = computed(
+  () =>
+    Boolean(provider.value) &&
+    Boolean(model.value.trim()) &&
+    hasApiKey.value &&
+    (!needsApiBase.value || hasApiBase.value),
 )
+
 const modelPlaceholder = computed(() => {
   if (!provider.value) return 'Select a provider first'
+  if (needsApiBase.value && !hasApiBase.value) return 'Enter the API base URL to load models'
   if (!models.value.length && !hasApiKey.value) return 'Enter the API key to load models'
   return 'Search models…'
 })
-// An empty picklist with no key entered is a missing key, not a missing provider —
-// say so rather than leaving a silently empty dropdown. Self-hosted types the model
-// by hand, so it never reaches here.
+// An empty picklist with no key entered is a missing key - say so.
 const modelsHint = computed(() => {
-  if (!provider.value || modelsLoading.value || models.value.length || hasApiKey.value) return ''
-  return `Enter the ${providerLabel.value} API key below to load models.`
+  if (!provider.value || modelsLoading.value || models.value.length) return ''
+  if (needsApiBase.value && !hasApiBase.value) return ''
+  if (hasApiKey.value) return ''
+  return `Enter the ${providerLabel.value} API key above to load models.`
 })
 
 async function fetchModels(providerValue) {
   models.value = []
   modelsError.value = ''
   if (!providerValue || freeTextModel.value) return
-  // Providers without a static catalog list models from their own API, so the key
-  // is sent along; the backend falls back to the key already saved in bench.toml.
+  // The key is sent along; the backend falls back to the saved one.
   if (modelsNeedApiKey.value && !hasApiKey.value) return
+  if (needsApiBase.value && !hasApiBase.value) return
   modelsLoading.value = true
   try {
-    const result = await settingsApi.llmModels(providerValue, apiKey.value.trim())
+    const result = await settingsApi.llmModels(providerValue, apiKey.value.trim(), apiBase.value.trim())
     if (result?.error) modelsError.value = apiErrorMessage(result, 'Could not load models.')
     else models.value = result || []
   } catch (e) {
@@ -183,15 +194,15 @@ async function fetchModels(providerValue) {
   }
 }
 
-function onProviderSelect(option) {
-  provider.value = option?.value || ''
+function onProviderSelect(value) {
+  provider.value = value || ''
   model.value = ''
   fetchModels(provider.value)
 }
 
 // A key-gated provider can only list models once a key exists, so reload when it settles.
 let apiKeyDebounce = null
-watch(apiKey, () => {
+watch([apiKey, apiBase], () => {
   if (!modelsNeedApiKey.value || !provider.value) return
   clearTimeout(apiKeyDebounce)
   apiKeyDebounce = setTimeout(() => fetchModels(provider.value), 600)
@@ -216,22 +227,6 @@ async function load() {
 }
 
 async function save() {
-  if (!provider.value) {
-    error.value = 'Provider is required.'
-    return
-  }
-  if (!model.value.trim()) {
-    error.value = 'Model is required.'
-    return
-  }
-  if (needsApiBase.value && !apiBase.value.trim()) {
-    error.value = 'API base URL is required for a self-hosted provider.'
-    return
-  }
-  if (!apiKeySet.value && !apiKey.value.trim()) {
-    error.value = 'API key is required.'
-    return
-  }
   saving.value = true
   error.value = ''
   try {

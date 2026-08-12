@@ -8,6 +8,7 @@ from flask import current_app
 from admin.backend.api.responses import error_response
 from admin.backend.providers.bench import BenchProvider
 from pilot.config import BenchConfig
+from pilot.config.admin import default_allow_bench_management
 
 BENCH_NAME_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 ADMIN_DOMAIN_RE = re.compile(
@@ -27,7 +28,7 @@ def guard_bench_management():
             403,
         )
 
-    if not config.get("admin", {}).get("allow_bench_management", True):
+    if not config.get("admin", {}).get("allow_bench_management", default_allow_bench_management()):
         return error_response(
             "bench_management_forbidden",
             "Bench management is disabled on this server.",
@@ -62,7 +63,7 @@ def bench_resource(bench_dir: Path) -> dict:
         "production": production,
         "process_manager": process_manager or None,
         "reachable": bench.is_port_open(port) or bench.is_port_open(port + 1),
-        "admin_url": f"{scheme}://{domain}" if production and domain else "",
+        "admin_url": f"{scheme}://{domain}" if domain else "",
         "workload_running": bench.is_workload_running if production else None,
         "admin_running": bench.is_admin_running if production else None,
         "site_count": bench.site_count,

@@ -8,7 +8,11 @@ import typing
 from datetime import UTC, datetime
 from pathlib import Path
 
+import psutil
+
+from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify
 from pilot.core.server.monitoring_config import MonitorConfigurator
+from pilot.core.server.monitoring_datum import MetricShipper
 from pilot.core.server.monitoring_proc import ProcMetricsReader
 from pilot.core.server.monitoring_processes import ProcessResolver
 from pilot.utils import cli_root, iter_sibling_benches
@@ -16,8 +20,10 @@ from pilot.utils import cli_root, iter_sibling_benches
 if typing.TYPE_CHECKING:
     from pilot.core.bench import Bench
 
-# Gap between the two /proc samples used to turn cumulative counters into a rate.
+# Gap between the two samples used to turn cumulative counters into a rate.
 CPU_SAMPLE_INTERVAL = 1.0
+
+ALERT_EVENT = "resource_limit_breached"
 
 # Raw MariaDB status counters/gauges + variables logged per cycle; the provider
 # turns consecutive samples into rates.
@@ -47,7 +53,7 @@ class Monitor:
         self._network: dict[str, float] = {}
         self._disk_io: dict[str, float] = {}
         self._targets: dict[str, int] | None = None
-        self._cpu_before: tuple[dict[str, int], dict[int, int]] | None = None
+        self._cpu_before: tuple[dict[str, float], dict[int, float]] | None = None
         self._io_before: tuple[dict[str, int], dict[str, int]] | None = None
 
     def monitored_targets(self) -> dict[str, int]:
@@ -56,8 +62,8 @@ class Monitor:
         return self._targets
 
     def sample_cpu(self) -> None:
-        pids = [pid for pid in self.monitored_targets().values() if Path(f"/proc/{pid}").exists()]
-        self._cpu_before = (self._cpu_fields(), {pid: self._proc_ticks(pid) for pid in pids})
+        pids = [pid for pid in self.monitored_targets().values() if psutil.pid_exists(pid)]
+        self._cpu_before = (self._cpu_fields(), {pid: self._proc_cpu_seconds(pid) for pid in pids})
 
     def compute_cpu(self) -> None:
         assert self._cpu_before is not None, "sample_cpu() must run before compute_cpu()"
@@ -132,43 +138,92 @@ class Monitor:
     def slow_query_log_path(self) -> Path:
         return self._configurator.slow_query_log_path
 
-    def collect_system_metrics(self) -> None:
-        self._append(
-            self.system_log_path,
-            {
-                "time": datetime.now(UTC).isoformat(),
-                "load_avg": self._load_average(),
-                "cpu_percent": self._system_cpu,
-                "cpu_breakdown": self._cpu_breakdown,
-                "memory": self._memory_usage(),
-                "storage": self._storage_usage(),
-                "network": self._network,
-                "disk_io": self._disk_io,
-            },
-        )
+    @property
+    def alerts_path(self) -> Path:
+        return self.system_log_path.with_suffix(".alerts")
 
-    def collect_database_metrics(self) -> None:
+    def _alert_payload(self, breached: list[str], system_record: dict) -> dict[str, typing.Any]:
+        """Central's report_pilot_event schema: event, message, context."""
+        limits = self.bench.config.resource_limits
+        readings = self._readings(system_record)
+        crossed = [
+            {"limit": name, "threshold": getattr(limits, name), "reading": readings[name]}
+            for name in breached
+        ]
+        summary = ", ".join(f"{item['limit']} at {item['reading']}%" for item in crossed)
+        return {
+            "event": ALERT_EVENT,
+            "message": f"{self.bench.config.name}: {summary}",
+            "context": {
+                "bench": self.bench.config.name,
+                "time": system_record["time"],
+                "sustained_seconds": ALERT_SUSTAINED_SECONDS,
+                "breached_limits": crossed,
+            },
+        }
+
+    def send_alert_if_required(self, system_record: dict) -> None:
+        """Send system alerts if required based on the breach limits set"""
+        alerts = SustainedAlerts(self.alerts_path)
+        due = alerts.due(self._breached_limits(system_record))
+        if due and notify(self.bench, self._alert_payload(due, system_record)):
+            alerts.mark_notified(due)
+
+    @staticmethod
+    def _readings(system_record: dict) -> dict[str, float]:
+        return {
+            "cpu_usage_limit": system_record["cpu_percent"],
+            "memory_usage_limit": system_record["memory"]["percent"],
+            "disk_space_limit": system_record["storage"]["disk"]["percent"],
+        }
+
+    def _breached_limits(self, system_record: dict) -> list[str]:
+        limits = self.bench.config.resource_limits
+        breached = []
+        for name, reading in self._readings(system_record).items():
+            limit = getattr(limits, name)
+            if limit and reading > limit:
+                breached.append(name)
+        return breached
+
+    def collect_system_metrics(self) -> dict:
+        record = {
+            "time": datetime.now(UTC).isoformat(),
+            "load_avg": self._load_average(),
+            "cpu_percent": self._system_cpu,
+            "cpu_breakdown": self._cpu_breakdown,
+            "memory": self._memory_usage(),
+            "storage": self._storage_usage(),
+            "network": self._network,
+            "disk_io": self._disk_io,
+        }
+        self._append(self.system_log_path, record)
+        self.send_alert_if_required(record)
+        return record
+
+    def collect_database_metrics(self) -> dict | None:
         """One raw MariaDB sample per host. Never crashes the daemon on a bad DB."""
         if self.bench.config.db_type != "mariadb":
-            return
+            return None
         try:
             from pilot.core.database import make_database
             from pilot.core.database.engines import MariaDB
 
             database = make_database(self.bench.config)
             if not isinstance(database, MariaDB):
-                return
+                return None
             status = database.get_global_status()
             variables = database.get_global_variables()
         except Exception:
-            return
+            return None
         record: dict[str, typing.Any] = {"time": datetime.now(UTC).isoformat()}
         for key in _DB_STATUS_KEYS:
             record[key] = _to_int(status.get(key))
         for key in _DB_VARIABLE_KEYS:
             record[key] = _to_int(variables.get(key))
-        record["total_ram_mb"] = self._memory_usage().get("total_mb")
+        record["total_ram_bytes"] = self._memory_usage().get("total_bytes")
         self._append(self.db_log_path, record)
+        return record
 
     def collect_slow_queries(self) -> None:
         """Append new slow-log rows to the occurrence log. Skips quietly if the
@@ -188,40 +243,38 @@ class Monitor:
         except Exception:
             return
 
-    def collect_application_metrics(self) -> None:
+    def collect_application_metrics(self) -> dict:
         processes = []
         for service, pid in self.monitored_targets().items():
-            if not Path(f"/proc/{pid}").exists():
+            try:
+                processes.append(self._process_metrics(service, pid))
+            except psutil.NoSuchProcess:
+                # Either never started, or exited between resolving the pid and reading it.
                 processes.append({"service": service, "pid": pid, "missing": True})
-                continue
-            processes.append(self._process_metrics(service, pid))
 
-        self._append(
-            self.log_path,
-            {
-                "time": datetime.now(UTC).isoformat(),
-                "bench": self.bench.config.name,
-                "processes": processes,
-            },
-        )
+        record = {
+            "time": datetime.now(UTC).isoformat(),
+            "bench": self.bench.config.name,
+            "processes": processes,
+        }
+        self._append(self.log_path, record)
+        return record
 
-    def _proc_usage(self, ticks_before: int, pid: int, delta_total: int) -> float:
+    def _proc_usage(self, seconds_before: float, pid: int, delta_total: float) -> float:
         try:
-            delta = self._proc_ticks(pid) - ticks_before
-        except FileNotFoundError:
+            delta = self._proc_cpu_seconds(pid) - seconds_before
+        except psutil.NoSuchProcess:
             return 0.0
         return round(delta / delta_total * 100, 2) if delta_total > 0 else 0.0
 
     def _process_metrics(self, service: str, pid: int) -> dict:
-        status = self._read_status(pid)
-        pss_memory = self._read_pss(pid)
         read_bytes, write_bytes = self._io_bytes(pid)
         return {
             "service": service,
             "pid": pid,
-            "state": status.get("State", "?").split()[0],
+            "state": self._process_state(pid),
             "cpu_percent": self._cpu_percent(pid),
-            "memory_rss_mb": round(pss_memory / 1024, 2),
+            "memory_rss_bytes": self._proc_memory_bytes(pid),
             "read_bytes": read_bytes,
             "write_bytes": write_bytes,
             "open_fds": self._open_fds(pid),
@@ -230,11 +283,11 @@ class Monitor:
     def _cpu_percent(self, pid: int) -> float:
         return self._proc_cpu.get(pid, 0.0)
 
-    def _cpu_fields(self) -> dict[str, int]:
+    def _cpu_fields(self) -> dict[str, float]:
         return self._proc_reader.cpu_fields()
 
-    def _proc_ticks(self, pid: int) -> int:
-        return self._proc_reader.proc_ticks(pid)
+    def _proc_cpu_seconds(self, pid: int) -> float:
+        return self._proc_reader.proc_cpu_seconds(pid)
 
     def _net_fields(self) -> dict[str, int]:
         return self._proc_reader.net_fields()
@@ -242,11 +295,11 @@ class Monitor:
     def _disk_io_fields(self) -> dict[str, int]:
         return self._proc_reader.disk_io_fields()
 
-    def _read_status(self, pid: int) -> dict[str, str]:
-        return self._proc_reader.read_status(pid)
+    def _process_state(self, pid: int) -> str:
+        return self._proc_reader.process_state(pid)
 
-    def _read_pss(self, pid: int) -> int:
-        return self._proc_reader.read_pss(pid)
+    def _proc_memory_bytes(self, pid: int) -> int:
+        return self._proc_reader.proc_memory_bytes(pid)
 
     def _io_bytes(self, pid: int) -> tuple[int, int]:
         return self._proc_reader.io_bytes(pid)
@@ -292,20 +345,28 @@ def _production_monitors() -> list[Monitor]:
 
 def main() -> None:
     monitors = _production_monitors()
+    if not monitors:
+        return
+
     for monitor in monitors:
         monitor.sample_cpu()
         monitor.sample_io()
     time.sleep(CPU_SAMPLE_INTERVAL)
+
+    shipper = MetricShipper(monitors[0].bench.config.datum)
     for monitor in monitors:
         monitor.compute_cpu()
         monitor.compute_io()
-        monitor.collect_application_metrics()
+        shipper.add_application(monitor.collect_application_metrics())
+
     # System/DB-wide metrics describe the shared host, not any one bench -
     # collect them exactly once per tick, not once per bench.
-    if monitors:
-        monitors[0].collect_system_metrics()
-        monitors[0].collect_database_metrics()
-        monitors[0].collect_slow_queries()
+    host = monitors[0]
+    shipper.add_system(host.collect_system_metrics())
+    shipper.add_database(host.collect_database_metrics())
+    host.collect_slow_queries()
+    # One tick, one POST, after every log is on disk.
+    shipper.send()
 
 
 if __name__ == "__main__":

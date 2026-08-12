@@ -11,14 +11,16 @@ import {
 } from 'frappe-ui'
 import Sidebar from '@/components/navigation/Sidebar.vue'
 import PilotLogo from '@/components/icons/Pilot.vue'
-import MigrationStatusButton from '@/components/common/MigrationStatusButton.vue'
+import UpdateStatusButton from '@/components/common/UpdateStatusButton.vue'
 import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import BenchSwitcherDialog from '@/components/benches/BenchSwitcherDialog.vue'
 import NewBenchDialog from '@/components/benches/NewBenchDialog.vue'
+import SearchDialog from '@/components/search/SearchDialog.vue'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSession } from '@/composables/auth/useSession'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
+import { openSearch, searchOpen, useSearchShortcut } from '@/composables/common/useSearch'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,6 +28,7 @@ const { items, resetBreadcrumbs } = useBreadcrumbs()
 const isMobile = useIsMobile()
 const { session } = useSession()
 const { showBenches, showNewBench } = useAppMenu()
+useSearchShortcut()
 
 // Remembers the last non-Settings route so dismissing the dialog (backdrop
 // click, Escape, close button) exits to it directly instead of stepping back
@@ -61,8 +64,10 @@ const breadcrumbs = computed(() => {
   return isMobile.value ? all.slice(-1) : all
 })
 
-function breadcrumbsFromRouteMeta({ title = '', group }) {
-  return group ? [{ label: group }, { label: title }] : [{ label: title }]
+// The group is only a sidebar section heading - it has no route of its own, so
+// rendering it as a crumb gives a dead link that leads nowhere.
+function breadcrumbsFromRouteMeta({ title = '' }) {
+  return title ? [{ label: title }] : []
 }
 </script>
 
@@ -74,7 +79,7 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
       <div class="flex items-center justify-between">
         <template v-if="route.name == 'Home'">
           <div class="flex items-center gap-2">
-            <PilotLogo class="size-6 rounded-sm" />
+            <PilotLogo class="size-6 rounded-1" />
             <span class="text-ink-gray-9">Home</span>
           </div>
         </template>
@@ -90,7 +95,7 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
 
         <div id="header-badge" class="flex items-center" />
         <div id="header-actions" class="flex items-center gap-2 ml-auto">
-          <MigrationStatusButton v-if="route.name !== 'SiteDetail'" />
+          <UpdateStatusButton v-if="route.meta.showUpdateStatus" />
         </div>
       </div>
     </header>
@@ -102,7 +107,7 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
     <template #nav>
       <MobileNav class="!bg-surface-base">
         <MobileNavItem label="Home" icon="lucide-house" to="/home" :active="route.name == 'Home'" />
-        <MobileNavItem label="Search" icon="lucide-search" />
+        <MobileNavItem label="Search" icon="lucide-search" @click="openSearch" />
         <MobileNavItem label="Notifications" icon="lucide-bell" />
         <MobileNavItem
           label="Settings"
@@ -127,11 +132,11 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
       class="sticky top-0 z-10 flex min-h-12 flex-col justify-center border-b bg-surface-base px-3 sm:px-5"
     >
       <div class="flex items-center justify-between">
-        <div class="flex flex-1 items-center gap-2">
+        <div class="flex flex-1 items-center gap-1">
           <Breadcrumbs :items="breadcrumbs" />
           <div id="header-badge" class="flex items-center" />
           <div id="header-actions" class="flex items-center gap-2 ml-auto">
-            <MigrationStatusButton />
+            <UpdateStatusButton v-if="route.meta.showUpdateStatus" />
           </div>
         </div>
       </div>
@@ -147,4 +152,5 @@ function breadcrumbsFromRouteMeta({ title = '', group }) {
     <BenchSwitcherDialog v-model="showBenches" @new-bench="showNewBench = true" />
     <NewBenchDialog v-model="showNewBench" />
   </template>
+  <SearchDialog v-model:open="searchOpen" />
 </template>

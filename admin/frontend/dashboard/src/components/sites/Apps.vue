@@ -1,7 +1,7 @@
 <template>
   <div class="mt-5">
-    <div v-if="appsLoading" class="flex justify-center py-12">
-      <LoadingText />
+    <div v-if="appsLoading" class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
+      <MarketplaceAppCardSkeleton v-for="i in 4" :key="i" :index="i - 1" />
     </div>
     <div v-else-if="!installedApps.length" class="py-12 text-ink-gray-5 text-sm text-center">
       No apps installed on this site.
@@ -12,12 +12,16 @@
           <Dropdown
             v-if="menuOptions(app).length"
             :options="menuOptions(app)"
-            placement="bottom-end"
           >
             <template #default="{ open }">
-              <Button variant="ghost" size="sm" :active="open">
-                <span class="size-4 lucide-ellipsis" />
-              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="App actions"
+                tooltip="Actions"
+              />
             </template>
           </Dropdown>
           <span v-else class="size-7 shrink-0" />
@@ -26,46 +30,34 @@
     </div>
   </div>
 
-  <Dialog v-model="showUninstall" :options="{ title: 'Uninstall App', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Uninstall <span class="font-semibold text-ink-gray-8 break-all">{{ uninstallTarget }}</span>
-        from <span class="font-semibold text-ink-gray-8 break-all">{{ siteName }}</span>?
-      </p>
-      <p class="mt-2 text-ink-red-6 text-sm">
-        This action will drop the doctype of {{ uninstallTarget }} and can't be undone.
-      </p>
-      <ErrorMessage v-if="uninstallError" :message="uninstallError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showUninstall = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="uninstalling" @click="confirmUninstall">
-          Uninstall
-        </Button>
-      </div>
-    </template>
-  </Dialog>
+  <UninstallAppDialog
+    v-model:open="showUninstall"
+    :app="uninstallTarget"
+    :site-name="siteName"
+    :can-disable="canDisable(uninstallTarget)"
+    @disabled="refresh"
+  />
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { Button, Dialog, Dropdown, ErrorMessage, LoadingText } from 'frappe-ui'
-import { apiErrorMessage } from '@/api/client'
+import { Button, Dropdown } from 'frappe-ui'
 import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
+import MarketplaceAppCardSkeleton from '@/components/marketplace/MarketplaceAppCardSkeleton.vue'
+import UninstallAppDialog from '@/components/apps/UninstallAppDialog.vue'
 import { useSite } from '@/composables/sites/useSite'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useSession } from '@/composables/auth/useSession'
-import { openTaskDetailPage } from '@/utils/taskRoute'
 import { toSentenceCase } from '@/utils/format'
 
 const props = defineProps({
   siteName: { type: String, required: true },
 })
-const router = useRouter()
 const { session } = useSession()
 
-const { apps, installedApps, appsLoading, loadApps, uninstallApp } = useSite(props.siteName)
+const { apps, canDisableApps, installedApps, appsLoading, loadApps, reload } = useSite(props.siteName)
 const {
+  registry,
   titleMap,
   descriptionMap,
   logoMap,
@@ -73,6 +65,17 @@ const {
   websiteMap,
   load: loadRegistry,
 } = useAppRegistry()
+
+// The list renders `installedApps`, which rides on the site payload - refreshing the
+// app metadata alone would leave a just-disabled app on screen.
+async function refresh() {
+  await Promise.all([reload(), loadApps()])
+}
+
+// Disabling needs a Frappe that supports it, and an app the catalog can reinstall.
+function canDisable(app) {
+  return canDisableApps.value && Boolean(app && registry.value.some((entry) => entry.name === app.name))
+}
 
 const appDetailMap = computed(() => Object.fromEntries(apps.value.map((a) => [a.name, a])))
 
@@ -89,9 +92,7 @@ const appObjects = computed(() =>
 )
 
 const showUninstall = ref(false)
-const uninstallTarget = ref('')
-const uninstalling = ref(false)
-const uninstallError = ref('')
+const uninstallTarget = ref(null)
 
 function openLink(url) {
   window.open(url, '_blank', 'noopener,noreferrer')
@@ -117,36 +118,17 @@ function menuOptions(app) {
     ...(app.name !== 'frappe'
       ? [
           {
-            label: 'Uninstall',
+            label: canDisable(app) ? 'Remove' : 'Uninstall',
             icon: 'lucide-trash-2',
             theme: 'red',
             onClick: () => {
-              uninstallTarget.value = app.name
-              uninstallError.value = ''
+              uninstallTarget.value = app
               showUninstall.value = true
             },
           },
         ]
       : []),
   ]
-}
-
-async function confirmUninstall() {
-  uninstalling.value = true
-  uninstallError.value = ''
-  try {
-    const result = await uninstallApp(uninstallTarget.value)
-    if (result.task_id) {
-      showUninstall.value = false
-      openTaskDetailPage(router, result.task_id)
-    } else {
-      uninstallError.value = apiErrorMessage(result, 'Uninstall failed.')
-    }
-  } catch (e) {
-    uninstallError.value = e.message || 'Uninstall failed.'
-  } finally {
-    uninstalling.value = false
-  }
 }
 
 onMounted(() => {

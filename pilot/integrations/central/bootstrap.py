@@ -38,11 +38,11 @@ def seed_from_metadata(bench: "Bench", path: str) -> bool:
 def seed(bench: "Bench", endpoint: str, bootstrap_token: str) -> None:
     from pilot.config.bench import BenchConfig
 
-    config = BenchConfig.read_raw(bench.path)
-    central = config.setdefault("central", {})
-    central["endpoint"] = endpoint
-    central["bootstrap_token"] = bootstrap_token
-    BenchConfig.write_raw(bench.path, config)
+    # Enrolment is host-shared: BenchConfig.open() persists it to
+    # common_config.toml, not into this bench's own bench.toml.
+    with BenchConfig.open(bench.path) as config:
+        config.central.endpoint = endpoint
+        config.central.bootstrap_token = bootstrap_token
 
     bench.config.central.endpoint = endpoint
     bench.config.central.bootstrap_token = bootstrap_token
@@ -54,7 +54,7 @@ def enroll_if_needed(bench: "Bench") -> bool:
         return False
     if not central.endpoint or not central.bootstrap_token:
         raise CentralClientError(
-            "Cannot enrol: central.endpoint / central.bootstrap_token not set in bench.toml"
+            "Cannot enrol: central.endpoint / central.bootstrap_token not set in common_config.toml"
         )
     result = _enroll(central.endpoint.rstrip("/"), central.bootstrap_token)
     _persist(bench, result)
@@ -88,23 +88,18 @@ def _persist(bench: "Bench", result: dict[str, Any]) -> None:
     if missing:
         raise CentralClientError(f"Enrollment response missing: {', '.join(missing)}")
 
-    config = BenchConfig.read_raw(bench.path)
+    # central and admin.jwks_* are both host-shared, so one typed transaction
+    # persists the whole enrolment to common_config.toml.
+    with BenchConfig.open(bench.path) as config:
+        config.central.endpoint = result.get("central_endpoint") or config.central.endpoint
+        config.central.auth_token = result["auth_token"]
+        config.central.bootstrap_token = ""
+        config.admin.jwks_url = result["jwks_url"]
+        config.admin.jwks_audience = result["audience_id"]
+        endpoint = config.central.endpoint
 
-    central = config.setdefault("central", {})
-    central["endpoint"] = result.get("central_endpoint") or central.get("endpoint", "")
-    central["auth_token"] = result["auth_token"]
-    central.pop("bootstrap_token", None)
-
-    BenchConfig.write_raw(bench.path, config)
-
-    bench.config.central.endpoint = central["endpoint"]
-    bench.config.central.auth_token = central["auth_token"]
+    bench.config.central.endpoint = endpoint
+    bench.config.central.auth_token = result["auth_token"]
     bench.config.central.bootstrap_token = ""
-
-    # admin.jwks_* is host-shared (common_config.toml); BenchConfig.open()
-    # writes it there, not into this bench's own bench.toml.
-    with BenchConfig.open(bench.path) as typed_config:
-        typed_config.admin.jwks_url = result["jwks_url"]
-        typed_config.admin.jwks_audience = result["audience_id"]
     bench.config.admin.jwks_url = result["jwks_url"]
     bench.config.admin.jwks_audience = result["audience_id"]

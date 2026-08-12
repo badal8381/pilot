@@ -95,13 +95,16 @@ allow_bench_management = true
 
 `admin.internal_port` is derived as `port + 1` for the localhost Gunicorn service behind nginx.
 
+`allow_bench_management` gates creating and managing sibling benches from this bench's Admin. It defaults to `true` only on a development checkout (`install.sh --dev`). A release install defaults to `false`, so set it in `bench.toml` to turn it on.
+
+`password` is stored as a PBKDF2-HMAC-SHA256 hash (`$pbkdf2-sha256$<iterations>$<salt>$<key>`, hashlib only - no dependency), so `bench.toml` holds a verifier rather than the password. Set it with `pilot set-admin-password` or the Settings page; a bench upgraded from an older version is migrated by the `hash_admin_password` patch, and its cleartext keeps working until then.
+
 `jwt_secret` is this bench's own local token signing secret, kept in `bench.toml`. `jwks_url` and `jwks_audience` trust a remote issuer instead and are host-shared - see [Common Config](#common-config).
 
 ## Other Groups
 
 - `[monitor]`: per-bench `log_path` for this bench's own application metrics. The host-wide system/DB/slow-query log paths are fixed at `cli_root()/system/logs/*` and not configurable anywhere.
 - `[gunicorn]`: Gunicorn process settings.
-- `[central]`: Central endpoint and Pilot auth token.
 - `[firewall]`: firewall behavior.
 - `[waf]`: WAF behavior.
 - `[s3]`: S3 backup credentials and bucket settings.
@@ -111,9 +114,17 @@ Nginx has no per-bench `bench.toml` section - `config.nginx` always holds its co
 
 Unknown fields are ignored by normal loads for compatibility. Strict validation can report unknown config paths.
 
+## Database Credentials
+
+`mariadb.root_password` and `postgres.root_password` never reach a command line. Pilot's own client calls pass them through `MYSQL_PWD`/`PGPASSWORD`, and the frappe commands that set a site up (`new-site`, `restore`, `reinstall`, `drop-site`) get a throwaway MariaDB account instead: `MariaDBManager.temporary_setup_user` grants it `RELOAD`, `CREATE USER`, and full rights on that one site database, then drops it when the command returns. Pilot therefore names the site database itself (`_<16 hex>`) rather than letting frappe pick a random one. Postgres still passes the superuser credential, because frappe's Postgres setup needs privileges a scoped role cannot hold.
+
+## Fetched Endpoints
+
+`admin.jwks_url`, `central.endpoint`, `datum.endpoint`, and `llm.api_base` are URLs this bench requests itself, so `BenchConfig.validate` sends each through `validate_external_url`: the scheme must be `http` or `https`, credentials must not be embedded, and the host must not be link-local or a cloud metadata name. Loopback and private addresses stay allowed - a self-hosted model or a local JWKS issuer is a normal setup. Validation reads the literal host only; a domain that resolves to a blocked address is not caught.
+
 ## Common Config
 
-Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
+Some settings are shared by every bench under one benches directory, not owned by any single bench: one MariaDB server, one Postgres server, one ACME account, one trusted admin JWKS issuer, one Central enrolment, one metrics destination. These live in `common_config.toml`, next to the bench folders, not in any bench's own `bench.toml`:
 
 ```toml
 [mariadb]
@@ -135,13 +146,23 @@ existing = false
 email = "ops@example.com"
 webroot_path = "/var/www/letsencrypt"
 
+[central]
+endpoint = "https://central.example.com"
+auth_token = ""
+
+[datum]
+endpoint = "https://datum.internal"
+token = ""
+
 [admin]
 jwks_url = "https://issuer.example.com/jwks.json"
 jwks_audience = "bench-fleet"
 ```
 
-`BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
+`BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, `config.central`, `config.datum`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
+
+`[datum]` is where the monitor ships metrics. With both `endpoint` and `token` set, and the optional `datum` package installed (`pip install pilot[metrics]`), every collection tick is posted as one batch of samples. The JSON-Lines monitor logs are written either way - they stay the Admin UI's source of truth.
 
 The host-wide system/DB/slow-query monitor log paths (`system_log_path`/`db_log_path`/`slow_query_log_path`) are not configurable at all, in `bench.toml` or `common_config.toml` - they're fixed at `cli_root()/system/logs/{system-stats.log,db-stats.log,slow-queries.json}` (see `pilot/config/monitor.py`).
 
-A pre-upgrade bench whose `bench.toml` still carries these fields directly is migrated by the `merge_common_config` patch - see [pilot/patches](../pilot/patches) and `bench admin run-patches`.
+A pre-upgrade bench whose `bench.toml` still carries these fields directly is migrated by the `merge_common_config` patch - see [pilot/patches](../pilot/patches) and `pilot admin run-patches`.

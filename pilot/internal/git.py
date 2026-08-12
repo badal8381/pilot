@@ -1,14 +1,35 @@
 from __future__ import annotations
 
+import contextlib
+import os
 import subprocess
+import time
 from pathlib import Path
+
+_STALE_TEMP_FILE_SECONDS = 24 * 60 * 60
+# ext:: hands git an arbitrary command to run as the transport, so no bench input can
+# ever be allowed to reach it. See gitprotocol-ext(5).
+_BASE_GIT_CONFIG = {"protocol.ext.allow": "never"}
+
+
+def git_env(config: dict[str, str] | None = None, base: dict | None = None) -> dict:
+    """Environment that carries git config for one invocation. Credentials belong here,
+    never in argv (readable in /proc) or in .git/config (outlives the call)."""
+    settings = {**_BASE_GIT_CONFIG, **(config or {})}
+    env = dict(os.environ if base is None else base)
+    env["GIT_CONFIG_COUNT"] = str(len(settings))
+    for index, (key, value) in enumerate(settings.items()):
+        env[f"GIT_CONFIG_KEY_{index}"] = key
+        env[f"GIT_CONFIG_VALUE_{index}"] = value
+    return env
 
 
 class GitRepo:
     """Git CLI wrapper with quiet read accessors."""
 
-    def __init__(self, path: Path) -> None:
+    def __init__(self, path: Path, config: dict[str, str] | None = None) -> None:
         self.path = Path(path)
+        self.config = config or {}
 
     @property
     def is_cloned(self) -> bool:
@@ -48,6 +69,15 @@ class GitRepo:
         except ValueError:
             return 0
 
+    def has_commit(self, sha: str) -> bool:
+        """Whether the object is already in this clone (no network)."""
+        return bool(sha) and self._run("cat-file", "-e", f"{sha}^{{commit}}").returncode == 0
+
+    def is_ancestor(self, ancestor: str, descendant: str) -> bool:
+        """Whether `ancestor` is reachable from `descendant`. False when either
+        commit is missing locally, so callers must fetch before trusting it."""
+        return self._run("merge-base", "--is-ancestor", ancestor, descendant).returncode == 0
+
     def tracking_sha(self, branch: str) -> str:
         """SHA of the locally-cached remote branch tip (no network)."""
         if not branch:
@@ -65,15 +95,24 @@ class GitRepo:
                 return sha
         return ""
 
-    def has_remote_update(self) -> bool:
-        """Whether origin's branch tip is ahead of local HEAD (one network call)."""
-        remote = self.remote_branch_sha(self.branch)
-        local = self.head_sha
-        return bool(remote and local and remote != local)
-
     def fetch(self, *refspecs: str, timeout: float | None = None) -> bool:
         """Best-effort fetch from origin; returns False instead of raising on failure."""
+        self.prune_stale_temp_packs()
         return self._run("fetch", "origin", *refspecs, "--quiet", timeout=timeout).returncode == 0
+
+    def prune_stale_temp_packs(self) -> None:
+        """Drop pack files left behind by a fetch that was killed mid-transfer.
+
+        A killed process runs no cleanup of its own, so this happens on the way
+        into the next fetch rather than on the way out of the last one. The
+        one-day floor is git's own staleness rule for these files, which keeps
+        it clear of a fetch running right now.
+        """
+        cutoff = time.time() - _STALE_TEMP_FILE_SECONDS
+        for temp_file in self.path.glob(".git/objects/pack/tmp_*"):
+            with contextlib.suppress(OSError):
+                if temp_file.stat().st_mtime < cutoff:
+                    temp_file.unlink()
 
     def abort_merge_rebase(self) -> None:
         """Best-effort cleanup of an in-progress merge/rebase, e.g. before switching branches."""
@@ -122,6 +161,7 @@ class GitRepo:
                 capture_output=True,
                 text=True,
                 timeout=timeout,
+                env=git_env(self.config),
             )
         except (OSError, subprocess.SubprocessError):
             return subprocess.CompletedProcess(args, returncode=1, stdout="", stderr="")

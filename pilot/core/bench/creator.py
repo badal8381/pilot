@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import secrets
 import socket
 from collections.abc import Callable
 from pathlib import Path
@@ -15,9 +14,8 @@ if TYPE_CHECKING:
 
 class BenchCreator:
     """Creates a bench. Host-shared settings (MariaDB/Postgres server, ACME
-    email, admin JWKS trust) live in common_config.toml and are merged in
-    automatically by BenchConfig - only a first-ever database needs seeding
-    here."""
+    email, admin JWKS trust) live in common_config.toml. Database credentials
+    are generated at `pilot init`, not here - see BenchInitializer."""
 
     def __init__(
         self,
@@ -27,6 +25,7 @@ class BenchCreator:
         admin_domain: str = "",
         admin_tls: bool | None = None,
         db_type: str = "mariadb",
+        admin_password: str = "",
     ) -> None:
         self.target_directory = target_directory
         self.name = name
@@ -34,6 +33,7 @@ class BenchCreator:
         self.admin_domain = admin_domain
         self.admin_tls = admin_tls
         self.db_type = db_type
+        self.admin_password = admin_password
 
     def run(self, on_progress: Callable[[str], None] = lambda message: None) -> "Bench":
         from pilot.config import BenchConfig
@@ -59,48 +59,31 @@ class BenchCreator:
 
         admin_port = BenchConfig.default_ports()["admin.port"] + offset
         on_progress(f"\nBench '{self.name}' created at {self.target_directory}")
+        if not self.admin_password:
+            on_progress(f"\nGenerated admin password: {settings['admin_password']}")
+            on_progress("  Change it any time with 'pilot set-admin-password'.")
         on_progress("\nNext step:")
-        on_progress("  bench start")
-        on_progress(f"  Then open http://localhost:{admin_port} - the setup wizard takes it from there.")
+        on_progress("  pilot start")
+        on_progress(f"  Then open the sign-in link it prints for http://localhost:{admin_port}.")
 
         return Bench(self.target_directory)
 
     def _initial_settings(self) -> dict:
+        import secrets
+
         settings = {
             "admin_enabled": True,
+            # The Admin needs a password from the start: the setup wizard authenticates
+            # like every other page, so there is no unprotected window to set one in.
+            "admin_password": self.admin_password or secrets.token_urlsafe(12),
             "admin_domain": self.admin_domain,
             # admin.tls is a per-bench choice, not inherited from siblings.
             "admin_tls": bool(self.admin_tls),
             "db_type": self.db_type,
         }
-        self._add_database_settings(settings)
         if self.process_manager:
             settings["production_process_manager"] = self.process_manager
         return settings
-
-    def _add_database_settings(self, settings: dict) -> None:
-        """Pick a fresh port/password only the first time this host
-        provisions the server; later benches inherit them automatically
-        through BenchConfig's merge with common_config.toml."""
-        from pilot.config import BenchConfig, MariaDBConfig, PostgresConfig
-
-        defaults = BenchConfig.default(benches_root=self.target_directory.parent)
-        if self.db_type == "mariadb" and not defaults.mariadb.root_password:
-            settings["mariadb_port"] = self._pick_free_port(MariaDBConfig().port)
-            settings["mariadb_password"] = secrets.token_hex(nbytes=8)
-        if self.db_type == "postgres" and not defaults.postgres.root_password:
-            settings["postgres_port"] = self._pick_free_port(PostgresConfig().port)
-            settings["postgres_password"] = secrets.token_hex(nbytes=8)
-
-    def _pick_free_port(self, port: int) -> int:
-        """Pick the first free port at or after `port`, for the first bench on this host."""
-        from pilot.managers.platform import is_macos
-
-        if is_macos():
-            return port
-        while self._port_is_live(port):
-            port += 1
-        return port
 
     def _pick_port_offset(self, bench_path: Path) -> int:
         """Pick the first base-port offset unused by configs or live processes."""

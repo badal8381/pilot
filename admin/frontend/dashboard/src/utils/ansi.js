@@ -1,21 +1,21 @@
-// Catppuccin Mocha palette for ANSI colours
 const ANSI_FG = {
-  30: '#45475a',
-  31: '#f38ba8',
-  32: '#a6e3a1',
-  33: '#f9e2af',
-  34: '#89b4fa',
-  35: '#cba6f7',
-  36: '#89dceb',
-  37: '#cdd6f4',
-  90: '#585b70',
-  91: '#f38ba8',
-  92: '#a6e3a1',
-  93: '#f9e2af',
-  94: '#89b4fa',
-  95: '#cba6f7',
-  96: '#89dceb',
-  97: '#ffffff',
+  30: 'var(--ink-gray-5)',
+  31: 'var(--ink-red-6)',
+  32: 'var(--ink-green-6)',
+  33: 'var(--ink-amber-6)',
+  34: 'var(--ink-blue-6)',
+  35: 'var(--ink-purple-6)',
+  36: 'var(--ink-cyan-6)',
+  37: 'var(--ink-gray-8)',
+  // Bright maps to a stronger ink step, not a lighter one.
+  90: 'var(--ink-gray-5)',
+  91: 'var(--ink-red-7)',
+  92: 'var(--ink-green-7)',
+  93: 'var(--ink-amber-7)',
+  94: 'var(--ink-blue-7)',
+  95: 'var(--ink-purple-7)',
+  96: 'var(--ink-cyan-7)',
+  97: 'var(--ink-gray-9)',
 }
 
 export function escapeHtml(text) {

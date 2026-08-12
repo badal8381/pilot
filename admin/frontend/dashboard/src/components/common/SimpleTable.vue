@@ -1,6 +1,6 @@
 <template>
-  <div :class="bordered ? 'border rounded-lg border-outline-gray-2 overflow-hidden' : ''">
-    <div :style="minHeight && !rows.length ? { minHeight } : {}">
+  <div :class="bordered ? 'border rounded-6 border-outline-gray-2 overflow-hidden' : ''">
+    <div class="overflow-x-auto hover-scrollbar" :style="minHeight && !rows.length ? { minHeight } : {}">
       <table class="w-full min-w-max text-sm">
         <thead>
           <tr class="bg-surface-gray-2 text-ink-gray-5 text-xs text-left uppercase">

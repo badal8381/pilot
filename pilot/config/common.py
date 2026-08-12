@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from pilot.config.alert_limit import ResourceLimitConfig
+from pilot.config.central import CentralConfig
+from pilot.config.datum import DatumConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
 from pilot.config.mariadb import MariaDBConfig
 from pilot.config.postgres import PostgresConfig
@@ -16,13 +19,17 @@ FILENAME = "common_config.toml"
 class CommonConfig:
     """Settings shared by every bench under one benches directory: one MariaDB
     server, one Postgres server, one ACME account, one trusted admin JWKS
-    issuer. Stored once at ``common_config.toml`` next to the bench folders.
-    BenchConfig is the only reader/writer; other code reaches these values
-    through a bench's own config instead."""
+    issuer, one Central enrolment, one metrics destination, one set of host
+    resource alert limits. Stored once at ``common_config.toml`` next to the
+    bench folders. BenchConfig is the only reader/writer; other code reaches
+    these values through a bench's own config instead."""
 
     mariadb: MariaDBConfig = field(default_factory=MariaDBConfig)
     postgres: PostgresConfig = field(default_factory=PostgresConfig)
     letsencrypt: LetsEncryptConfig = field(default_factory=LetsEncryptConfig)
+    central: CentralConfig = field(default_factory=CentralConfig)
+    datum: DatumConfig = field(default_factory=DatumConfig)
+    resource_limits: ResourceLimitConfig = field(default_factory=ResourceLimitConfig)
     jwks_url: str = ""
     jwks_audience: str = ""
 
@@ -46,6 +53,11 @@ class CommonConfig:
             mariadb=MariaDBConfig(**_known_fields(MariaDBConfig, data.get("mariadb", {}))),
             postgres=PostgresConfig(**_known_fields(PostgresConfig, data.get("postgres", {}))),
             letsencrypt=LetsEncryptConfig.from_dict(data.get("letsencrypt", {})),
+            central=CentralConfig.from_dict(data.get("central", {})),
+            datum=DatumConfig.from_dict(data.get("datum", {})),
+            resource_limits=ResourceLimitConfig(
+                **_known_fields(ResourceLimitConfig, data.get("resource_limits", {}))
+            ),
             jwks_url=admin.get("jwks_url", ""),
             jwks_audience=admin.get("jwks_audience", ""),
         )
@@ -75,8 +87,29 @@ class CommonConfig:
                 "webroot_path": str(self.letsencrypt.webroot_path),
             },
         }
+        if self.central != CentralConfig():
+            data["central"] = self._central_section()
+        if self.datum != DatumConfig():
+            data["datum"] = {"endpoint": self.datum.endpoint, "token": self.datum.token}
+        if self.resource_limits != ResourceLimitConfig():
+            data["resource_limits"] = self._resource_limits_section()
         if self.jwks_url:
             data["admin"] = {"jwks_url": self.jwks_url, "jwks_audience": self.jwks_audience}
+        return data
+
+    def _resource_limits_section(self) -> ConfigDict:
+        return {
+            "cpu_usage_limit": self.resource_limits.cpu_usage_limit,
+            "memory_usage_limit": self.resource_limits.memory_usage_limit,
+            "disk_space_limit": self.resource_limits.disk_space_limit,
+            "site_uptime": self.resource_limits.site_uptime,
+            "webhook_endpoints": self.resource_limits.webhook_endpoints,
+        }
+
+    def _central_section(self) -> ConfigDict:
+        data: ConfigDict = {"endpoint": self.central.endpoint, "auth_token": self.central.auth_token}
+        if self.central.bootstrap_token:
+            data["bootstrap_token"] = self.central.bootstrap_token
         return data
 
 

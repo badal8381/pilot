@@ -83,9 +83,6 @@ pick them up:
 - **supervisor** and the **dev runner**: neither has hooks of its own, so a
   process with hooks runs as a single shell line that preserves the exit code.
 
-The Processes page in the admin dashboard lists them, and can start, stop and
-restart each one in production.
-
 ## Failure Handling
 
 Every value here can come from a third-party app, so each field is validated

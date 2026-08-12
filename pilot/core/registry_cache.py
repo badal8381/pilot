@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 import shlex
 import subprocess
 import sys
@@ -9,6 +11,7 @@ import time
 from pathlib import Path
 
 from pilot.exceptions import CommandError, RegistryUnavailableError
+from pilot.internal.git import GitRepo
 from pilot.managers.cron import CronManager
 from pilot.utils import run_command
 
@@ -18,6 +21,7 @@ _REFRESH_INTERVAL_SECONDS = 60 * 60
 _LS_REMOTE_TIMEOUT_SECONDS = 15
 _CRON_JOB_KEY = "marketplace-registry-refresh"
 _CRON_SCHEDULE = "0 3 * * *"  # once a day, 03:00
+_APP_NAME = re.compile(r"[a-z][a-z0-9_]*")
 
 
 class RegistryCache:
@@ -31,12 +35,55 @@ class RegistryCache:
         return self._cli_root / "system" / "registry-cache"
 
     @property
-    def apps_json_path(self) -> Path:
+    def index_path(self) -> Path:
         return self.path / "apps.json"
 
     @property
     def _last_checked_path(self) -> Path:
         return self._cli_root / "system" / "registry-cache.last_checked"
+
+    def load(self) -> list[dict]:
+        """The app index, without releases - those are read per app by `releases`,
+        so the index stays cheap however many releases the registry grows."""
+        self.ensure_fresh()
+        entries = self._read_json(self.index_path)
+        if not isinstance(entries, list):
+            raise RegistryUnavailableError(f"The marketplace index is not a list of apps: {self.index_path}")
+        for entry in entries:
+            self._reject_foreign_pointer(entry)
+            entry.pop("releases")
+        return entries
+
+    def releases(self, app_name: str) -> list[dict]:
+        """Releases for one indexed app. Assumes `load` has already run, so it does
+        not re-check freshness - that check shells out to git."""
+        if not _APP_NAME.fullmatch(app_name):
+            raise RegistryUnavailableError(f"{app_name!r} is not a marketplace app name.")
+        payload = self._read_json(self.path / "apps" / f"{app_name}.json")
+        releases = payload.get("releases") if isinstance(payload, dict) else None
+        if not isinstance(releases, list):
+            raise RegistryUnavailableError(f"apps/{app_name}.json does not hold a 'releases' list.")
+        return releases
+
+    @staticmethod
+    def _reject_foreign_pointer(entry: dict) -> None:
+        """An entry may only point 'releases' at its own apps/<name>.json."""
+        name = entry.get("name") or ""
+        pointer = entry.get("releases")
+        expected = f"apps/{name}.json"
+        if not _APP_NAME.fullmatch(name) or pointer != expected:
+            raise RegistryUnavailableError(
+                f"The marketplace entry {name or entry!r} must point 'releases' at "
+                f"{expected!r}, not {pointer!r} - the registry cache is unusable."
+            )
+
+    def _read_json(self, path: Path):
+        try:
+            return json.loads(path.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise RegistryUnavailableError(
+                f"Could not read the marketplace registry at {path}: {exc}"
+            ) from exc
 
     def ensure_fresh(self) -> None:
         """Clone on first use; later reject tampering and refresh hourly."""
@@ -91,6 +138,7 @@ class RegistryCache:
             )
             if remote_head == local_head:
                 return
+            GitRepo(self.path).prune_stale_temp_packs()
             run_command(["git", "-C", str(self.path), "fetch", "--depth", "1", "origin", "HEAD"])
             run_command(["git", "-C", str(self.path), "reset", "--hard", "FETCH_HEAD"])
         except CommandError:

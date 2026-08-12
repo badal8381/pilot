@@ -72,10 +72,6 @@ domain = "admin.systemd.example.test"
 tls = true
 allow_bench_management = false
 
-[central]
-endpoint = "https://central.example.test"
-auth_token = "fixture-central-token"
-
 [firewall]
 enabled = true
 default = "deny"

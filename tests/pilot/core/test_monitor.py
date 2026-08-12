@@ -1,12 +1,18 @@
 import json
+import urllib.error
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import PropertyMock, patch
 
+import psutil
 import pytest
 
 from pilot.config import BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig
+from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, ALERT_TIMEOUT_SECONDS, notify, send_alert
 from pilot.core.bench import Bench
 from pilot.core.server.monitoring import Monitor, MonitorConfigurator
+from pilot.core.server.monitoring_proc import CPU_STAT_FIELDS
 
 
 @pytest.fixture(autouse=True)
@@ -38,13 +44,18 @@ def _fake_proc_reads(monitor: Monitor) -> None:
     monitor._load_average = lambda: (0.5, 0.4, 0.3)  # type: ignore[method-assign]
     monitor._system_cpu = 12.5
     monitor._memory_usage = lambda: {
-        "total_mb": 8192.0,
-        "used_mb": 4096.0,
-        "available_mb": 4096.0,
+        "total_bytes": 8192 * 1024**2,
+        "used_bytes": 4096 * 1024**2,
+        "available_bytes": 4096 * 1024**2,
         "percent": 50.0,
     }  # type: ignore[method-assign]
     monitor._storage_usage = lambda: {
-        "disk": {"total_mb": 51200.0, "used_mb": 20480.0, "free_mb": 30720.0, "percent": 40.0}
+        "disk": {
+            "total_bytes": 51200 * 1024**2,
+            "used_bytes": 20480 * 1024**2,
+            "free_bytes": 30720 * 1024**2,
+            "percent": 40.0,
+        }
     }  # type: ignore[method-assign]
 
 
@@ -92,18 +103,18 @@ def test_collect_system_metrics_includes_storage(tmp_path: Path) -> None:
 def test_disk_usage_returns_expected_fields(tmp_path: Path) -> None:
     monitor = _make_monitor(_make_bench(tmp_path))
     result = monitor._disk_usage(tmp_path)
-    assert result["total_mb"] > 0
-    assert result["used_mb"] >= 0
-    assert result["free_mb"] >= 0
+    assert result["total_bytes"] > 0
+    assert result["used_bytes"] >= 0
+    assert result["free_bytes"] >= 0
     assert 0.0 <= result["percent"] <= 100.0
-    assert abs(result["total_mb"] - result["used_mb"] - result["free_mb"]) < 1.0
+    assert result["total_bytes"] == result["used_bytes"] + result["free_bytes"]
 
 
 def test_storage_usage_always_includes_disk(tmp_path: Path) -> None:
     monitor = _make_monitor(_make_bench(tmp_path))
     result = monitor._storage_usage()
     assert "disk" in result
-    assert result["disk"]["total_mb"] > 0
+    assert result["disk"]["total_bytes"] > 0
 
 
 def test_compute_cpu_breakdown_sums_to_100_percent(tmp_path: Path) -> None:
@@ -167,8 +178,17 @@ def test_memory_usage_breakdown_sums_to_total(tmp_path: Path) -> None:
     monitor = _make_monitor(_make_bench(tmp_path))
     result = monitor._memory_usage()
 
-    assert set(result) >= {"total_mb", "used_mb", "cached_mb", "free_mb", "swap_used_mb", "percent"}
-    assert abs(result["total_mb"] - result["used_mb"] - result["cached_mb"] - result["free_mb"]) < 1.0
+    assert set(result) >= {
+        "total_bytes",
+        "used_bytes",
+        "cached_bytes",
+        "free_bytes",
+        "swap_used_bytes",
+        "percent",
+    }
+    assert (
+        result["total_bytes"] == result["used_bytes"] + result["cached_bytes"] + result["free_bytes"]
+    )
 
 
 def test_compute_io_reports_bytes_per_sec(tmp_path: Path) -> None:
@@ -187,18 +207,288 @@ def test_compute_io_reports_bytes_per_sec(tmp_path: Path) -> None:
     assert monitor._disk_io == {"read_bytes_per_sec": 1000.0, "write_bytes_per_sec": 500.0}
 
 
+def _disk_counter(read_bytes: int, write_bytes: int) -> SimpleNamespace:
+    return SimpleNamespace(read_bytes=read_bytes, write_bytes=write_bytes)
+
+
+def _net_counter(bytes_recv: int, bytes_sent: int) -> SimpleNamespace:
+    return SimpleNamespace(bytes_recv=bytes_recv, bytes_sent=bytes_sent)
+
+
 def test_disk_io_fields_ignores_partitions(tmp_path: Path) -> None:
+    """Partitions and dm-/loop devices double-count the disk underneath them."""
     monitor = _make_monitor(_make_bench(tmp_path))
-    diskstats = tmp_path / "diskstats"
-    diskstats.write_text(
-        "   8       0 sda 100 0 2000 0 50 0 1000 0 0 0 0\n"
-        "   8       1 sda1 40 0 800 0 20 0 400 0 0 0 0\n"
-        "  259       0 nvme0n1 10 0 200 0 5 0 100 0 0 0 0\n"
-    )
-    with patch(
-        "pilot.core.server.monitoring_proc.Path",
-        side_effect=lambda p: diskstats if p == "/proc/diskstats" else Path(p),
-    ):
+    counters = {
+        "sda": _disk_counter(2000, 1000),
+        "sda1": _disk_counter(800, 400),
+        "nvme0n1": _disk_counter(200, 100),
+        "dm-0": _disk_counter(9999, 9999),
+        "loop0": _disk_counter(5555, 5555),
+    }
+    with patch("psutil.disk_io_counters", return_value=counters):
         result = monitor._disk_io_fields()
 
-    assert result == {"read_bytes": (2000 + 200) * 512, "write_bytes": (1000 + 100) * 512}
+    assert result == {"read_bytes": 2000 + 200, "write_bytes": 1000 + 100}
+
+
+def test_net_fields_excludes_loopback(tmp_path: Path) -> None:
+    monitor = _make_monitor(_make_bench(tmp_path))
+    counters = {
+        "eth0": _net_counter(1000, 200),
+        "lo": _net_counter(9999, 9999),
+        "lo0": _net_counter(8888, 8888),
+    }
+    with patch("psutil.net_io_counters", return_value=counters):
+        result = monitor._net_fields()
+
+    assert result == {"rx_bytes": 1000, "tx_bytes": 200}
+
+
+def test_cpu_fields_defaults_absent_states_to_zero(tmp_path: Path) -> None:
+    """macOS reports no iowait/irq/softirq/steal; the sample must still complete."""
+    monitor = _make_monitor(_make_bench(tmp_path))
+    times = SimpleNamespace(user=100.0, nice=1.0, system=50.0, idle=800.0)
+    with patch("psutil.cpu_times", return_value=times):
+        fields = monitor._cpu_fields()
+
+    assert set(fields) == set(CPU_STAT_FIELDS)
+    assert fields["user"] == 100.0
+    assert fields["iowait"] == 0.0
+    assert fields["steal"] == 0.0
+
+
+def test_proc_memory_falls_back_to_uss_without_pss(tmp_path: Path) -> None:
+    """Linux reports PSS; platforms without it fall back to USS, not to zero."""
+    monitor = _make_monitor(_make_bench(tmp_path))
+    process = SimpleNamespace(memory_full_info=lambda: SimpleNamespace(uss=4 * 1024 * 1024))
+    with patch("psutil.Process", return_value=process):
+        assert monitor._proc_memory_bytes(1234) == 4 * 1024 * 1024
+
+    process = SimpleNamespace(
+        memory_full_info=lambda: SimpleNamespace(pss=2 * 1024 * 1024, uss=4 * 1024 * 1024)
+    )
+    with patch("psutil.Process", return_value=process):
+        assert monitor._proc_memory_bytes(1234) == 2 * 1024 * 1024
+
+
+def test_io_bytes_is_zero_where_the_platform_has_no_counters(tmp_path: Path) -> None:
+    monitor = _make_monitor(_make_bench(tmp_path))
+    with patch("psutil.Process", return_value=SimpleNamespace()):
+        assert monitor._io_bytes(1234) == (0, 0)
+
+    process = SimpleNamespace(
+        io_counters=lambda: SimpleNamespace(read_bytes=500, write_bytes=250)
+    )
+    with patch("psutil.Process", return_value=process):
+        assert monitor._io_bytes(1234) == (500, 250)
+
+
+def test_collect_application_metrics_marks_a_vanished_process_missing(tmp_path: Path) -> None:
+    """A pid that exits between resolution and reading must not kill the tick."""
+    monitor = _make_monitor(_make_bench(tmp_path / "my-bench"))
+    monitor._targets = {"web": 4242}
+    app_log = tmp_path / "app.log"
+
+    with (
+        patch.object(type(monitor), "log_path", new_callable=PropertyMock, return_value=app_log),
+        patch("psutil.Process", side_effect=psutil.NoSuchProcess(4242)),
+    ):
+        monitor.collect_application_metrics()
+
+    entry = json.loads(app_log.read_text().splitlines()[-1])
+    assert entry["processes"] == [{"service": "web", "pid": 4242, "missing": True}]
+
+
+def _alerting_monitor(tmp_path: Path, **limits: int) -> Monitor:
+    bench = _make_bench(tmp_path / "my-bench")
+    for name, value in limits.items():
+        setattr(bench.config.resource_limits, name, value)
+    monitor = _make_monitor(bench)
+    # MonitorConfigurator.setup() makes this directory on a real host, and it
+    # is patched out here.
+    monitor.alerts_path.parent.mkdir(parents=True, exist_ok=True)
+    bench.config.resource_limits.webhook_endpoints = {"https://alerts.example.com": "tok"}
+    return monitor
+
+
+@contextmanager
+def _captured_alerts():
+    """Collect what reaches the webhook sink. Central is not enrolled on a bare
+    test config, so notify() falls through to the webhooks alone."""
+    payloads: list[dict] = []
+    with patch(
+        "pilot.core.alerts.send_alert",
+        lambda endpoint, token, payload: payloads.append(payload),
+    ):
+        yield payloads
+
+
+def _breached(payloads: list[dict]) -> list[list[str]]:
+    return [[item["limit"] for item in payload["context"]["breached_limits"]] for payload in payloads]
+
+
+def _system_record(cpu: float = 10.0, memory: float = 10.0, disk: float = 10.0) -> dict:
+    return {
+        "time": "2026-08-10T12:00:00+00:00",
+        "cpu_percent": cpu,
+        "memory": {"percent": memory},
+        "storage": {"disk": {"percent": disk}},
+    }
+
+
+def test_alert_waits_for_the_breach_to_be_sustained(tmp_path: Path) -> None:
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert payloads == []
+    assert list(json.loads(monitor.alerts_path.read_text())) == ["cpu_usage_limit"]
+
+
+def test_alert_fires_once_the_breach_outlives_the_window(tmp_path: Path) -> None:
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+    monitor.send_alert_if_required(_system_record(cpu=95.0))
+    _age_alerts(monitor)
+
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert _breached(payloads) == [["cpu_usage_limit"]], (
+        "a sustained breach alerts once, not every tick"
+    )
+
+
+def test_alert_covers_only_the_limits_the_operator_set(tmp_path: Path) -> None:
+    """Memory is over 90% here but has no configured limit, so it is not an alert."""
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+    monitor.send_alert_if_required(_system_record(cpu=95.0, memory=99.0))
+    _age_alerts(monitor)
+
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0, memory=99.0))
+
+    assert _breached(payloads) == [["cpu_usage_limit"]]
+
+
+def test_recovering_below_the_threshold_clears_the_alerts_file(tmp_path: Path) -> None:
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80, disk_space_limit=90)
+
+    with _captured_alerts():
+        monitor.send_alert_if_required(_system_record(cpu=95.0, disk=95.0))
+        monitor.send_alert_if_required(_system_record(cpu=95.0, disk=10.0))
+
+        assert list(json.loads(monitor.alerts_path.read_text())) == ["cpu_usage_limit"]
+
+        monitor.send_alert_if_required(_system_record(cpu=10.0, disk=10.0))
+
+    assert not monitor.alerts_path.exists(), "nothing breaching means no file to keep"
+
+
+def test_a_recovered_limit_starts_its_window_over(tmp_path: Path) -> None:
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+    monitor.send_alert_if_required(_system_record(cpu=95.0))
+    _age_alerts(monitor)
+    monitor.send_alert_if_required(_system_record(cpu=10.0))
+
+    with _captured_alerts() as payloads:
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert payloads == [], "the second breach has to sustain on its own before alerting"
+
+
+def test_a_corrupt_alerts_file_does_not_stop_the_tick(tmp_path: Path) -> None:
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+    monitor.alerts_path.write_text("not json")
+
+    with _captured_alerts():
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert list(json.loads(monitor.alerts_path.read_text())) == ["cpu_usage_limit"]
+
+
+def _age_alerts(monitor: Monitor) -> None:
+    """Push every recorded breach back past the sustain window."""
+    state = json.loads(monitor.alerts_path.read_text())
+    for entry in state.values():
+        entry["since"] -= ALERT_SUSTAINED_SECONDS + 1
+    monitor.alerts_path.write_text(json.dumps(state))
+
+
+def test_alert_body_matches_centrals_event_schema(tmp_path: Path) -> None:
+    """Central's report_pilot_event takes event/message/context, and the webhook
+    sinks get the identical body."""
+    bench = _make_bench(tmp_path / "my-bench")
+    bench.config.resource_limits.cpu_usage_limit = 80
+    monitor = _make_monitor(bench)
+
+    payload = monitor._alert_payload(["cpu_usage_limit"], _system_record(cpu=95.0))
+
+    assert set(payload) == {"event", "message", "context"}
+    assert payload["event"] == "resource_limit_breached"
+    assert payload["message"] == "my-bench: cpu_usage_limit at 95.0%"
+    assert payload["context"]["breached_limits"] == [
+        {"limit": "cpu_usage_limit", "threshold": 80, "reading": 95.0}
+    ]
+    assert payload["context"]["bench"] == "my-bench"
+    json.dumps(payload)
+
+
+def test_send_alert_posts_json_with_a_bearer_token() -> None:
+    captured = {}
+
+    def fake_urlopen(request, timeout=None):
+        captured["url"] = request.full_url
+        captured["method"] = request.get_method()
+        captured["body"] = json.loads(request.data.decode())
+        captured["auth"] = request.get_header("Authorization")
+        captured["type"] = request.get_header("Content-type")
+        captured["timeout"] = timeout
+        return nullcontext()
+
+    with patch("urllib.request.urlopen", fake_urlopen):
+        send_alert("https://alerts.example.com/pilot", "tok-123", {"event": "x", "context": {}})
+
+    assert captured["url"] == "https://alerts.example.com/pilot"
+    assert captured["method"] == "POST", "urllib sends the verb verbatim, so it has to be upper case"
+    assert captured["body"] == {"event": "x", "context": {}}
+    assert captured["auth"] == "Bearer tok-123"
+    assert captured["type"] == "application/json"
+    assert captured["timeout"] == ALERT_TIMEOUT_SECONDS
+
+
+def test_alert_reaches_every_webhook_even_when_one_is_down(tmp_path: Path) -> None:
+    bench = _make_bench(tmp_path / "my-bench")
+    bench.config.resource_limits.cpu_usage_limit = 80
+    bench.config.resource_limits.webhook_endpoints = {
+        "https://down.example.com": "tok-a",
+        "https://up.example.com": "tok-b",
+    }
+    reached = []
+
+    def fake_send(endpoint, token, payload):
+        if endpoint == "https://down.example.com":
+            raise urllib.error.URLError("connection refused")
+        reached.append(endpoint)
+
+    with patch("pilot.core.alerts.send_alert", fake_send):
+        delivered = notify(bench, {"event": "x", "message": "m", "context": {}})
+
+    assert reached == ["https://up.example.com"]
+    assert delivered is True, "one sink answering is a delivered alert"
+
+
+def test_an_alert_no_sink_accepted_is_not_delivered(tmp_path: Path) -> None:
+    """The caller marks the condition notified off this, so a round where
+    everything was down must not count."""
+    bench = _make_bench(tmp_path / "my-bench")
+    bench.config.resource_limits.webhook_endpoints = {"https://down.example.com": "tok"}
+
+    def refuse(endpoint, token, payload):
+        raise urllib.error.URLError("connection refused")
+
+    with patch("pilot.core.alerts.send_alert", refuse):
+        delivered = notify(bench, {"event": "x", "message": "m", "context": {}})
+
+    assert delivered is False

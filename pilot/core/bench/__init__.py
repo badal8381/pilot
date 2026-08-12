@@ -58,6 +58,7 @@ class Bench:
         admin_domain: str = "",
         admin_tls: bool | None = None,
         db_type: str = "mariadb",
+        admin_password: str = "",
         on_progress: Callable[[str], None] = lambda message: None,
     ) -> "Bench":
         from pilot.core.bench.creator import BenchCreator
@@ -69,6 +70,7 @@ class Bench:
             admin_domain=admin_domain,
             admin_tls=admin_tls,
             db_type=db_type,
+            admin_password=admin_password,
         ).run(on_progress)
 
     @property
@@ -94,6 +96,11 @@ class Bench:
     @property
     def apps_path(self) -> Path:
         return self.path / "apps"
+
+    @property
+    def staging_path(self) -> Path:
+        """Where apps are cloned and validated before they enter apps/."""
+        return self.path / ".staging"
 
     @property
     def sites_path(self) -> Path:
@@ -123,6 +130,15 @@ class Bench:
     def frappe_call(self) -> list[str]:
         """Command prefix to invoke frappe's bench helper via the venv Python."""
         return [str(self.python), "-m", "frappe.utils.bench_helper"]
+
+    @property
+    def has_app_disabling(self) -> bool:
+        """Whether this bench's Frappe can disable an app instead of uninstalling it.
+        Bench-wide, since every site here runs the same Frappe - asked of the first
+        site that answers."""
+        from pilot.core.site.config import has_app_disabling
+
+        return any(has_app_disabling(self.path, site.config.name) for site in self.sites())
 
     @property
     def db_root_args(self) -> list[str]:
@@ -243,10 +259,10 @@ class Bench:
 
         BenchRuntime(self).rebuild_config()
 
-    def rebuild_assets(self, force: bool = False) -> None:
+    def rebuild_assets(self, apps: list[str] | None = None, force: bool = False) -> None:
         from pilot.core.bench.runtime import BenchRuntime
 
-        BenchRuntime(self).rebuild_assets(force)
+        BenchRuntime(self).rebuild_assets(apps, force)
 
     def install_requirements(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
         from pilot.core.bench.runtime import BenchRuntime
@@ -313,6 +329,13 @@ class Bench:
 
         BenchProduction(self).setup_letsencrypt()
 
+    def issue_setup_link(self) -> str:
+        """A short-lived ?sid= token that signs a browser in to this bench's Admin,
+        so the setup wizard is reachable before anyone knows the password."""
+        from admin.backend.internal.session import Session
+
+        return Session(self).issue_setup_link_token()
+
     def initialize(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
         from pilot.core.bench.initializer import BenchInitializer
 
@@ -367,11 +390,3 @@ class Bench:
         from pilot.core.bench.update import BenchUpdater
 
         BenchUpdater(self).rebuild_assets(apps_filter, on_progress)
-
-
-def _marketplace_pin(app: "App", marketplace_by_name: dict) -> "RevisionPin | None":
-    """Marketplace's advertised pin for app's installed version, or None for a
-    branch target, unlisted app, or repo mismatch (e.g. a fork)."""
-    from pilot.core.bench.update import marketplace_pin
-
-    return marketplace_pin(app, marketplace_by_name)

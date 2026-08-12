@@ -3,7 +3,7 @@
     <SiteUptime :site-name="siteName" :window="window" />
 
     <template v-if="loading">
-      <Skeleton v-for="i in 12" :key="i" class="rounded-lg h-[340px]" />
+      <Skeleton v-for="i in 12" :key="i" class="rounded-6 h-[340px]" />
     </template>
     <ErrorMessage v-else-if="error" :message="error" class="sm:col-span-2" />
 
@@ -20,7 +20,7 @@
         <AxisChart
           v-else
           :config="chart.config"
-          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 py-2"
+          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
         />
       </ChartCard>
     </template>

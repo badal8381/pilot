@@ -31,13 +31,14 @@ class BenchInitializer:
         python_env_manager = PythonEnvManager(self.bench)
 
         # Production deployment (process manager, nginx, TLS) is intentionally
-        # NOT done here - it's a separate `bench setup production` step. bench
+        # NOT done here - it's a separate `pilot setup production` step. Pilot
         # init never needs root: system packages/services are installed once
         # by install.sh, and MariaDB/PostgreSQL run as a rootless per-user
         # server (see MariaDBManager/PostgresManager).
         steps: list[tuple[str, Callable[[], None]]] = [
             ("Validate bench.toml", self.bench.config.validate),
             ("Ensure admin password", self._ensure_admin_password),
+            ("Ensure database credentials", self._ensure_database_credentials),
             ("Install system packages", self._install_system_packages),
             ("Create bench directory structure", self._create_bench_structure),
             ("Create Python virtualenv", lambda: self._create_virtualenv(python_env_manager)),
@@ -58,8 +59,8 @@ class BenchInitializer:
             action()
 
         on_progress("\nBench initialised. Next steps:")
-        on_progress("  bench new-site site1.example.com   # create your first site")
-        on_progress("  bench start                        # start all processes")
+        on_progress("  pilot new-site site1.example.com   # create your first site")
+        on_progress("  pilot start                        # start all processes")
 
     def _rollback(self, on_progress: Callable[[str], None]) -> None:
         if not self._rollback_actions:
@@ -103,7 +104,24 @@ class BenchInitializer:
         admin = self.bench.config.admin
         if not admin.enabled or admin.password:
             return
-        admin.password = secrets.token_hex(nbytes=5)
+        admin.set_password(secrets.token_urlsafe(12))
+        self.bench.config.write(self.bench.path)
+
+    def _ensure_database_credentials(self) -> None:
+        """Generate a root password and free port for a fresh shared DB server,
+        the first time any bench on this host provisions one. Later benches on
+        the same host inherit them from common_config.toml instead."""
+        if self.bench.config.db_type not in ("mariadb", "postgres"):
+            return
+        import secrets
+
+        from pilot.utils import pick_free_port
+
+        db = self.bench.config.mariadb if self.bench.config.db_type == "mariadb" else self.bench.config.postgres
+        if db.existing or db.root_password:
+            return
+        db.port = pick_free_port(db.port)
+        db.root_password = secrets.token_hex(nbytes=8)
         self.bench.config.write(self.bench.path)
 
     def _configure_redis(self) -> None:
@@ -157,7 +175,7 @@ class BenchInitializer:
         # frappe imports mysqlclient in its __init__.py for every engine, so the
         # MariaDB client headers are always required; postgres benches additionally
         # need libpq headers for psycopg. install.sh provisions them once for the
-        # whole host, so bench init only ever verifies them.
+        # whole host, so pilot init only ever verifies them.
         from pilot.exceptions import BenchError
         from pilot.managers.platform import is_linux
 

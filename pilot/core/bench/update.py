@@ -24,27 +24,34 @@ class BenchUpdater:
         from pilot.exceptions import CommandError, MigrateError
 
         live_lookup = pins is None
-        marketplace_by_name = self._marketplace_registry() if live_lookup else {}
         pins = pins or {}
 
+        updated = []
         for app in self.bench.apps():
             if apps_filter is not None and app.config.name not in apps_filter:
                 continue
+            pin = pins.get(app.config.name) or (marketplace_pin(app) if live_lookup else None)
+            if pin is None and not self._follows_its_branch(app, live_lookup):
+                on_progress(f"{app.config.name} is at the newest advertised release, skipping.")
+                continue
             on_progress(f"Updating {app.config.name}...")
-            pin = pins.get(app.config.name)
-            if pin is None and live_lookup:
-                pin = marketplace_pin(app, marketplace_by_name)
             try:
                 app.update(pin=pin)
             except CommandError as error:
                 print(f"  Error updating {app.config.name}: {error}", file=sys.stderr)
                 raise MigrateError(f"Failed to update {app.config.name}") from error
+            updated.append(app)
+
+        # Every app is on its target revision now, so the checks see the tree
+        # migrate will actually run against. Failing here means nothing has been
+        # installed or built yet, and reverting is a checkout.
+        for app in updated:
+            on_progress(f"Validating {app.config.name}...")
+            app.validate()
 
     @staticmethod
-    def _marketplace_registry() -> dict:
-        from pilot.integrations.marketplace import Marketplace
-
-        return {entry["name"]: entry for entry in Marketplace.registry()}
+    def _follows_its_branch(app: "App", live_lookup: bool) -> bool:
+        return live_lookup and not app.is_marketplace
 
     def reinstall_apps(self, apps_filter: set | None, on_progress: Callable[[str], None]) -> None:
         from pilot.exceptions import CommandError, MigrateError
@@ -71,15 +78,6 @@ class BenchUpdater:
             python_env.build_assets_for_app(app)
 
 
-def marketplace_pin(app: "App", marketplace_by_name: dict) -> "RevisionPin | None":
-    entry = marketplace_by_name.get(app.config.name)
-    if not entry or app.config.repo != entry.get("repo"):
-        return None
-    version = app.installed_version
-    target = next((target for target in entry.get("targets", []) if target["version"] == version), None)
-    if target is None:
-        return None
-
-    from pilot.core.app import RevisionPin
-
-    return RevisionPin.from_marketplace_target(target)
+def marketplace_pin(app: "App") -> "RevisionPin | None":
+    """The newer advertised release for a marketplace app, or None when there is none."""
+    return app.update_target() if app.is_marketplace else None

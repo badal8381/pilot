@@ -1,6 +1,9 @@
+import re
 from dataclasses import dataclass, field
 
 from pilot.exceptions import ConfigError
+
+_QUEUE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 @dataclass
@@ -40,7 +43,13 @@ class WorkerConfig:
             prefix = f"workers[{i}]"
             if not isinstance(group.queues, list) or not group.queues:
                 raise ConfigError(f"{prefix}.queues must be a non-empty list.")
-            if not all(isinstance(q, str) and q for q in group.queues):
-                raise ConfigError(f"{prefix}.queues must contain non-empty strings.")
+            for queue in group.queues:
+                # A queue name reaches a systemd ExecStart and a supervisor stanza, where
+                # a newline would start a directive of the attacker's choosing.
+                if not isinstance(queue, str) or not _QUEUE_NAME_PATTERN.match(queue):
+                    raise ConfigError(
+                        f"{prefix}.queues entries must be 1-64 characters of letters, "
+                        f"numbers, '-' or '_' (got {queue!r})."
+                    )
             if not isinstance(group.count, int) or group.count < 1:
                 raise ConfigError(f"{prefix}.count must be a positive integer, got '{group.count}'.")

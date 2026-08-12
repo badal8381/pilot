@@ -10,9 +10,11 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from pilot.config.admin import AdminConfig
+from pilot.config.alert_limit import ResourceLimitConfig
 from pilot.config.app import AppConfig
 from pilot.config.central import CentralConfig
 from pilot.config.common import CommonConfig
+from pilot.config.datum import DatumConfig
 from pilot.config.firewall import FirewallConfig, FirewallRule
 from pilot.config.gunicorn import GunicornConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
@@ -122,10 +124,12 @@ class BenchConfig:
     letsencrypt: LetsEncryptConfig = field(default_factory=LetsEncryptConfig)
     admin: AdminConfig = field(default_factory=AdminConfig)
     central: CentralConfig = field(default_factory=CentralConfig)
+    datum: DatumConfig = field(default_factory=DatumConfig)
     firewall: FirewallConfig = field(default_factory=FirewallConfig)
     waf: WafConfig = field(default_factory=WafConfig)
     s3: S3Config = field(default_factory=S3Config)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    resource_limits: ResourceLimitConfig = field(default_factory=ResourceLimitConfig)
 
     # -- construction --
 
@@ -175,7 +179,9 @@ class BenchConfig:
         return config
 
     @classmethod
-    def _from_dict(cls, data: dict, *, common: CommonConfig | None = None, strict: bool = False) -> "BenchConfig":
+    def _from_dict(
+        cls, data: dict, *, common: CommonConfig | None = None, strict: bool = False
+    ) -> "BenchConfig":
         cls._report_unknown_fields(data, strict=strict)
         common = common or CommonConfig()
         bench_data = data.get("bench", {})
@@ -205,6 +211,9 @@ class BenchConfig:
             mariadb=common.mariadb,
             postgres=common.postgres,
             letsencrypt=common.letsencrypt,
+            central=common.central,
+            datum=common.datum,
+            resource_limits=common.resource_limits,
             **sections,
         )
         config.admin.jwks_url = common.jwks_url
@@ -214,7 +223,7 @@ class BenchConfig:
     @staticmethod
     def _known_fields(dataclass_type: type, data: dict) -> dict:
         """Drop keys a bench.toml table has that the dataclass no longer
-        declares, so a config written by an older bench-cli still loads."""
+        declares, so a config written by an older Pilot version still loads."""
         known = {f.name for f in fields(dataclass_type)}
         return {k: v for k, v in data.items() if k in known}
 
@@ -237,6 +246,7 @@ class BenchConfig:
         self._validate_ports()
         self._validate_socketio_backend()
         self._validate_db_type()
+        self._validate_external_urls()
         self.redis.validate()
         self.workers.validate()
         self.letsencrypt.validate()
@@ -246,6 +256,7 @@ class BenchConfig:
         self.firewall.validate()
         self.waf.validate(self.nginx.client_max_body_size)
         self.llm.validate()
+        self.resource_limits.validate()
 
     def _validate_required_fields(self) -> None:
         if not self.name:
@@ -292,6 +303,20 @@ class BenchConfig:
             raise ConfigError(
                 f"bench.socketio_backend '{self.socketio_backend}' is invalid. Must be 'python' or 'node'."
             )
+
+    def _validate_external_urls(self) -> None:
+        """Every endpoint this bench fetches from, checked before anything reaches it."""
+        from pilot.internal.validators import validate_external_url
+
+        endpoints = {
+            "admin.jwks_url": self.admin.jwks_url,
+            "central.endpoint": self.central.endpoint,
+            "datum.endpoint": self.datum.endpoint,
+            "llm.api_base": self.llm.api_base,
+        }
+        for name, url in endpoints.items():
+            if error := validate_external_url(url, name):
+                raise ConfigError(error)
 
     def _validate_db_type(self) -> None:
         if self.db_type not in ("mariadb", "postgres", "sqlite"):
@@ -421,13 +446,17 @@ class BenchConfig:
 
     def _write_common(self, bench_root: Path) -> None:
         """Persist this config's shared subset (mariadb/postgres/letsencrypt/
-        jwks) to common_config.toml, the single source every bench merges.
+        central/datum/resource_limits/jwks) to common_config.toml, the single
+        source every bench merges.
         A no-op when nothing shared changed, so an unrelated bench.toml write
         never disturbs the file other benches are reading."""
         common = CommonConfig(
             mariadb=self.mariadb,
             postgres=self.postgres,
             letsencrypt=self.letsencrypt,
+            central=self.central,
+            datum=self.datum,
+            resource_limits=self.resource_limits,
             jwks_url=self.admin.jwks_url,
             jwks_audience=self.admin.jwks_audience,
         )
@@ -535,15 +564,6 @@ class BenchConfig:
         admin.update({key: value for key, value in optional_admin.items() if value})
         return admin
 
-    def _central_section(self) -> ConfigDict:
-        data: ConfigDict = {
-            "endpoint": self.central.endpoint,
-            "auth_token": self.central.auth_token,
-        }
-        if self.central.bootstrap_token:
-            data["bootstrap_token"] = self.central.bootstrap_token
-        return data
-
     def _firewall_section(self) -> ConfigDict:
         return {
             "enabled": self.firewall.enabled,
@@ -614,7 +634,9 @@ class BenchConfig:
             self._apply_setting(key, value)
 
     def _apply_setting(self, key: str, value) -> None:
-        if key in FLAT_KEYS:
+        if key == "admin_password":
+            self.admin.set_password(str(value))
+        elif key in FLAT_KEYS:
             _set_path(self, FLAT_KEYS[key], value)
         elif key == "app_repo":
             self.apps[0].repo = str(value)
@@ -624,7 +646,7 @@ class BenchConfig:
             self.workers.groups = _workers_to_groups(value)
         elif key == "production_process_manager":
             # Store the manager preference only. Production is enabled (and the
-            # deployment built) by `bench setup production`, never by editing config.
+            # deployment built) by `pilot setup production`, never by editing config.
             self.production.process_manager = "" if str(value) in ("", "none") else str(value)
         # unknown keys (wizard extras like is_linux) are ignored
 
@@ -717,13 +739,6 @@ _SECTIONS: tuple[_Section, ...] = (
         "admin",
         lambda data: AdminConfig.from_dict(data.get("admin", {})),
         lambda config: config._admin_section(),
-    ),
-    _Section(
-        "central",
-        lambda data: CentralConfig.from_dict(data.get("central", {})),
-        lambda config: (
-            config._central_section() if (config.central.endpoint or config.central.auth_token) else None
-        ),
     ),
     _Section(
         "firewall",
@@ -827,7 +842,7 @@ _BENCH_KEYS = {
     "default_branch",
     "allow_developer_mode",
 }
-# Keys older bench-cli versions wrote that the parser still tolerates.
+# Keys older Pilot versions wrote that the parser still tolerates.
 _PRODUCTION_LEGACY = {"lightweight", "nginx"}
 _WORKER_LEGACY = {"queue"}
 
@@ -840,7 +855,6 @@ def _bench_schema() -> _Table:
             "production": _Table(keys=_keys(ProductionConfig) | _PRODUCTION_LEGACY),
             "gunicorn": _Table(keys=_keys(GunicornConfig)),
             "admin": _Table(keys=_keys(AdminConfig)),
-            "central": _Table(keys=_keys(CentralConfig)),
             "s3": _Table(keys=_keys(S3Config)),
             "llm": _Table(keys=_keys(LLMConfig)),
             "firewall": _Table(

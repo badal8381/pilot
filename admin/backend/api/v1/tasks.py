@@ -18,7 +18,12 @@ from admin.backend.api.responses import (
     error_response,
     no_content_response,
 )
-from pilot.exceptions import TaskConflictError, TaskNotFoundError, TaskNotRunningError
+from pilot.exceptions import (
+    TaskConflictError,
+    TaskNotCancellableError,
+    TaskNotFoundError,
+    TaskNotRunningError,
+)
 from pilot.managers.task import (
     TaskActivityReader,
     TaskReader,
@@ -102,6 +107,8 @@ def cancel_task(task_id: str):
         return error_response("task_not_found", str(error), 404)
     except TaskNotRunningError as error:
         return error_response("task_not_active", str(error), 409)
+    except TaskNotCancellableError as error:
+        return error_response("task_not_cancellable", str(error), 409)
     except Exception:
         return error_response("task_cancellation_failed", "Could not cancel task.", 500)
     return no_content_response()
@@ -115,7 +122,7 @@ def retry_task(task_id: str):
         return error_response("task_not_found", str(error), 404)
     except Exception:
         return error_response("task_unavailable", "Could not read task.", 500)
-    if task_has_secrets(task.command):
+    if task_has_secrets(task.command, task.args):
         return error_response(
             "fresh_credentials_required",
             "This task requires fresh credentials and cannot be retried.",
@@ -213,10 +220,17 @@ def debug_task(task_id: str):
         return error_response("ai_not_configured", "Connect an AI assistant in Settings first.", 409)
 
     output = "".join(reader.iter_output(task_id)) if task.output_path.exists() else ""
+    refresh = request.args.get("refresh") == "1"
 
     def generate():
         try:
-            for text in stream_task_debug(config.llm, task, output, bench_root=bench_root):
+            for text in stream_task_debug(
+                config.llm,
+                task,
+                output,
+                bench_root=bench_root,
+                refresh=refresh,
+            ):
                 yield sse_message({"type": "delta", "text": text})
             yield sse_message({"type": "done"})
         except LLMError as error:

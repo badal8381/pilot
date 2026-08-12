@@ -8,6 +8,7 @@ from pilot.core.database.base import (
     BinlogFile,
     BinlogStatus,
     Database,
+    DatabaseProcess,
     DatabaseSize,
     LockWaitRow,
     LockWaitStatus,
@@ -15,15 +16,18 @@ from pilot.core.database.base import (
     TableSize,
 )
 from pilot.core.database.engines import MariaDB, PostgreSQL, SQLite
+from pilot.core.database.engines.helpers import DEFAULT_CONNECT_TIMEOUT
 from pilot.exceptions import DatabaseError
 
 if TYPE_CHECKING:
     from pilot.config import BenchConfig
 
 __all__ = [
+    "DEFAULT_CONNECT_TIMEOUT",
     "BinlogFile",
     "BinlogStatus",
     "Database",
+    "DatabaseProcess",
     "DatabaseSize",
     "LockWaitRow",
     "LockWaitStatus",
@@ -50,7 +54,7 @@ def make_database(config: "BenchConfig") -> Database:
             port=postgres.port,
             user=postgres.admin_user,
             password=postgres.root_password or "trust_auth",
-            database=postgres.admin_user,
+            database="",
         )
     mariadb = config.mariadb
     return MariaDB(
@@ -80,7 +84,11 @@ def site_database_name(bench_root: Path | str, site_name: str) -> str:
     return read_site_config(bench_root, site_name).get("db_name", "")
 
 
-def make_site_database(bench_root: Path | str, site_name: str) -> Database:
+def make_site_database(
+    bench_root: Path | str,
+    site_name: str,
+    connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
+) -> Database:
     """Site-specific database connection from site_config.json."""
     config = read_site_config(bench_root, site_name)
     db_type = config.get("db_type", "mariadb")
@@ -91,6 +99,7 @@ def make_site_database(bench_root: Path | str, site_name: str) -> Database:
             user=config["db_user"],
             password=config["db_password"],
             database=config["db_name"],
+            connect_timeout=connect_timeout,
         )
     if db_type == "sqlite":
         # Frappe stores SQLite under sites/<site>/db/, not directly in the site folder.
@@ -103,4 +112,5 @@ def make_site_database(bench_root: Path | str, site_name: str) -> Database:
         password=config["db_password"],
         database=config["db_name"],
         socket=config.get("db_socket") or None,
+        connect_timeout=connect_timeout,
     )

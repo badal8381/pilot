@@ -1,7 +1,7 @@
 <template>
   <div class="flex justify-center items-center p-4 h-screen">
     <div
-      class="flex flex-col bg-surface-base shadow-sm border rounded-xl border-outline-gray-2 w-full"
+      class="flex flex-col bg-surface-base shadow-sm border rounded-7 border-outline-gray-2 w-full"
       :class="modalWidthClass"
       style="max-height: calc(100vh - 2rem)"
     >
@@ -18,20 +18,6 @@
         <!-- Loading -->
         <div v-show="currentStep === 'loading'" class="flex justify-center items-center py-10">
           <LoadingText />
-        </div>
-
-        <!-- Admin password -->
-        <div v-show="currentStep === 'passwords'" class="flex flex-col gap-4">
-          <div class="flex flex-col gap-2">
-            <Password
-              label="Admin password"
-              v-model="adminPassword"
-              placeholder="Choose a password"
-              @keydown.enter="goToNextStep"
-            />
-            <PasswordStrengthMeter :password="adminPassword" />
-          </div>
-          <ErrorMessage v-show="errorMessage" :message="errorMessage" />
         </div>
 
         <!-- Database -->
@@ -83,9 +69,9 @@
             class="flex items-center self-start gap-1 text-ink-gray-5 hover:text-ink-gray-7 text-sm"
             @click="toggleStreamDetails"
           >
-            <FeatherIcon
-              :name="showStreamDetails ? 'chevron-down' : 'chevron-right'"
-              class="w-4 h-4"
+            <span
+              class="size-4"
+              :class="showStreamDetails ? 'lucide-chevron-down' : 'lucide-chevron-right'"
             />
             {{ showStreamDetails ? 'Hide details' : 'Show details' }}
           </button>
@@ -121,22 +107,22 @@
           <div>
             <p class="font-medium text-ink-gray-6 text-xs">Develop locally</p>
             <code
-              class="block bg-surface-gray-2 mt-1 px-2 py-1.5 rounded font-mono text-ink-gray-8 text-sm select-all"
-              >{{ benchCommand }}
+              class="block bg-surface-gray-2 mt-1 px-2 py-1.5 rounded-4 font-mono text-ink-gray-8 text-sm select-all"
+              >{{ pilotCommand }}
               start</code
             >
           </div>
           <div>
             <p class="font-medium text-ink-gray-6 text-xs">Deploy to production</p>
             <code
-              class="block bg-surface-gray-2 mt-1 px-2 py-1.5 rounded font-mono text-ink-gray-8 text-sm select-all"
-              >{{ benchCommand }}
+              class="block bg-surface-gray-2 mt-1 px-2 py-1.5 rounded-4 font-mono text-ink-gray-8 text-sm select-all"
+              >{{ pilotCommand }}
               setup production --admin-domain &lt;your-domain&gt; --tls --letsencrypt-email
               &lt;you@example.com&gt;</code
             >
           </div>
           <p class="text-ink-gray-5 text-xs">
-            <code class="font-mono">{{ benchCommand }} start</code>
+            <code class="font-mono">{{ pilotCommand }} start</code>
             reloads this page automatically once the bench is back.
           </p>
         </div>
@@ -161,15 +147,6 @@
           Back
         </Button>
         <Button
-          v-show="isConfiguring && currentStep === 'passwords'"
-          variant="solid"
-          class="w-full"
-          :disabled="!isAdminPasswordValid"
-          @click="goToNextStep"
-        >
-          Next
-        </Button>
-        <Button
           v-show="isConfiguring && currentStep === 'database' && dbMode === 'external'"
           variant="solid"
           :loading="isSubmitting"
@@ -187,7 +164,7 @@
           Next
         </Button>
         <Button
-          v-show="isConfiguring && currentStep !== 'passwords' && currentStep !== 'database' && !isLastConfigStep"
+          v-show="isConfiguring && currentStep !== 'database' && !isLastConfigStep"
           variant="solid"
           class="flex-1"
           @click="goToNextStep"
@@ -195,7 +172,7 @@
           Next
         </Button>
         <Button
-          v-show="isConfiguring && currentStep !== 'passwords' && currentStep !== 'database' && isLastConfigStep"
+          v-show="isConfiguring && currentStep !== 'database' && isLastConfigStep"
           variant="solid"
           :loading="isSubmitting"
           class="flex-1"
@@ -216,11 +193,9 @@ import {
   FormLabel,
   Password,
   ErrorMessage,
-  FeatherIcon,
   LoadingText,
 } from 'frappe-ui'
 import TaskStream from '../../components/tasks/TaskStream.vue'
-import PasswordStrengthMeter from '../../components/common/PasswordStrengthMeter.vue'
 import { useSetup } from '../../composables/setup/useSetup'
 
 const {
@@ -230,13 +205,11 @@ const {
   isLinux,
   isProductionHandoff,
   isDone,
-  benchCommand,
+  pilotCommand,
   terminal,
   streamUrl,
   streamStatus,
   showStreamDetails,
-  isAdminPasswordValid,
-  adminPassword,
   dbType,
   dbUser,
   dbPassword,

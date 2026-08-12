@@ -8,6 +8,23 @@ body {
   @apply bg-surface-base text-ink-gray-9 text-base;
 }
 
+/* Alpha gray: selection lands on any surface, and it flips polarity in dark
+   mode. Background only, so text keeps its ink color. */
+::selection {
+  background-color: var(--surface-alpha-gray-4);
+}
+
+/* frappe-ui's Button paints its subtle/outline/ghost red variants with raw
+   text-red-700 - a palette class that never flips for dark mode, unlike the
+   ink tokens its gray and blue variants use - so every red button turned
+   dark-red-on-dark-red. ink-red-8 is what the library's own Badge pairs with
+   surface-red-2, so this is Button catching up to its sibling. Scoped to dark
+   mode and to that exact utility (used nowhere else, checked) so light keeps
+   the library's spec. Delete once Button moves to ink-red upstream. */
+[data-theme='dark'] .text-red-700 {
+  color: var(--ink-red-8);
+}
+
 /* .text-base, */
 /* .text-base-medium { */
 /*   @apply !text-[16px]; */
@@ -26,6 +43,20 @@ body {
 
 .mobile-sidebar [data-slot="sidebar-item"] {
   @apply !h-auto !py-2.5;
+}
+
+/* A hovered row reads as one block, so the rules touching it fade. Goes on the
+   rows' parent; rows qualify by carrying a hover background, not by tag. First
+   pair covers `divide-y`, second covers rows wrapping a bordered body.
+   `!important` breaks a specificity tie with Tailwind's divide rule. */
+.hover-merges-dividers > [class*='hover:bg-']:hover,
+.hover-merges-dividers > [class*='hover:bg-']:hover + * {
+  border-top-color: transparent !important;
+}
+
+.hover-merges-dividers > [class*='hover:bg-']:hover > *,
+.hover-merges-dividers > *:has(+ [class*='hover:bg-']:hover) > * {
+  border-bottom-color: transparent;
 }
 
 /* Reduced motion: keep transitions near-instant, drop movement */
@@ -68,14 +99,29 @@ body {
   background-color: var(--outline-gray-3);
 }
 
-/* Ensure frappe-ui dialog overlay sits above the sticky app header */
-.dialog-overlay {
-  z-index: 50;
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.35s var(--ease-out);
+}
+
+#app {
+  isolation: isolate;
 }
 
 /* Dropdown/Menu content teleports to <body> without a z-index; lift it above both
-   the dialog overlay (z-50, so in-dialog menus like bench actions aren't hidden)
-   and the mobile sidebar drawer (z-30, so the sidebar's Bench menu stays usable). */
+   the dialog overlay (z-index: auto, so in-dialog menus like bench actions
+   aren't hidden) and the mobile sidebar drawer (z-30, so the sidebar's Bench
+   menu stays usable). */
 .menu-content {
   z-index: 51;
 }

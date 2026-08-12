@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +11,7 @@ import pytest
 
 from pilot.config import BenchConfig, MariaDBConfig, PostgresConfig, RedisConfig, WorkerConfig, WorkerGroup
 from pilot.core.database import (
+    DatabaseProcess,
     MariaDB,
     PostgreSQL,
     SQLite,
@@ -211,6 +213,24 @@ def test_mariadb_get_schema_uses_one_connection() -> None:
     assert [c["name"] for c in by_name["beta"]] == ["id"]
 
 
+def test_postgres_connect_failure_surfaces_as_a_database_error() -> None:
+    """A raw driver error escaped _connect and reached the API as an opaque 500,
+    hiding why diagnostics failed."""
+    import sys
+    import types
+
+    fake_psycopg2 = types.ModuleType("psycopg2")
+    fake_psycopg2.Error = type("Error", (Exception,), {})
+    fake_psycopg2.connect = MagicMock(side_effect=fake_psycopg2.Error("connection refused"))
+
+    db = PostgreSQL(host="db.internal", port=5432, user="u", password="p", database="d")
+    with (
+        patch.dict(sys.modules, {"psycopg2": fake_psycopg2}),
+        pytest.raises(DatabaseError, match=r"Could not connect to PostgreSQL at db\.internal:5432"),
+    ):
+        db.get_active_connections()
+
+
 def test_postgres_get_schema_uses_one_connection() -> None:
     db = PostgreSQL(host="h", port=5432, user="u", password="p", database="d")
     fake_cursor = MagicMock()
@@ -250,19 +270,31 @@ def _canned_execute(responses: dict, calls: list | None = None):
     return execute
 
 
-def test_mariadb_get_process_list_maps_rows_to_dicts() -> None:
+_MARIADB_PROCESS_COLUMNS = ["Id", "User", "Host", "db", "Command", "Time", "State", "Info"]
+
+
+def test_mariadb_get_process_list_normalises_rows() -> None:
     db = MariaDB(host="h", port=3306, user="u", password="p", database="")
     responses = {
         "PROCESSLIST": (
-            ["Id", "User", "db", "Command", "Time", "State", "Info"],
-            [[7, "app", "mydb", "Query", 3, "Sending data", "SELECT 1"]],
+            _MARIADB_PROCESS_COLUMNS,
+            [[7, "app", "localhost:53422", "mydb", "Query", 3, "Sending data", "SELECT 1"]],
         )
     }
     with patch.object(MariaDB, "execute", _canned_execute(responses)):
         processes = db.get_process_list()
 
     assert processes == [
-        {"Id": 7, "User": "app", "db": "mydb", "Command": "Query", "Time": 3, "State": "Sending data", "Info": "SELECT 1"}
+        DatabaseProcess(
+            id=7,
+            user="app",
+            host="localhost:53422",
+            database="mydb",
+            command="Query",
+            state="Sending data",
+            duration_seconds=3.0,
+            query="SELECT 1",
+        )
     ]
 
 
@@ -270,18 +302,20 @@ def test_mariadb_get_process_list_filters_by_database() -> None:
     db = MariaDB(host="h", port=3306, user="u", password="p", database="")
     responses = {
         "PROCESSLIST": (
-            ["Id", "User", "db", "Command", "Time", "State", "Info"],
+            _MARIADB_PROCESS_COLUMNS,
             [
-                [7, "app", "site_one", "Query", 3, "Sending data", "SELECT 1"],
-                [8, "app", "site_two", "Query", 1, "Sending data", "SELECT 2"],
-                [9, "root", None, "Sleep", 0, "", None],
+                [7, "app", "h:1", "site_one", "Query", 3, "Sending data", "SELECT 1"],
+                [8, "app", "h:2", "site_two", "Query", 1, "Sending data", "SELECT 2"],
+                [9, "root", "h:3", None, "Sleep", 0, "", None],
             ],
         )
     }
     with patch.object(MariaDB, "execute", _canned_execute(responses)):
-        assert [p["Id"] for p in db.get_process_list("site_one")] == [7]
+        assert [p.id for p in db.get_process_list("site_one")] == [7]
         # No database means server-wide, including connections with no database.
-        assert [p["Id"] for p in db.get_process_list()] == [7, 8, 9]
+        assert [p.id for p in db.get_process_list()] == [7, 8, 9]
+        # An idle connection reports no state of its own.
+        assert db.get_process_list()[2].state is None
 
 
 def test_mariadb_kill_process_issues_kill_connection() -> None:
@@ -493,6 +527,78 @@ def test_mariadb_get_binlog_files_empty_when_disabled() -> None:
         assert db.get_binlog_files() == []
 
 
+def test_mariadb_get_storage_components_measures_each_log(tmp_path: Path) -> None:
+    """@@log_error is relative to datadir, @@slow_query_log_file absolute, and
+    @@log_bin_index unset - all three resolve without special-casing."""
+    db = MariaDB(host="localhost", port=3306, user="u", password="p", database="")
+    (tmp_path / "mysql-bin.000001").write_bytes(b"x" * 1024)
+    (tmp_path / "mariadb.err").write_bytes(b"x" * 777)
+    (tmp_path / "slow.log").write_bytes(b"x" * 42)
+    responses = _binlog_responses(tmp_path) | {
+        "@@datadir": (["@@datadir"], [[str(tmp_path)]]),
+        "@@log_error": (["@@log_error"], [["mariadb.err"]]),
+        "@@slow_query_log_file": (["@@slow_query_log_file"], [[str(tmp_path / "slow.log")]]),
+        "@@log_bin_index": (["@@log_bin_index"], [[""]]),
+    }
+
+    with patch.object(MariaDB, "execute", _canned_execute(responses)):
+        components = db.get_storage_components()
+
+    assert {c.key: c.bytes for c in components} == {
+        "binlog": 3072,
+        "error_log": 777,
+        "slow_log": 42,
+        "binlog_index": 0,
+    }
+    assert [c.label for c in components] == [
+        "binary log",
+        "error log",
+        "slow query log",
+        "binary log index",
+    ]
+
+
+def test_mariadb_get_data_directory_is_none_for_a_remote_server() -> None:
+    db = MariaDB(host="db.example.com", port=3306, user="u", password="p", database="")
+    assert db.get_data_directory() is None
+
+
+def test_postgres_get_storage_components_reports_wal_and_server_log() -> None:
+    db = PostgreSQL(host="localhost", port=5432, user="u", password="p", database="d")
+    responses = {
+        "pg_ls_waldir": (["sum"], [[33554432]]),
+        "SHOW logging_collector": (["logging_collector"], [["on"]]),
+        "pg_ls_logdir": (["sum"], [[8192]]),
+    }
+
+    with patch.object(PostgreSQL, "execute", _canned_execute(responses)):
+        components = db.get_storage_components()
+
+    assert [(c.key, c.label, c.bytes) for c in components] == [
+        ("wal", "write-ahead log", 33554432),
+        ("server_log", "server log", 8192),
+    ]
+
+
+def test_postgres_server_log_is_zero_without_the_logging_collector() -> None:
+    """Logging to stderr leaves no log directory for pg_ls_logdir to size."""
+    db = PostgreSQL(host="localhost", port=5432, user="u", password="p", database="d")
+    responses = {
+        "pg_ls_waldir": (["sum"], [[16777216]]),
+        "SHOW logging_collector": (["logging_collector"], [["off"]]),
+    }
+
+    with patch.object(PostgreSQL, "execute", _canned_execute(responses)):
+        components = db.get_storage_components()
+
+    assert {c.key: c.bytes for c in components} == {"wal": 16777216, "server_log": 0}
+
+
+def test_postgres_get_data_directory_is_none_for_a_remote_server() -> None:
+    db = PostgreSQL(host="db.example.com", port=5432, user="u", password="p", database="d")
+    assert db.get_data_directory() is None
+
+
 def test_mariadb_purge_binlogs_issues_purge_for_known_file(tmp_path: Path) -> None:
     db = MariaDB(host="h", port=3306, user="u", password="p", database="")
     calls: list = []
@@ -540,19 +646,30 @@ def test_postgres_get_lock_wait_rows_leaves_unsupported_fields_none() -> None:
     responses = {
         "blocked.granted": (
             ["pid", "locktype", "mode", "relation", "state", "query_start", "query", "datname"],
-            [[123, "relation", "RowExclusiveLock", "tabDoc", "active",
-              "2026-01-01 00:00:00", "UPDATE tabDoc SET x=1", "site_one"]],
-        )
+            [
+                [
+                    123,
+                    "relation",
+                    "RowExclusiveLock",
+                    16385,
+                    "active",
+                    "2026-01-01 00:00:00",
+                    "UPDATE tabDoc SET x=1",
+                    "site_one",
+                ]
+            ],
+        ),
+        "n.nspname": (["oid", "nspname", "relname"], [[16385, "public", "tabDoc"]]),
     }
     with patch.object(PostgreSQL, "execute", _canned_execute(responses)):
-        rows = db.get_lock_wait_rows()
+        rows = db.get_lock_wait_rows("site_one")
 
     assert len(rows) == 1
     row = rows[0]
     assert row.id == "123"
     assert row.type == "relation"
     assert row.mode == "RowExclusiveLock"
-    assert row.table == "tabDoc"
+    assert row.table == "site_one.public.tabDoc"
     assert row.index is None
     assert row.state == "active"
     assert row.started == "2026-01-01 00:00:00"
@@ -561,23 +678,119 @@ def test_postgres_get_lock_wait_rows_leaves_unsupported_fields_none() -> None:
     assert row.rows_modified is None
 
 
+def test_postgres_server_wide_lock_waits_do_not_query_every_database() -> None:
+    """The server-wide view refreshes every two seconds, so relation lookup
+    must not open one connection for every database with a wait."""
+    from pilot.core.database import QueryResult
+
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
+    locks = [
+        [1, "relation", "RowExclusiveLock", 16385, "active", None, "UPDATE", "site_one"],
+        [2, "relation", "RowExclusiveLock", 16385, "active", None, "UPDATE", "site_two"],
+        [3, "advisory", "ExclusiveLock", None, "active", None, "SELECT", "site_one"],
+    ]
+
+    def execute(self, query: str, read_only: bool = True) -> QueryResult:
+        assert "blocked.granted" in query
+        return QueryResult(columns=[], rows=locks, duration_ms=0)
+
+    with patch.object(PostgreSQL, "execute", execute):
+        rows = db.get_lock_wait_rows()
+
+    assert [row.table for row in rows] == [
+        "site_one (relation OID 16385)",
+        "site_two (relation OID 16385)",
+        None,
+    ]
+
+
+def test_postgres_site_lock_wait_includes_schema_in_relation_name() -> None:
+    """Relation names need the database and schema because PostgreSQL permits
+    the same table name in multiple schemas."""
+    from pilot.core.database import QueryResult
+
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
+    lock = [1, "relation", "RowExclusiveLock", 16385, "active", None, "UPDATE", "site_one"]
+    asked: list[str] = []
+
+    def execute(self, query: str, read_only: bool = True) -> QueryResult:
+        if "blocked.granted" in query:
+            return QueryResult(columns=[], rows=[lock], duration_ms=0)
+        assert "JOIN pg_namespace" in query
+        asked.append(self._database)
+        return QueryResult(columns=[], rows=[[16385, "archive", "tabItem"]], duration_ms=0)
+
+    with patch.object(PostgreSQL, "execute", execute):
+        rows = db.get_lock_wait_rows("site_one")
+
+    assert rows[0].table == "site_one.archive.tabItem"
+    assert asked == ["site_one"]
+
+
+def test_postgres_lock_waits_ask_no_catalog_when_nothing_is_waiting() -> None:
+    """Locks auto-refresh every couple of seconds, so the common empty case
+    must not open a connection per database."""
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
+    with patch.object(PostgreSQL, "execute", _canned_execute({"blocked.granted": ([], [])})):
+        assert db.get_lock_wait_rows() == []
+
+
 def test_postgres_diagnostics_filter_by_database() -> None:
     db = PostgreSQL(host="h", port=5432, user="u", password="p", database="d")
     lock_rows = (
         ["pid", "locktype", "mode", "relation", "state", "query_start", "query", "datname"],
         [
-            [1, "relation", "RowExclusiveLock", "t", "active", None, None, "site_one"],
-            [2, "relation", "RowExclusiveLock", "t", "active", None, None, "site_two"],
+            [1, "advisory", "ExclusiveLock", None, "active", None, None, "site_one"],
+            [2, "advisory", "ExclusiveLock", None, "active", None, None, "site_two"],
         ],
-    )
-    processes = (
-        ["pid", "user", "database", "state", "duration_seconds", "query"],
-        [[1, "app", "site_one", "active", 1, "SELECT 1"], [2, "app", "site_two", "active", 1, "SELECT 2"]],
     )
     with patch.object(PostgreSQL, "execute", _canned_execute({"blocked.granted": lock_rows})):
         assert [r.id for r in db.get_lock_wait_rows("site_one")] == ["1"]
-    with patch.object(PostgreSQL, "execute", _canned_execute({"pg_stat_activity": processes})):
-        assert [p["pid"] for p in db.get_process_list("site_two")] == [2]
+    with patch.object(PostgreSQL, "execute", _canned_execute({"pg_stat_activity": _POSTGRES_PROCESSES})):
+        assert [p.id for p in db.get_process_list("site_two")] == [2]
+
+
+_POSTGRES_PROCESSES = (
+    ["pid", "usename", "client_addr", "client_port", "datname", "state", "wait_event", "seconds", "query"],
+    [
+        [1, "app", "10.0.0.4", 53422, "site_one", "active", None, 3.4, "SELECT 1"],
+        [2, "app", None, -1, "site_two", "idle", "ClientRead", 12.0, "SELECT 2"],
+    ],
+)
+
+
+def test_postgres_get_process_list_normalises_rows() -> None:
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="d")
+    with patch.object(PostgreSQL, "execute", _canned_execute({"pg_stat_activity": _POSTGRES_PROCESSES})):
+        processes = db.get_process_list()
+
+    assert processes[0] == DatabaseProcess(
+        id=1,
+        user="app",
+        host="10.0.0.4:53422",
+        database="site_one",
+        command="active",
+        state=None,
+        duration_seconds=3.4,
+        query="SELECT 1",
+    )
+    # A connection over the local socket has no client address to report.
+    assert processes[1].host is None
+
+
+def test_both_engines_report_the_same_process_shape() -> None:
+    """The dashboard reads one shape, so neither engine's own column names may
+    reach it."""
+    postgres = PostgreSQL(host="h", port=5432, user="u", password="p", database="d")
+    mariadb = MariaDB(host="h", port=3306, user="u", password="p", database="")
+    mariadb_rows = {"PROCESSLIST": (_MARIADB_PROCESS_COLUMNS, [[7, "app", "h:1", "db", "Query", 3, "", None]])}
+
+    with patch.object(PostgreSQL, "execute", _canned_execute({"pg_stat_activity": _POSTGRES_PROCESSES})):
+        from_postgres = postgres.get_process_list()[0]
+    with patch.object(MariaDB, "execute", _canned_execute(mariadb_rows)):
+        from_mariadb = mariadb.get_process_list()[0]
+
+    assert asdict(from_postgres).keys() == asdict(from_mariadb).keys()
 
 
 def test_postgres_get_database_size_leaves_claimable_space_unknown() -> None:
@@ -591,6 +804,33 @@ def test_postgres_get_database_size_leaves_claimable_space_unknown() -> None:
     # Reclaimable bloat needs the pgstattuple extension; remote host has no readable datadir.
     assert size.claimable_bytes is None
     assert size.free_bytes is None
+
+
+def test_postgres_server_wide_size_uses_one_combined_query() -> None:
+    """A host may have hundreds of databases, so server scope must not open a
+    connection and query pg_class once for every site."""
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
+    calls: list = []
+    responses = {"pg_database_size": (["total", "unavailable"], [[2400, 0]])}
+    with patch.object(PostgreSQL, "execute", _canned_execute(responses, calls)):
+        size = db.get_database_size()
+
+    assert size.data_bytes is None
+    assert size.index_bytes is None
+    assert size.total_bytes == 2400
+    assert len(calls) == 1
+    assert "datallowconn" not in calls[0][0]
+
+
+def test_postgres_server_wide_size_fails_if_a_database_cannot_be_measured() -> None:
+    db = PostgreSQL(host="h", port=5432, user="u", password="p", database="")
+    responses = {"pg_database_size": (["total", "unavailable"], [[2400, 1]])}
+
+    with (
+        patch.object(PostgreSQL, "execute", _canned_execute(responses)),
+        pytest.raises(DatabaseError, match="1 database"),
+    ):
+        db.get_database_size()
 
 
 def test_postgres_get_table_sizes_reports_per_relation() -> None:
@@ -631,9 +871,11 @@ def test_make_database_returns_mariadb_for_mariadb_bench() -> None:
     assert isinstance(db, MariaDB)
 
 
-def test_make_database_returns_postgres_for_postgres_bench() -> None:
+def test_make_database_returns_a_server_wide_postgres_for_postgres_bench() -> None:
     db = make_database(_bench_config("postgres"))
     assert isinstance(db, PostgreSQL)
+    # No database means server-wide, the same signal MariaDB uses.
+    assert db._database == ""
 
 
 def test_make_database_raises_for_sqlite_bench() -> None:

@@ -146,13 +146,6 @@ class SupervisorProcessManager(ManagedProcessManager):
             return
         run_command([*self._supervisorctl(), action, self._target(role)])
 
-    def control_process(self, name: str, action: str) -> None:
-        if action not in ("start", "stop", "restart"):
-            raise ValueError(f"unsupported action '{action}'")
-        bench = self.bench.config.name
-        target = f"{bench}:{bench}-{name.replace('_', '-')}"
-        run_command([*self._supervisorctl(), action, target])
-
     @override
     def are_units_running(self, role: UnitGroup) -> bool:
         if not self.is_configured() or not self.is_alive():

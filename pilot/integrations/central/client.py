@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pilot.exceptions import BenchError
@@ -50,6 +51,15 @@ def _error_detail(body: bytes) -> str:
     return exception.split(":", 1)[-1].strip() if ":" in exception else exception.strip()
 
 
+def central(bench_name: str) -> CentralClient:
+    from pilot.config.bench import BenchConfig
+    from pilot.core.bench import Bench
+
+    bench_root = Path.cwd() / "benches" / bench_name
+    bench = Bench(BenchConfig.read(bench_root), bench_root)
+    return CentralClient(bench)
+
+
 class CentralClient:
     """Central transport using this bench's pilot token."""
 
@@ -62,20 +72,27 @@ class CentralClient:
         """Verify Central auth and return its identity echo."""
         return self._get("/api/method/central.api.pilot.heartbeat")
 
+    def notify_central(self, event: str, message: str, context: dict | None = None) -> dict[str, Any]:
+        """Send a notification to Central for a bench event."""
+        return self._post(
+            "/api/method/central.notification.api.report_pilot_event",
+            {"event": event, "message": message, "context": context or {}},
+        )
+
     def forward(self, method_path: str, http_method: str, data: dict[str, Any] | None = None) -> Any:
         """Proxy an arbitrary Central pilot-API method with the X-Pilot-Token, returning its
         result (the ``{"message": ...}`` envelope unwrapped). The caller decides what's reachable."""
         return _message(self._request(f"/api/method/{method_path}", method=http_method, data=data))
 
     def _credentials(self) -> tuple[str, str]:
-        endpoint, token = self._bench_toml_credentials()
+        endpoint, token = self._common_config_credentials()
         if not (endpoint and token):
             endpoint, token = self._legacy_common_site_config_credentials()
         if not endpoint or not token:
-            raise CentralClientError("central.endpoint / central.auth_token not set in bench.toml")
+            raise CentralClientError("central.endpoint / central.auth_token not set in common_config.toml")
         return endpoint.rstrip("/"), token
 
-    def _bench_toml_credentials(self) -> tuple[str | None, str | None]:
+    def _common_config_credentials(self) -> tuple[str | None, str | None]:
         central = self.bench.config.central
         return central.endpoint, central.auth_token
 

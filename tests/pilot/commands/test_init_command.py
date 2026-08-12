@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -47,3 +47,48 @@ def test_raises_when_existing_credentials_are_wrong() -> None:
         _initializer()._provision_or_verify(manager, "MariaDB")
 
     manager.provision.assert_not_called()
+
+
+def test_ensure_database_credentials_generates_for_a_fresh_server() -> None:
+    bench = MagicMock()
+    bench.config.db_type = "mariadb"
+    bench.config.mariadb.existing = False
+    bench.config.mariadb.root_password = ""
+    bench.config.mariadb.port = 3306
+
+    with patch("pilot.utils.pick_free_port", return_value=3306):
+        BenchInitializer(bench)._ensure_database_credentials()
+
+    assert bench.config.mariadb.root_password
+    bench.config.write.assert_called_once_with(bench.path)
+
+
+def test_ensure_database_credentials_skips_when_already_set() -> None:
+    bench = MagicMock()
+    bench.config.db_type = "mariadb"
+    bench.config.mariadb.existing = False
+    bench.config.mariadb.root_password = "already-set"
+
+    BenchInitializer(bench)._ensure_database_credentials()
+
+    bench.config.write.assert_not_called()
+
+
+def test_ensure_database_credentials_skips_for_an_existing_server() -> None:
+    bench = MagicMock()
+    bench.config.db_type = "mariadb"
+    bench.config.mariadb.existing = True
+    bench.config.mariadb.root_password = ""
+
+    BenchInitializer(bench)._ensure_database_credentials()
+
+    bench.config.write.assert_not_called()
+
+
+def test_ensure_database_credentials_skips_sqlite() -> None:
+    bench = MagicMock()
+    bench.config.db_type = "sqlite"
+
+    BenchInitializer(bench)._ensure_database_credentials()
+
+    bench.config.write.assert_not_called()

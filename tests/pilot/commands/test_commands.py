@@ -1,14 +1,22 @@
-"""Unit tests for bench-cli command classes."""
+"""Unit tests for Pilot command classes."""
 
 from __future__ import annotations
 
 import tomllib
 from pathlib import Path
-from unittest.mock import ANY, MagicMock, patch
+from unittest.mock import ANY, MagicMock, PropertyMock, patch
 
 import pytest
 
-from pilot.config import AppConfig, BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig, WorkerGroup
+from pilot.config import (
+    AppConfig,
+    BenchConfig,
+    MariaDBConfig,
+    PostgresConfig,
+    RedisConfig,
+    WorkerConfig,
+    WorkerGroup,
+)
 from pilot.config.common import CommonConfig
 from pilot.core.bench import Bench
 from pilot.exceptions import BenchAlreadyExistsError, BenchError
@@ -31,6 +39,26 @@ def make_bench(tmp_path: Path) -> Bench:
     )
     return Bench(config, tmp_path)
 
+
+def _ensure_database_credentials(bench_dir: Path) -> None:
+    """The DB-credential step of `pilot init` (see BenchInitializer) - database
+    ports/passwords are generated there, not by `pilot new`."""
+    from pilot.core.bench import Bench
+    from pilot.core.bench.initializer import BenchInitializer
+
+    BenchInitializer(Bench(bench_dir))._ensure_database_credentials()
+
+
+
+def _write_installable_app(app_dir: Path, name: str) -> None:
+    """The minimum an app needs to pass validation, which every update runs."""
+    (app_dir / "pyproject.toml").write_text(
+        f'[project]\nname = "{name}"\n\n'
+        '[tool.bench.frappe-dependencies]\nfrappe = ">=16.0.0,<17.0.0"\n'
+    )
+    (app_dir / name).mkdir(exist_ok=True)
+    (app_dir / name / "__init__.py").write_text("")
+    (app_dir / name / "hooks.py").write_text(f"app_name = '{name}'\n")
 
 def test_new_command_creates_directory_and_toml(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from pilot.commands.bench.create import NewCommand
@@ -136,20 +164,21 @@ def test_new_command_first_bench_has_no_jwks_url(tmp_path: Path, monkeypatch: py
     assert BenchConfig.read(target).admin.jwks_url == ""
 
 
-def test_new_command_postgres_bench(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Postgres benches record db_type and a provisioning password."""
+def test_new_command_postgres_bench_has_no_password_yet(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`pilot new` alone must not provision the shared DB server - only `pilot
+    init` does (BenchInitializer._ensure_database_credentials)."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "pg", bench_name="pg", database="postgres").run()
 
     with open(benches_dir / "pg" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "postgres"
-    assert CommonConfig.read(benches_dir).postgres.root_password  # generated for provisioning
+    assert not CommonConfig.read(benches_dir).postgres.root_password
 
 
 def test_new_command_second_postgres_bench_inherits_password(
@@ -157,14 +186,16 @@ def test_new_command_second_postgres_bench_inherits_password(
 ) -> None:
     """Second Postgres bench reuses the shared server password."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "pg1", bench_name="pg1", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "pg1")
     password = CommonConfig.read(benches_dir).postgres.root_password
+    assert password
     NewCommand(target_directory=benches_dir / "pg2", bench_name="pg2", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "pg2")
 
     assert CommonConfig.read(benches_dir).postgres.root_password == password
     assert BenchConfig.read(benches_dir / "pg2").postgres.root_password == password
@@ -179,13 +210,15 @@ def test_new_command_postgres_port_is_not_offset_between_benches(
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "first", bench_name="first", database="postgres").run()
+    _ensure_database_credentials(benches_dir / "first")
     NewCommand(target_directory=benches_dir / "second", bench_name="second", database="postgres").run()
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert CommonConfig.read(benches_dir).postgres.port == 5432
+    assert CommonConfig.read(benches_dir).postgres.port == PostgresConfig().port
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -194,32 +227,31 @@ def test_new_command_postgres_port_ignores_live_scan_on_macos(
 ) -> None:
     """macOS Postgres uses Homebrew's default service port."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    # 5432 reads as live, which would normally push the picker to 5433+.
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: port == 5432))
+    default_port = PostgresConfig().port
+    # The default port reads as live, which would normally push the picker up.
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == default_port)
+    target = tmp_path / "benches" / "pg"
     with patch("pilot.managers.platform.is_macos", return_value=True):
-        NewCommand(target_directory=tmp_path / "benches" / "pg", bench_name="pg", database="postgres").run()
+        NewCommand(target_directory=target, bench_name="pg", database="postgres").run()
+        _ensure_database_credentials(target)
 
-    assert CommonConfig.read(tmp_path / "benches").postgres.port == 5432
+    assert CommonConfig.read(tmp_path / "benches").postgres.port == default_port
 
 
-def test_new_command_mariadb_bench_has_no_postgres_password(
+def test_new_command_mariadb_bench_has_no_password_yet(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
     NewCommand(target_directory=tmp_path / "benches" / "m", bench_name="m").run()
 
     with open(tmp_path / "benches" / "m" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
     assert data["bench"]["db_type"] == "mariadb"
-    # not provisioned for mariadb benches
-    assert not CommonConfig.read(tmp_path / "benches").postgres.root_password
+    assert not CommonConfig.read(tmp_path / "benches").mariadb.root_password
 
 
 def test_new_command_mariadb_port_is_not_offset_between_benches(
@@ -231,13 +263,15 @@ def test_new_command_mariadb_port_is_not_offset_between_benches(
 
     monkeypatch.setattr("builtins.input", lambda _: "")
     monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "first", bench_name="first").run()
+    _ensure_database_credentials(benches_dir / "first")
     NewCommand(target_directory=benches_dir / "second", bench_name="second").run()
 
     with open(benches_dir / "second" / "bench.toml", "rb") as f:
         data = tomllib.load(f)
-    assert CommonConfig.read(benches_dir).mariadb.port == 3306
+    assert CommonConfig.read(benches_dir).mariadb.port == MariaDBConfig().port
     assert data["bench"]["http_port"] == 8001  # other ports still offset
 
 
@@ -246,15 +280,17 @@ def test_new_command_mariadb_port_ignores_live_scan_on_macos(
 ) -> None:
     """macOS MariaDB uses Homebrew's default service port."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    # 3306 reads as live, which would normally push the picker to 3307+.
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: port == 3306))
+    default_port = MariaDBConfig().port
+    # The default port reads as live, which would normally push the picker up.
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: port == default_port)
+    target = tmp_path / "benches" / "m"
     with patch("pilot.managers.platform.is_macos", return_value=True):
-        NewCommand(target_directory=tmp_path / "benches" / "m", bench_name="m").run()
+        NewCommand(target_directory=target, bench_name="m").run()
+        _ensure_database_credentials(target)
 
-    assert CommonConfig.read(tmp_path / "benches").mariadb.port == 3306
+    assert CommonConfig.read(tmp_path / "benches").mariadb.port == default_port
 
 
 def test_new_command_second_mariadb_bench_inherits_password(
@@ -262,18 +298,19 @@ def test_new_command_second_mariadb_bench_inherits_password(
 ) -> None:
     """Second MariaDB bench reuses the shared server password."""
     from pilot.commands.bench.create import NewCommand
-    from pilot.core.bench.creator import BenchCreator
 
     monkeypatch.setattr("builtins.input", lambda _: "")
-    monkeypatch.setattr(BenchCreator, "_port_is_live", staticmethod(lambda port: False))
+    monkeypatch.setattr("pilot.utils._port_is_live", lambda port: False)
     benches_dir = tmp_path / "benches"
     NewCommand(target_directory=benches_dir / "m1", bench_name="m1").run()
+    _ensure_database_credentials(benches_dir / "m1")
     password = CommonConfig.read(benches_dir).mariadb.root_password
     # Random, not the old guessable hardcoded default.
     assert password != "root"
     assert len(password) == 16  # secrets.token_hex(nbytes=8)
 
     NewCommand(target_directory=benches_dir / "m2", bench_name="m2").run()
+    _ensure_database_credentials(benches_dir / "m2")
     assert CommonConfig.read(benches_dir).mariadb.root_password == password
     assert BenchConfig.read(benches_dir / "m2").mariadb.root_password == password
 
@@ -583,6 +620,59 @@ def test_build_command_default_uses_prebuilt_per_app(tmp_path: Path) -> None:
         mock_build.assert_not_called()
 
 
+def fake_app(name: str) -> MagicMock:
+    app = MagicMock()
+    app.config.name = name
+    return app
+
+
+def test_build_command_builds_only_named_apps(tmp_path: Path) -> None:
+    from pilot.commands.runtime.build import BuildCommand
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    hrms = fake_app("hrms")
+
+    with (
+        patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(bench, "apps", return_value=[fake_app("frappe"), hrms]),
+    ):
+        BuildCommand(bench, apps=["hrms"]).run()
+        mock_build.assert_called_once_with(hrms, force=False)
+
+
+def test_build_command_named_apps_with_force_skips_prebuilt(tmp_path: Path) -> None:
+    from pilot.commands.runtime.build import BuildCommand
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    hrms = fake_app("hrms")
+
+    with (
+        patch("pilot.managers.environment.PythonEnvManager.build_assets") as mock_build_all,
+        patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(bench, "apps", return_value=[fake_app("frappe"), hrms]),
+    ):
+        BuildCommand(bench, apps=["hrms"], force=True).run()
+        mock_build.assert_called_once_with(hrms, force=True)
+        mock_build_all.assert_not_called()
+
+
+def test_build_command_rejects_unknown_app(tmp_path: Path) -> None:
+    from pilot.commands.runtime.build import BuildCommand
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+
+    with (
+        patch("pilot.managers.environment.PythonEnvManager.build_assets_for_app") as mock_build,
+        patch.object(bench, "apps", return_value=[fake_app("frappe")]),
+        pytest.raises(BenchError, match="nope"),
+    ):
+        BuildCommand(bench, apps=["nope"]).run()
+        mock_build.assert_not_called()
+
+
 def test_requirements_skips_app_without_python_setup_files(tmp_path: Path) -> None:
     from pilot.core.bench.runtime import BenchRuntime
 
@@ -594,7 +684,7 @@ def test_requirements_skips_app_without_python_setup_files(tmp_path: Path) -> No
     # No pyproject.toml or setup.py
 
     with (
-        patch("pilot.managers.environment.PythonEnvManager._ensure_uv", return_value="uv"),
+        patch("pilot.managers.environment.ensure_uv", return_value="uv"),
         patch("pilot.utils.run_command") as mock_rc,
     ):
         BenchRuntime(bench)._install_python_requirements(lambda _message: None)
@@ -612,7 +702,7 @@ def test_requirements_installs_app_with_pyproject_toml(tmp_path: Path) -> None:
     (app_dir / "pyproject.toml").write_text("[project]\nname = 'myapp'\n")
 
     with (
-        patch("pilot.managers.environment.PythonEnvManager._ensure_uv", return_value="uv"),
+        patch("pilot.managers.environment.ensure_uv", return_value="uv"),
         patch("pilot.utils.run_command") as mock_rc,
     ):
         BenchRuntime(bench)._install_python_requirements(lambda _message: None)
@@ -630,7 +720,7 @@ def test_requirements_installs_app_with_setup_py(tmp_path: Path) -> None:
     (app_dir / "setup.py").write_text("from setuptools import setup; setup()\n")
 
     with (
-        patch("pilot.managers.environment.PythonEnvManager._ensure_uv", return_value="uv"),
+        patch("pilot.managers.environment.ensure_uv", return_value="uv"),
         patch("pilot.utils.run_command") as mock_rc,
     ):
         BenchRuntime(bench)._install_python_requirements(lambda _message: None)
@@ -697,82 +787,38 @@ def test_bench_update_apps_raises_on_command_error(tmp_path: Path) -> None:
         bench._update_apps(None, lambda message: None)
 
 
-def test_bench_marketplace_pin_matched_by_version(tmp_path: Path) -> None:
-    from pilot.core.app import RevisionPin
-    from pilot.core.bench import _marketplace_pin
+def _commit_ahead_of_head(repo: Path) -> str:
+    """Commit on top of the repo's HEAD, left unchecked-out - what a release
+    advertises once the app has been running an older commit."""
+    import subprocess
 
-    app = MagicMock()
-    app.config.name = "helpdesk"
-    app.config.repo = "https://github.com/frappe/helpdesk"
-    app.installed_version = "1.0.0"
-    registry = {
-        "helpdesk": {
-            "repo": "https://github.com/frappe/helpdesk",
-            "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v1.0.0"}],
-        },
-    }
+    from pilot.internal.git import GitRepo
 
-    pin = _marketplace_pin(app, registry)
+    def git(*args: str) -> None:
+        subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True)
 
-    assert pin == RevisionPin(kind="tag", ref="v1.0.0")
-
-
-def test_bench_marketplace_pin_none_on_repo_mismatch() -> None:
-    from pilot.core.bench import _marketplace_pin
-
-    app = MagicMock()
-    app.config.name = "helpdesk"
-    app.config.repo = "https://github.com/someone/helpdesk"  # a fork
-    app.installed_version = "1.0.0"
-    registry = {
-        "helpdesk": {
-            "repo": "https://github.com/frappe/helpdesk",
-            "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v1.0.0"}],
-        },
-    }
-
-    assert _marketplace_pin(app, registry) is None
-
-
-def test_bench_marketplace_pin_none_when_not_in_registry() -> None:
-    from pilot.core.bench import _marketplace_pin
-
-    app = MagicMock()
-    app.config.name = "frappe"
-    app.config.repo = "https://github.com/frappe/frappe"
-    app.installed_version = "16.0.0"
-
-    assert _marketplace_pin(app, {}) is None
-
-
-def test_bench_marketplace_pin_none_for_branch_target() -> None:
-    from pilot.core.bench import _marketplace_pin
-
-    app = MagicMock()
-    app.config.name = "hrms"
-    app.config.repo = "https://github.com/frappe/hrms"
-    app.installed_version = "3.0.0"
-    registry = {
-        "hrms": {
-            "repo": "https://github.com/frappe/hrms",
-            "targets": [{"version": "3.0.0", "target_type": "branch", "target": "main"}],
-        },
-    }
-
-    assert _marketplace_pin(app, registry) is None
+    git("config", "user.email", "t@t.com")
+    git("config", "user.name", "t")
+    git("commit", "-q", "--allow-empty", "-m", "installed")
+    head = GitRepo(repo).head_sha
+    git("commit", "-q", "--allow-empty", "-m", "published")
+    published = GitRepo(repo).head_sha
+    git("reset", "--hard", "-q", head)
+    return published
 
 
 def test_bench_update_apps_passes_marketplace_pin_to_app_update(tmp_path: Path) -> None:
     import subprocess
 
     from pilot.core.app import RevisionPin
-    from pilot.integrations.marketplace import Marketplace
+    from tests.pilot.marketplace_registry import publish
 
     bench = make_bench(tmp_path)
     bench.create_directories()
     app_dir = bench.apps_path / "helpdesk"
     app_dir.mkdir()
-    subprocess.run(["git", "init", "-q", str(app_dir)], check=True)
+    _write_installable_app(app_dir, "helpdesk")
+    subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
     subprocess.run(
         [
             "git",
@@ -786,48 +832,96 @@ def test_bench_update_apps_passes_marketplace_pin_to_app_update(tmp_path: Path) 
         check=True,
     )
 
+    published = _commit_ahead_of_head(app_dir)
     registry = [
         {
             "name": "helpdesk",
             "repo": "https://github.com/frappe/helpdesk",
-            "targets": [{"version": "1.0.0", "target_type": "tag", "target": "v2.0.0"}],
+            "releases": [{"version": "1.1.0", "branch": "main", "commit": published}],
         }
     ]
 
-    with (
-        patch.object(Marketplace, "registry", return_value=registry),
-        patch(
-            "pilot.core.app.App.installed_version",
-            new_callable=lambda: property(lambda self: "1.0.0"),
-        ),
-        patch("pilot.core.app.App.update") as mock_update,
-    ):
+    publish(registry)
+    with patch("pilot.core.app.App.update") as mock_update:
         bench._update_apps(None, lambda message: None)
 
-    mock_update.assert_called_once_with(pin=RevisionPin(kind="tag", ref="v2.0.0"))
+    mock_update.assert_called_once_with(pin=RevisionPin(kind="commit", ref=published))
+
+
+def test_bench_update_apps_skips_a_marketplace_app_with_nothing_newer(tmp_path: Path) -> None:
+    """Pulling the branch for a registry app would install unpublished code."""
+    import subprocess
+
+    from tests.pilot.marketplace_registry import publish
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    app_dir = bench.apps_path / "helpdesk"
+    app_dir.mkdir()
+    _write_installable_app(app_dir, "helpdesk")
+    subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
+    subprocess.run(
+        ["git", "-C", str(app_dir), "remote", "add", "origin", "https://github.com/frappe/helpdesk"],
+        check=True,
+    )
+
+    from pilot.internal.git import GitRepo
+
+    _commit_ahead_of_head(app_dir)  # leaves HEAD on a real commit
+    registry = [
+        {
+            "name": "helpdesk",
+            "repo": "https://github.com/frappe/helpdesk",
+            # Exactly what is checked out - no forward release.
+            "releases": [{"version": "1.0.0", "branch": "main", "commit": GitRepo(app_dir).head_sha}],
+        }
+    ]
+
+    publish(registry)
+    with patch("pilot.core.app.App.update") as mock_update:
+        bench._update_apps(None, lambda message: None)
+
+    mock_update.assert_not_called()
+
+
+def test_bench_update_apps_updates_an_app_outside_the_registry_branch_wide(tmp_path: Path) -> None:
+    import subprocess
+
+    from tests.pilot.marketplace_registry import publish
+
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    app_dir = bench.apps_path / "private_app"
+    app_dir.mkdir()
+    _write_installable_app(app_dir, "private_app")
+    subprocess.run(["git", "init", "-q", "-b", "main", str(app_dir)], check=True)
+
+    publish([])
+    with patch("pilot.core.app.App.update") as mock_update:
+        bench._update_apps(None, lambda message: None)
+
+    mock_update.assert_called_once_with(pin=None)
 
 
 def test_bench_update_apps_uses_captured_target_for_unpinned_app(tmp_path: Path) -> None:
     import subprocess
 
     from pilot.core.app import RevisionPin
-    from pilot.integrations.marketplace import Marketplace
+    from tests.pilot.marketplace_registry import publish
 
     bench = make_bench(tmp_path)
     bench.create_directories()
     app_dir = bench.apps_path / "helpdesk"
     app_dir.mkdir()
+    _write_installable_app(app_dir, "helpdesk")
     subprocess.run(["git", "init", "-q", str(app_dir)], check=True)
 
-    with (
-        patch.object(Marketplace, "registry", return_value=[]) as mock_registry,
-        patch("pilot.core.app.App.update") as mock_update,
-    ):
+    publish([])
+    with patch("pilot.core.app.App.update") as mock_update:
         # A captured pin is used exactly as given - never re-resolved live.
         bench._update_apps(None, lambda message: None, {"helpdesk": RevisionPin(kind="commit", ref="deadbeef")})
 
     mock_update.assert_called_once_with(pin=RevisionPin(kind="commit", ref="deadbeef"))
-    mock_registry.assert_not_called()
 
 
 def test_drop_site_removes_site_from_bench_toml(tmp_path: Path) -> None:
@@ -937,6 +1031,36 @@ def test_ls_lists_benches_with_mode_and_address(tmp_path: Path, capsys: pytest.C
     out = capsys.readouterr().out
     assert "alpha" in out and "production" in out and "alpha-admin.example.com" in out
     assert "beta" in out and "development" in out and "http://localhost:7005" in out
+
+
+def test_ls_shows_manager_and_domain_before_wizard_finishes(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    from pilot.commands.bench.list import ListCommand
+
+    benches = tmp_path / "benches"
+    (benches / "pending").mkdir(parents=True)
+    (benches / "pending" / "bench.toml").write_text(
+        '[bench]\nname = "pending"\n\n[production]\nenabled = false\nprocess_manager = "systemd"\n\n'
+        '[admin]\ndomain = "pending-admin.example.com"\n'
+    )
+
+    with (
+        patch("pilot.utils.cli_root", return_value=tmp_path),
+        patch("pilot.commands.bench.list.ListCommand._state", return_value="stopped"),
+        patch(
+            "pilot.managers.nginx.NginxManager.has_admin_cert",
+            new_callable=PropertyMock,
+            return_value=False,
+        ),
+    ):
+        ListCommand().run()
+
+    out = capsys.readouterr().out
+    assert "development" in out
+    assert "systemd" in out
+    assert "http://pending-admin.example.com" in out
+    assert "foreground" not in out
 
 
 def test_ls_state_admin_active_when_workload_down_but_admin_up(tmp_path: Path) -> None:
@@ -1176,7 +1300,7 @@ def test_drop_bench_deletes_directory_with_no_sites(tmp_path: Path) -> None:
 def test_build_admin_rejects_old_node(monkeypatch: pytest.MonkeyPatch) -> None:
     from admin.backend.frontend import _check_node_version
 
-    monkeypatch.setattr("subprocess.run", lambda *a, **k: MagicMock(stdout="v18.20.8\n"))
+    monkeypatch.setattr("pilot.utils.run_command", lambda *a, **k: MagicMock(stdout=b"v18.20.8\n"))
     with pytest.raises(BenchError, match=r"Node\.js"):
         _check_node_version()
 
@@ -1184,7 +1308,7 @@ def test_build_admin_rejects_old_node(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_build_admin_accepts_supported_node(monkeypatch: pytest.MonkeyPatch) -> None:
     from admin.backend.frontend import _check_node_version
 
-    monkeypatch.setattr("subprocess.run", lambda *a, **k: MagicMock(stdout="v20.11.0\n"))
+    monkeypatch.setattr("pilot.utils.run_command", lambda *a, **k: MagicMock(stdout=b"v20.11.0\n"))
     _check_node_version()  # no raise
 
 
@@ -1194,7 +1318,20 @@ def test_build_admin_errors_when_node_missing(monkeypatch: pytest.MonkeyPatch) -
     def _missing(*a, **k):
         raise FileNotFoundError("node")
 
-    monkeypatch.setattr("subprocess.run", _missing)
+    monkeypatch.setattr("pilot.utils.run_command", _missing)
+    with pytest.raises(BenchError, match=r"Node\.js is required"):
+        _check_node_version()
+
+
+def test_build_admin_errors_when_node_exits_nonzero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """run_command raises on a failing exit code rather than returning it."""
+    from admin.backend.frontend import _check_node_version
+    from pilot.exceptions import CommandError
+
+    def _failing(*a, **k):
+        raise CommandError("Command 'node' failed with exit code 1.", returncode=1)
+
+    monkeypatch.setattr("pilot.utils.run_command", _failing)
     with pytest.raises(BenchError, match=r"Node\.js is required"):
         _check_node_version()
 

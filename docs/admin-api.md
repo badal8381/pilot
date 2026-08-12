@@ -37,6 +37,10 @@ Admin auth code lives under the admin backend, not in route files. Routes should
 
 Supported auth modes include local Admin sessions and trusted remote JWKS tokens when configured in `[admin]`.
 
+Only these routes answer without a session: `GET /health`, `GET /bootstrap`, and the three `/auth/session` methods. `GET /bootstrap` returns just `mode`, `enabled`, and `name` until the caller has one. Add `@allow_unauthenticated` only with the same kind of reason.
+
+A `?sid=<token>` link is exchanged for a session cookie by `POST /auth/session`. Setup links (`Session.issue_setup_link_token`) live one hour and mint a 3-hour session; a password login mints the full 24 hours.
+
 ## Response Shape
 
 Prefer small response models that match UI needs. Include stable ids, names, status, and task ids. Avoid returning raw config objects when only a few fields are needed.
@@ -51,6 +55,21 @@ Task-starting endpoints should return:
 ```
 
 `created` is useful for idempotent submissions.
+
+### Site Apps
+
+`GET /sites/<name>/apps` returns the apps in use on the site, disabled ones excluded, plus `can_disable` for whether this bench's Frappe supports disabling at all.
+
+Two app operations answer inline instead of returning a task id, because both are flag flips on data that never left the site:
+
+- `DELETE /sites/<name>/apps/<app>?mode=disable` returns `{"app": ..., "disabled": true}`. Without the parameter the route queues an uninstall as before.
+- `POST /sites/<name>/apps` for an app the site only has disabled returns `{"app": ..., "enabled": true}`. It falls through to the install queue when a required app has to be installed first.
+
+### Setup
+
+Every `/setup/*` route needs a session, like the rest of the API. The Admin password is set when the bench is created (`pilot new`), so there is no unauthenticated window: a browser reaches the wizard through the `?sid=` link that `pilot start` prints, or by signing in with that password. `POST /benches` returns a `setup_link` token for the same purpose.
+
+`PUT /setup/configuration` accepts only the fields the wizard owns: `app_repo`, `app_branch`, `db_type`, `db_mode`, and the `mariadb_*`/`postgres_*` connection fields. Any other key gets a 422 - including `admin_password`. Change the remaining `bench.toml` settings through the settings API.
 
 ## Errors
 

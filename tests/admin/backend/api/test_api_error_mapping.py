@@ -114,13 +114,11 @@ def test_database_runtime_errors_are_safe_server_failures(tmp_path: Path) -> Non
 @pytest.mark.parametrize(
     ("error", "status", "code"),
     [
-        (DomainConflictError("duplicate"), 409, "domain_conflict"),
-        (DomainProviderError("secret provider stderr"), 503, "domain_provider_unavailable"),
         (ConfigError("secret config detail"), 503, "configuration_unavailable"),
         (BenchError("secret internal detail"), 500, "internal_error"),
     ],
 )
-def test_domain_failures_preserve_their_semantics(
+def test_unrelated_failures_stay_generic(
     tmp_path: Path,
     error: Exception,
     status: int,
@@ -140,3 +138,33 @@ def test_domain_failures_preserve_their_semantics(
     assert response.status_code == status
     assert response.get_json()["error"]["code"] == code
     assert b"secret" not in response.data
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "code"),
+    [
+        (DomainConflictError("app.example.com is already taken"), 409, "domain_conflict"),
+        (DomainProviderError("provider quota exceeded"), 503, "domain_provider_unavailable"),
+    ],
+)
+def test_domain_failures_surface_the_provider_message(
+    tmp_path: Path,
+    error: Exception,
+    status: int,
+    code: str,
+) -> None:
+    bench_root = tmp_path / "bench"
+    client = _client(bench_root)
+    site_dir = bench_root / "sites" / "site.test"
+    site_dir.mkdir(parents=True)
+    (site_dir / "site_config.json").write_text("{}")
+    site_domains = Mock()
+    site_domains.names.side_effect = error
+
+    with patch("admin.backend.api.v1.sites.domains._site_domains", return_value=site_domains):
+        response = client.get("/api/v1/sites/site.test/domains")
+
+    assert response.status_code == status
+    body = response.get_json()
+    assert body["error"]["code"] == code
+    assert body["error"]["message"] == str(error)

@@ -13,7 +13,9 @@ from admin.backend.api.responses import (
 from admin.backend.api.v1.sites.shared import task_failure
 from pilot.core.bench import Bench
 from pilot.core.bench.migration.operation import MigrationOperation
-from pilot.exceptions import MigrationNotFoundError
+from pilot.exceptions import MigrationNotFoundError, TaskNotFoundError
+from pilot.internal.tasks.store import TaskStore
+from pilot.managers.task import TaskReader
 from pilot.tasks.bypass_patch import BypassPatchTask
 from pilot.tasks.retry_update import RetryUpdateTask
 from pilot.tasks.revert_migration import RevertMigrationTask
@@ -31,7 +33,23 @@ def _summary(operation: MigrationOperation) -> dict:
         app["compare_url"] = revision.compare_url
     data["can_restore"] = operation.can_revert
     data["task_logs"] = _task_logs(operation)
+    data["pending_action"] = _pending_action(operation)
     return data
+
+
+def _pending_action(operation: MigrationOperation) -> dict | None:
+    """The queued/running action task on an operation still paused on a failure."""
+    if not operation.state.is_failure or not operation.task_ids:
+        return None
+    reader = TaskReader(operation.bench.path)
+    for role, task_id in reversed(list(operation.task_ids.items())):
+        try:
+            task = reader.read_task(task_id)
+        except Exception:
+            continue
+        if task.status.is_active:
+            return {"role": role, "task_id": task_id, "status": task.status.value}
+    return None
 
 
 _CHAIN_LABELS = {
@@ -45,9 +63,10 @@ _CHAIN_LABELS = {
 
 
 def _task_logs(operation: MigrationOperation) -> list[dict]:
-    """Retained chain-task logs as a flat list, with attempt numbers."""
+    """Retained chain-task logs as a flat list, with attempt numbers and status."""
     logs: list[dict] = []
     attempts: dict[tuple, int] = {}
+    store = TaskStore(operation.bench.path)
     for record in operation.chain:
         base = _CHAIN_LABELS.get(record.get("command", ""))
         task_id = record.get("task_id")
@@ -59,8 +78,19 @@ def _task_logs(operation: MigrationOperation) -> list[dict]:
         key = (record["command"], site)
         attempts[key] = attempts.get(key, 0) + 1
         label = base if attempts[key] == 1 else f"{base} (attempt {attempts[key]})"
-        logs.append({"id": task_id, "label": label, "site": site})
+        logs.append(
+            {"id": task_id, "label": label, "site": site, "status": _task_status(store, task_id)}
+        )
     return logs
+
+
+def _task_status(store: TaskStore, task_id: str) -> str | None:
+    """Status file only: TaskReader.read_task also walks the queue for a position
+    this list never shows. None once the task is no longer readable."""
+    try:
+        return store.read_status(task_id).value
+    except (TaskNotFoundError, FileNotFoundError):
+        return None
 
 
 def _accepted(operation: MigrationOperation, task_id: str):

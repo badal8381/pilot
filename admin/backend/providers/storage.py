@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import subprocess
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -8,16 +7,21 @@ from pathlib import Path
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
 from pilot.core.database import make_database, site_database_name
+from pilot.core.database.base import StorageComponent
+from pilot.exceptions import CommandError
+from pilot.utils import run_command
 
 _SYSTEM_SCHEMAS = {"mysql", "performance_schema", "information_schema", "sys"}
 
-_SCHEMA_SIZE_QUERY = (
-    "SELECT table_schema, COALESCE(SUM(data_length + index_length), 0) "
-    "FROM information_schema.TABLES GROUP BY table_schema"
-)
-_PG_DATABASE_SIZE_QUERY = (
-    "SELECT datname, pg_database_size(datname) FROM pg_database WHERE datistemplate = false"
-)
+_SIZE_QUERY_BY_ENGINE = {
+    "mariadb": (
+        "SELECT table_schema, COALESCE(SUM(data_length + index_length), 0) "
+        "FROM information_schema.TABLES GROUP BY table_schema"
+    ),
+    "postgres": (
+        "SELECT datname, pg_database_size(datname) FROM pg_database WHERE datistemplate = false"
+    ),
+}
 
 
 @dataclass
@@ -30,14 +34,16 @@ class DatabaseRow:
 
 @dataclass
 class DatabaseBreakdown:
+    """`core_bytes` is whatever the data directory holds beyond the databases
+    and `components`. It is None when that directory cannot be measured from
+    here - a remote server, or PostgreSQL's mode-0700 data directory."""
+
     engine: str
     supported: bool
     used_bytes: int
     binlog_bytes: int
-    core_bytes: int
-    error_log_bytes: int = 0
-    slow_log_bytes: int = 0
-    binlog_index_bytes: int = 0
+    core_bytes: int | None = None
+    components: list[StorageComponent] = field(default_factory=list)
     databases: list[DatabaseRow] = field(default_factory=list)
 
 
@@ -79,11 +85,25 @@ class StorageBreakdown:
 
 @lru_cache(maxsize=256)
 def directory_size_bytes(path: str) -> int:
-    try:
-        result = subprocess.run(["du", "-sb", path], capture_output=True, timeout=10)
-        return int(result.stdout.split()[0]) if result.returncode == 0 else 0
-    except Exception:
+    """`du -sk` reports allocated blocks and is POSIX. GNU-only `-b` fails
+    outright on BSD/macOS, where it used to be swallowed into a silent 0.
+
+    Absent paths are legitimately empty (a site need not have every optional
+    directory). Anything else is a real failure and is left to raise."""
+    if not Path(path).exists():
         return 0
+    return int(run_command(["du", "-sk", path], timeout=10).stdout.split()[0]) * 1024
+
+
+def _data_directory_bytes(path: str | None) -> int | None:
+    """None means "cannot be measured", which is not the same as empty: the
+    server may be remote, and PostgreSQL keeps its data directory at 0700."""
+    if not path:
+        return None
+    try:
+        return directory_size_bytes(path)
+    except (OSError, CommandError, IndexError, ValueError):
+        return None
 
 
 _PRIVATE_SUBDIRS_EXCLUDED_FROM_OTHER = {"files", "backups"}
@@ -117,20 +137,6 @@ def _site_other_entries(site_path: Path) -> list[StorageItem]:
     return entries
 
 
-def _mariadb_variable_file_size(database, variable: str, data_dir: Path) -> int:
-    """Size of the file a MariaDB system variable (e.g. @@log_error) points at."""
-    value = str(database.get_scalar(f"SELECT {variable}") or "")
-    if not value:
-        return 0
-    path = Path(value)
-    if not path.is_absolute():
-        path = data_dir / path
-    try:
-        return path.stat().st_size
-    except OSError:
-        return 0
-
-
 class StorageProvider:
     """Disk usage breakdown for a bench's database engine and bench directories."""
 
@@ -140,6 +146,10 @@ class StorageProvider:
         self._bench = Bench(self._config, bench_root)
 
     def get_breakdown(self, disk_total: int, disk_used: int) -> StorageBreakdown:
+        """Measures fresh. The cache exists for the 10s /metrics poll, and it
+        never expires, so leaving it in place pins every directory to its first
+        reading for the life of the process - including on an explicit refresh."""
+        directory_size_bytes.cache_clear()
         return StorageBreakdown(
             disk_total=disk_total,
             disk_used=disk_used,
@@ -149,57 +159,24 @@ class StorageProvider:
 
     def _database_breakdown(self) -> DatabaseBreakdown:
         engine = self._config.db_type
-        if engine == "mariadb":
-            return self._mariadb_breakdown()
-        if engine == "postgres":
-            return self._postgres_breakdown()
-        return DatabaseBreakdown(
-            engine=engine, supported=False, used_bytes=0, binlog_bytes=0, core_bytes=0
-        )
+        if engine not in _SIZE_QUERY_BY_ENGINE:
+            return DatabaseBreakdown(engine=engine, supported=False, used_bytes=0, binlog_bytes=0)
 
-    def _mariadb_breakdown(self) -> DatabaseBreakdown:
-        from pilot.managers.database.mariadb import MariaDBManager
-
-        data_dir = MariaDBManager(self._config.mariadb).data_dir
-        total_bytes = directory_size_bytes(str(data_dir))
         database = make_database(self._config)
-        databases = self._schema_sizes(database, _SCHEMA_SIZE_QUERY)
-        binlog_bytes = database.get_binlog_status().size_bytes
-        error_log_bytes = _mariadb_variable_file_size(database, "@@log_error", data_dir)
-        slow_log_bytes = _mariadb_variable_file_size(database, "@@slow_query_log_file", data_dir)
-        binlog_index_bytes = _mariadb_variable_file_size(database, "@@log_bin_index", data_dir)
-        schema_bytes = sum(row.bytes for row in databases)
-        core_bytes = max(
-            total_bytes
-            - binlog_bytes
-            - schema_bytes
-            - error_log_bytes
-            - slow_log_bytes
-            - binlog_index_bytes,
-            0,
+        databases = self._schema_sizes(database, _SIZE_QUERY_BY_ENGINE[engine])
+        components = database.get_storage_components()
+        total_bytes = _data_directory_bytes(database.get_data_directory())
+        accounted_bytes = sum(row.bytes for row in databases) + sum(
+            component.bytes for component in components
         )
+        binlog = next((c for c in components if c.key == "binlog"), None)
         return DatabaseBreakdown(
-            engine="mariadb",
+            engine=engine,
             supported=True,
-            used_bytes=total_bytes,
-            binlog_bytes=binlog_bytes,
-            core_bytes=core_bytes,
-            error_log_bytes=error_log_bytes,
-            slow_log_bytes=slow_log_bytes,
-            binlog_index_bytes=binlog_index_bytes,
-            databases=databases,
-        )
-
-    def _postgres_breakdown(self) -> DatabaseBreakdown:
-        database = make_database(self._config)
-        databases = self._schema_sizes(database, _PG_DATABASE_SIZE_QUERY)
-        used_bytes = sum(row.bytes for row in databases)
-        return DatabaseBreakdown(
-            engine="postgres",
-            supported=True,
-            used_bytes=used_bytes,
-            binlog_bytes=0,
-            core_bytes=0,
+            used_bytes=total_bytes if total_bytes is not None else accounted_bytes,
+            binlog_bytes=binlog.bytes if binlog else 0,
+            core_bytes=None if total_bytes is None else max(total_bytes - accounted_bytes, 0),
+            components=components,
             databases=databases,
         )
 

@@ -58,15 +58,26 @@ class SiteBackups:
             ts for ts in policy.select_deletions(timestamps) if self._delete_run(offsite, offsite_runs, ts)
         ]
 
+    def resolve_file(self, filename: str) -> Path:
+        """A path inside this site's own backup directory. These names arrive from API
+        requests, so anything that would reach outside it raises instead."""
+        from pilot.exceptions import BenchError
+
+        if not filename or "/" in filename or "\\" in filename or filename.startswith("."):
+            raise BenchError("Backup filename is invalid.")
+        backups_dir = self.directory.resolve()
+        target = (backups_dir / filename).resolve()
+        if backups_dir not in target.parents:
+            raise BenchError("Backup filename is invalid.")
+        return target
+
     def download_file_path(self, timestamp: str, file_id: str) -> Path:
         from pilot.exceptions import BenchError
 
-        if not file_id.startswith(timestamp) or "/" in file_id or "\\" in file_id or file_id.startswith("."):
+        if not file_id.startswith(timestamp):
             raise BenchError("Backup filename is invalid.")
-
-        backups_dir = self.directory.resolve()
-        target = (backups_dir / file_id).resolve()
-        if backups_dir not in target.parents or not target.is_file():
+        target = self.resolve_file(file_id)
+        if not target.is_file():
             raise FileNotFoundError(file_id)
         return target
 

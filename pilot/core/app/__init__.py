@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import re
 import shutil
 from collections.abc import Callable
@@ -46,9 +47,10 @@ class NewAppOptions:
 
 
 class App:
-    def __init__(self, config: AppConfig, bench: "Bench") -> None:
+    def __init__(self, config: AppConfig, bench: "Bench", *, staged: bool = False) -> None:
         self.config = config
         self.bench = bench
+        self.is_staged = staged  # cloned outside apps/, pending validation
 
     @classmethod
     def from_repo(cls, bench: "Bench", repo: str, branch: str = "") -> "App":
@@ -85,7 +87,9 @@ class App:
         on_progress(f"Creating new app '{name}'...")
         # Answers are piped, so keep make-app quiet - its echoed prompts are noise.
         run_command(
-            args, cwd=bench.sites_path, stream_output=options is None,
+            args,
+            cwd=bench.sites_path,
+            stream_output=options is None,
             stdin_text=options.as_answers() if options else None,
         )
 
@@ -118,7 +122,8 @@ class App:
 
     @property
     def path(self) -> Path:
-        return self.bench.apps_path / self.config.name
+        root = self.bench.staging_path if self.is_staged else self.bench.apps_path
+        return root / self.config.name
 
     @property
     def requirements(self) -> "AppRequirements":
@@ -143,33 +148,70 @@ class App:
     def installed_tag(self) -> str:
         return self._repository.installed_tag
 
+    @property
+    def head_sha(self) -> str:
+        """The commit checked out on disk, unlike installed_hash which reads dist-info."""
+        return self._repository.repo.head_sha
+
+    @property
+    def current_branch(self) -> str:
+        """The branch checked out on disk, empty when HEAD is detached."""
+        return self._repository.repo.branch
+
     def is_on_revision(self, pin: RevisionPin) -> bool:
         return self._repository.is_on_revision(pin)
 
-    def has_marketplace_update(self, marketplace_entry: dict | None) -> bool:
-        return self._repository.has_marketplace_update(marketplace_entry)
+    def has_marketplace_update(self) -> bool:
+        return self._repository.has_marketplace_update()
 
-    def update_target(self, marketplace_entry: dict | None) -> RevisionPin | None:
-        return self._repository.update_target(marketplace_entry)
+    def update_target(self) -> RevisionPin | None:
+        return self._repository.update_target()
 
-    def has_remote_update(self) -> bool:
-        return self._repository.has_remote_update()
+    @property
+    def marketplace_entry(self) -> dict | None:
+        return self._repository.marketplace_entry
+
+    @property
+    def is_marketplace(self) -> bool:
+        return self.marketplace_entry is not None
+
+    @property
+    def existing_clone_path(self) -> Path | None:
+        by_config_name = self.bench.apps_path / self.config.name
+        if (by_config_name / ".git").exists():
+            return by_config_name
+        by_module_name = self.bench.apps_path / self.module_name
+        if by_module_name != by_config_name and (by_module_name / ".git").exists():
+            return by_module_name
+        return None
 
     @property
     def is_cloned(self) -> bool:
-        # The clone may live under the configured name or, after get-app
-        # normalised it, under the importable module name (e.g. india-compliance
-        # -> india_compliance). Check the cheap config-name path first and only
-        # resolve module_name (which reads pyproject) when that misses.
         if (self.path / ".git").exists():
             return True
-        module_path = self.bench.apps_path / self.module_name
-        return module_path != self.path and (module_path / ".git").exists()
+        return self.existing_clone_path is not None
 
     def is_commit_hash(self, ref: str) -> bool:
         return AppRepository.is_commit_hash(ref)
 
-    def clone(self) -> None:
+    def clone(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
+        """Clone into apps/, or into staging when this app is staged - nothing
+        unvalidated should sit in apps/ where a bench-wide operation would pick it
+        up. A tree already in apps/ is moved into staging rather than cloned again."""
+        if not self.is_staged:
+            on_progress(f"Cloning {self.config.name}...")
+            self._repository.clone()
+            return
+
+        shutil.rmtree(self.path, ignore_errors=True)  # leftovers from an interrupted run
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        apps_clone = self.existing_clone_path
+        if apps_clone is not None:
+            on_progress(f"'{self.config.name}' already cloned, moving it out of apps/ to validate.")
+            shutil.move(str(apps_clone), str(self.path))
+            return
+
+        on_progress(f"Cloning {self.config.name}...")
         self._repository.clone()
 
     def update(self, pin: RevisionPin | None = None) -> None:
@@ -210,64 +252,98 @@ class App:
             return
         run_command(["yarn", "--cwd", str(self.path), "build"])
 
+    def _skip_already_installed(
+        self, on_progress: Callable[[str], None], install_dependencies: bool = False
+    ) -> AppInstallResult:
+        app = self.bench.app(self.module_name)
+        dependencies = app._install_dependencies(on_progress) if install_dependencies else []
+        on_progress(f"'{app.config.name}' already installed, skipping.")
+        return AppInstallResult(app, already_installed=True, installed_dependencies=dependencies)
+
     def install(
         self,
         *,
         install_dependencies: bool = False,
-        skip_validations: bool = False,
+        commit: str = "",
         on_progress: Callable[[str], None] = lambda message: None,
     ) -> AppInstallResult:
-        """Clone, validate, install, register, and build app assets."""
+        """Pinned commit based Clone, validate, install, register, and build app assets."""
         if self.bench.is_app_installed(self.config.name):
-            app = self.bench.app(self.module_name)
-            dependencies = app._install_dependencies(on_progress) if install_dependencies else []
-            on_progress(f"'{app.config.name}' already installed, skipping.")
-            return AppInstallResult(app, already_installed=True, installed_dependencies=dependencies)
+            return self._skip_already_installed(on_progress, install_dependencies)
 
-        app, cloned_this_run = self._clone_and_normalize(on_progress)
-        app.record_branch()
+        existing_clone = self.existing_clone_path
+        self.is_staged = not self.is_marketplace
+        if self.is_staged or existing_clone is None:
+            self.clone(on_progress)
+
         try:
-            dependencies = app._install_dependencies(on_progress) if install_dependencies else []
-            if not skip_validations:
-                app._validate()
+            if commit and self.installed_hash != commit:
+                on_progress(f"Checking out {self.config.name} at {commit[:8]}...")
+                self.checkout_commit(commit)
+            dependencies = self._install_dependencies(on_progress) if install_dependencies else []
+            if self.is_staged:
+                self.validate()
+            self.promote()
         except BenchError:
-            if cloned_this_run:
-                shutil.rmtree(app.path, ignore_errors=True)
+            self._undo_clone(existing_clone)
             raise
 
-        on_progress(f"Installing {app.config.name}...")
-        app._install_into_environment()
-        app._register()
-        on_progress(f"\nSetting up assets for {app.config.name}...")
-        app._build_assets_via_env_manager()
-        on_progress(f"\n'{app.config.name}' installed successfully.")
-        return AppInstallResult(app, already_installed=False, installed_dependencies=dependencies)
+        on_progress(f"Installing {self.config.name}...")
 
-    def _clone_and_normalize(self, on_progress: Callable[[str], None]) -> tuple["App", bool]:
-        """Clone if needed and rename the folder to the importable module name."""
-        cloned_this_run = False
-        if self.is_cloned:
-            on_progress(f"'{self.config.name}' already cloned, skipping clone.")
-        else:
-            on_progress(f"Cloning {self.config.name}...")
-            self.clone()
-            cloned_this_run = True
+        try:
+            self._install_into_environment()
+            self._register()
+            on_progress(f"\nSetting up assets for {self.config.name}...")
+            self._build_assets_via_env_manager()
+        except Exception:
+            self._roll_back_install(delete_clone=existing_clone is None, on_progress=on_progress)
+            raise
 
+        self.record_branch()
+        on_progress(f"\n'{self.config.name}' installed successfully.")
+        return AppInstallResult(self, already_installed=False, installed_dependencies=dependencies)
+
+    def _undo_clone(self, existing_clone: Path | None) -> None:
+        """Undo the clone after a failure: delete a tree this run created, and put
+        one that was already in apps/ back where it was. A working tree we did not
+        create is not ours to remove."""
+        if existing_clone is None:
+            shutil.rmtree(self.path, ignore_errors=True)
+        elif self.is_staged:
+            shutil.move(str(self.path), str(existing_clone))
+
+    def promote(self) -> "App":
+        if not self.path.is_dir():
+            raise BenchError(f"'{self.config.name}' was never cloned into {self.path} - nothing to install.")
         module = self.module_name
-        if module == self.config.name:
-            return self, cloned_this_run
         target = self.bench.apps_path / module
-        if not target.exists():
-            self.path.rename(target)
-        renamed = App(AppConfig(name=module, repo=self.config.repo, branch=self.config.branch), self.bench)
-        return renamed, cloned_this_run
+        if target == self.path:
+            return self
+        if target.exists():
+            raise BenchError(f"'{target}' already exists - remove it before installing this app.")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(self.path), str(target))  # a rename, unless apps/ is another filesystem
+        self.config.name = module
+        self.is_staged = False
+        return self
+
+    def _roll_back_install(self, *, delete_clone: bool, on_progress: Callable[[str], None]) -> None:
+        """Undo a half-finished install - a registered but broken app takes the site
+        down. Best effort: the caller re-raises the failure that got us here."""
+        on_progress(f"\nInstall of '{self.config.name}' failed - undoing it...")
+        with contextlib.suppress(Exception):
+            self._deregister()
+        with contextlib.suppress(Exception):
+            self._pip_uninstall()
+        if delete_clone:
+            shutil.rmtree(self.path, ignore_errors=True)
 
     def _install_dependencies(self, on_progress: Callable[[str], None]) -> list["App"]:
         from pilot.core.app.dependency_installer import AppDependencyInstaller
 
         return AppDependencyInstaller(self.bench, self).install(on_progress)
 
-    def _validate(self) -> None:
+    def validate(self) -> None:
         from pilot.core.app.validator import Validator
 
         Validator(self).validate()
@@ -295,7 +371,9 @@ class App:
             apps = raw.setdefault("apps", [])
             entry = next((a for a in apps if a.get("name") == self.config.name), None)
             if entry is None:
-                apps.append({"name": self.config.name, "repo": self.config.repo, "branch": self.config.branch})
+                apps.append(
+                    {"name": self.config.name, "repo": self.config.repo, "branch": self.config.branch}
+                )
             else:
                 entry["branch"] = self.config.branch
 

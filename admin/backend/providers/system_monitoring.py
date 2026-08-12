@@ -38,13 +38,13 @@ class SystemMonitoringProvider(WindowedLogProvider):
             "earliest": self.get_earliest(path),
             "points": [self.build_system_point(when, metrics) for when, metrics in rows],
             "storage": self.get_latest_storage(rows),
-            "memory_total_mb": self.get_latest_memory_total(rows),
+            "memory_total_bytes": self.get_latest_memory_total(rows),
         }
 
     @staticmethod
     def get_latest_memory_total(rows: list) -> float | None:
         for _, metrics in reversed(rows):
-            total = (metrics.get("memory") or {}).get("total_mb")
+            total = (metrics.get("memory") or {}).get("total_bytes")
             if total is not None:
                 return total
         return None
@@ -64,10 +64,10 @@ class SystemMonitoringProvider(WindowedLogProvider):
             "Busy IOWait": cpu.get("iowait"),
             "Busy IRQ": cpu.get("irq"),
             "Busy Other": cpu.get("other"),
-            "Used": memory.get("used_mb"),
-            "Cached + Buffers": memory.get("cached_mb"),
-            "Free": memory.get("free_mb"),
-            "Swap Used": memory.get("swap_used_mb"),
+            "Used": memory.get("used_bytes"),
+            "Cached + Buffers": memory.get("cached_bytes"),
+            "Free": memory.get("free_bytes"),
+            "Swap Used": memory.get("swap_used_bytes"),
             "Load1": load[0],
             "Load5": load[1],
             "Load15": load[2],
@@ -85,8 +85,8 @@ class SystemMonitoringProvider(WindowedLogProvider):
             if disk:
                 return {
                     "disk": {
-                        "used_mb": disk.get("used_mb"),
-                        "total_mb": disk.get("total_mb"),
+                        "used_bytes": disk.get("used_bytes"),
+                        "total_bytes": disk.get("total_bytes"),
                         "percent": disk.get("percent"),
                     }
                 }
@@ -101,7 +101,8 @@ class SystemMonitoringProvider(WindowedLogProvider):
                 self.build_service_row(when, metrics, bench_name, "cpu_percent") for when, metrics in rows
             ],
             "memory": [
-                self.build_service_row(when, metrics, bench_name, "memory_rss_mb") for when, metrics in rows
+                self.build_service_row(when, metrics, bench_name, "memory_rss_bytes")
+                for when, metrics in rows
             ],
         }
 

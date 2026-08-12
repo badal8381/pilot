@@ -7,15 +7,17 @@ from pilot.core.database.base import (
     BinlogFile,
     BinlogStatus,
     Database,
+    DatabaseProcess,
     DatabaseSize,
     LockWaitRow,
     LockWaitStatus,
     QueryResult,
+    StorageComponent,
     TableSize,
 )
 from pilot.core.database.engines.helpers import (
+    DEFAULT_CONNECT_TIMEOUT,
     MAX_ROWS,
-    disk_free,
     file_modified_ms,
     is_local_host,
     rows_as_dicts,
@@ -33,6 +35,7 @@ class MariaDB(Database):
         password: str,
         database: str,
         socket: str | None = None,
+        connect_timeout: int = DEFAULT_CONNECT_TIMEOUT,
     ) -> None:
         self._host = host
         self._port = port
@@ -40,6 +43,7 @@ class MariaDB(Database):
         self._password = password
         self._database = database
         self._socket = socket
+        self._connect_timeout = connect_timeout
 
     def _connect(self):
         import pymysql
@@ -52,8 +56,12 @@ class MariaDB(Database):
             password=self._password,
             database=self._database or None,
             unix_socket=self._socket,
+            connect_timeout=self._connect_timeout,
             cursorclass=pymysql.cursors.DictCursor,
         )
+
+    def quote_identifier(self, name: str) -> str:
+        return "`{}`".format(name.replace("`", ""))
 
     def execute(self, query: str, read_only: bool = True) -> QueryResult:
         import pymysql
@@ -100,11 +108,10 @@ class MariaDB(Database):
             conn.close()
 
     def get_table_columns(self, table: str) -> list[dict]:
-        safe = table.replace("`", "")
         conn = self._connect()
         try:
             with conn.cursor() as cursor:
-                cursor.execute(f"SHOW COLUMNS FROM `{safe}`")
+                cursor.execute(f"SHOW COLUMNS FROM {self.quote_identifier(table)}")
                 return [{"name": r["Field"], "type": r["Type"]} for r in cursor.fetchall()]
         finally:
             conn.close()
@@ -191,11 +198,22 @@ class MariaDB(Database):
         finally:
             conn.close()
 
-    def get_process_list(self, database: str = "") -> list[dict]:
+    def get_process_list(self, database: str = "") -> list[DatabaseProcess]:
         rows = rows_as_dicts(self.execute("SHOW FULL PROCESSLIST"))
-        if not database:
-            return rows
-        return [row for row in rows if row.get("db") == database]
+        return [
+            DatabaseProcess(
+                id=int(row["Id"]),
+                user=row["User"],
+                host=row["Host"],
+                database=row["db"],
+                command=row["Command"],
+                state=row["State"] or None,
+                duration_seconds=float(row["Time"]) if row["Time"] is not None else None,
+                query=row["Info"],
+            )
+            for row in rows
+            if not database or row["db"] == database
+        ]
 
     def get_database_size(self) -> DatabaseSize:
         result = self.execute(
@@ -208,7 +226,7 @@ class MariaDB(Database):
             data_bytes=int(data),
             index_bytes=int(index),
             claimable_bytes=int(claimable),
-            free_bytes=self._free_disk_bytes(),
+            free_bytes=self.get_free_disk_bytes(),
         )
 
     def get_table_sizes(self) -> list[TableSize]:
@@ -234,13 +252,6 @@ class MariaDB(Database):
         if self._database:
             return "table_schema = DATABASE()"
         return "table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')"
-
-    def _free_disk_bytes(self) -> int | None:
-        """Only meaningful when the server shares this host - the data directory
-        path means nothing locally for a remote server."""
-        if not is_local_host(self._host, self._socket):
-            return None
-        return disk_free(str(self.get_scalar("SELECT @@datadir")))
 
     def kill_process(self, process_id: int) -> None:
         """Drop a connection and roll back whatever it was running."""
@@ -323,14 +334,46 @@ class MariaDB(Database):
             raise DatabaseError(f"Unknown binlog file: {up_to}")
         self.execute(f"PURGE BINARY LOGS TO '{up_to}'", read_only=False)
 
+    def get_data_directory(self) -> str | None:
+        if not is_local_host(self._host, self._socket):
+            return None
+        return str(self.get_scalar("SELECT @@datadir"))
+
+    def get_storage_components(self) -> list[StorageComponent]:
+        data_dir = Path(self.get_data_directory() or ".")
+        return [
+            StorageComponent("binlog", "binary log", self.get_binlog_status().size_bytes),
+            StorageComponent(
+                "error_log", "error log", self._variable_file_size("@@log_error", data_dir)
+            ),
+            StorageComponent(
+                "slow_log",
+                "slow query log",
+                self._variable_file_size("@@slow_query_log_file", data_dir),
+            ),
+            StorageComponent(
+                "binlog_index",
+                "binary log index",
+                self._variable_file_size("@@log_bin_index", data_dir),
+            ),
+        ]
+
+    def _variable_file_size(self, variable: str, data_dir: Path) -> int:
+        """Size of the file a system variable points at. Unset variables and
+        unreadable paths both mean "nothing to count here"."""
+        value = str(self.get_scalar(f"SELECT {variable}") or "")
+        if not value:
+            return 0
+        path = Path(value)
+        if not path.is_absolute():
+            path = data_dir / path
+        try:
+            return path.stat().st_size
+        except OSError:
+            return 0
+
     def get_status_value(self, variable: str) -> int:
         result = self.execute(f"SHOW GLOBAL STATUS LIKE '{variable}'")
         if not result.rows:
             raise DatabaseError(f"Unknown status variable: {variable}")
         return int(result.rows[0][1])
-
-    def get_scalar(self, query: str):
-        result = self.execute(query)
-        if not result.rows:
-            raise DatabaseError(f"Query returned no rows: {query}")
-        return result.rows[0][0]

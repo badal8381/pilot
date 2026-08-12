@@ -1,32 +1,26 @@
 <template>
   <div>
     <div v-if="loading" class="gap-4 grid grid-cols-1 sm:grid-cols-2">
-      <Skeleton v-for="i in 6" :key="i" class="rounded-lg h-[340px]" />
+      <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
     </div>
     <ErrorMessage v-else-if="error" :message="error" />
-    <div
+    <EmptyState
       v-else-if="unsupported"
-      class="flex flex-col justify-center items-center gap-2 h-[40vh] text-center"
-    >
-      <span class="size-10 text-ink-gray-3 lucide-database" />
-      <p class="font-medium text-ink-gray-7 text-sm">DB analyzer supports MariaDB only</p>
-    </div>
-    <div
+      icon="lucide-database"
+      title="DB analyzer supports MariaDB only"
+    />
+    <EmptyState
       v-else-if="empty"
-      class="flex flex-col justify-center items-center gap-2 h-[40vh] text-center"
-    >
-      <span class="size-10 text-ink-gray-3 lucide-database" />
-      <p class="font-medium text-ink-gray-7 text-sm">No data for the selected range</p>
-      <p class="text-ink-gray-5 text-xs">
-        The monitor hasn't sampled the database in this range yet.
-      </p>
-    </div>
+      icon="lucide-database"
+      title="No data for the selected range"
+      description="The monitor hasn't sampled the database in this range yet."
+    />
 
     <div v-else class="gap-4 grid grid-cols-1 sm:grid-cols-2">
       <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
         <AxisChart
           :config="chart.config"
-          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 py-2"
+          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
         />
       </ChartCard>
       <SlowQueries v-if="!unsupported" :overview="data?.slow_queries" />
@@ -38,6 +32,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { AxisChart, ErrorMessage, Skeleton } from 'frappe-ui'
 import ChartCard from '@/components/common/ChartCard.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 import SlowQueries from '@/components/dashboard/SlowQueries.vue'
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'

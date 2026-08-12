@@ -2,11 +2,13 @@ import Git from '@/components/settings/Git.vue'
 import Workers from '@/components/settings/Workers.vue'
 import S3Bucket from '@/components/settings/S3Bucket.vue'
 import LLM from '@/components/settings/LLM.vue'
+import Notifications from '@/components/settings/Notifications.vue'
 import Firewall from '@/components/settings/Firewall.vue'
 import Waf from '@/components/settings/Waf.vue'
 import SshKeys from '@/components/settings/SshKeys.vue'
 import ChangeAdminPassword from '@/components/settings/ChangeAdminPassword.vue'
 import TwoFactor from '@/components/settings/TwoFactor.vue'
+import DatabaseQuickActions from '@/components/settings/DatabaseQuickActions.vue'
 
 // Single source of truth for id/label/component so SettingsDialog can resolve
 // a routed subsection id without each page owning its own private mapping.
@@ -30,10 +32,24 @@ export const GENERAL_SECTIONS = [
     component: LLM,
   },
   {
+    id: 'notifications',
+    label: 'Notification settings',
+    description: 'Alert when host resource usage crosses a limit.',
+    component: Notifications,
+  },
+  {
     id: 'workers',
     label: 'Background workers',
     description: 'Configure background worker groups and queues.',
     component: Workers,
+  },
+]
+
+export const DATABASE_SECTIONS = [
+  {
+    id: 'quick-actions',
+    label: 'Quick actions',
+    component: DatabaseQuickActions,
   },
 ]
 
@@ -43,7 +59,6 @@ export const SECURITY_SECTIONS = [
     label: 'Change password',
     description: 'Update the password that signs in to this bench.',
     component: ChangeAdminPassword,
-    action: 'Change',
   },
   {
     id: 'two-factor',
@@ -59,8 +74,8 @@ export const SECURITY_SECTIONS = [
   },
   {
     id: 'waf',
-    label: 'WAF settings',
-    description: 'Web application firewall rules for your sites.',
+    label: 'Web application firewall',
+    description: 'Inspect incoming requests for attacks before they reach your sites.',
     component: Waf,
   },
   {
