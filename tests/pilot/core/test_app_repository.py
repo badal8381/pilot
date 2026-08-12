@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -37,6 +38,7 @@ class _FakeApp:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.config = AppConfig(name="demo", repo="", branch="main")
+        self.bench = SimpleNamespace(path=path.parent)
 
 
 def _repository(path: Path) -> AppRepository:

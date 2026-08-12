@@ -119,11 +119,9 @@ def callback_handler(
 
 
 def _secret_values(value, key: str = "") -> list[str]:
-    sensitive = any(
-        marker in key.lower()
-        for marker in ("password", "secret", "token", "credential", "access_key", "private_key")
-    )
-    if sensitive and isinstance(value, (str, int, float)):
+    from pilot.internal.tasks.args import is_sensitive_key
+
+    if is_sensitive_key(key) and isinstance(value, (str, int, float)):
         return [str(value)] if str(value) else []
     if isinstance(value, dict):
         return [secret for child_key, child in value.items() for secret in _secret_values(child, child_key)]
@@ -133,18 +131,32 @@ def _secret_values(value, key: str = "") -> list[str]:
 
 
 def _load_redactions(task_dir: Path, bench_root: Path) -> list[str]:
+    """Secrets that must never appear in task output: this task's own, plus every
+    credential the bench holds - including the host-shared ones one level up."""
     values = []
     secret_path = task_dir / "secrets.json"
     if secret_path.exists():
         values.extend(_secret_values(json.loads(secret_path.read_text())))
-    config_path = bench_root / "bench.toml"
-    if config_path.exists():
+    for config_path in (
+        bench_root / "bench.toml",
+        bench_root.parent / "common_config.toml",
+    ):
+        if not config_path.exists():
+            continue
         try:
             with config_path.open("rb") as config_file:
                 values.extend(_secret_values(tomllib.load(config_file)))
         except (OSError, tomllib.TOMLDecodeError):
             pass
+    values.extend(_json_secret_values(bench_root / ".bench.git.info"))
     return list(dict.fromkeys(values))
+
+
+def _json_secret_values(path: Path) -> list[str]:
+    try:
+        return _secret_values(json.loads(path.read_text(encoding="utf-8")))
+    except (OSError, ValueError):
+        return []
 
 
 def main() -> None:

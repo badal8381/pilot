@@ -220,6 +220,36 @@ def test_llm_models_prefers_the_posted_key(tmp_path: Path, monkeypatch: pytest.M
     assert seen == {"api_key": "sk-typed", "api_base": "http://typed.example/v1"}
 
 
+def test_llm_models_refuses_a_metadata_api_base(tmp_path: Path) -> None:
+    client = _client(tmp_path / "test-bench")
+
+    response = client.post(
+        "/api/v1/settings/llm/models",
+        json={"provider": "frappe-llm", "api_key": "k", "api_base": "http://169.254.169.254/latest"},
+    )
+
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == "invalid_api_base"
+
+
+def test_settings_patch_refuses_a_metadata_api_base(tmp_path: Path) -> None:
+    client = _client(tmp_path / "test-bench")
+
+    response = client.patch(
+        "/api/v1/settings",
+        json={
+            "llm": {
+                "provider": "frappe-llm",
+                "api_key": "k",
+                "model": "qwen3.6-27b-fp8",
+                "api_base": "http://metadata.google.internal/computeMetadata",
+            }
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_llm_models_without_a_provider(tmp_path: Path) -> None:
     client = _client(tmp_path / "test-bench")
 

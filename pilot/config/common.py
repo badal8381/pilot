@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, fields
 from pathlib import Path
 
+from pilot.config.alert_limit import ResourceLimitConfig
 from pilot.config.central import CentralConfig
 from pilot.config.datum import DatumConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
@@ -30,6 +31,7 @@ class CommonConfig:
     central: CentralConfig = field(default_factory=CentralConfig)
     datum: DatumConfig = field(default_factory=DatumConfig)
     logs: LogsConfig = field(default_factory=LogsConfig)
+    resource_limits: ResourceLimitConfig = field(default_factory=ResourceLimitConfig)
     jwks_url: str = ""
     jwks_audience: str = ""
 
@@ -56,6 +58,9 @@ class CommonConfig:
             central=CentralConfig.from_dict(data.get("central", {})),
             datum=DatumConfig.from_dict(data.get("datum", {})),
             logs=LogsConfig.from_dict(data.get("logs", {})),
+            resource_limits=ResourceLimitConfig(
+                **_known_fields(ResourceLimitConfig, data.get("resource_limits", {}))
+            ),
             jwks_url=admin.get("jwks_url", ""),
             jwks_audience=admin.get("jwks_audience", ""),
         )
@@ -95,9 +100,20 @@ class CommonConfig:
                 "token": self.logs.token,
                 "enabled": self.logs.enabled,
             }
+        if self.resource_limits != ResourceLimitConfig():
+            data["resource_limits"] = self._resource_limits_section()
         if self.jwks_url:
             data["admin"] = {"jwks_url": self.jwks_url, "jwks_audience": self.jwks_audience}
         return data
+
+    def _resource_limits_section(self) -> ConfigDict:
+        return {
+            "cpu_usage_limit": self.resource_limits.cpu_usage_limit,
+            "memory_usage_limit": self.resource_limits.memory_usage_limit,
+            "disk_space_limit": self.resource_limits.disk_space_limit,
+            "site_uptime": self.resource_limits.site_uptime,
+            "webhook_endpoints": self.resource_limits.webhook_endpoints,
+        }
 
     def _central_section(self) -> ConfigDict:
         data: ConfigDict = {"endpoint": self.central.endpoint, "auth_token": self.central.auth_token}

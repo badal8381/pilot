@@ -1,32 +1,31 @@
 <template>
-  <Dialog v-model="open" :options="{ title: `Table sizes on ${site}`, size: '3xl' }">
-    <template #body-content>
-      <div v-if="loading" class="flex justify-center py-10">
-        <LoadingText />
-      </div>
+  <Dialog v-model="open" :title="`Table sizes on ${site}`" size="3xl">
+    <div v-if="loading" class="flex justify-center py-10">
+      <LoadingText />
+    </div>
 
-      <ErrorMessage v-else-if="error" :message="error" />
+    <ErrorMessage v-else-if="error" :message="error" />
 
-      <p v-else-if="!tables.length" class="py-10 text-ink-gray-5 text-sm text-center">
-        No results to display
-      </p>
+    <p v-else-if="!tables.length" class="py-10 text-ink-gray-5 text-sm text-center">
+      No results to display
+    </p>
 
-      <div v-else class="max-h-[60vh] overflow-y-auto">
-        <ListView
-          class="!w-full"
-          :columns="columns"
-          :rows="rows"
-          row-key="name"
-          :options="{ selectable: false, showTooltip: false }"
-        />
-      </div>
-    </template>
+    <div v-else class="max-h-[60vh] overflow-y-auto">
+      <ListView
+        class="!w-full"
+        :columns="columns"
+        :rows="rows"
+        row-key="name"
+        :options="{ selectable: false, showTooltip: false }"
+      />
+    </div>
   </Dialog>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { Dialog, ErrorMessage, ListView, LoadingText } from 'frappe-ui'
+import { Dialog, ErrorMessage, LoadingText } from 'frappe-ui'
+import { ListView } from 'frappe-ui/experimental'
 import { apiErrorMessage } from '@/api/client'
 import { databaseApi } from '@/api/database'
 import { formatBytes } from '@/utils/format'

@@ -28,6 +28,22 @@ Use Frappe UI by default. Think carefully before writing custom controls, overla
 
 Custom UI is acceptable when Frappe UI does not provide the behavior, but keep it small and reusable. Prefer wrapping Frappe UI components over rebuilding interaction and accessibility from scratch.
 
+Icon-only buttons pass the icon through Frappe UI `Button`'s `icon` prop. An icon `<span>` in the default slot counts as text content, and the button renders wider than it is tall.
+
+App logos render through `components/apps/AppIcon.vue`, which wraps Frappe UI `Avatar` in its square shape. Size them with Avatar's `size` scale rather than a Tailwind size class.
+
+## Page Chrome
+
+The shell header exposes two teleport targets: `#header-badge` for a count or status Badge beside the breadcrumb, and `#header-actions` for page actions. Pages teleport into them, so the layout does not need to know about individual pages.
+
+The update-status button is opt-in per route through `meta.showUpdateStatus`.
+
+`components/common/PageHero.vue` is the dotted page header. It bleeds to the page edges and re-constrains its own content to the body column, so a page header and the content below it stay the same width.
+
+`components/common/StickyToolbar.vue` pins a filter row under the header and sets `data-stuck` while pinned, which fades content passing beneath it.
+
+`components/common/ToolbarSelect.vue` is the dropdown trigger used in those toolbars. Attributes fall through to the `Button`, so set width and truncation with a plain `class` on the component.
+
 ## Data Flow
 
 - Fetch state from the Admin API.

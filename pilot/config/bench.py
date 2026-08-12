@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 from pilot.config.admin import AdminConfig
+from pilot.config.alert_limit import ResourceLimitConfig
 from pilot.config.app import AppConfig
 from pilot.config.central import CentralConfig
 from pilot.config.common import CommonConfig
@@ -130,6 +131,7 @@ class BenchConfig:
     waf: WafConfig = field(default_factory=WafConfig)
     s3: S3Config = field(default_factory=S3Config)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    resource_limits: ResourceLimitConfig = field(default_factory=ResourceLimitConfig)
 
     # -- construction --
 
@@ -179,7 +181,9 @@ class BenchConfig:
         return config
 
     @classmethod
-    def _from_dict(cls, data: dict, *, common: CommonConfig | None = None, strict: bool = False) -> "BenchConfig":
+    def _from_dict(
+        cls, data: dict, *, common: CommonConfig | None = None, strict: bool = False
+    ) -> "BenchConfig":
         cls._report_unknown_fields(data, strict=strict)
         common = common or CommonConfig()
         bench_data = data.get("bench", {})
@@ -212,6 +216,7 @@ class BenchConfig:
             central=common.central,
             datum=common.datum,
             logs=common.logs,
+            resource_limits=common.resource_limits,
             **sections,
         )
         config.admin.jwks_url = common.jwks_url
@@ -244,6 +249,7 @@ class BenchConfig:
         self._validate_ports()
         self._validate_socketio_backend()
         self._validate_db_type()
+        self._validate_external_urls()
         self.redis.validate()
         self.workers.validate()
         self.letsencrypt.validate()
@@ -253,6 +259,7 @@ class BenchConfig:
         self.firewall.validate()
         self.waf.validate(self.nginx.client_max_body_size)
         self.llm.validate()
+        self.resource_limits.validate()
 
     def _validate_required_fields(self) -> None:
         if not self.name:
@@ -299,6 +306,20 @@ class BenchConfig:
             raise ConfigError(
                 f"bench.socketio_backend '{self.socketio_backend}' is invalid. Must be 'python' or 'node'."
             )
+
+    def _validate_external_urls(self) -> None:
+        """Every endpoint this bench fetches from, checked before anything reaches it."""
+        from pilot.internal.validators import validate_external_url
+
+        endpoints = {
+            "admin.jwks_url": self.admin.jwks_url,
+            "central.endpoint": self.central.endpoint,
+            "datum.endpoint": self.datum.endpoint,
+            "llm.api_base": self.llm.api_base,
+        }
+        for name, url in endpoints.items():
+            if error := validate_external_url(url, name):
+                raise ConfigError(error)
 
     def _validate_db_type(self) -> None:
         if self.db_type not in ("mariadb", "postgres", "sqlite"):
@@ -428,7 +449,8 @@ class BenchConfig:
 
     def _write_common(self, bench_root: Path) -> None:
         """Persist this config's shared subset (mariadb/postgres/letsencrypt/
-        central/datum/jwks) to common_config.toml, the single source every bench merges.
+        central/datum/resource_limits/jwks) to common_config.toml, the single
+        source every bench merges.
         A no-op when nothing shared changed, so an unrelated bench.toml write
         never disturbs the file other benches are reading."""
         common = CommonConfig(
@@ -438,6 +460,7 @@ class BenchConfig:
             central=self.central,
             datum=self.datum,
             logs=self.logs,
+            resource_limits=self.resource_limits,
             jwks_url=self.admin.jwks_url,
             jwks_audience=self.admin.jwks_audience,
         )
@@ -615,7 +638,9 @@ class BenchConfig:
             self._apply_setting(key, value)
 
     def _apply_setting(self, key: str, value) -> None:
-        if key in FLAT_KEYS:
+        if key == "admin_password":
+            self.admin.set_password(str(value))
+        elif key in FLAT_KEYS:
             _set_path(self, FLAT_KEYS[key], value)
         elif key == "app_repo":
             self.apps[0].repo = str(value)

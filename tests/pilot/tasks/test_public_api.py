@@ -180,7 +180,11 @@ def test_task_manager_public_exports_resolve_lazily() -> None:
 
 
 def test_task_retry_secret_policy_is_public() -> None:
+    """Driven by the recorded args, so a new command carrying a secret is covered
+    without editing an allow-list."""
     from pilot.managers.task import task_has_secrets
 
-    assert task_has_secrets("new-site") is True
+    assert task_has_secrets("new-site", {"site": "s.localhost", "admin_password": "[redacted]"}) is True
+    assert task_has_secrets("anything", {"s3_access_key": "[redacted]"}) is True
+    assert task_has_secrets("migrate", {"site": "s.localhost"}) is False
     assert task_has_secrets("migrate") is False

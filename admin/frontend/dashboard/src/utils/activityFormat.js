@@ -1,13 +1,13 @@
 import { commandLabel, relativeTime } from './taskFormat'
 
 const typeMetaMap = {
-  backup: { icon: 'lucide-database', iconBg: 'bg-surface-blue-2 text-ink-blue-8' },
-  app: { icon: 'lucide-package', iconBg: 'bg-surface-purple-2 text-ink-purple-8' },
-  session: { icon: 'lucide-key-round', iconBg: 'bg-surface-amber-2 text-ink-amber-8' },
+  backup: { icon: 'lucide-database', iconBg: 'bg-surface-blue-2 text-ink-blue-7' },
+  app: { icon: 'lucide-package', iconBg: 'bg-surface-purple-2 text-ink-purple-7' },
+  session: { icon: 'lucide-key-round', iconBg: 'bg-surface-amber-2 text-ink-amber-7' },
   ssh_key: { icon: 'lucide-key', iconBg: 'bg-surface-gray-2 text-ink-gray-7' },
   git: { icon: 'lucide-git-branch', iconBg: 'bg-surface-gray-2 text-ink-gray-7' },
-  task: { icon: 'lucide-list-checks', iconBg: 'bg-surface-blue-2 text-ink-blue-8' },
-  bypass_patch: { icon: 'lucide-wrench', iconBg: 'bg-surface-red-2 text-ink-red-8' },
+  task: { icon: 'lucide-list-checks', iconBg: 'bg-surface-blue-2 text-ink-blue-7' },
+  bypass_patch: { icon: 'lucide-wrench', iconBg: 'bg-surface-red-2 text-ink-red-7' },
 }
 
 const defaultTypeMeta = { icon: 'lucide-activity', iconBg: 'bg-surface-gray-2 text-ink-gray-7' }

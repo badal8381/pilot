@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, cast
 from pilot.exceptions import BenchError
 
 if TYPE_CHECKING:
+    from pilot.core.app import App
     from pilot.core.bench import Bench
     from pilot.managers.processes.base import ManagedProcessManager
     from pilot.managers.processes.local import ProcessManager
@@ -90,17 +91,28 @@ class BenchRuntime:
         if self.bench.config.production.enabled:
             NginxManager(self.bench).generate_config()
 
-    def rebuild_assets(self, force: bool = False) -> None:
+    def rebuild_assets(self, apps: list[str] | None = None, force: bool = False) -> None:
         from pilot.managers.environment import PythonEnvManager
         from pilot.managers.processes.local import ProcessManager
 
         manager = PythonEnvManager(self.bench)
-        if force:
+        if force and not apps:
             manager.build_assets()
         else:
-            for app in self.bench.apps():
-                manager.build_assets_for_app(app)
+            for app in self.apps_to_build(apps):
+                manager.build_assets_for_app(app, force=force)
         ProcessManager.for_bench(self.bench).reload_workers(web_only=True)
+
+    def apps_to_build(self, names: list[str] | None) -> list["App"]:
+        """Bench apps matching `names`; every app when no names are given."""
+        apps = self.bench.apps()
+        if not names:
+            return apps
+        by_name = {app.config.name: app for app in apps}
+        missing = [name for name in names if name not in by_name]
+        if missing:
+            raise BenchError(f"App(s) not found in bench: {', '.join(missing)}")
+        return [by_name[name] for name in names]
 
     def install_requirements(self, on_progress: Callable[[str], None]) -> None:
         self._install_python_requirements(on_progress)
@@ -183,7 +195,8 @@ class BenchRuntime:
 
         port = self._admin_port()
         on_progress("\nBench not initialized. Starting setup wizard...")
-        on_progress(f"  Open http://localhost:{port} in your browser\n")
+        on_progress(f"  Open http://localhost:{port}/?sid={self.bench.issue_setup_link()} in your browser")
+        on_progress("  The link signs you in and expires in an hour.\n")
 
         env = {**os.environ, "PYTHONPATH": str(root)}
         subprocess.run(

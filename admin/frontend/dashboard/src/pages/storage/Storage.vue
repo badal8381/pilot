@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { Badge, Button, ErrorMessage, Skeleton } from 'frappe-ui'
+import { Button, ErrorMessage, Skeleton } from 'frappe-ui'
 
 import { h, onMounted, ref } from 'vue'
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 
 import FCLogo from '@/components/icons/FC.vue'
-import AppStorageCard from '@/components/server/AppStorageCard.vue'
-import DBStorageCard from '@/components/server/DatabaseStorageCard.vue'
+import AppStorageCard from '@/components/storage/AppStorageCard.vue'
+import DBStorageCard from '@/components/storage/DatabaseStorageCard.vue'
 
 import type { StorageBreakdown } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
@@ -34,19 +34,10 @@ onMounted(load)
 
 <template>
   <section class="mx-auto max-w-5xl">
-    <h2 class="text-lg mb-10">
-      Server
-      <Badge theme="amber">WIP</Badge>
-    </h2>
-  </section>
-
-  <!-- storgae -->
-  <section class="mx-auto max-w-5xl">
-    <!-- header -->
     <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
       <h2 class="flex items-center gap-2 font-medium text-ink-gray-8 text-lg">
         <span class="size-4 lucide-hard-drive" />
-        Storage
+        Disk usage
       </h2>
 
       <span v-if="storageData" class="-mr-0.5"> {{ formatBytes(storageData.disk_used) }} </span>
@@ -69,10 +60,9 @@ onMounted(load)
       <Button :iconLeft="h(FCLogo, { class: 'size-4' })"> Manage Storage </Button>
     </div>
 
-    <!-- loader -->
     <div
       v-if="loading && !storageData"
-      class="bg-surface-base border border-outline-gray-2 rounded-xl overflow-hidden"
+      class="bg-surface-base border border-outline-gray-2 rounded-7 overflow-hidden"
     >
       <div
         class="divide-y lg:divide-x lg:divide-y-0 grid grid-cols-1 divide-outline-gray-2 lg:grid-cols-2"
@@ -82,7 +72,7 @@ onMounted(load)
           <Skeleton
             v-for="row in 4"
             :key="row"
-            class="h-3.5 rounded"
+            class="h-3.5 rounded-4"
             :class="row % 2 ? 'w-full' : 'w-2/3'"
           />
         </div>
@@ -93,7 +83,7 @@ onMounted(load)
 
     <div
       v-else-if="storageData"
-      class="bg-surface-base border border-outline-gray-2 rounded-xl fade-in overflow-hidden"
+      class="bg-surface-base border border-outline-gray-2 rounded-7 fade-in overflow-hidden"
     >
       <div
         class="divide-y lg:divide-x lg:divide-y-0 grid grid-cols-1 divide-outline-gray-2 lg:grid-cols-2"

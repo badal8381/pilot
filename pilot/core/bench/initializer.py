@@ -104,7 +104,7 @@ class BenchInitializer:
         admin = self.bench.config.admin
         if not admin.enabled or admin.password:
             return
-        admin.password = secrets.token_hex(nbytes=5)
+        admin.set_password(secrets.token_urlsafe(12))
         self.bench.config.write(self.bench.path)
 
     def _ensure_database_credentials(self) -> None:

@@ -1,12 +1,6 @@
 <template>
   <div class="flex items-center gap-3">
-    <AppIcon
-      :name="app.name"
-      :label="app.title"
-      :logo="app.logo_url || ''"
-      class="rounded-[10px] size-9"
-      initial-class="text-base"
-    />
+    <AppIcon :name="app.name" :label="app.title" :logo="app.logo_url || ''" size="xl" />
 
     <div class="flex flex-1 justify-between items-center gap-2 py-2 min-w-0">
       <div class="min-w-0">
@@ -48,20 +42,18 @@
       </slot>
     </div>
 
-    <Dialog v-model="showIncompatible" :options="{ title: 'Incompatible app', size: 'sm' }">
-      <template #body-content>
-        <p class="text-ink-gray-7 text-p-sm">{{ incompatibleReason }}</p>
-        <div class="flex flex-col gap-1.5 mt-3 text-sm">
-          <div class="flex justify-between">
-            <span class="text-ink-gray-5">Current version</span>
-            <span class="font-medium text-ink-gray-8">{{ app.frappe_version || 'Unknown' }}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-ink-gray-5">Required version</span>
-            <span class="font-medium text-ink-gray-8">{{ app.needs || 'Not specified' }}</span>
-          </div>
+    <Dialog v-model="showIncompatible" title="Incompatible app" size="sm">
+      <p class="text-ink-gray-7 text-p-sm">{{ incompatibleReason }}</p>
+      <div class="flex flex-col gap-1.5 mt-3 text-sm">
+        <div class="flex justify-between">
+          <span class="text-ink-gray-5">Current version</span>
+          <span class="font-medium text-ink-gray-8">{{ app.frappe_version || 'Unknown' }}</span>
         </div>
-      </template>
+        <div class="flex justify-between">
+          <span class="text-ink-gray-5">Required version</span>
+          <span class="font-medium text-ink-gray-8">{{ app.needs || 'Not specified' }}</span>
+        </div>
+      </div>
     </Dialog>
   </div>
 </template>

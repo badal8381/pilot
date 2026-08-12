@@ -1,13 +1,13 @@
 <template>
   <div>
     <div
-      class="flex items-center gap-3 px-2.5 py-2 rounded transition-colors"
+      class="flex items-center gap-3 px-2.5 py-2 rounded-4 transition-colors"
       :class="hasOutput ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
       @click="toggle"
     >
-      <span class="place-items-center grid rounded size-6 shrink-0" :class="iconBg">
+      <span class="place-items-center grid rounded-full size-6 shrink-0" :class="iconBg">
         <span v-if="status === 'done'" class="size-3.5 lucide-check" />
-        <span v-else-if="status === 'running'" class="size-3.5 animate-spin lucide-loader-circle" />
+        <Spinner v-else-if="status === 'running'" size="sm" />
         <span v-else-if="status === 'failed'" class="size-3.5 lucide-x" />
         <span v-else class="bg-ink-gray-3 rounded-full size-1.5" />
       </span>
@@ -27,18 +27,14 @@
         :class="[hasOutput ? '' : 'invisible', expanded ? 'rotate-180' : '']"
       />
     </div>
-    <LogView
-      v-if="expanded && hasOutput"
-      class="mt-1"
-      :lines="lines"
-      :streaming="streaming"
-      :rounded="false"
-    />
+    <!-- The step list insets this by p-1, so its rounding never reaches here. -->
+    <LogView v-if="expanded && hasOutput" class="mt-1" :lines="lines" :streaming="streaming" />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { Spinner } from 'frappe-ui'
 import LogView from '../logs/LogView.vue'
 
 const props = defineProps({
@@ -73,8 +69,8 @@ function toggle() {
 
 const STATUS_ICON_BG = {
   done: 'bg-surface-gray-2 text-ink-gray-6',
-  running: 'bg-surface-amber-2 text-ink-amber-8',
-  failed: 'bg-surface-red-2 text-ink-red-8',
+  running: 'bg-surface-amber-2 text-ink-amber-7',
+  failed: 'bg-surface-red-2 text-ink-red-7',
   pending: 'bg-surface-gray-2',
 }
 

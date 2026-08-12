@@ -196,6 +196,15 @@ def test_rule_8_redis_ports_must_be_distinct() -> None:
     assert "redis.cache_port" in str(exc_info.value) or "redis.queue_port" in str(exc_info.value)
 
 
+def test_worker_queue_names_cannot_carry_a_service_directive() -> None:
+    """Queue names are rendered into a systemd ExecStart and a supervisor stanza."""
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    data["workers"] = [{"queues": ["default\nExecStart=/tmp/pwn.sh"], "count": 1}]
+    with pytest.raises(ConfigError) as exc_info:
+        load_from_dict(data)
+    assert "workers[0].queues" in str(exc_info.value)
+
+
 def test_rule_9_worker_counts_must_be_positive() -> None:
     data = copy.deepcopy(MINIMAL_VALID_DATA)
     data["workers"] = [{"queues": ["default"], "count": 0}]
@@ -409,10 +418,41 @@ def test_admin_tls_roundtrip() -> None:
     assert "tls = false" in config.dumps()
 
 
-def test_admin_allow_bench_management_defaults_to_true() -> None:
+@pytest.mark.parametrize(
+    "section,field,url",
+    [
+        ("admin", "jwks_url", "http://169.254.169.254/token"),
+        ("central", "endpoint", "http://metadata.google.internal/computeMetadata"),
+        ("datum", "endpoint", "file:///etc/shadow"),
+        ("llm", "api_base", "http://user:password@llm.example.com/v1"),
+    ],
+)
+def test_endpoints_this_bench_fetches_refuse_unsafe_urls(section: str, field: str, url: str) -> None:
+    config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
+    setattr(getattr(config, section), field, url)
+    with pytest.raises(ConfigError):
+        config.validate()
+
+
+def test_a_private_llm_endpoint_stays_allowed() -> None:
+    config = BenchConfig._from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
+    config.llm.api_base = "http://127.0.0.1:11434/v1"
+    config.validate()
+
+
+def test_admin_allow_bench_management_defaults_to_true_on_a_dev_checkout() -> None:
     config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
     assert config.admin.allow_bench_management is True
     assert "allow_bench_management = true" in config.dumps()
+
+
+def test_admin_allow_bench_management_defaults_to_false_on_a_release_install(monkeypatch) -> None:
+    import pilot
+
+    monkeypatch.setattr(pilot, "is_dev_build", False)
+    config = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA))
+    assert config.admin.allow_bench_management is False
+    assert "allow_bench_management = false" in config.dumps()
 
 
 def test_admin_allow_bench_management_can_be_disabled() -> None:

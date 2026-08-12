@@ -17,7 +17,8 @@ REPO_URL="${PILOT_REPO_URL:-https://github.com/$GITHUB_SLUG}"
 BRANCH_NAME="${PILOT_BRANCH:-develop}"
 PILOT_DIR="$HOME/pilot"
 BENCH_USER="${BENCH_USER:-frappe}"
-# Lets an unattended run answer sudo, which `curl | sh` cannot prompt for.
+# Answers sudo for an unattended run, which `curl | sh` cannot prompt for. Set it
+# in the environment: an argument would expose the password to every local `ps`.
 SUDO_PASS="${SUDO_PASS:-}"
 # The default install pulls a prebuilt release tarball; --dev clones develop and
 # compiles the admin frontend from source.
@@ -32,8 +33,6 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --user) BENCH_USER="$2"; shift 2 ;;
         --user=*) BENCH_USER="${1#*=}"; shift ;;
-        --sudo-password|--sudo-pass) SUDO_PASS="$2"; shift 2 ;;
-        --sudo-password=*|--sudo-pass=*) SUDO_PASS="${1#*=}"; shift ;;
         --dev) DEV_MODE=1; shift ;;
         *) echo "Unknown option: $1"; exit 1 ;;
     esac

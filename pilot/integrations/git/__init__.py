@@ -10,8 +10,9 @@ from pilot.integrations.git.base import (
     GitAuthError,
     GitProvider,
     GitProviderError,
-    inject_https_token,
     normalize_to_https,
+    repo_host,
+    without_credentials,
 )
 from pilot.integrations.git.credentials import CREDENTIALS_FILENAME, GitCredentialStore
 from pilot.integrations.git.github import GitHubProvider, parse_github_owner_repo
@@ -25,13 +26,14 @@ __all__ = [
     "GitHubProvider",
     "GitProvider",
     "GitProviderError",
-    "authenticated_url_for",
-    "inject_https_token",
+    "auth_config_for",
     "normalize_to_https",
     "parse_github_owner_repo",
     "provider_for_name",
     "provider_for_repo",
+    "repo_host",
     "resolve_app_name_from_repo",
+    "without_credentials",
 ]
 
 PROVIDERS: dict[str, type[GitProvider]] = {
@@ -47,8 +49,11 @@ def provider_for_name(name: str, token: str = "") -> GitProvider:
 
 
 def provider_for_repo(repo_url: str, token: str = "") -> GitProvider | None:
+    """The provider hosting this repo, matched on hostname - never on a substring, which
+    would hand github.com.attacker.example a GitHub token."""
+    host = repo_host(repo_url)
     for cls in PROVIDERS.values():
-        if cls.host and cls.host in (repo_url or ""):
+        if cls.host and cls.host == host:
             return cls(token)
     return None
 
@@ -98,12 +103,12 @@ def resolve_app_name_from_repo(bench_root: Path, repo_url: str, branch: str = ""
     return {"name": name, "description": description}
 
 
-def authenticated_url_for(bench_root: Path, repo_url: str) -> str:
-    """Return a token-embedded clone URL when stored credentials apply."""
+def auth_config_for(bench_root: Path, repo_url: str) -> dict[str, str]:
+    """Git config authenticating this repo when stored credentials apply to its host."""
     record = GitCredentialStore(bench_root).load()
     if not record or not record.get("token"):
-        return repo_url
+        return {}
     provider = provider_for_repo(repo_url, record["token"])
     if provider is None or provider.name != record.get("provider"):
-        return repo_url
-    return provider.authenticated_clone_url(repo_url)
+        return {}
+    return provider.auth_config(repo_url)

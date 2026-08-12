@@ -16,7 +16,7 @@
 
     <div
       v-else-if="diagnostics && !diagnostics.supported"
-      class="flex flex-col items-center gap-1 bg-surface-white py-14 border rounded-lg border-outline-gray-2 text-center"
+      class="flex flex-col items-center gap-1 bg-surface-white py-14 border rounded-6 border-outline-gray-2 text-center"
     >
       <span class="size-6 text-ink-gray-3 lucide-database" />
       <p class="font-medium text-ink-gray-7 text-sm">No database server</p>
@@ -133,9 +133,14 @@
               />
               <div v-else-if="column.key === 'actions'" class="flex justify-end">
                 <Tooltip v-if="!row.isActive" text="Delete this file and every older one">
-                  <Button variant="ghost" theme="red" size="sm" @click="confirmPurge(row.index)">
-                    <span class="size-4 lucide-trash-2" />
-                  </Button>
+                  <Button
+                    variant="ghost"
+                    theme="red"
+                    size="sm"
+                    icon="lucide-trash-2"
+                    label="Delete binary logs"
+                    @click="confirmPurge(row.index)"
+                  />
                 </Tooltip>
               </div>
               <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
@@ -168,66 +173,62 @@
 
   <TableSizesDialog v-model:open="showTableSizes" :site="selectedSite" />
 
-  <Dialog v-model="showKillDialog" :options="{ title: 'Kill database process', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Close connection <strong>{{ killTarget?.Id }}</strong> and roll back whatever it is running?
-        Any bench sharing this server may own it.
-      </p>
+  <Dialog v-model="showKillDialog" title="Kill database process" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Close connection <strong>{{ killTarget?.id }}</strong> and roll back whatever it is running?
+      Any bench sharing this server may own it.
+    </p>
 
-      <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-lg text-xs">
-        <div
-          v-for="item in killDetails"
-          :key="item.label"
-          class="flex justify-between items-baseline gap-4"
-        >
-          <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
-          <dd class="font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
-        </div>
-        <div v-if="killQuery" class="space-y-1.5 pt-1.5 border-t border-outline-gray-2">
-          <dt class="text-ink-gray-5">Query</dt>
-          <dd class="max-h-24 overflow-y-auto font-mono font-medium text-ink-gray-8 break-all">
-            {{ killQuery }}
-          </dd>
-        </div>
-      </dl>
-
-      <ErrorMessage v-if="killError" :message="killError" class="mt-3" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showKillDialog = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="killing" @click="kill">Kill process</Button>
+    <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-6 text-xs">
+      <div
+        v-for="item in killDetails"
+        :key="item.label"
+        class="flex justify-between items-baseline gap-4"
+      >
+        <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
+        <dd class="font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
       </div>
-    </template>
+      <div v-if="killQuery" class="space-y-1.5 pt-1.5 border-t border-outline-gray-2">
+        <dt class="text-ink-gray-5">Query</dt>
+        <dd class="max-h-24 overflow-y-auto font-mono font-medium text-ink-gray-8 break-all">
+          {{ killQuery }}
+        </dd>
+      </div>
+    </dl>
+
+    <ErrorMessage v-if="killError" :message="killError" class="mt-3" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showKillDialog = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="killing" @click="kill">Kill process</Button>
+    </div>
   </Dialog>
 
-  <Dialog v-model="showPurgeDialog" :options="{ title: 'Delete binary logs', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Permanently delete
-        <strong
-          >{{ pendingFiles.length }}
-          file{{ pendingFiles.length === 1 ? '' : 's' }}</strong
-        >, freeing {{ pendingSize }}? Binary logs are shared by every bench on this server and are
-        used for point-in-time recovery and replication.
-      </p>
+  <Dialog v-model="showPurgeDialog" title="Delete binary logs" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Permanently delete
+      <strong
+        >{{ pendingFiles.length }}
+        file{{ pendingFiles.length === 1 ? '' : 's' }}</strong
+      >, freeing {{ pendingSize }}? Binary logs are shared by every bench on this server and are
+      used for point-in-time recovery and replication.
+    </p>
 
-      <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-lg text-xs">
-        <div
-          v-for="item in purgeDetails"
-          :key="item.label"
-          class="flex justify-between items-baseline gap-4"
-        >
-          <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
-          <dd class="font-mono font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
-        </div>
-      </dl>
-
-      <ErrorMessage v-if="purgeError" :message="purgeError" class="mt-3" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showPurgeDialog = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="purging" @click="purge">Delete</Button>
+    <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-6 text-xs">
+      <div
+        v-for="item in purgeDetails"
+        :key="item.label"
+        class="flex justify-between items-baseline gap-4"
+      >
+        <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
+        <dd class="font-mono font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
       </div>
-    </template>
+    </dl>
+
+    <ErrorMessage v-if="purgeError" :message="purgeError" class="mt-3" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showPurgeDialog = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="purging" @click="purge">Delete</Button>
+    </div>
   </Dialog>
 </template>
 
@@ -238,14 +239,16 @@ import {
   Dialog,
   ErrorMessage,
   FormControl,
-  ListHeader,
-  ListRowItem,
-  ListRows,
-  ListView,
   LoadingText,
   Tooltip,
   toast,
 } from 'frappe-ui'
+import {
+  ListHeader,
+  ListRowItem,
+  ListRows,
+  ListView,
+} from 'frappe-ui/experimental'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiErrorMessage } from '@/api/client'
@@ -311,6 +314,10 @@ const lockWaitsLoading = ref(false)
 const lockWaitsError = ref('')
 const autoRefreshLocks = ref(true)
 let lockWaitsTimer = null
+let lockWaitsPollVersion = 0
+let lockWaitsRequest = null
+let lockWaitsRequestSite = null
+let lockWaitsReloadQueued = false
 
 const binlogs = ref([])
 const binlogsLoading = ref(false)
@@ -335,13 +342,13 @@ const purgeError = ref('')
 const processRows = computed(() =>
   processes.value.map((process, index) => ({
     number: index + 1,
-    id: process.Id,
-    state: process.State || '—',
-    time: `${process.Time}s`,
-    user: process.User,
-    host: process.Host || '—',
-    command: process.Command,
-    query: truncateQuery(process.Info),
+    id: process.id,
+    state: process.state || '—',
+    time: formatSeconds(process.duration_seconds),
+    user: process.user || '—',
+    host: process.host || '—',
+    command: process.command || '—',
+    query: truncateQuery(process.query),
     process,
   })),
 )
@@ -377,14 +384,14 @@ const killDetails = computed(() => {
   const process = killTarget.value
   if (!process) return []
   return [
-    { label: 'User', value: process.User },
-    { label: 'Database', value: process.db || '—' },
-    { label: 'State', value: process.Command },
-    { label: 'Running for', value: `${process.Time}s` },
+    { label: 'User', value: process.user || '—' },
+    { label: 'Database', value: process.database || '—' },
+    { label: 'State', value: process.command || '—' },
+    { label: 'Running for', value: formatSeconds(process.duration_seconds) },
   ]
 })
 
-const killQuery = computed(() => killTarget.value?.Info || '')
+const killQuery = computed(() => killTarget.value?.query || '')
 
 const pendingFiles = computed(() =>
   pendingIndex.value < 0 ? [] : binlogs.value.slice(0, pendingIndex.value + 1),
@@ -433,6 +440,10 @@ function truncateQuery(query) {
   return query.length > MAX_QUERY_LENGTH ? `${query.slice(0, MAX_QUERY_LENGTH)}…` : query
 }
 
+function formatSeconds(seconds) {
+  return seconds == null ? '—' : `${Math.round(seconds)}s`
+}
+
 function fileAge(file) {
   return file.modified_ms ? relativeTime(new Date(file.modified_ms).toISOString()) : '—'
 }
@@ -453,10 +464,10 @@ async function kill() {
   killing.value = true
   killError.value = ''
   try {
-    const result = await databaseApi.killProcess(killTarget.value.Id)
+    const result = await databaseApi.killProcess(killTarget.value.id)
     if (result.error) throw new Error(apiErrorMessage(result, 'Could not kill the process.'))
     showKillDialog.value = false
-    toast.success(`Killed process ${killTarget.value.Id}`)
+    toast.success(`Killed process ${killTarget.value.id}`)
     await loadProcesses()
   } catch (e) {
     killError.value = e.message || 'Could not kill the process.'
@@ -506,18 +517,45 @@ async function loadProcesses() {
   }
 }
 
-async function loadLockWaits() {
+function loadLockWaits() {
+  if (lockWaitsRequest) {
+    if (lockWaitsRequestSite !== selectedSite.value) lockWaitsReloadQueued = true
+    return lockWaitsRequest
+  }
+  lockWaitsRequest = drainLockWaitsRequests()
+  return lockWaitsRequest
+}
+
+async function drainLockWaitsRequests() {
   lockWaitsLoading.value = true
+  try {
+    do {
+      lockWaitsReloadQueued = false
+      await fetchLockWaits()
+    } while (lockWaitsReloadQueued)
+  } finally {
+    lockWaitsLoading.value = false
+    lockWaitsRequest = null
+    lockWaitsRequestSite = null
+  }
+}
+
+async function fetchLockWaits() {
+  const site = selectedSite.value
+  lockWaitsRequestSite = site
   lockWaitsError.value = ''
   try {
-    const result = await databaseApi.lockWaitRows(selectedSite.value)
+    const result = await databaseApi.lockWaitRows(site)
+    if (site !== selectedSite.value) {
+      lockWaitsReloadQueued = true
+      return
+    }
     if (result?.error)
       throw new Error(apiErrorMessage(result, 'Could not load database lock waits.'))
     lockWaits.value = Array.isArray(result) ? result : []
   } catch (e) {
-    lockWaitsError.value = e.message || 'Could not load database lock waits.'
-  } finally {
-    lockWaitsLoading.value = false
+    if (site !== selectedSite.value) lockWaitsReloadQueued = true
+    else lockWaitsError.value = e.message || 'Could not load database lock waits.'
   }
 }
 
@@ -551,13 +589,21 @@ async function loadBinlogs() {
   }
 }
 
+async function pollLockWaits(version) {
+  await loadLockWaits()
+  if (version !== lockWaitsPollVersion || !autoRefreshLocks.value) return
+  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
+}
+
 function startLockWaitsAutoRefresh() {
   stopLockWaitsAutoRefresh()
-  lockWaitsTimer = setInterval(loadLockWaits, AUTO_REFRESH_INTERVAL_MS)
+  const version = lockWaitsPollVersion
+  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
 }
 
 function stopLockWaitsAutoRefresh() {
-  if (lockWaitsTimer) clearInterval(lockWaitsTimer)
+  lockWaitsPollVersion += 1
+  if (lockWaitsTimer) clearTimeout(lockWaitsTimer)
   lockWaitsTimer = null
 }
 

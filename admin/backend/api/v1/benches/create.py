@@ -148,6 +148,7 @@ def _start_production_setup_wizard(new_dir: Path, name: str, admin_domain: str):
             "wizard_at_domain": True,
             "scheme": "http",
             "server_ip": server_ip,
+            "setup_link": bench.issue_setup_link(),
         },
         url_for("benches.get_bench", name=name),
     )
@@ -204,6 +205,7 @@ def _start_standalone_setup_wizard(new_dir: Path, name: str, new_port: int):
         {
             **bench_resource(new_dir),
             "wizard_at_domain": False,
+            "setup_link": Bench(new_dir).issue_setup_link(),
         },
         url_for("benches.get_bench", name=name),
     )

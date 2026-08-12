@@ -14,7 +14,7 @@ export const sidebarSections: SidebarSection[] = [
   {
     items: [
       { label: 'Sites', icon: 'lucide-globe', to: '/sites' },
-      { label: 'Server', icon: 'lucide-server', to: '/server' },
+      { label: 'Storage', icon: 'lucide-hard-drive', to: '/storage' },
       { label: 'Marketplace', icon: 'lucide-store', to: '/marketplace' },
     ],
   },
@@ -23,8 +23,8 @@ export const sidebarSections: SidebarSection[] = [
     items: [
       { label: 'Analytics', icon: 'lucide-chart-line', to: '/insights/analytics' },
       { label: 'Updates', icon: 'lucide-git-pull-request-arrow', to: '/updates' },
-      { label: 'Logs', icon: 'lucide-scroll-text', to: '/insights/logs' },
       { label: 'Tasks', icon: 'lucide-list-checks', to: '/insights/tasks' },
+      { label: 'Logs', icon: 'lucide-scroll-text', to: '/insights/logs' },
     ],
   },
   {

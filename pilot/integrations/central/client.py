@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pilot.exceptions import BenchError
@@ -50,6 +51,15 @@ def _error_detail(body: bytes) -> str:
     return exception.split(":", 1)[-1].strip() if ":" in exception else exception.strip()
 
 
+def central(bench_name: str) -> CentralClient:
+    from pilot.config.bench import BenchConfig
+    from pilot.core.bench import Bench
+
+    bench_root = Path.cwd() / "benches" / bench_name
+    bench = Bench(BenchConfig.read(bench_root), bench_root)
+    return CentralClient(bench)
+
+
 class CentralClient:
     """Central transport using this bench's pilot token."""
 
@@ -65,6 +75,13 @@ class CentralClient:
     def log_token(self) -> dict[str, Any]:
         """The JWT to present to Datum when shipping logs, plus its TTL and resource id."""
         return self.forward("central.api.pilot.log_token", "GET")
+      
+    def notify_central(self, event: str, message: str, context: dict | None = None) -> dict[str, Any]:
+        """Send a notification to Central for a bench event."""
+        return self._post(
+            "/api/method/central.notification.api.report_pilot_event",
+            {"event": event, "message": message, "context": context or {}},
+        )
 
     def forward(self, method_path: str, http_method: str, data: dict[str, Any] | None = None) -> Any:
         """Proxy an arbitrary Central pilot-API method with the X-Pilot-Token, returning its

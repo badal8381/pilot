@@ -17,7 +17,7 @@ from admin.backend.api.v1.sites.shared import (
     task_failure,
     text_fields,
 )
-from admin.backend.middleware import require_scope
+from admin.backend.middleware import is_bench_scoped, require_scope
 from admin.backend.providers.apps import AppProvider
 from admin.backend.providers.sites import SiteProvider
 from pilot.core.bench import Bench
@@ -116,6 +116,14 @@ def install_site_app(name: str):
     if request_error is not None:
         return request_error
     app, repo, branch = requested
+    if repo and not is_bench_scoped():
+        # Cloning a repository adds it to every site's bench, so a single site's token
+        # must not choose the code. Installing an app the bench already has is fine.
+        return error_response(
+            "bench_scope_required",
+            "Installing an app from a repository needs a bench session.",
+            403,
+        )
 
     bench = Bench(bench_root)
     try:

@@ -110,7 +110,10 @@ def test_no_op_for_missing_site(tmp_path: Path, monkeypatch) -> None:
 
 def _capture_drop_cmd(tmp_path: Path, monkeypatch, bench: Bench) -> dict:
     bench.config.write(bench.path)
-    _write_site(bench, "mysite", {})
+    _write_site(bench, "mysite", {"db_name": "_dropdb"})
+    monkeypatch.setattr(
+        "pilot.managers.database.mariadb.MariaDBManager.run_admin_sql", lambda self, sql: None
+    )
     captured: dict = {}
     monkeypatch.setattr("pilot.core.site.run_command", lambda cmd, **kw: captured.setdefault("cmd", cmd))
     Site(SiteConfig(name="mysite", apps=[]), bench).drop()
@@ -131,11 +134,12 @@ def test_drop_uses_postgres_root_creds(tmp_path: Path, monkeypatch) -> None:
     assert cmd[cmd.index("--db-root-password") + 1] == "pgpw"
 
 
-def test_drop_uses_mariadb_root_creds(tmp_path: Path, monkeypatch) -> None:
+def test_drop_uses_a_scoped_mariadb_account_not_root(tmp_path: Path, monkeypatch) -> None:
     _install_provider(tmp_path, monkeypatch)
     bench = _make_bench(tmp_path)  # defaults to mariadb
     bench.config.mariadb.root_password = "root"
 
     cmd = _capture_drop_cmd(tmp_path, monkeypatch, bench)["cmd"]
-    assert cmd[cmd.index("--db-root-username") + 1] == "root"
-    assert cmd[cmd.index("--db-root-password") + 1] == "root"
+    user = cmd[cmd.index("--db-root-username") + 1]
+    assert user.startswith("pilot_setup_")
+    assert "root" not in (user, cmd[cmd.index("--db-root-password") + 1])

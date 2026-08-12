@@ -17,6 +17,22 @@ class QueryResult:
 
 
 @dataclass
+class DatabaseProcess:
+    """One client connection. `command` is what it is doing (MariaDB's Command,
+    PostgreSQL's state), `state` the finer step within it, and
+    `duration_seconds` the time spent in that state."""
+
+    id: int
+    user: str | None
+    host: str | None
+    database: str | None
+    command: str | None
+    state: str | None
+    duration_seconds: float | None
+    query: str | None
+
+
+@dataclass
 class LockWaitStatus:
     current_waits: int
     total_waits: int | None
@@ -43,14 +59,17 @@ class LockWaitRow:
 
 @dataclass
 class DatabaseSize:
-    """Storage breakdown. `claimable_bytes` is space a rebuild would return to
-    the filesystem; `free_bytes` is what the data directory's disk has left.
-    Either is None when the engine or a remote host can't report it."""
+    """Storage breakdown. `total_bytes` carries an exact combined size when an
+    engine cannot split a server-wide total into data and indexes.
+    `claimable_bytes` is space a rebuild would return to the filesystem;
+    `free_bytes` is what the data directory's disk has left. Fields stay None
+    when the engine or a remote host cannot report them."""
 
-    data_bytes: int
-    index_bytes: int
+    data_bytes: int | None
+    index_bytes: int | None
     claimable_bytes: int | None
     free_bytes: int | None
+    total_bytes: int | None = None
 
 
 @dataclass
@@ -103,7 +122,7 @@ class Database(ABC):
     def get_schema(self) -> list[dict]:
         return [{"name": t, "columns": self.get_table_columns(t)} for t in self.get_tables()]
 
-    def get_process_list(self, database: str = "") -> list[dict]:
+    def get_process_list(self, database: str = "") -> list[DatabaseProcess]:
         """`database` narrows the result to one database; empty means server-wide."""
         raise NotImplementedError
 
@@ -146,6 +165,19 @@ class Database(ABC):
         """Server data directory, or None when the server is not on this host
         and the path would therefore be meaningless locally."""
         raise NotImplementedError
+
+    def get_free_disk_bytes(self) -> int | None:
+        """Free space on the disk holding the data directory, or None when that
+        directory cannot be reached from here."""
+        import shutil
+
+        directory = self.get_data_directory()
+        if not directory:
+            return None
+        try:
+            return shutil.disk_usage(directory).free
+        except OSError:
+            return None
 
     def get_scalar(self, query: str):
         result = self.execute(query)

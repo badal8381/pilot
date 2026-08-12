@@ -655,23 +655,9 @@ class MariaDBManager(UserOwnedDBManager):
     def has_valid_credentials(self, password: str | None = None) -> bool:
         """Check admin credentials using MYSQL_PWD, never argv."""
         pw = self.config.root_password if password is None else password
-        cmd = [
-            "mariadb",
-            f"--connect-timeout={_CLIENT_TIMEOUT}",
-            "-u",
-            self.config.admin_user,
-            "--batch",
-            "--skip-column-names",
-        ]
-        socket_path = self._detect_socket()
-        if socket_path:
-            cmd.append(f"--socket={socket_path}")
-        else:
-            cmd += ["-h", self.config.host, "-P", str(self.config.port)]
-        cmd += ["-e", "SELECT 1"]
         try:
             result = subprocess.run(
-                cmd,
+                [*self._client_command(), "--skip-column-names", "-e", "SELECT 1"],
                 env={**os.environ, "MYSQL_PWD": pw},
                 capture_output=True,
                 text=True,
@@ -680,6 +666,64 @@ class MariaDBManager(UserOwnedDBManager):
         except subprocess.TimeoutExpired:
             return False
         return result.returncode == 0
+
+    def _client_command(self) -> list[str]:
+        """Client argv for the admin account, over the socket when there is one."""
+        cmd = [
+            "mariadb",
+            f"--connect-timeout={_CLIENT_TIMEOUT}",
+            "-u",
+            self.config.admin_user,
+            "--batch",
+        ]
+        socket_path = self._detect_socket()
+        if socket_path:
+            cmd.append(f"--socket={socket_path}")
+        else:
+            cmd += ["-h", self.config.host, "-P", str(self.config.port)]
+        return cmd
+
+    def run_admin_sql(self, sql: str) -> None:
+        """Run statements as the admin account, with the password in MYSQL_PWD."""
+        subprocess.run(
+            self._client_command(),
+            input=sql,
+            text=True,
+            check=True,
+            capture_output=True,
+            timeout=_CLIENT_TIMEOUT,
+            env={**os.environ, "MYSQL_PWD": self.config.root_password},
+        )
+
+    @contextmanager
+    def temporary_setup_user(self, db_name: str):
+        """A throwaway account holding only what frappe needs to build `db_name`.
+
+        frappe takes its database credential on the command line, where every local
+        process can read it, so the long-lived admin password must not go there. The
+        host is '%' because the client may reach the server over a socket, over
+        loopback, or from another host, and the account lives for one command.
+        """
+        import secrets
+
+        user = f"pilot_setup_{secrets.token_hex(4)}"
+        password = secrets.token_urlsafe(24)
+        quoted_user = self._sql_quote(user)
+        database = db_name.replace("`", "")
+        self.run_admin_sql(
+            "\n".join(
+                [
+                    f"CREATE USER {quoted_user}@'%' IDENTIFIED BY {self._sql_quote(password)};",
+                    f"GRANT RELOAD, CREATE USER ON *.* TO {quoted_user}@'%';",
+                    f"GRANT ALL PRIVILEGES ON `{database}`.* TO {quoted_user}@'%' WITH GRANT OPTION;",
+                    "FLUSH PRIVILEGES;",
+                ]
+            )
+        )
+        try:
+            yield user, password
+        finally:
+            self.run_admin_sql(f"DROP USER IF EXISTS {quoted_user}@'%';\nFLUSH PRIVILEGES;")
 
     def secure_installation(self) -> None:
         """Create/update the admin account and apply basic hardening."""

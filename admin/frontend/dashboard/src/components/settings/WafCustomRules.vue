@@ -22,13 +22,13 @@
 
     <div
       v-if="rules.length"
-      class="bg-surface-elevation-1 p-1 border border-outline-gray-2 rounded-lg"
+      class="bg-surface-elevation-1 p-1 border border-outline-gray-2 rounded-6"
     >
       <div
         v-for="rule in rules"
         :key="keyOf(rule)"
         :data-rule-key="keyOf(rule)"
-        class="rounded ring-1 ring-inset transition-shadow"
+        class="rounded-4 ring-1 ring-inset transition-shadow"
         :class="[
           // Fast in, slow out. transition-shadow: a ring is box-shadow underneath.
           flaggedKey === keyOf(rule) ? 'ring-outline-red-3 duration-75' : 'ring-transparent duration-1000',
@@ -41,7 +41,7 @@
       >
         <!-- The whole row toggles; interactive children stop the click. -->
         <div
-          class="flex items-center gap-3 px-2.5 h-10 rounded transition-colors cursor-pointer select-none hover:bg-surface-gray-1"
+          class="flex items-center gap-3 px-2.5 h-10 rounded-4 transition-colors cursor-pointer select-none hover:bg-surface-alpha-gray-1"
           @click="toggleOpen(rule)"
         >
           <button
@@ -97,77 +97,78 @@
           placeholder="Block /admin from outside the office"
         />
 
-        <div class="space-y-2">
-          <!-- All/Any only once there is something to combine. -->
-          <div class="flex flex-wrap items-center gap-2 text-ink-gray-7 text-base">
+        <div class="space-y-3">
+          <!-- All/Any only once there is something to combine. gap-1 is about a
+               space at this size, so the row reads as a sentence. -->
+          <div class="flex flex-wrap items-center gap-1 text-ink-gray-7 text-base">
             <!-- One phrase when there is no Select between the words, or the flex
                  gap reads as a double space. -->
             <template v-if="rule.conditions.length > 1">
               <span>When</span>
-              <Select v-model="rule.match" :options="MATCH_OPTIONS" class="w-24" />
+              <Select v-model="rule.match" :options="MATCH_OPTIONS" />
               <span>of the following match:</span>
             </template>
             <span v-else>When this matches:</span>
           </div>
 
-          <div class="relative space-y-2 pl-5">
-            <!-- One condition bends into its row, several run straight past them
-                 all. -top-2 spans the space-y gap so the line meets "When". -->
+          <!-- Anchored here, not to the group, so it clears the label whatever
+               that row's height is - it grows when the All/Any select appears. -->
+          <div class="relative space-y-3">
             <span
               aria-hidden="true"
-              class="absolute left-1 -top-2 border-outline-gray-3"
-              :class="
-                rule.conditions.length > 1
-                  ? 'bottom-1 border-l'
-                  : 'h-[1.625rem] w-2.5 border-l border-b rounded-bl-lg'
-              "
+              class="absolute left-1 -top-2 bottom-0 border-l border-outline-gray-3"
             />
 
-            <div
-              v-if="rule.conditions.length > 1"
-              class="hidden sm:grid grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] gap-2 text-ink-gray-5 text-sm"
-            >
-              <span>Field</span>
-              <span>Condition</span>
-              <span>Value</span>
-              <span />
-            </div>
-
-            <div
-              v-for="(cond, ci) in rule.conditions"
-              :key="keyOf(cond)"
-              class="gap-2 grid grid-cols-1 sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
-            >
-              <!-- Stacked inside the field column to keep rows aligned. -->
-              <div class="space-y-1.5 min-w-0">
-                <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
+            <div class="space-y-2 pl-5">
+              <div
+                v-for="(cond, ci) in rule.conditions"
+                :key="keyOf(cond)"
+                class="gap-2 grid grid-cols-1 sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
+              >
+                <!-- Stacked inside the field column to keep rows aligned. -->
+                <div class="space-y-1.5 min-w-0">
+                  <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
+                  <TextInput
+                    v-if="cond.field === 'header'"
+                    v-model="cond.header_name"
+                    placeholder="Header name"
+                    class="w-full"
+                  />
+                </div>
+                <Select v-model="cond.operator" :options="operatorOptions" class="w-full" />
                 <TextInput
-                  v-if="cond.field === 'header'"
-                  v-model="cond.header_name"
-                  placeholder="Header name"
+                  v-model="cond.value"
+                  :placeholder="placeholder(cond.field)"
                   class="w-full"
                 />
+                <!-- Conditionless rules are dropped silently; the last one cannot go. -->
+                <Button
+                  variant="ghost"
+                  icon="lucide-x"
+                  label="Remove condition"
+                  tooltip="Remove condition"
+                  :disabled="rule.conditions.length === 1"
+                  @click="removeCondition(rule, ci)"
+                />
               </div>
-              <Select v-model="cond.operator" :options="operatorOptions" class="w-full" />
-              <TextInput v-model="cond.value" :placeholder="placeholder(cond.field)" class="w-full" />
-              <!-- Conditionless rules are dropped silently; the last one cannot go. -->
-              <Button
-                variant="ghost"
-                icon="lucide-x"
-                label="Remove condition"
-                tooltip="Remove condition"
-                :disabled="rule.conditions.length === 1"
-                @click="removeCondition(rule, ci)"
-              />
+            </div>
+
+            <!-- Indented with the conditions so it reads as one more row of them. -->
+            <div class="pl-5">
+              <Button variant="ghost" icon-left="lucide-plus" @click="addCondition(rule)">
+                Add condition
+              </Button>
             </div>
           </div>
-
-          <Button variant="ghost" icon-left="lucide-plus" @click="addCondition(rule)">
-            Add condition
-          </Button>
         </div>
 
-        <div class="space-y-1.5">
+        <div class="relative space-y-1.5 pl-5">
+          <!-- -top-4 spans the group gap above so the line is unbroken; the
+               extra 0.875rem drops the curve to the middle of this row. -->
+          <span
+            aria-hidden="true"
+            class="absolute left-1 -top-4 h-[1.875rem] w-2.5 border-l border-b rounded-bl-6 border-outline-gray-3"
+          />
           <div class="flex flex-wrap items-center gap-2 text-ink-gray-7 text-base">
             <span>Then</span>
             <Select v-model="rule.action" :options="actionOptions" class="w-48" />
@@ -183,7 +184,7 @@
           </div>
           <p
             v-if="rule.action === 'skip'"
-            class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm"
+            class="flex items-start gap-1.5 text-ink-amber-6 text-p-sm"
           >
             <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
             Matching requests bypass the firewall entirely - no managed rules, no inspection.
@@ -193,17 +194,15 @@
       </div>
     </div>
 
-    <Dialog v-model="showRemove" :options="{ title: 'Delete rule', size: 'md' }">
-      <template #body-content>
-        <p class="text-ink-gray-7 text-p-base">
-          Delete <strong>{{ removingLabel }}</strong
-          >? Requests it was matching fall through to the managed ruleset.
-        </p>
-        <div class="flex justify-end gap-2 mt-4">
-          <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-          <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
-        </div>
-      </template>
+    <Dialog v-model="showRemove" title="Delete rule" size="md">
+      <p class="text-ink-gray-7 text-p-base">
+        Delete <strong>{{ removingLabel }}</strong
+        >? Requests it was matching fall through to the managed ruleset.
+      </p>
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+        <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
+      </div>
     </Dialog>
   </div>
 </template>

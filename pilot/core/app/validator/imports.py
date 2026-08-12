@@ -114,9 +114,9 @@ class ImportCheck:
         stdlib = sys.stdlib_module_names
         locations: dict[str, list[str]] = {}
         for path in python_files(app):
-            if self._is_test_file(path):
-                continue
             relpath = path.relative_to(app.path)
+            if self._is_test_file(relpath):
+                continue
             for module, lineno in self._file_imported_modules(app, path):
                 if module.split(".", 1)[0] in stdlib:
                     continue
@@ -127,10 +127,12 @@ class ImportCheck:
         return locations
 
     @staticmethod
-    def _is_test_file(path: Path) -> bool:
+    def _is_test_file(relpath: Path) -> bool:
         # Test-only imports (responses, time_machine, ...) come from dev extras
         # a plain pip install never provides, so they'd always fail to resolve.
-        return path.name.startswith("test_") or path.name == "conftest.py"
+        if "tests" in relpath.parts[:-1]:
+            return True
+        return relpath.name.startswith("test_") or relpath.name == "conftest.py"
 
     def _file_imported_modules(self, app: "App", path: Path) -> list[tuple[str, int]]:
         try:

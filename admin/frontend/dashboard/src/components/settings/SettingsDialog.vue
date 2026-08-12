@@ -86,16 +86,14 @@
     </template>
   </Dialog>
 
-  <Dialog v-model="showDiscard" :options="{ title: 'Unsaved changes', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-base">
-        You have changes here that have not been saved. Leaving loses them.
-      </p>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="subtle" @click="showDiscard = false">Keep editing</Button>
-        <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>
-      </div>
-    </template>
+  <Dialog v-model="showDiscard" title="Unsaved changes" size="sm">
+    <p class="text-ink-gray-7 text-p-base">
+      You have changes here that have not been saved. Leaving loses them.
+    </p>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="subtle" @click="showDiscard = false">Keep editing</Button>
+      <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>
+    </div>
   </Dialog>
 </template>
 

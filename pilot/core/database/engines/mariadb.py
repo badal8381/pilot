@@ -7,6 +7,7 @@ from pilot.core.database.base import (
     BinlogFile,
     BinlogStatus,
     Database,
+    DatabaseProcess,
     DatabaseSize,
     LockWaitRow,
     LockWaitStatus,
@@ -17,7 +18,6 @@ from pilot.core.database.base import (
 from pilot.core.database.engines.helpers import (
     DEFAULT_CONNECT_TIMEOUT,
     MAX_ROWS,
-    disk_free,
     file_modified_ms,
     is_local_host,
     rows_as_dicts,
@@ -198,11 +198,22 @@ class MariaDB(Database):
         finally:
             conn.close()
 
-    def get_process_list(self, database: str = "") -> list[dict]:
+    def get_process_list(self, database: str = "") -> list[DatabaseProcess]:
         rows = rows_as_dicts(self.execute("SHOW FULL PROCESSLIST"))
-        if not database:
-            return rows
-        return [row for row in rows if row.get("db") == database]
+        return [
+            DatabaseProcess(
+                id=int(row["Id"]),
+                user=row["User"],
+                host=row["Host"],
+                database=row["db"],
+                command=row["Command"],
+                state=row["State"] or None,
+                duration_seconds=float(row["Time"]) if row["Time"] is not None else None,
+                query=row["Info"],
+            )
+            for row in rows
+            if not database or row["db"] == database
+        ]
 
     def get_database_size(self) -> DatabaseSize:
         result = self.execute(
@@ -215,7 +226,7 @@ class MariaDB(Database):
             data_bytes=int(data),
             index_bytes=int(index),
             claimable_bytes=int(claimable),
-            free_bytes=self._free_disk_bytes(),
+            free_bytes=self.get_free_disk_bytes(),
         )
 
     def get_table_sizes(self) -> list[TableSize]:
@@ -241,13 +252,6 @@ class MariaDB(Database):
         if self._database:
             return "table_schema = DATABASE()"
         return "table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')"
-
-    def _free_disk_bytes(self) -> int | None:
-        """Only meaningful when the server shares this host - the data directory
-        path means nothing locally for a remote server."""
-        if not is_local_host(self._host, self._socket):
-            return None
-        return disk_free(str(self.get_scalar("SELECT @@datadir")))
 
     def kill_process(self, process_id: int) -> None:
         """Drop a connection and roll back whatever it was running."""

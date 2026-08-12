@@ -266,7 +266,7 @@ def test_write_flat_preserves_production_enabled(tmp_path: Path) -> None:
     config = BenchConfig.read(tmp_path)
     assert config.production.enabled is True
     assert config.production.process_manager == "systemd"
-    assert config.admin.password == "secret"
+    assert config.admin.verify_password("secret")
 
 
 def test_write_flat_preserves_user_defined_keys(tmp_path: Path) -> None:

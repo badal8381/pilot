@@ -816,11 +816,18 @@ def test_has_valid_credentials_times_out() -> None:
 
 
 def _client(tmp_path):
+    """A signed-in wizard client: the setup routes authenticate like every other route."""
     from admin.backend.app import create_app
+    from admin.backend.internal.session import Session
+    from pilot.config import BenchConfig
+    from pilot.core.bench import Bench
 
+    BenchConfig.write_flat(tmp_path, tmp_path.name, {"admin_enabled": True, "admin_password": "secret"})
     app = create_app(tmp_path)
     app.config["TESTING"] = True
-    return app.test_client()
+    client = app.test_client()
+    client.set_cookie("sid", Session(Bench(tmp_path)).issue_session_token()[0])
+    return client
 
 
 def _post_validate(client, password: str):

@@ -25,6 +25,42 @@ def test_github_provider_sends_auth_header_with_token() -> None:
     assert GitHubProvider(token="ghp_token")._headers()["Authorization"] == "Bearer ghp_token"
 
 
+def test_stored_token_travels_as_git_config_not_in_the_url(tmp_path: Path) -> None:
+    """A token in the clone URL lands in argv (/proc) and in .git/config; a header
+    scoped to the host does neither."""
+    from pilot.integrations.git import auth_config_for
+    from pilot.integrations.git.credentials import GitCredentialStore
+
+    GitCredentialStore(tmp_path).save("github", "ghp_secret")
+    config = auth_config_for(tmp_path, "https://github.com/frappe/erpnext")
+
+    assert list(config) == ["http.https://github.com/.extraHeader"]
+    assert config["http.https://github.com/.extraHeader"].startswith("Authorization: Basic ")
+    assert "ghp_secret" not in str(config)
+
+
+def test_stored_token_is_not_offered_to_a_lookalike_host(tmp_path: Path) -> None:
+    from pilot.integrations.git import auth_config_for
+    from pilot.integrations.git.credentials import GitCredentialStore
+
+    GitCredentialStore(tmp_path).save("github", "ghp_secret")
+
+    assert auth_config_for(tmp_path, "https://github.com.attacker.example/frappe/erpnext") == {}
+    assert auth_config_for(tmp_path, "https://notgithub.com/frappe/erpnext") == {}
+
+
+def test_git_env_disables_the_ext_transport() -> None:
+    from pilot.internal.git import git_env
+
+    env = git_env()
+
+    settings = {
+        env[f"GIT_CONFIG_KEY_{index}"]: env[f"GIT_CONFIG_VALUE_{index}"]
+        for index in range(int(env["GIT_CONFIG_COUNT"]))
+    }
+    assert settings["protocol.ext.allow"] == "never"
+
+
 def test_credential_store_round_trip(tmp_path: Path) -> None:
     store = GitCredentialStore(tmp_path)
     assert store.load() is None
@@ -72,9 +108,18 @@ def test_parse_github_owner_repo(url: str, expected: tuple[str, str]) -> None:
     assert parse_github_owner_repo(url) == expected
 
 
-def test_parse_github_owner_repo_rejects_malformed_url() -> None:
+@pytest.mark.parametrize(
+    "url",
+    [
+        "not-a-url",
+        "https://evil.example.com/frappe/frappe",
+        "https://github.com/frappe/..%2f..%2fuser",
+        "https://github.com/frappe/repo?x=1",
+    ],
+)
+def test_parse_github_owner_repo_rejects_anything_but_a_github_owner_repo(url: str) -> None:
     with pytest.raises(GitProviderError):
-        parse_github_owner_repo("not-a-url")
+        parse_github_owner_repo(url)
 
 
 def test_resolve_app_name_requires_hooks_file(tmp_path: Path) -> None:

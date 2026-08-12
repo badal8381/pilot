@@ -4,7 +4,7 @@
       v-for="req in requirements"
       :key="req.label"
       class="flex items-center gap-1.5 text-xs"
-      :class="req.met ? 'text-ink-green-6' : 'text-ink-gray-4'"
+      :class="req.met ? 'text-ink-green-5' : 'text-ink-gray-4'"
     >
       <LucideCheck class="size-3" />
       {{ req.label }}

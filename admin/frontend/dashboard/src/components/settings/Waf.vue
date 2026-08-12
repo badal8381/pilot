@@ -11,7 +11,7 @@
         @update:model-value="(v) => (enabled = v)"
       />
 
-      <p v-if="setupNote" class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm">
+      <p v-if="setupNote" class="flex items-start gap-1.5 text-ink-amber-6 text-p-sm">
         <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
         <span>{{ setupNote }}</span>
       </p>
@@ -51,7 +51,7 @@
       <!-- Chrome marks a clicked summary :focus-visible; blur keeps the focus
            ring for keyboard only. w-fit so the ring hugs the word. -->
       <summary
-        class="flex items-center gap-1.5 pr-1.5 rounded-sm w-fit text-ink-gray-6 text-base cursor-pointer select-none"
+        class="flex items-center gap-1.5 pr-1.5 rounded-1 w-fit text-ink-gray-6 text-base cursor-pointer select-none"
         @click="(e) => e.currentTarget.blur()"
       >
         <span
@@ -67,7 +67,7 @@
               min="1"
               v-model="inboundThreshold"
             />
-            <p v-if="thresholdError" class="text-ink-red-6 text-p-sm">{{ thresholdError }}</p>
+            <p v-if="thresholdError" class="text-ink-red-5 text-p-sm">{{ thresholdError }}</p>
             <p v-else class="text-ink-gray-5 text-p-sm">
               Score needed before Action applies. Sensitivity raises scores, so the two compound.
             </p>

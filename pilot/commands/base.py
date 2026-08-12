@@ -50,6 +50,30 @@ class Command:
         print(message)
         sys.stdout.flush()
 
+    def resolve_password(self, value: str | None, label: str = "admin password") -> str:
+        """A validated password from the flag or the terminal. Returns "" when neither
+        supplied one, leaving the caller to generate it."""
+        from pilot.internal.validators import validate_admin_password
+
+        password = value or self.ask_password(label)
+        if not password:
+            return ""
+        if error := validate_admin_password(password):
+            raise BenchError(error)
+        return password
+
+    def ask_password(self, label: str = "admin password") -> str:
+        """Read a password twice from the terminal. Returns "" with no TTY to ask on,
+        so an unattended run can fall back to a generated one."""
+        import getpass
+
+        if not sys.stdin.isatty():
+            return ""
+        password = getpass.getpass(f"New {label}: ")
+        if password != getpass.getpass(f"Confirm {label}: "):
+            raise BenchError("Passwords do not match.")
+        return password
+
     def confirm(self, prompt: str, *, skip: bool = False, error: type[Exception] = BenchError) -> None:
         if skip:
             return

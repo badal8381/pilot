@@ -24,7 +24,7 @@
     <!-- Config table -->
     <div
       v-if="!rows.length"
-      class="py-12 border border-dashed rounded-xl border-outline-gray-2 text-ink-gray-5 text-sm text-center"
+      class="py-12 border border-dashed rounded-7 border-outline-gray-2 text-ink-gray-5 text-sm text-center"
     >
       No config keys.
     </div>
@@ -37,11 +37,16 @@
     >
       <template #cell="{ column, row, item }">
         <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Dropdown v-if="!row.readonly" :options="menuOptions(row)" placement="left">
+          <Dropdown v-if="!row.readonly" :options="menuOptions(row)">
             <template #default="{ open }">
-              <Button variant="ghost" size="sm" :active="open"
-                ><span class="size-4 lucide-ellipsis" /></Button
-              >
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="Config actions"
+                tooltip="Actions"
+              />
             </template>
           </Dropdown>
         </div>
@@ -51,62 +56,63 @@
   </div>
 
   <!-- Add dialog -->
-  <Dialog v-model="showAddDialog" :options="{ title: 'Add config', size: 'sm' }">
-    <template #body-content>
-      <div class="space-y-3">
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-sm">Key</p>
-          <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
-        </div>
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-sm">Value</p>
-          <TextInput v-model="entryValue" placeholder="value" class="w-full" />
-        </div>
-        <ErrorMessage v-if="dialogError" :message="dialogError" />
+  <Dialog v-model="showAddDialog" title="Add config" size="sm">
+    <div class="space-y-3">
+      <div class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Key</p>
+        <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
       </div>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
-        <Button variant="solid" :loading="saving" @click="save">Save</Button>
-      </div>
-    </template>
-  </Dialog>
-
-  <!-- Edit dialog -->
-  <Dialog v-model="showEditDialog" :options="{ title: `Edit ${entryKey}`, size: 'sm' }">
-    <template #body-content>
       <div class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Value</p>
         <TextInput v-model="entryValue" placeholder="value" class="w-full" />
       </div>
-      <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
-        <Button variant="solid" :loading="saving" @click="save">Save</Button>
-      </div>
-    </template>
+      <ErrorMessage v-if="dialogError" :message="dialogError" />
+    </div>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
+  </Dialog>
+
+  <!-- Edit dialog -->
+  <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
+    <div class="space-y-1.5">
+      <p class="font-medium text-ink-gray-7 text-sm">Value</p>
+      <TextInput v-model="entryValue" placeholder="value" class="w-full" />
+    </div>
+    <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
   </Dialog>
 
   <!-- Delete dialog -->
-  <Dialog v-model="showDelete" :options="{ title: 'Remove config', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
-        <code class="text-ink-gray-9">site_config.json</code>?
-      </p>
-      <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-          >Remove</Button
-        >
-      </div>
-    </template>
+  <Dialog v-model="showDelete" title="Remove config" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
+      <code class="text-ink-gray-9">site_config.json</code>?
+    </p>
+    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+        >Remove</Button
+      >
+    </div>
   </Dialog>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { Button, Dialog, Dropdown, ErrorMessage, ListView, ListRowItem, TextInput } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  Dropdown,
+  ErrorMessage,
+  TextInput,
+} from 'frappe-ui'
+import { ListView, ListRowItem } from 'frappe-ui/experimental'
 import { sitesApi } from '@/api/sites'
 import { useSite } from '@/composables/sites/useSite'
 

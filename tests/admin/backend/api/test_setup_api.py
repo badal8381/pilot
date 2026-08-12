@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import threading
 from pathlib import Path
 from unittest.mock import patch
 
@@ -10,19 +9,29 @@ from pilot.internal.tasks.store import TaskStore
 from pilot.managers.task.models import TaskStatus
 
 
-def setup_client(bench_root: Path):
+def setup_client(bench_root: Path, *, authenticated: bool = True):
+    """A wizard client for a freshly created bench: bench.toml with an admin password
+    (written by `pilot new`), plus the session its setup link would mint."""
+    from admin.backend.internal.session import Session
+    from pilot.core.bench import Bench
+
+    bench_root.mkdir(parents=True, exist_ok=True)
+    if not BenchConfig.exists(bench_root):
+        BenchConfig.write_flat(
+            bench_root, bench_root.name, {"admin_enabled": True, "admin_password": "admin-secret"}
+        )
     app = create_app(bench_root)
     app.config["TESTING"] = True
-    return app.test_client()
+    client = app.test_client()
+    if authenticated:
+        client.set_cookie("sid", Session(Bench(bench_root)).issue_session_token()[0])
+    return client
 
 
 def save_configuration(client):
     return client.put(
         "/api/v1/setup/configuration",
-        json={
-            "admin_password": "admin-secret",
-            "mariadb_password": "database-secret",
-        },
+        json={"mariadb_password": "database-secret"},
     )
 
 
@@ -80,17 +89,14 @@ def test_configuration_update_is_sanitized_and_preserves_unknown_keys(
     assert first.status_code == 200
     assert response.status_code == 200
     assert response.get_json()["app_branch"] == "develop"
-    assert response.get_json()["admin_password_configured"] is True
     assert response.get_json()["mariadb_password_configured"] is True
     assert response.get_json()["postgres_password_configured"] is False
-    assert "admin_password" not in response.get_json()
     assert "mariadb_password" not in response.get_json()
-    assert BenchConfig.read(tmp_path).admin.password == "admin-secret"
     assert BenchConfig.read(tmp_path).mariadb.root_password == "database-secret"
     assert BenchConfig.read_raw(tmp_path)["plugin"] == {"custom_key": "custom-value"}
 
 
-def test_authenticated_reload_can_save_without_resending_secrets(tmp_path: Path) -> None:
+def test_reload_can_save_without_resending_secrets(tmp_path: Path) -> None:
     client = setup_client(tmp_path)
     assert save_configuration(client).status_code == 200
 
@@ -100,14 +106,10 @@ def test_authenticated_reload_can_save_without_resending_secrets(tmp_path: Path)
         json={"app_branch": "develop"},
     )
 
-    assert configuration["admin_password_configured"] is True
     assert configuration["mariadb_password_configured"] is True
-    assert "admin_password" not in configuration
     assert "mariadb_password" not in configuration
     assert response.status_code == 200
-    config = BenchConfig.read(tmp_path)
-    assert config.admin.password == "admin-secret"
-    assert config.mariadb.root_password == "database-secret"
+    assert BenchConfig.read(tmp_path).mariadb.root_password == "database-secret"
 
 
 def test_configuration_update_rejects_malformed_and_invalid_payloads(
@@ -118,7 +120,7 @@ def test_configuration_update_rejects_malformed_and_invalid_payloads(
     malformed = client.put("/api/v1/setup/configuration", json=[])
     invalid = client.put(
         "/api/v1/setup/configuration",
-        json={"admin_password": "secret", "mariadb_password": 123},
+        json={"mariadb_password": 123},
     )
 
     assert malformed.status_code == 400
@@ -127,55 +129,34 @@ def test_configuration_update_rejects_malformed_and_invalid_payloads(
     assert invalid.get_json()["error"]["code"] == "invalid_setup_configuration"
 
 
-def test_only_one_unauthenticated_request_can_claim_setup(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    app = create_app(tmp_path)
-    app.config["TESTING"] = True
-    first_in_write = threading.Event()
-    second_passed_guard = threading.Event()
-    release_first = threading.Event()
-    original_write = BenchConfig.write_flat.__func__
+def test_configuration_update_rejects_keys_the_wizard_does_not_own(tmp_path: Path) -> None:
+    client = setup_client(tmp_path)
 
-    def delayed_write(*args, **kwargs):
-        first_in_write.set()
-        assert release_first.wait(2)
-        return original_write(BenchConfig, *args, **kwargs)
+    response = client.put(
+        "/api/v1/setup/configuration",
+        json={
+            "admin_password": "hijacked",
+            "mariadb_password": "database-secret",
+            "admin_jwks_url": "https://attacker.example.com/jwks.json",
+            "admin_allow_bench_management": True,
+        },
+    )
 
-    @app.before_request
-    def observe_second_request():
-        from flask import request
+    assert response.status_code == 422
+    assert response.get_json()["error"]["code"] == "invalid_setup_configuration"
+    assert "admin_jwks_url" in response.get_json()["error"]["message"]
+    assert BenchConfig.read(tmp_path).admin.verify_password("admin-secret")
 
-        if request.headers.get("X-Setup-Claim") == "second":
-            second_passed_guard.set()
 
-    monkeypatch.setattr(BenchConfig, "write_flat", delayed_write)
-    responses = {}
+def test_setup_configuration_needs_a_session(tmp_path: Path) -> None:
+    client = setup_client(tmp_path, authenticated=False)
 
-    def claim(name: str) -> None:
-        responses[name] = app.test_client().put(
-            "/api/v1/setup/configuration",
-            headers={"X-Setup-Claim": name},
-            json={
-                "admin_password": f"{name}-admin-secret",
-                "mariadb_password": "database-secret",
-            },
-        )
+    read = client.get("/api/v1/setup/configuration")
+    write = client.put("/api/v1/setup/configuration", json={"mariadb_password": "database-secret"})
 
-    first = threading.Thread(target=claim, args=("first",))
-    second = threading.Thread(target=claim, args=("second",))
-    first.start()
-    assert first_in_write.wait(2)
-    second.start()
-    assert second_passed_guard.wait(2)
-    release_first.set()
-    first.join(2)
-    second.join(2)
-
-    assert responses["first"].status_code == 200
-    assert responses["second"].status_code == 401
-    assert BenchConfig.read(tmp_path).admin.password == "first-admin-secret"
+    assert read.status_code == 401
+    assert write.status_code == 401
+    assert write.get_json()["error"]["code"] == "authentication_required"
 
 
 def _write_sibling_local_database(benches: Path, name: str, password: str) -> None:
@@ -230,7 +211,7 @@ def test_existing_local_database_mode_copies_sibling_credentials(tmp_path: Path)
 
     response = client.put(
         "/api/v1/setup/configuration",
-        json={"admin_password": "admin-secret", "db_type": "mariadb", "db_mode": "existing_local"},
+        json={"db_type": "mariadb", "db_mode": "existing_local"},
     )
 
     assert response.status_code == 200
@@ -252,7 +233,7 @@ def test_existing_local_database_mode_without_a_sibling_still_requires_a_passwor
 
     response = client.put(
         "/api/v1/setup/configuration",
-        json={"admin_password": "admin-secret", "db_type": "mariadb", "db_mode": "existing_local"},
+        json={"db_type": "mariadb", "db_mode": "existing_local"},
     )
 
     assert response.status_code == 422
@@ -364,7 +345,6 @@ def test_failed_setup_can_retry_without_resending_saved_secrets(tmp_path: Path) 
     )
     retried = start_setup(client, "second-attempt")
 
-    assert configuration["admin_password_configured"] is True
     assert configuration["mariadb_password_configured"] is True
     assert saved.status_code == 200
     assert retried.status_code == 202

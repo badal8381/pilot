@@ -15,7 +15,7 @@
             <Tooltip :text="site?.ssl ? 'SSL active' : 'SSL inactive'">
               <span
                 class="mt-0.5 size-4 text-ink-gray-5 shrink-0"
-                :class="site?.ssl ? 'lucide-lock text-ink-green-6' : 'lucide-lock-open'"
+                :class="site?.ssl ? 'lucide-lock text-ink-green-5' : 'lucide-lock-open'"
               />
             </Tooltip>
             <div class="flex items-center gap-2 min-w-0">
@@ -33,12 +33,16 @@
           <Dropdown
             v-if="domainMenuOptions(row).length"
             :options="domainMenuOptions(row)"
-            placement="bottom-end"
           >
             <template #default="{ open }">
-              <Button variant="ghost" size="sm" :active="open">
-                <span class="size-4 lucide-ellipsis" />
-              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="Domain actions"
+                tooltip="Actions"
+              />
             </template>
           </Dropdown>
         </div>

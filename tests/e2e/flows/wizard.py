@@ -23,10 +23,12 @@ def complete_dev_wizard(
     framework_branch: str | None = None,
 ) -> None:
     """Complete the development-only setup wizard."""
+    # Setup needs a session like every other page. The wizard's own ?sid= link is
+    # printed by `pilot start`; here we sign in with the password `pilot new` was given.
+    page.get_by_placeholder("Password").fill(admin_password)
+    page.get_by_role("button", name="Continue").click()
     # The wizard mounts in a 'loading' state, then resolves to the first step.
     expect(page.get_by_text("Step 1 of", exact=False)).to_be_visible(timeout=30_000)
-    page.get_by_label("Admin password").fill(admin_password)
-    page.get_by_role("button", name="Next").click()
     _choose_select(page, "Database engine", "PostgreSQL" if db_type == "postgres" else "MariaDB")
     # "Use existing database" / "Create new database" need no input here - only
     # "Connect to external database" shows host/user/password fields.

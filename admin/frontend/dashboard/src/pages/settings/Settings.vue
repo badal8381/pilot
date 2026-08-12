@@ -1,28 +1,29 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button, TabButtons, useTheme } from 'frappe-ui'
+import { Button, TabButtons, useColorScheme } from 'frappe-ui'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 
 const router = useRouter()
 const { showBenches, logout, session } = useAppMenu()
-const { currentTheme, setTheme } = useTheme()
+const { colorScheme, setColorScheme } = useColorScheme()
 
-const themeOptions = computed(() => [
-  {
-    icon: 'lucide-monitor',
-    active: currentTheme.value === 'system',
-    onClick: () => setTheme('system'),
-  },
-  { icon: 'lucide-sun', active: currentTheme.value === 'light', onClick: () => setTheme('light') },
-  { icon: 'lucide-moon', active: currentTheme.value === 'dark', onClick: () => setTheme('dark') },
-])
+const themeModel = computed({
+  get: () => colorScheme.value,
+  set: setColorScheme,
+})
+
+const themeOptions = [
+  { value: 'system', label: 'System', icon: 'lucide-monitor' },
+  { value: 'light', label: 'Light', icon: 'lucide-sun' },
+  { value: 'dark', label: 'Dark', icon: 'lucide-moon' },
+]
 </script>
 
 <template>
   <div class="mx-auto max-w-3xl">
     <div
-      class="flex flex-col divide-y divide-outline-gray-1 rounded-lg border border-outline-gray-1"
+      class="flex flex-col divide-y divide-outline-gray-1 rounded-6 border border-outline-gray-1"
     >
       <div class="flex items-center gap-3 px-3 py-2.5  text-ink-gray-8">
         <span class="size-4 text-ink-gray-6 lucide-cloud" />
@@ -71,7 +72,7 @@ const themeOptions = computed(() => [
           <span class="size-4 text-ink-gray-6 lucide-sun-moon" />
           Theme
         </span>
-        <TabButtons :options="themeOptions" />
+        <TabButtons v-model="themeModel" :options="themeOptions" />
       </div>
 
       <Button variant="ghost" class="w-full !h-auto !justify-between !px-3 !py-2.5" @click="logout">

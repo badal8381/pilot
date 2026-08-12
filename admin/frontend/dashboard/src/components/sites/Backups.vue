@@ -20,7 +20,7 @@
 
     <ErrorMessage v-if="error" :message="error" />
 
-    <div :class="backups.length ? '' : 'rounded-xl border border-dashed border-outline-gray-2'">
+    <div :class="backups.length ? '' : 'rounded-7 border border-dashed border-outline-gray-2'">
       <div v-if="backupsLoading" class="flex justify-center py-12">
         <LoadingText />
       </div>
@@ -49,11 +49,16 @@
       >
         <template #cell="{ column, row, item }">
           <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row.set)" placement="left">
+            <Dropdown :options="menuOptions(row.set)">
               <template #default="{ open }">
-                <Button variant="ghost" size="sm" :active="open"
-                  ><span class="size-4 lucide-ellipsis" /></Button
-                >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  :active="open"
+                  icon="lucide-ellipsis"
+                  label="Backup actions"
+                  tooltip="Actions"
+                />
               </template>
             </Dropdown>
           </div>
@@ -80,21 +85,19 @@
   </div>
 
   <!-- Delete backup dialog -->
-  <Dialog v-model="showDelete" :options="{ title: 'Delete Backup', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Delete the backup from
-        <strong>{{ deleteTarget ? fmt(deleteTarget.created_at) : '' }}</strong>? This cannot be
-        undone.
-      </p>
-      <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-          >Delete</Button
-        >
-      </div>
-    </template>
+  <Dialog v-model="showDelete" title="Delete Backup" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Delete the backup from
+      <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
+      be undone.
+    </p>
+    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+        >Delete</Button
+      >
+    </div>
   </Dialog>
 </template>
 
@@ -106,11 +109,9 @@ import {
   Dialog,
   Dropdown,
   ErrorMessage,
-  ListFooter,
-  ListView,
-  ListRowItem,
   LoadingText,
 } from 'frappe-ui'
+import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
 import { apiErrorMessage } from '@/api/client'
@@ -118,6 +119,7 @@ import { sitesApi } from '@/api/sites'
 import { tasksApi } from '@/api/tasks'
 import { useSite } from '@/composables/sites/useSite'
 import { openTaskDetailPage } from '@/utils/taskRoute'
+import { fmtDateTime } from '@/utils/taskFormat'
 import { cronToLabel } from '@/utils/backup'
 
 const props = defineProps({ siteName: { type: String, required: true } })
@@ -186,7 +188,6 @@ const columns = [
   { label: '', key: 'actions', align: 'right', width: '3rem' },
 ]
 
-const fmt = (iso) => new Date(iso).toLocaleString()
 const fileOf = (set, kind) => set.files?.find((f) => f.kind === kind) ?? null
 const fmtSize = (b) =>
   !b ? '-' : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 ** 2).toFixed(1)} MB`
@@ -194,7 +195,7 @@ const fmtSize = (b) =>
 const rows = computed(() =>
   backups.value.map((set) => ({
     name: set.created_at,
-    timestamp: fmt(set.created_at),
+    timestamp: fmtDateTime(set.created_at),
     database: fmtSize(fileOf(set, 'database')?.size_bytes),
     public: fmtSize(fileOf(set, 'public-file')?.size_bytes),
     private: fmtSize(fileOf(set, 'private-file')?.size_bytes),

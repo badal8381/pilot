@@ -212,5 +212,5 @@ class PythonEnvManager:
     def build_assets(self) -> None:
         self._assets.build_assets()
 
-    def build_assets_for_app(self, app: "App") -> None:
-        self._assets.build_assets_for_app(app)
+    def build_assets_for_app(self, app: "App", force: bool = False) -> None:
+        self._assets.build_assets_for_app(app, force=force)
