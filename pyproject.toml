@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "pilot"
 version = "0.1.0"
 requires-python = ">=3.11"
-dependencies = ["packaging>=23.2"]
+dependencies = []
 
 [project.scripts]
 pilot = "pilot.cli:main"
@@ -43,12 +43,16 @@ markers = [
 "pilot.managers.gunicorn" = [
   "templates/*.template",
 ]
+"pilot._vendor.packaging" = [
+  "py.typed",
+  "LICENSE*",
+]
 
 [tool.mypy]
 python_version = "3.11"
 ignore_missing_imports = true
 warn_unused_ignores = true
-exclude = ["^build/", "^benches/", "^admin/frontend/dashboard/"]
+exclude = ["^build/", "^benches/", "^admin/frontend/dashboard/", "^pilot/_vendor/"]
 
 # Every requires_bench=True command's self.bench is guaranteed non-None by the
 # CLI dispatch layer (pilot/registry.py) before run() executes - an invariant
