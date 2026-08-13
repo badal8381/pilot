@@ -8,7 +8,7 @@
     </div>
     <div
       v-if="loadError"
-      class="py-12 border border-dashed rounded-xl border-outline-red-2 text-ink-red-3 text-p-sm text-center"
+      class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
     >
       {{ loadError }}
     </div>
@@ -43,48 +43,52 @@
     </ListView>
   </div>
 
-  <Dialog v-model="showAdd" :options="{ title: 'Add SSH key', size: 'md' }">
-    <template #body-content>
-      <FormControl
-        type="textarea"
-        label="Public key"
-        v-model="newKey"
-        :rows="3"
-        placeholder="ssh-ed25519 AAAA… user@host"
-      />
-      <ErrorMessage v-if="error" :message="error" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-        <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
-          Add key
-        </Button>
-      </div>
-    </template>
+  <Dialog v-model="showAdd" title="Add SSH key" size="md">
+    <FormControl
+      type="textarea"
+      label="Public key"
+      v-model="newKey"
+      :rows="3"
+      placeholder="ssh-ed25519 AAAA… user@host"
+    />
+    <ErrorMessage v-if="error" :message="error" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showAdd = false">Cancel</Button>
+      <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
+        Add key
+      </Button>
+    </div>
   </Dialog>
 
-  <Dialog v-model="showRemove" :options="{ title: 'Remove SSH key', size: 'md' }">
-    <template #body-content>
-      <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
-        This is the last authorized key. It can't be removed, or you'd lose SSH access to this
-        server.
-      </p>
-      <p v-else class="text-ink-gray-7 text-p-base">
-        Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
-        Whoever holds the matching private key loses SSH access.
-      </p>
-      <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
-          >Remove</Button
-        >
-      </div>
-    </template>
+  <Dialog v-model="showRemove" title="Remove SSH key" size="md">
+    <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
+      This is the last authorized key. It can't be removed, or you'd lose SSH access to this
+      server.
+    </p>
+    <p v-else class="text-ink-gray-7 text-p-base">
+      Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
+      Whoever holds the matching private key loses SSH access.
+    </p>
+    <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
+        >Remove</Button
+      >
+    </div>
   </Dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  ErrorMessage,
+  FormControl,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
 import EmptyState from '@/components/common/EmptyState.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sshKeysApi } from '@/api/sshKeys'

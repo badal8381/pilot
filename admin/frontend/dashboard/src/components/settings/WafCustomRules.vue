@@ -22,13 +22,13 @@
 
     <div
       v-if="rules.length"
-      class="bg-surface-elevation-1 p-1 border border-outline-gray-2 rounded-lg"
+      class="bg-surface-elevation-1 p-1 border border-outline-gray-2 rounded-6"
     >
       <div
         v-for="rule in rules"
         :key="keyOf(rule)"
         :data-rule-key="keyOf(rule)"
-        class="rounded ring-1 ring-inset transition-shadow"
+        class="rounded-4 ring-1 ring-inset transition-shadow"
         :class="[
           // Fast in, slow out. transition-shadow: a ring is box-shadow underneath.
           flaggedKey === keyOf(rule) ? 'ring-outline-red-3 duration-75' : 'ring-transparent duration-1000',
@@ -41,7 +41,7 @@
       >
         <!-- The whole row toggles; interactive children stop the click. -->
         <div
-          class="flex items-center gap-3 px-2.5 h-10 rounded transition-colors cursor-pointer select-none hover:bg-surface-alpha-gray-1"
+          class="flex items-center gap-3 px-2.5 h-10 rounded-4 transition-colors cursor-pointer select-none hover:bg-surface-alpha-gray-1"
           @click="toggleOpen(rule)"
         >
           <button
@@ -167,7 +167,7 @@
                extra 0.875rem drops the curve to the middle of this row. -->
           <span
             aria-hidden="true"
-            class="absolute left-1 -top-4 h-[1.875rem] w-2.5 border-l border-b rounded-bl-lg border-outline-gray-3"
+            class="absolute left-1 -top-4 h-[1.875rem] w-2.5 border-l border-b rounded-bl-6 border-outline-gray-3"
           />
           <div class="flex flex-wrap items-center gap-2 text-ink-gray-7 text-base">
             <span>Then</span>
@@ -184,7 +184,7 @@
           </div>
           <p
             v-if="rule.action === 'skip'"
-            class="flex items-start gap-1.5 text-ink-amber-7 text-p-sm"
+            class="flex items-start gap-1.5 text-ink-amber-6 text-p-sm"
           >
             <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
             Matching requests bypass the firewall entirely - no managed rules, no inspection.
@@ -194,17 +194,15 @@
       </div>
     </div>
 
-    <Dialog v-model="showRemove" :options="{ title: 'Delete rule', size: 'md' }">
-      <template #body-content>
-        <p class="text-ink-gray-7 text-p-base">
-          Delete <strong>{{ removingLabel }}</strong
-          >? Requests it was matching fall through to the managed ruleset.
-        </p>
-        <div class="flex justify-end gap-2 mt-4">
-          <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-          <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
-        </div>
-      </template>
+    <Dialog v-model="showRemove" title="Delete rule" size="md">
+      <p class="text-ink-gray-7 text-p-base">
+        Delete <strong>{{ removingLabel }}</strong
+        >? Requests it was matching fall through to the managed ruleset.
+      </p>
+      <div class="flex justify-end gap-2 mt-4">
+        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+        <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
+      </div>
     </Dialog>
   </div>
 </template>

@@ -21,7 +21,7 @@
 
     <div
       v-if="atDeviceLimit"
-      class="bg-surface-amber-1 p-3 border border-outline-amber-2 rounded-lg text-ink-amber-8 text-p-sm"
+      class="bg-surface-amber-1 p-3 border border-outline-amber-2 rounded-6 text-ink-amber-7 text-p-sm"
     >
       All {{ status.max_devices }} device slots are in use. Remove one to enrol another, or share
       an existing device's setup key to add another authenticator app.
@@ -85,119 +85,119 @@
     </div>
   </div>
 
-  <Dialog v-model="showAdd" :options="{ title: 'Add device', size: 'md' }">
-    <template #body-content>
-      <div class="space-y-3">
-        <FormControl
-          v-if="!enrollment"
-          v-model="deviceName"
-          label="Device name"
-          placeholder="My Phone"
-          maxlength="40"
-          @keydown.enter="startEnrollment"
-        />
+  <Dialog v-model="showAdd" title="Add device" size="md">
+    <div class="space-y-3">
+      <FormControl
+        v-if="!enrollment"
+        v-model="deviceName"
+        label="Device name"
+        placeholder="My Phone"
+        maxlength="40"
+        @keydown.enter="startEnrollment"
+      />
 
-        <template v-if="enrollment">
-          <p class="text-ink-gray-6 text-p-base">
-            Scan with Authy, Bitwarden, Microsoft Authenticator or any TOTP app.
-          </p>
-          <div class="flex justify-center bg-surface-white p-4 rounded-lg">
-            <QrcodeVue :value="enrollment.provisioning_url" :size="176" level="M" render-as="svg" />
+      <template v-if="enrollment">
+        <p class="text-ink-gray-6 text-p-base">
+          Scan with Authy, Bitwarden, Microsoft Authenticator or any TOTP app.
+        </p>
+        <div class="flex justify-center bg-surface-white p-4 rounded-6">
+          <QrcodeVue :value="enrollment.provisioning_url" :size="176" level="M" render-as="svg" />
+        </div>
+        <details class="group">
+          <summary
+            class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
+          >
+            <span
+              class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
+            ></span>
+            Can't scan? Enter the key by hand
+          </summary>
+          <div class="bg-surface-gray-2 mt-2 p-3 rounded-6">
+            <p class="font-mono text-ink-gray-8 text-base break-all">{{ enrollment.secret }}</p>
+            <button class="mt-1 text-ink-blue-2 text-sm" @click="copy(enrollment.secret)">
+              Copy key
+            </button>
           </div>
-          <details class="group">
-            <summary
-              class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
-            >
-              <span
-                class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
-              ></span>
-              Can't scan? Enter the key by hand
-            </summary>
-            <div class="bg-surface-gray-2 mt-2 p-3 rounded-lg">
-              <p class="font-mono text-ink-gray-8 text-base break-all">{{ enrollment.secret }}</p>
-              <button class="mt-1 text-ink-blue-3 text-sm" @click="copy(enrollment.secret)">
-                Copy key
-              </button>
-            </div>
-          </details>
-          <FormControl v-model="otp" label="Code from the app" placeholder="123456" autofocus />
-        </template>
-      </div>
+        </details>
+        <FormControl v-model="otp" label="Code from the app" placeholder="123456" autofocus />
+      </template>
+    </div>
 
-      <ErrorMessage v-if="error" :message="error" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-        <Button
-          v-if="!enrollment"
-          variant="solid"
-          :loading="busy"
-          :disabled="!deviceName.trim()"
-          @click="startEnrollment"
-          >Get QR code</Button
-        >
-        <Button v-else variant="solid" :loading="busy" :disabled="!otp" @click="confirmEnrollment"
-          >Verify</Button
-        >
-      </div>
-    </template>
+    <ErrorMessage v-if="error" :message="error" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showAdd = false">Cancel</Button>
+      <Button
+        v-if="!enrollment"
+        variant="solid"
+        :loading="busy"
+        :disabled="!deviceName.trim()"
+        @click="startEnrollment"
+        >Get QR code</Button
+      >
+      <Button v-else variant="solid" :loading="busy" :disabled="!otp" @click="confirmEnrollment"
+        >Verify</Button
+      >
+    </div>
   </Dialog>
 
-  <Dialog v-model="showCodes" :options="{ title: 'Save your recovery codes', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-base">
-        These are shown once. Store them somewhere safe — each one signs you in when no device
-        is available, and works only once.
-      </p>
-      <div class="gap-x-6 gap-y-2 grid grid-cols-2 bg-surface-gray-2 mt-3 px-4 py-3.5 rounded-lg">
-        <span
-          v-for="code in codes"
-          :key="code"
-          class="font-mono text-ink-gray-8 text-sm text-center"
-        >
-          {{ code }}
-        </span>
-      </div>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="subtle" @click="copy(codes.join('\n'))">Copy all</Button>
-        <Button variant="solid" icon-left="lucide-download" @click="downloadCodes">
-          Download
-        </Button>
-      </div>
-    </template>
+  <Dialog v-model="showCodes" title="Save your recovery codes" size="md">
+    <p class="text-ink-gray-7 text-p-base">
+      These are shown once. Store them somewhere safe — each one signs you in when no device
+      is available, and works only once.
+    </p>
+    <div class="gap-x-6 gap-y-2 grid grid-cols-2 bg-surface-gray-2 mt-3 px-4 py-3.5 rounded-6">
+      <span
+        v-for="code in codes"
+        :key="code"
+        class="font-mono text-ink-gray-8 text-sm text-center"
+      >
+        {{ code }}
+      </span>
+    </div>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="subtle" @click="copy(codes.join('\n'))">Copy all</Button>
+      <Button variant="solid" icon-left="lucide-download" @click="downloadCodes">
+        Download
+      </Button>
+    </div>
   </Dialog>
 
-  <Dialog v-model="showRemove" :options="{ title: 'Remove device', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-base">
-        Remove <strong>{{ removing?.name }}</strong
-        >? Its codes stop working. Removing the last device turns two-factor off.
-      </p>
-      <ErrorMessage v-if="error" :message="error" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="busy" @click="confirmRemove">Remove</Button>
-      </div>
-    </template>
+  <Dialog v-model="showRemove" title="Remove device" size="md">
+    <p class="text-ink-gray-7 text-p-base">
+      Remove <strong>{{ removing?.name }}</strong
+      >? Its codes stop working. Removing the last device turns two-factor off.
+    </p>
+    <ErrorMessage v-if="error" :message="error" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="busy" @click="confirmRemove">Remove</Button>
+    </div>
   </Dialog>
 
-  <Dialog v-model="showRegenerate" :options="{ title: 'Regenerate recovery codes', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-base">
-        This replaces all existing codes, including unused ones. Anything you saved earlier stops
-        working.
-      </p>
-      <ErrorMessage v-if="error" :message="error" class="mt-2" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRegenerate = false">Cancel</Button>
-        <Button variant="solid" :loading="busy" @click="regenerate">Regenerate</Button>
-      </div>
-    </template>
+  <Dialog v-model="showRegenerate" title="Regenerate recovery codes" size="md">
+    <p class="text-ink-gray-7 text-p-base">
+      This replaces all existing codes, including unused ones. Anything you saved earlier stops
+      working.
+    </p>
+    <ErrorMessage v-if="error" :message="error" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRegenerate = false">Cancel</Button>
+      <Button variant="solid" :loading="busy" @click="regenerate">Regenerate</Button>
+    </div>
   </Dialog>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, ListRowItem, ListView, Spinner, toast } from 'frappe-ui'
+import {
+  Button,
+  Dialog,
+  ErrorMessage,
+  FormControl,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
 import QrcodeVue from 'qrcode.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'

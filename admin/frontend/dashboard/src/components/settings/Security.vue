@@ -5,21 +5,19 @@
     @passwordChanged="showRevokePrompt = true"
   />
 
-  <Dialog v-model="showRevokePrompt" :options="{ title: 'Password changed', size: 'md' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-p-base">
-        Revoke every other active session? Anyone signed in elsewhere will be signed out
-        immediately — this browser stays signed in.
-      </p>
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" :disabled="revoking" @click="showRevokePrompt = false">
-          Not now
-        </Button>
-        <Button variant="solid" theme="red" :loading="revoking" @click="revokeOtherSessions">
-          Revoke other sessions
-        </Button>
-      </div>
-    </template>
+  <Dialog v-model="showRevokePrompt" title="Password changed" size="md">
+    <p class="text-ink-gray-7 text-p-base">
+      Revoke every other active session? Anyone signed in elsewhere will be signed out
+      immediately — this browser stays signed in.
+    </p>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" :disabled="revoking" @click="showRevokePrompt = false">
+        Not now
+      </Button>
+      <Button variant="solid" theme="red" :loading="revoking" @click="revokeOtherSessions">
+        Revoke other sessions
+      </Button>
+    </div>
   </Dialog>
 </template>
 

@@ -8,8 +8,8 @@
 
 <script setup>
 // Switch's default label (regular ink-gray-5) reads as disabled next to a
-// SettingsRow. Styled via data-slot hooks: `labelClasses` is deprecated and
-// no longer applied, so passing it only warns.
+// SettingsRow. Styled via data-slot hooks: `labelClasses` was removed in
+// frappe-ui 1.0.
 import { Switch } from 'frappe-ui'
 
 defineOptions({ inheritAttrs: false })

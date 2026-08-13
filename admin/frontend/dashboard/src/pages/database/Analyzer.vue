@@ -16,7 +16,7 @@
 
     <div
       v-else-if="diagnostics && !diagnostics.supported"
-      class="flex flex-col items-center gap-1 bg-surface-white py-14 border rounded-lg border-outline-gray-2 text-center"
+      class="flex flex-col items-center gap-1 bg-surface-white py-14 border rounded-6 border-outline-gray-2 text-center"
     >
       <span class="size-6 text-ink-gray-3 lucide-database" />
       <p class="font-medium text-ink-gray-7 text-sm">No database server</p>
@@ -173,66 +173,62 @@
 
   <TableSizesDialog v-model:open="showTableSizes" :site="selectedSite" />
 
-  <Dialog v-model="showKillDialog" :options="{ title: 'Kill database process', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Close connection <strong>{{ killTarget?.id }}</strong> and roll back whatever it is running?
-        Any bench sharing this server may own it.
-      </p>
+  <Dialog v-model="showKillDialog" title="Kill database process" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Close connection <strong>{{ killTarget?.id }}</strong> and roll back whatever it is running?
+      Any bench sharing this server may own it.
+    </p>
 
-      <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-lg text-xs">
-        <div
-          v-for="item in killDetails"
-          :key="item.label"
-          class="flex justify-between items-baseline gap-4"
-        >
-          <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
-          <dd class="font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
-        </div>
-        <div v-if="killQuery" class="space-y-1.5 pt-1.5 border-t border-outline-gray-2">
-          <dt class="text-ink-gray-5">Query</dt>
-          <dd class="max-h-24 overflow-y-auto font-mono font-medium text-ink-gray-8 break-all">
-            {{ killQuery }}
-          </dd>
-        </div>
-      </dl>
-
-      <ErrorMessage v-if="killError" :message="killError" class="mt-3" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showKillDialog = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="killing" @click="kill">Kill process</Button>
+    <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-6 text-xs">
+      <div
+        v-for="item in killDetails"
+        :key="item.label"
+        class="flex justify-between items-baseline gap-4"
+      >
+        <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
+        <dd class="font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
       </div>
-    </template>
+      <div v-if="killQuery" class="space-y-1.5 pt-1.5 border-t border-outline-gray-2">
+        <dt class="text-ink-gray-5">Query</dt>
+        <dd class="max-h-24 overflow-y-auto font-mono font-medium text-ink-gray-8 break-all">
+          {{ killQuery }}
+        </dd>
+      </div>
+    </dl>
+
+    <ErrorMessage v-if="killError" :message="killError" class="mt-3" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showKillDialog = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="killing" @click="kill">Kill process</Button>
+    </div>
   </Dialog>
 
-  <Dialog v-model="showPurgeDialog" :options="{ title: 'Delete binary logs', size: 'sm' }">
-    <template #body-content>
-      <p class="text-ink-gray-7 text-sm">
-        Permanently delete
-        <strong
-          >{{ pendingFiles.length }}
-          file{{ pendingFiles.length === 1 ? '' : 's' }}</strong
-        >, freeing {{ pendingSize }}? Binary logs are shared by every bench on this server and are
-        used for point-in-time recovery and replication.
-      </p>
+  <Dialog v-model="showPurgeDialog" title="Delete binary logs" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Permanently delete
+      <strong
+        >{{ pendingFiles.length }}
+        file{{ pendingFiles.length === 1 ? '' : 's' }}</strong
+      >, freeing {{ pendingSize }}? Binary logs are shared by every bench on this server and are
+      used for point-in-time recovery and replication.
+    </p>
 
-      <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-lg text-xs">
-        <div
-          v-for="item in purgeDetails"
-          :key="item.label"
-          class="flex justify-between items-baseline gap-4"
-        >
-          <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
-          <dd class="font-mono font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
-        </div>
-      </dl>
-
-      <ErrorMessage v-if="purgeError" :message="purgeError" class="mt-3" />
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showPurgeDialog = false">Cancel</Button>
-        <Button variant="solid" theme="red" :loading="purging" @click="purge">Delete</Button>
+    <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-6 text-xs">
+      <div
+        v-for="item in purgeDetails"
+        :key="item.label"
+        class="flex justify-between items-baseline gap-4"
+      >
+        <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
+        <dd class="font-mono font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
       </div>
-    </template>
+    </dl>
+
+    <ErrorMessage v-if="purgeError" :message="purgeError" class="mt-3" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showPurgeDialog = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="purging" @click="purge">Delete</Button>
+    </div>
   </Dialog>
 </template>
 
@@ -243,14 +239,16 @@ import {
   Dialog,
   ErrorMessage,
   FormControl,
-  ListHeader,
-  ListRowItem,
-  ListRows,
-  ListView,
   LoadingText,
   Tooltip,
   toast,
 } from 'frappe-ui'
+import {
+  ListHeader,
+  ListRowItem,
+  ListRows,
+  ListView,
+} from 'frappe-ui/experimental'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { apiErrorMessage } from '@/api/client'

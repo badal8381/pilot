@@ -16,7 +16,7 @@
       <!-- Width-bound row: flex-1 must resolve against the row, not content. -->
       <div class="flex gap-2 w-full sm:w-auto">
         <div class="flex-1 sm:flex-none min-w-0">
-          <Dropdown :options="worksWithMenu" placement="bottom-end">
+          <Dropdown :options="worksWithMenu">
             <template #default="{ open }">
               <Button
                 class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto"
@@ -47,7 +47,7 @@
       <TabButtons
         v-model="pillModel"
         :options="pillOptions"
-        type="ghost"
+        variant="ghost"
         :size="isMobile ? 'md' : 'sm'"
       />
     </div>

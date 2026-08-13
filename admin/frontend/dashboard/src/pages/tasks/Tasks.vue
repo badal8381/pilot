@@ -9,7 +9,7 @@
         @update:modelValue="onFilterChange"
       />
       <div class="flex flex-1 items-center gap-2 min-w-0">
-        <Dropdown :options="typeMenu" placement="bottom-start">
+        <Dropdown :options="typeMenu">
           <template #default="{ open }">
             <Button
               variant="subtle"
@@ -23,7 +23,7 @@
           </template>
         </Dropdown>
         <div class="flex-1 sm:flex-none min-w-0">
-          <Dropdown :options="siteMenu" placement="bottom-start">
+          <Dropdown :options="siteMenu">
             <template #default="{ open }">
               <Button
                 variant="subtle"
