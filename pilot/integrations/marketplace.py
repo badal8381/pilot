@@ -5,9 +5,8 @@ from dataclasses import dataclass, field
 from functools import cache, lru_cache
 from typing import Literal
 
-from packaging.specifiers import InvalidSpecifier, SpecifierSet
-from packaging.version import InvalidVersion, Version
-
+from pilot._vendor.packaging.specifiers import InvalidSpecifier, SpecifierSet
+from pilot._vendor.packaging.version import InvalidVersion, Version
 from pilot.exceptions import AppNotFoundError, DependencyResolutionError
 from pilot.utils import run_command
 
