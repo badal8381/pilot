@@ -40,6 +40,17 @@ export const databaseApi = {
       request.post("database/binlogs/purge", { json: { up_to: upTo } }).json(),
   },
 
+  configurations: {
+    list: () => request.get("database/configurations").json(),
+    set: (variable, value, idempotencyKey) =>
+      request
+        .post(`database/configurations/${encodeURIComponent(variable)}`, {
+          json: { value },
+          headers: { "Idempotency-Key": idempotencyKey },
+        })
+        .json(),
+  },
+
   quickActions: {
     capabilities: () => request.get("database/quick-actions").json(),
     restart: (idempotencyKey) =>
