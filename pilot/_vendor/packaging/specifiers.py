@@ -45,6 +45,7 @@ if TYPE_CHECKING:
     else:
         from typing_extensions import TypeGuard
 
+    from . import ranges
     from ._ranges import Interval
 
 
@@ -1123,6 +1124,21 @@ class SpecifierSet(BaseSpecifier):
             return True
 
         return not all(s.contains(candidate) for s in standard)
+
+    def to_range(self) -> ranges.VersionRange:
+        """Return the :class:`~packaging.ranges.VersionRange` this set accepts.
+
+        An empty set yields the full range; an unsatisfiable set yields the
+        empty range. ``===`` specifiers contribute literal-string admission.
+
+        >>> SpecifierSet(">=1.0,<2.0").to_range()
+        <VersionRange '[1.0, 2.0.dev0)'>
+
+        .. versionadded:: 26.3
+        """
+        from .ranges import VersionRange  # noqa: PLC0415
+
+        return VersionRange._from_specifier_set(self)
 
     def _check_relation_operand(self, other: object) -> None:
         if not isinstance(other, SpecifierSet):

@@ -54,6 +54,12 @@ ignore_missing_imports = true
 warn_unused_ignores = true
 exclude = ["^build/", "^benches/", "^admin/frontend/dashboard/", "^pilot/_vendor/"]
 
+# Vendored upstream source; not ours to fix.
+[[tool.mypy.overrides]]
+module = "pilot._vendor.*"
+ignore_errors = true
+follow_imports = "skip"
+
 # Every requires_bench=True command's self.bench is guaranteed non-None by the
 # CLI dispatch layer (pilot/registry.py) before run() executes - an invariant
 # the type checker can't see from Command's shared `Bench | None` attribute.
