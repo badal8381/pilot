@@ -103,6 +103,7 @@ def build_settings_response(config: BenchConfig, bench_root: Path | None = None)
             "process_manager": config.production.process_manager or "none",
             "enabled": config.production.enabled,
         },
+        "lite_mode": {"enabled": config.lite_mode.enabled},
         "admin": {
             "domain": config.admin.domain,
             "tls": config.admin.tls,
