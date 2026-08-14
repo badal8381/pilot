@@ -19,7 +19,7 @@ def _config() -> BenchConfig:
 
 
 def test_settings_response_reports_lite_mode_off() -> None:
-    assert build_settings_response(_config())["lite_mode"] == {"enabled": False}
+    assert build_settings_response(_config())["lite_mode"] == {"enabled": False, "supported": False}
 
 
 def test_patcher_toggles_lite_mode() -> None:

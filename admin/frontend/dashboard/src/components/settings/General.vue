@@ -25,6 +25,7 @@
       </SettingsRow>
 
       <SettingsRow
+        v-if="liteModeSupported"
         label="Lite mode"
         description="One process for web, realtime and jobs. Less memory, best for small sites."
         interactive
@@ -73,6 +74,7 @@ const saving = ref(false)
 const error = ref('')
 const allowDeveloperMode = ref(false)
 const liteMode = ref(false)
+const liteModeSupported = ref(false)
 
 async function toggleAllowDeveloperMode(value) {
   saving.value = true
@@ -108,6 +110,7 @@ onMounted(async () => {
     const data = await settingsApi.get()
     allowDeveloperMode.value = Boolean(data?.bench?.allow_developer_mode)
     liteMode.value = Boolean(data?.lite_mode?.enabled)
+    liteModeSupported.value = Boolean(data?.lite_mode?.supported)
   } catch {
     error.value = 'Could not load settings.'
   } finally {
