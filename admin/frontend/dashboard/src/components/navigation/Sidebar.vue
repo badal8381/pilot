@@ -5,6 +5,7 @@ import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem, SidebarCollapseToggl
 import { sidebarSections } from './list'
 import { useAppMenu } from './useAppMenu'
 import PilotLogo from '@/components/icons/Pilot.vue'
+import NotificationsPanel from '@/components/notifications/NotificationsPanel.vue'
 import { openSearch } from '@/composables/common/useSearch'
 
 const props = defineProps({
@@ -27,9 +28,7 @@ const visibleSections = computed(() =>
 
 // Prefix match, not just exact: a site's detail page (/sites/foo/general)
 // should still light up the "Sites" item, not just the bare list page.
-function isActive(to) {
-  return route.path === to || route.path.startsWith(`${to}/`)
-}
+const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
 </script>
 
 <template>
@@ -47,9 +46,11 @@ function isActive(to) {
     />
 
     <nav class="flex-1 overflow-y-auto px-2 pt-2">
-      <SidebarItem icon="lucide-search" suffix="⌘ K" class="mb-2 text-sm" @click="openSearch">
+      <SidebarItem icon="lucide-search" suffix="⌘ K" class="mb-0.5 text-sm" @click="openSearch">
         Search
       </SidebarItem>
+
+      <NotificationsPanel />
 
       <template v-for="section in visibleSections" :key="section.label || 'main'">
         <!-- `divider`: collapsed, the section name has no room, so the label
