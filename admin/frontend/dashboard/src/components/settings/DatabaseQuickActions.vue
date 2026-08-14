@@ -17,19 +17,20 @@
   <div v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
 
-    <div v-if="capabilities" class="pb-4">
-      <Badge :label="engineLabel" theme="gray" size="sm" />
-    </div>
-
     <div
       v-if="showManagedMariaDBDisclaimer"
-      class="mb-4 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-ink-gray-7 text-sm"
+      class="my-4 border rounded border-outline-gray-2 bg-surface-gray-1 p-2 text-ink-gray-7 text-sm flex"
     >
+      <span
+        class="size-4 text-ink-gray-5 lucide-circle-alert inline-block mr-2"
+        aria-hidden="true"
+      />
       Database actions are available only for Pilot-managed MariaDB instances.
     </div>
 
     <div v-if="capabilities" class="divide-y divide-outline-alpha-gray-1">
       <SettingsRow
+        class="!ps-0"
         label="Performance Schema"
         description="Collect database instrumentation for deeper performance diagnostics."
       >
@@ -42,34 +43,35 @@
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Update InnoDB Buffer Pool Size"
         :description="bufferPoolDescription"
       >
         <Button
           size="sm"
-          variant="subtle"
+          variant="ghost"
+          icon="lucide-pencil"
           :disabled="!action('innodb_buffer_pool_size').available || Boolean(activeAction)"
           @click="openSizingAction('innodb_buffer_pool_size')"
-        >
-          Update
-        </Button>
+        />
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Update Max DB Connections"
         :description="maxConnectionsDescription"
       >
         <Button
           size="sm"
-          variant="subtle"
+          variant="ghost"
+          icon="lucide-pencil"
           :disabled="!action('max_connections').available || Boolean(activeAction)"
           @click="openSizingAction('max_connections')"
-        >
-          Update
-        </Button>
+        />
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Manage Binlogs"
         description="Inspect binary logs and safely purge complete log ranges."
       >
@@ -84,6 +86,7 @@
       </SettingsRow>
 
       <SettingsRow
+        class="!ps-0"
         label="Restart MariaDB"
         description="Restart the database service and verify that it accepts connections."
       >
@@ -160,9 +163,9 @@
 </template>
 
 <script setup>
+import { Button, Dialog, ErrorMessage, FormControl, Switch, Tooltip } from 'frappe-ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Badge, Button, Dialog, ErrorMessage, FormControl, Switch, Tooltip } from 'frappe-ui'
 import { databaseApi } from '@/api/database'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import { openTaskDetailPage } from '@/utils/taskRoute'
@@ -214,10 +217,6 @@ const showManagedMariaDBDisclaimer = computed(
     capabilities.value !== null &&
     (capabilities.value.engine !== 'mariadb' || !capabilities.value.managed),
 )
-const engineLabel = computed(() => {
-  const labels = { mariadb: 'MariaDB', postgres: 'PostgreSQL', sqlite: 'SQLite' }
-  return labels[capabilities.value?.engine] || 'Database'
-})
 const bufferPoolDescription = computed(() => {
   const capability = action('innodb_buffer_pool_size')
   const description = ''
@@ -230,10 +229,12 @@ const maxConnectionsDescription = computed(() => {
 })
 
 function action(name) {
-  return capabilities.value?.actions?.[name] || {
-    available: false,
-    reason: 'Database capabilities are unavailable.',
-  }
+  return (
+    capabilities.value?.actions?.[name] || {
+      available: false,
+      reason: 'Database capabilities are unavailable.',
+    }
+  )
 }
 
 function formatSizingValue(value, unit = '') {
