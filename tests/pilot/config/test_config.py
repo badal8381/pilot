@@ -376,6 +376,19 @@ def test_production_legacy_lightweight_systemd() -> None:
     assert config.production.enabled is True
 
 
+def test_production_legacy_companion_manager_dropped() -> None:
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    data["production"] = {
+        "enabled": True,
+        "process_manager": "systemd",
+        "use_companion_manager": True,
+    }
+    data["admin"] = {"domain": "admin.example.com"}
+    config = load_from_dict(data)
+    assert config.production.process_manager == "systemd"
+    assert "use_companion_manager" not in config.dumps()
+
+
 def test_production_missing_section_defaults() -> None:
     data = copy.deepcopy(MINIMAL_VALID_DATA)
     config = load_from_dict(data)
@@ -626,7 +639,6 @@ def test_every_field_survives_a_round_trip(tmp_path: Path) -> None:
 
     config.production.enabled = True
     config.production.process_manager = "systemd"
-    config.production.use_companion_manager = True
 
     config.gunicorn.workers = 9
     config.gunicorn.threads = 17

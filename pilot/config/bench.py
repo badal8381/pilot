@@ -527,10 +527,7 @@ class BenchConfig:
         return [{"queues": group.queues, "count": group.count} for group in self.workers.groups]
 
     def _production_section(self) -> ConfigDict:
-        production: ConfigDict = {
-            "enabled": self.production.enabled,
-            "use_companion_manager": self.production.use_companion_manager,
-        }
+        production: ConfigDict = {"enabled": self.production.enabled}
         if self.production.process_manager:
             production["process_manager"] = self.production.process_manager
         return production
@@ -843,7 +840,7 @@ _BENCH_KEYS = {
     "allow_developer_mode",
 }
 # Keys older Pilot versions wrote that the parser still tolerates.
-_PRODUCTION_LEGACY = {"lightweight", "nginx"}
+_PRODUCTION_LEGACY = {"lightweight", "nginx", "use_companion_manager"}
 _WORKER_LEGACY = {"queue"}
 
 

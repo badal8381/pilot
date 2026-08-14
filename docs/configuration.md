@@ -77,7 +77,6 @@ count = 2
 [production]
 enabled = true
 process_manager = "systemd"
-use_companion_manager = false
 ```
 
 Supported process managers are `systemd` and `supervisor`.

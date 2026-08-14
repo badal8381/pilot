@@ -19,7 +19,7 @@ class ProcessDefinition:
     log_file: Path
     env: dict = field(default_factory=dict)
     working_dir: Path | None = None  # was `cd {dir} &&`
-    stop_timeout: int | None = None  # graceful-stop seconds (redis=300, web+companion=1600)
+    stop_timeout: int | None = None  # graceful-stop seconds (redis=300)
     critical: bool = True  # dev runner stops the whole bench when this process exits
 
 
@@ -30,9 +30,7 @@ class ProcessDefinitionBuilder:
         self.watch_admin_js = watch_admin_js
 
     def prod_process_definitions(self) -> list[ProcessDefinition]:
-        if self.bench.config.production.use_companion_manager:
-            defs = [self.web_definition(), self.admin_definition()]
-        elif self.bench.config.production.process_manager == "systemd":
+        if self.bench.config.production.process_manager == "systemd":
             all_queues = ",".join(q for group in self.bench.config.workers.groups for q in group.queues)
             num_workers = sum(group.count for group in self.bench.config.workers.groups)
             defs = [
@@ -109,14 +107,12 @@ class ProcessDefinitionBuilder:
                 working_dir=sites,
             )
         gunicorn = self.bench.env_path / "bin" / "gunicorn"
-        companion = self.bench.config.production.use_companion_manager
         return ProcessDefinition(
             name="web",
             argv=[str(gunicorn), "-c", "../config/gunicorn.conf.py", "frappe.app:application"],
             log_file=self.bench.logs_path / "web.log",
             env=self.python_env(),
             working_dir=sites,
-            stop_timeout=1600 if companion else None,
         )
 
     def socketio_definition(self) -> ProcessDefinition:
