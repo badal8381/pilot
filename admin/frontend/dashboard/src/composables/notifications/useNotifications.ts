@@ -78,7 +78,6 @@ export const useNotifications = () => {
 
       notifications.value = [...notifications.value, ...page.data]
       cursor.value = page.meta.next_cursor
-      unread.value = page.meta.unread
     } catch (caught: any) {
       if (request !== newestRequest) return
 
