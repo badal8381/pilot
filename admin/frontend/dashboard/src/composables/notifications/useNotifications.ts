@@ -23,6 +23,7 @@ const cursor = ref<string | null>(null)
 
 let shownFilters: NotificationFilters = {}
 let newestRequest = 0
+let newestLocalChange = 0
 
 const searchParams = (filters: NotificationFilters, forCursor?: string | null) => {
   const params: Record<string, string | number> = { limit: pageSize }
@@ -89,9 +90,10 @@ export const useNotifications = () => {
 
   const refreshBadge = async () => {
     const request = newestRequest
+    const localChange = newestLocalChange
     const page: NotificationPage | null = await notificationsApi.list({ limit: 1 }).catch(() => null)
 
-    if (!page || request !== newestRequest) return
+    if (!page || request !== newestRequest || localChange !== newestLocalChange) return
 
     unread.value = page.meta.unread
   }
@@ -101,6 +103,7 @@ export const useNotifications = () => {
 
     if (!row || row.is_read) return
 
+    newestLocalChange += 1
     row.is_read = true
     unread.value = Math.max(0, unread.value - 1)
 
@@ -112,6 +115,8 @@ export const useNotifications = () => {
   }
 
   const markAllAsRead = async () => {
+    newestLocalChange += 1
+
     for (const item of notifications.value) item.is_read = true
     unread.value = 0
 
