@@ -89,13 +89,12 @@ export const useNotifications = () => {
       await notificationsApi.markRead(name)
     } catch {
       row.is_read = false
-      unread.value += 1
+      await refreshBadge()
     }
   }
 
   const markAllAsRead = async () => {
-    const wasRead = notifications.value.map((item) => item.is_read)
-    const wasUnread = unread.value
+    const wasRead = new Map(notifications.value.map((item) => [item.name, item.is_read]))
 
     for (const item of notifications.value) item.is_read = true
     unread.value = 0
@@ -103,10 +102,13 @@ export const useNotifications = () => {
     try {
       await notificationsApi.markAllRead()
     } catch {
-      notifications.value.forEach((item, index) => {
-        item.is_read = wasRead[index]
-      })
-      unread.value = wasUnread
+      for (const item of notifications.value) {
+        const previous = wasRead.get(item.name)
+
+        if (previous !== undefined) item.is_read = previous
+      }
+
+      await refreshBadge()
     }
   }
 
