@@ -21,6 +21,8 @@ const loadingMore = ref(false)
 const error = ref('')
 const cursor = ref<string | null>(null)
 
+let shownFilters: NotificationFilters = {}
+
 const searchParams = (filters: NotificationFilters, forCursor?: string | null) => {
   const params: Record<string, string | number> = { limit: pageSize }
 
@@ -33,6 +35,7 @@ const searchParams = (filters: NotificationFilters, forCursor?: string | null) =
 
 export const useNotifications = () => {
   const load = async (filters: NotificationFilters = {}) => {
+    shownFilters = filters
     loading.value = true
     error.value = ''
     cursor.value = null
@@ -88,23 +91,18 @@ export const useNotifications = () => {
     try {
       await notificationsApi.markRead(name)
     } catch {
-      row.is_read = false
-      await refreshBadge()
+      await load(shownFilters)
     }
   }
 
   const markAllAsRead = async () => {
-    const flipped = notifications.value.filter((item) => !item.is_read)
-
-    for (const item of flipped) item.is_read = true
+    for (const item of notifications.value) item.is_read = true
     unread.value = 0
 
     try {
       await notificationsApi.markAllRead()
     } catch {
-      for (const item of flipped) item.is_read = false
-
-      await refreshBadge()
+      await load(shownFilters)
     }
   }
 
