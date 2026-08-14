@@ -30,7 +30,10 @@ class ProcessDefinitionBuilder:
         self.watch_admin_js = watch_admin_js
 
     def prod_process_definitions(self) -> list[ProcessDefinition]:
-        if self.bench.config.production.process_manager == "systemd":
+        if self.bench.config.lite_mode.enabled:
+            # web, realtime and jobs all live in the one lite process.
+            defs = [self.web_definition(), self.admin_definition()]
+        elif self.bench.config.production.process_manager == "systemd":
             all_queues = ",".join(q for group in self.bench.config.workers.groups for q in group.queues)
             num_workers = sum(group.count for group in self.bench.config.workers.groups)
             defs = [
@@ -86,6 +89,8 @@ class ProcessDefinitionBuilder:
 
     def web_definition(self, dev: bool = False) -> ProcessDefinition:
         sites = self.bench.sites_path
+        if self.bench.config.lite_mode.enabled:
+            return self.lite_definition(dev=dev)
         if dev:
             port = self.bench.config.http_port
             argv = [
@@ -113,6 +118,34 @@ class ProcessDefinitionBuilder:
             log_file=self.bench.logs_path / "web.log",
             env=self.python_env(),
             working_dir=sites,
+        )
+
+    def lite_definition(self, dev: bool = False) -> ProcessDefinition:
+        """Web, realtime and background jobs in one self-recycling process."""
+        lite_mode = self.bench.config.lite_mode
+        argv = [
+            str(self.python),
+            "-m",
+            "frappe.runner",
+            f"--port={self.bench.config.http_port}",
+            f"--queue={','.join(self.bench.config.workers.queues)}",
+            f"--job-threads={self.bench.config.workers.count}",
+            f"--restart-after-requests={lite_mode.restart_after_requests}",
+            f"--restart-after-jobs={lite_mode.restart_after_jobs}",
+            f"--restart-idle-seconds={lite_mode.restart_idle_seconds}",
+            f"--request-drain-seconds={lite_mode.request_drain_seconds}",
+            f"--job-drain-seconds={lite_mode.job_drain_seconds}",
+        ]
+        if dev:
+            # No nginx in front, so the process serves /assets and /files itself.
+            argv.append("--serve-assets")
+        return ProcessDefinition(
+            name="web",
+            argv=argv,
+            log_file=self.bench.logs_path / "web.log",
+            env=self.python_env(),
+            working_dir=self.bench.sites_path,
+            stop_timeout=lite_mode.stop_timeout,
         )
 
     def socketio_definition(self) -> ProcessDefinition:

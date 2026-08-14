@@ -72,7 +72,7 @@ class BenchConfigFiles:
                 "redis_socketio": redis_cache,
                 "socketio_port": self.bench.config.socketio_port,
                 "webserver_port": self.bench.config.http_port,
-                "socketio_backend": self.bench.config.socketio_backend,
+                "socketio_backend": self.bench.config.realtime_backend,
                 "monitor": True,
             }
         )

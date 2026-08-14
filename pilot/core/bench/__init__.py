@@ -269,6 +269,17 @@ class Bench:
 
         BenchRuntime(self).install_requirements(on_progress)
 
+    def enforce_lite_mode_rules(self) -> bool:
+        """Lite mode runs one worker pool, so it cannot honour a per-queue worker
+        count. Turn it off rather than fail, and leave the reason in the audit log."""
+        groups = self.config.workers.groups
+        if not self.config.lite_mode.enabled or len(groups) == 1:
+            return False
+        self.config.lite_mode.enabled = False
+        self.config.write(self.path)
+        self.audit_action("lite_mode_disabled", {"reason": "multiple worker groups", "groups": len(groups)})
+        return True
+
     def audit_action(self, category: str, fields: dict) -> None:
         """Record a bench-level audit entry, enriched with any registered context (e.g. the
         request IP and actor). Best-effort: a logging failure never fails the caller."""
@@ -299,6 +310,11 @@ class Bench:
         from pilot.core.bench.production import BenchProduction
 
         BenchProduction(self).restart_processes()
+
+    def rebuild_process_set(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
+        from pilot.core.bench.production import BenchProduction
+
+        BenchProduction(self).rebuild_process_set(on_progress)
 
     def remove_production(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
         from pilot.core.bench.production import BenchProduction
