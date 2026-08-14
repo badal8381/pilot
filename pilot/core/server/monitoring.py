@@ -167,20 +167,24 @@ class Monitor:
         """Send system alerts if required based on the breach limits set"""
         alerts = SustainedAlerts(self.alerts_path)
         due = alerts.due(self._breached_limits(system_record))
-        if not due:
-            return
 
-        payload = self._alert_payload(due, system_record)
-
-        # The bench's own record does not wait on a sink accepting the alert, but it is
-        # written once per breach rather than once per tick.
-        unrecorded = alerts.unrecorded(due)
+        # Recording runs off `sustained`, not `due`: a sink accepting the alert retires
+        # the condition from `due` for good, and must not retire an incident the bench
+        # never managed to write down. Once written it is not written again.
+        unrecorded = alerts.unrecorded(alerts.sustained())
         if unrecorded and record_alert(
-            self.bench, payload, category="Server", severity="Warning", title="Resource limit breached"
+            self.bench,
+            self._alert_payload(unrecorded, system_record),
+            category="Server",
+            severity="Warning",
+            title="Resource limit breached",
         ):
             alerts.mark_recorded(unrecorded)
 
-        if notify(self.bench, payload):
+        if not due:
+            return
+
+        if notify(self.bench, self._alert_payload(due, system_record)):
             alerts.mark_notified(due)
 
     @staticmethod

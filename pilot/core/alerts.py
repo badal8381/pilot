@@ -87,6 +87,18 @@ class SustainedAlerts:
                 state[name]["notified"] = True
         self._write(state)
 
+    def sustained(self) -> list[str]:
+        """Every condition that has held for the full window, read from the state
+        `due()` just wrote - so call it after `due()`, not instead of it.
+
+        Unlike `due()` this ignores delivery entirely. A condition an external sink
+        already accepted is still sustained, and still needs a local record if the
+        bench never managed to write one."""
+        now = time.time()
+        return sorted(
+            name for name, entry in self._read().items() if now - entry["since"] >= self.window_seconds
+        )
+
     def unrecorded(self, names: list[str]) -> list[str]:
         """Of `names`, the ones the bench has not written to its own feed yet.
 

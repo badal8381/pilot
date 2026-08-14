@@ -553,3 +553,25 @@ def test_a_local_record_that_failed_is_retried_on_the_next_tick(tmp_path: Path) 
         monitor.send_alert_if_required(_system_record(cpu=95.0))
 
     assert [item.title for item in monitor.bench.notifications.list(10)] == ["Resource limit breached"]
+
+
+def test_a_delivered_alert_whose_local_write_failed_is_still_recorded(tmp_path: Path) -> None:
+    """Delivery retires the condition from `due` for good. The bench's own record
+    is tracked apart from that, so a failed write is still retried afterwards."""
+    from pilot.core.notification import NotificationStore
+
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+
+    with _captured_alerts():
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        _age_alerts(monitor)
+
+        with patch.object(NotificationStore, "create", side_effect=OSError("no space left on device")):
+            monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+        assert monitor.bench.notifications.list(10) == []
+        assert json.loads(monitor.alerts_path.read_text())["cpu_usage_limit"]["notified"] is True
+
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert [item.title for item in monitor.bench.notifications.list(10)] == ["Resource limit breached"]

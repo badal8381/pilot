@@ -64,22 +64,26 @@ class UptimeMonitor:
         down = [result["site"] for result in results if not result["up"]] if alerting else []
         alerts = SustainedAlerts(self.alerts_path)
         due = alerts.due(down)
-        if not due:
-            return
-
-        payload = self._alert_payload(due, results)
 
         recorded = [
             site
-            for site in alerts.unrecorded(due)
+            for site in alerts.unrecorded(alerts.sustained())
             if record_alert(
-                self.bench, payload, category="Sites", severity="Error", title=f"{site} is unreachable", site=site
+                self.bench,
+                self._alert_payload([site], results),
+                category="Sites",
+                severity="Error",
+                title=f"{site} is unreachable",
+                site=site,
             )
         ]
         if recorded:
             alerts.mark_recorded(recorded)
 
-        if notify(self.bench, payload):
+        if not due:
+            return
+
+        if notify(self.bench, self._alert_payload(due, results)):
             alerts.mark_notified(due)
 
     def _alert_payload(self, down: list[str], results: list[dict]) -> dict:
