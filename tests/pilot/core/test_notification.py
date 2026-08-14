@@ -161,3 +161,25 @@ def test_bench_owns_the_store(tmp_path) -> None:
     bench.notifications.create("failed", category="Tasks", event="task_failed", severity="Error")
 
     assert [item.title for item in bench.notifications.list(10)] == ["failed"]
+
+
+def test_concurrent_marks_do_not_drop_each_other(tmp_path) -> None:
+    """Read state is a read-modify-write, and the admin backend serves four threads.
+    Without the file lock the later writer replaces the snapshot it started from."""
+    import threading
+
+    store = _store(tmp_path)
+    names = [_create(store, f"n{index}").name for index in range(25)]
+    ready = threading.Barrier(len(names))
+
+    def mark(name: str) -> None:
+        ready.wait()
+        store.mark_read(name)
+
+    threads = [threading.Thread(target=mark, args=(name,)) for name in names]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert store.unread_count == 0

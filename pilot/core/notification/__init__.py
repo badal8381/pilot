@@ -11,10 +11,12 @@ from __future__ import annotations
 import json
 import secrets
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from pilot.internal.atomic_file import atomic_write_private_text
+from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
 from pilot.internal.jsonl_log import JsonlLog, utc_now
 
 CATEGORIES = ("Sites", "Tasks", "Server", "Updates")
@@ -73,20 +75,32 @@ class ReadState:
             return ReadMarks("", frozenset())
 
     def add(self, name: str) -> None:
-        marks = self.read()
-        if name in marks.names:
-            return
-        self._write(marks.read_through, marks.names | {name})
+        """Read-modify-write under the file's lock. Two admin requests marking
+        different notifications read at once would otherwise each write back the
+        snapshot they started from, and the later write would drop the other's mark."""
+        with self._locked():
+            marks = self.read()
+
+            if name in marks.names:
+                return
+
+            self._write_locked(marks.read_through, marks.names | {name})
 
     def mark_through(self, timestamp: str) -> None:
-        self._write(timestamp, frozenset())
+        with self._locked():
+            self._write_locked(timestamp, frozenset())
 
-    def _write(self, read_through: str, names: frozenset[str]) -> None:
+    @contextmanager
+    def _locked(self) -> Iterator[None]:
         """Read state can be written before anything has ever been logged, so the
-        directory the feed lives in is not guaranteed to exist yet."""
+        directory the lock file lives in is not guaranteed to exist yet."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        with exclusive_file_lock(self.path):
+            yield
+
+    def _write_locked(self, read_through: str, names: frozenset[str]) -> None:
         payload = {"read_through": read_through, "names": sorted(names)}
-        atomic_write_private_text(self.path, json.dumps(payload))
+        replace_private_text_locked(self.path, json.dumps(payload))
 
 
 class NotificationStore:
