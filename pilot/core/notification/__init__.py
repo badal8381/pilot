@@ -86,9 +86,13 @@ class ReadState:
 
             self._write_locked(marks.read_through, marks.names | {name})
 
-    def mark_through(self, timestamp: str) -> None:
+    def mark_through(self) -> None:
+        """The watermark is taken under the lock, not before it. Taken before, a
+        notification created after it could be marked read by another request while
+        this one waited - and clearing the name set would drop that mark for a
+        notification the watermark does not reach."""
         with self._locked():
-            self._write_locked(timestamp, frozenset())
+            self._write_locked(utc_now(), frozenset())
 
     @contextmanager
     def _locked(self) -> Iterator[None]:
@@ -183,7 +187,7 @@ class NotificationStore:
         self.read_state.add(name)
 
     def mark_all_read(self) -> None:
-        self.read_state.mark_through(utc_now())
+        self.read_state.mark_through()
 
     def _build(self, record: dict, marks: ReadMarks) -> Notification | None:
         """A record missing the fields that identify it is skipped - a partial line

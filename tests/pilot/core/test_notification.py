@@ -183,3 +183,30 @@ def test_concurrent_marks_do_not_drop_each_other(tmp_path) -> None:
         thread.join()
 
     assert store.unread_count == 0
+
+
+def test_mark_all_read_keeps_a_mark_made_while_it_waited_for_the_lock(tmp_path) -> None:
+    """The watermark has to be taken under the lock. Taken before, a notification
+    created after it but marked read before the write loses its explicit mark."""
+    from contextlib import contextmanager
+    from unittest.mock import patch
+
+    from pilot.core import notification as notification_module
+
+    store = _store(tmp_path)
+    real_lock = notification_module.exclusive_file_lock
+    intercepted: list[bool] = []
+
+    @contextmanager
+    def lock_once_a_newer_mark_landed(path):
+        if not intercepted:
+            intercepted.append(True)
+            newer = _create(store, "arrived while mark-all waited")
+            store.mark_read(newer.name)
+        with real_lock(path):
+            yield
+
+    with patch.object(notification_module, "exclusive_file_lock", lock_once_a_newer_mark_landed):
+        store.mark_all_read()
+
+    assert store.unread_count == 0
