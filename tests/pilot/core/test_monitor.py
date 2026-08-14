@@ -529,3 +529,27 @@ def test_a_breach_that_recovers_and_returns_is_recorded_again(tmp_path: Path) ->
         monitor.send_alert_if_required(_system_record(cpu=95.0))
 
     assert len(monitor.bench.notifications.list(10)) == 2
+
+
+def test_a_local_record_that_failed_is_retried_on_the_next_tick(tmp_path: Path) -> None:
+    """Recording once per breach must not mean losing the breach when the write
+    itself fails - the condition stays unrecorded so the next tick tries again."""
+    from pilot.core.notification import NotificationStore
+
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+
+    def refuse(endpoint, token, payload):
+        raise urllib.error.URLError("connection refused")
+
+    with patch("pilot.core.alerts.send_alert", refuse):
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        _age_alerts(monitor)
+
+        with patch.object(NotificationStore, "create", side_effect=OSError("no space left on device")):
+            monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+        assert monitor.bench.notifications.list(10) == [], "the failed write left nothing behind"
+
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert [item.title for item in monitor.bench.notifications.list(10)] == ["Resource limit breached"]

@@ -175,8 +175,9 @@ class Monitor:
         # The bench's own record does not wait on a sink accepting the alert, but it is
         # written once per breach rather than once per tick.
         unrecorded = alerts.unrecorded(due)
-        if unrecorded:
-            record_alert(self.bench, payload, category="Server", severity="Warning", title="Resource limit breached")
+        if unrecorded and record_alert(
+            self.bench, payload, category="Server", severity="Warning", title="Resource limit breached"
+        ):
             alerts.mark_recorded(unrecorded)
 
         if notify(self.bench, payload):

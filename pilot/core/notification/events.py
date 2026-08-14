@@ -84,11 +84,13 @@ def record_alert(
     severity: str,
     title: str,
     site: str | None = None,
-) -> None:
-    """Record a sustained alert in the bench's own feed.
+) -> bool:
+    """Record a sustained alert in the bench's own feed, reporting whether it landed.
 
     The caller still hands the same payload to `alerts.notify` for the webhook and
-    Central fan-out; this is the copy that stays on the bench."""
+    Central fan-out; this is the copy that stays on the bench. A write that failed
+    returns False so the caller leaves the condition unrecorded and tries again on
+    the next tick, rather than losing the incident until it clears and recurs."""
     try:
         bench.notifications.create(
             title,
@@ -99,8 +101,10 @@ def record_alert(
             site=site,
             action_route=f"/sites/{site}" if site else "/insights/analytics",
         )
+        return True
     except Exception as exc:
         logging.warning("Notification skipped for alert %s: %s", payload.get("event"), exc)
+        return False
 
 
 def _readable(command: str) -> str:
