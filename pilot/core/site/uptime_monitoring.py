@@ -13,6 +13,7 @@ import urllib.request
 from datetime import UTC, datetime
 
 from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify
+from pilot.core.notification.events import record_alert
 from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 from pilot.utils import cli_root, iter_sibling_benches
 
@@ -63,7 +64,13 @@ class UptimeMonitor:
         down = [result["site"] for result in results if not result["up"]] if alerting else []
         alerts = SustainedAlerts(self.alerts_path)
         due = alerts.due(down)
-        if due and notify(self.bench, self._alert_payload(due, results)):
+        if not due:
+            return
+
+        payload = self._alert_payload(due, results)
+        for site in due:
+            record_alert(self.bench, payload, category="Sites", severity="Error", title=f"{site} is unreachable", site=site)
+        if notify(self.bench, payload):
             alerts.mark_notified(due)
 
     def _alert_payload(self, down: list[str], results: list[dict]) -> dict:
