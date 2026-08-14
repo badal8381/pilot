@@ -68,8 +68,13 @@ class UptimeMonitor:
             return
 
         payload = self._alert_payload(due, results)
-        for site in due:
+
+        unrecorded = alerts.unrecorded(due)
+        for site in unrecorded:
             record_alert(self.bench, payload, category="Sites", severity="Error", title=f"{site} is unreachable", site=site)
+        if unrecorded:
+            alerts.mark_recorded(unrecorded)
+
         if notify(self.bench, payload):
             alerts.mark_notified(due)
 

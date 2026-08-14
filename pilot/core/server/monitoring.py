@@ -171,9 +171,14 @@ class Monitor:
             return
 
         payload = self._alert_payload(due, system_record)
-        # The bench's own record is written whether or not a sink accepted the alert;
-        # mark_notified only tracks external delivery.
-        record_alert(self.bench, payload, category="Server", severity="Warning", title="Resource limit breached")
+
+        # The bench's own record does not wait on a sink accepting the alert, but it is
+        # written once per breach rather than once per tick.
+        unrecorded = alerts.unrecorded(due)
+        if unrecorded:
+            record_alert(self.bench, payload, category="Server", severity="Warning", title="Resource limit breached")
+            alerts.mark_recorded(unrecorded)
+
         if notify(self.bench, payload):
             alerts.mark_notified(due)
 
