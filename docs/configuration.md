@@ -81,6 +81,49 @@ process_manager = "systemd"
 
 Supported process managers are `systemd` and `supervisor`.
 
+## Lite Mode
+
+Lite mode runs the whole bench as one process - web, realtime and background jobs
+together - instead of separate web, socketio and worker processes. Every key below
+becomes a flag on `python -m frappe.runner`, which is what the `web` process runs.
+The process manager still supervises it; only the process set changes.
+
+```toml
+[lite_mode]
+enabled = true
+restart_after_requests = 5000
+restart_after_jobs = 500
+restart_idle_seconds = 300
+request_drain_seconds = 60
+job_drain_seconds = 600
+```
+
+The process recycles itself to release heap. `restart_after_requests` and
+`restart_after_jobs` are counted since the last restart, and `0` disables either
+limit. Reaching a limit only books the restart: it happens once no web request
+has been served for `restart_idle_seconds`, so it never lands mid-traffic. Only
+2xx responses count, and realtime polls and health checks are ignored - a browser
+tab and a monitor ping forever, and a process counting those would never look idle.
+
+`request_drain_seconds` and `job_drain_seconds` bound the graceful shutdown on
+every restart and stop. A job still running when its drain expires is abandoned,
+so keep `job_drain_seconds` above your longest job.
+
+Lite mode runs a single worker pool, so `[[workers]]` must hold exactly one record:
+its queues become `--queue` and its `count` becomes `--job-threads`. Raising the
+count raises the concurrency for every queue at once - a different count per set of
+queues is what the one pool cannot express. A bench that has more than one record
+when lite mode is applied has lite mode switched back off, with the reason recorded
+in the audit log under `lite_mode_disabled`.
+
+Toggling `enabled` rebuilds the process set through a `switch-lite-mode` task: it
+stops the running processes, reinstalls the units so the ones lite mode drops are
+removed rather than left behind, and starts the new set. No manual restart.
+
+Lite mode serves realtime from inside its own process, so pilot writes
+`socketio_backend = "python-embedded"` to `common_site_config.json`; the
+`bench.socketio_backend` setting is not used.
+
 ## Admin
 
 ```toml
