@@ -22,6 +22,7 @@ const error = ref('')
 const cursor = ref<string | null>(null)
 
 let shownFilters: NotificationFilters = {}
+let newestRequest = 0
 
 const searchParams = (filters: NotificationFilters, forCursor?: string | null) => {
   const params: Record<string, string | number> = { limit: pageSize }
@@ -35,6 +36,8 @@ const searchParams = (filters: NotificationFilters, forCursor?: string | null) =
 
 export const useNotifications = () => {
   const load = async (filters: NotificationFilters = {}) => {
+    const request = ++newestRequest
+
     shownFilters = filters
     loading.value = true
     error.value = ''
@@ -43,19 +46,25 @@ export const useNotifications = () => {
     try {
       const page: NotificationPage = await notificationsApi.list(searchParams(filters))
 
+      if (request !== newestRequest) return
+
       notifications.value = page.data
       cursor.value = page.meta.next_cursor
       unread.value = page.meta.unread
     } catch (caught: any) {
+      if (request !== newestRequest) return
+
       error.value = caught.message || 'Failed to load notifications'
       notifications.value = []
     } finally {
-      loading.value = false
+      if (request === newestRequest) loading.value = false
     }
   }
 
   const loadMore = async (filters: NotificationFilters = {}) => {
     if (!cursor.value || loadingMore.value) return
+
+    const request = newestRequest
 
     loadingMore.value = true
 
@@ -64,10 +73,14 @@ export const useNotifications = () => {
         searchParams(filters, cursor.value),
       )
 
+      if (request !== newestRequest) return
+
       notifications.value = [...notifications.value, ...page.data]
       cursor.value = page.meta.next_cursor
       unread.value = page.meta.unread
     } catch (caught: any) {
+      if (request !== newestRequest) return
+
       error.value = caught.message || 'Failed to load more notifications'
     } finally {
       loadingMore.value = false
