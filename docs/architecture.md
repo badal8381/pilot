@@ -84,6 +84,7 @@ Tasks are dataclass commands with a `run()` method. They are queued through `Som
 - Bench lifecycle, config, runtime, production: `pilot/core/bench`.
 - Site lifecycle, domains, backups, retention: `pilot/core/site`.
 - App repository and install concerns: `pilot/core/app`.
+- Notification feed and the events that raise it: `pilot/core/notification`.
 - External tools or services: `pilot/managers` or `pilot/core/adapters`.
 - CLI parsing and help text: `pilot/commands`.
 - API request and response shaping: `admin/backend/api/v1`.

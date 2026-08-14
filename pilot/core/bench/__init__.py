@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from pilot.core.app import App, NewAppOptions, RevisionPin
     from pilot.core.bench.migration.store import MigrationStore
     from pilot.core.database import Database
+    from pilot.core.notification import NotificationStore
     from pilot.core.site import Site
     from pilot.tasks import TaskRunner
 
@@ -92,6 +93,12 @@ class Bench:
         from pilot.core.bench.migration.store import MigrationStore
 
         return MigrationStore(self)
+
+    @cached_property
+    def notifications(self) -> "NotificationStore":
+        from pilot.core.notification import NotificationStore
+
+        return NotificationStore(self.logs_path)
 
     @property
     def apps_path(self) -> Path:

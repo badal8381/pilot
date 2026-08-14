@@ -11,6 +11,7 @@ from pathlib import Path
 import psutil
 
 from pilot.core.alerts import ALERT_SUSTAINED_SECONDS, SustainedAlerts, notify
+from pilot.core.notification.events import record_alert
 from pilot.core.server.monitoring_config import MonitorConfigurator
 from pilot.core.server.monitoring_datum import MetricShipper
 from pilot.core.server.monitoring_proc import ProcMetricsReader
@@ -166,7 +167,24 @@ class Monitor:
         """Send system alerts if required based on the breach limits set"""
         alerts = SustainedAlerts(self.alerts_path)
         due = alerts.due(self._breached_limits(system_record))
-        if due and notify(self.bench, self._alert_payload(due, system_record)):
+
+        # Recording runs off `sustained`, not `due`: a sink accepting the alert retires
+        # the condition from `due` for good, and must not retire an incident the bench
+        # never managed to write down. Once written it is not written again.
+        unrecorded = alerts.unrecorded(alerts.sustained())
+        if unrecorded and record_alert(
+            self.bench,
+            self._alert_payload(unrecorded, system_record),
+            category="Server",
+            severity="Warning",
+            title="Resource limit breached",
+        ):
+            alerts.mark_recorded(unrecorded)
+
+        if not due:
+            return
+
+        if notify(self.bench, self._alert_payload(due, system_record)):
             alerts.mark_notified(due)
 
     @staticmethod

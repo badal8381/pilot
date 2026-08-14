@@ -68,12 +68,13 @@ def parse_pagination(default_limit: int, max_limit: int) -> tuple[int, int]:
     return limit, _decode_cursor(request.args.get("cursor"))
 
 
-def paginated_response(fetch_newest: Callable[[int], list], limit: int, offset: int):
-    """Return one cursor page from a newest-first fetcher."""
+def paginated_response(fetch_newest: Callable[[int], list], limit: int, offset: int, meta: dict | None = None):
+    """Return one cursor page from a newest-first fetcher. `meta` merges extra
+    page-level fields (e.g. an unread count) into the envelope."""
     fetched = fetch_newest(min(offset + limit + 1, _MAX_PAGE_OFFSET + limit + 1))
     page = fetched[offset : offset + limit]
     next_cursor = _encode_cursor(offset + limit) if len(fetched) > offset + limit else None
-    return jsonify({"data": page, "meta": {"limit": limit, "next_cursor": next_cursor}})
+    return jsonify({"data": page, "meta": {"limit": limit, "next_cursor": next_cursor, **(meta or {})}})
 
 
 def _encode_cursor(offset: int) -> str:
