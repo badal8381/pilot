@@ -88,9 +88,12 @@ export const useNotifications = () => {
   }
 
   const refreshBadge = async () => {
+    const request = newestRequest
     const page: NotificationPage | null = await notificationsApi.list({ limit: 1 }).catch(() => null)
 
-    if (page) unread.value = page.meta.unread
+    if (!page || request !== newestRequest) return
+
+    unread.value = page.meta.unread
   }
 
   const markAsRead = async (name: string) => {
