@@ -94,19 +94,15 @@ export const useNotifications = () => {
   }
 
   const markAllAsRead = async () => {
-    const wasRead = new Map(notifications.value.map((item) => [item.name, item.is_read]))
+    const flipped = notifications.value.filter((item) => !item.is_read)
 
-    for (const item of notifications.value) item.is_read = true
+    for (const item of flipped) item.is_read = true
     unread.value = 0
 
     try {
       await notificationsApi.markAllRead()
     } catch {
-      for (const item of notifications.value) {
-        const previous = wasRead.get(item.name)
-
-        if (previous !== undefined) item.is_read = previous
-      }
+      for (const item of flipped) item.is_read = false
 
       await refreshBadge()
     }
