@@ -404,6 +404,66 @@ def test_production_enabled_requires_process_manager() -> None:
         load_from_dict(data)
 
 
+def test_lite_defaults_to_off() -> None:
+    lite = load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA)).lite_mode
+    assert lite.enabled is False
+    assert lite.restart_after_requests == 5000
+    assert lite.restart_after_jobs == 500
+    assert lite.restart_idle_seconds == 300
+    assert lite.request_drain_seconds == 60
+    assert lite.job_drain_seconds == 600
+
+
+def test_lite_round_trips() -> None:
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    data["lite_mode"] = {"enabled": True, "restart_after_requests": 8000, "job_drain_seconds": 900}
+    config = load_from_dict(data)
+    assert config.lite_mode.enabled is True
+    assert config.lite_mode.restart_after_requests == 8000
+    assert config.lite_mode.job_drain_seconds == 900
+    section = config.dumps().split("[lite_mode]")[1].split("[")[0]
+    assert "restart_after_requests = 8000" in section
+    assert "job_drain_seconds = 900" in section
+
+
+def test_toml_writer_omits_lite_section_when_off() -> None:
+    assert "[lite_mode]" not in load_from_dict(copy.deepcopy(MINIMAL_VALID_DATA)).dumps()
+
+
+def test_lite_restart_limits_may_be_zero_but_not_negative() -> None:
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    data["lite_mode"] = {"enabled": True, "restart_after_requests": 0, "restart_after_jobs": 0}
+    assert load_from_dict(data).lite_mode.restart_after_requests == 0
+
+    data["lite_mode"] = {"enabled": True, "restart_after_jobs": -1}
+    with pytest.raises(ConfigError):
+        load_from_dict(data)
+
+
+def test_lite_drains_must_be_positive() -> None:
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    data["lite_mode"] = {"enabled": True, "job_drain_seconds": 0}
+    with pytest.raises(ConfigError):
+        load_from_dict(data)
+
+
+def test_lite_embeds_realtime_in_its_own_process() -> None:
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    assert load_from_dict(data).realtime_backend == "node"
+
+    data["lite_mode"] = {"enabled": True}
+    assert load_from_dict(data).realtime_backend == "python-embedded"
+
+
+def test_worker_queues_are_deduped_across_groups() -> None:
+    data = copy.deepcopy(MINIMAL_VALID_DATA)
+    data["workers"] = [
+        {"queues": ["default", "short"], "count": 2},
+        {"queues": ["long", "default"], "count": 1},
+    ]
+    assert load_from_dict(data).workers.queues == ["default", "short", "long"]
+
+
 def test_toml_writer_production_emits_enabled_and_pm() -> None:
     data = copy.deepcopy(MINIMAL_VALID_DATA)
     data["production"] = {"enabled": True, "process_manager": "supervisor"}

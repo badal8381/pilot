@@ -22,6 +22,16 @@ class WorkerConfig:
         ]
     )
 
+    @property
+    def queues(self) -> list[str]:
+        """Every queue across the groups, deduped, order preserved."""
+        return list(dict.fromkeys(queue for group in self.groups for queue in group.queues))
+
+    @property
+    def count(self) -> int:
+        """Workers across every group."""
+        return sum(group.count for group in self.groups)
+
     @classmethod
     def from_dict(cls, data: list) -> "WorkerConfig":
         # [[workers]] array-of-tables: each group lists queues and a count.

@@ -18,6 +18,7 @@ from pilot.config.datum import DatumConfig
 from pilot.config.firewall import FirewallConfig, FirewallRule
 from pilot.config.gunicorn import GunicornConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
+from pilot.config.lite_mode import LiteModeConfig
 from pilot.config.llm import LLMConfig
 from pilot.config.mariadb import MariaDBConfig
 from pilot.config.nginx import NginxConfig
@@ -119,6 +120,7 @@ class BenchConfig:
     # Gates whether developer mode can be toggled per site; sets nothing itself.
     allow_developer_mode: bool = False
     production: ProductionConfig = field(default_factory=ProductionConfig)
+    lite_mode: LiteModeConfig = field(default_factory=LiteModeConfig)
     nginx: NginxConfig = field(default_factory=NginxConfig)
     gunicorn: GunicornConfig = field(default_factory=GunicornConfig)
     letsencrypt: LetsEncryptConfig = field(default_factory=LetsEncryptConfig)
@@ -251,6 +253,7 @@ class BenchConfig:
         self.workers.validate()
         self.letsencrypt.validate()
         self.gunicorn.validate()
+        self.lite_mode.validate()
         self.production.validate(self.name)
         self.admin.validate(self.production.enabled, self.name)
         self.firewall.validate()
@@ -325,6 +328,12 @@ class BenchConfig:
             )
 
     # -- derived data --
+
+    @property
+    def realtime_backend(self) -> str:
+        """What frappe is told to run. Lite serves realtime from its own process,
+        so it embeds the server instead of expecting a separate one."""
+        return "python-embedded" if self.lite_mode.enabled else self.socketio_backend
 
     @property
     def framework_app(self) -> AppConfig:
@@ -532,6 +541,16 @@ class BenchConfig:
             production["process_manager"] = self.production.process_manager
         return production
 
+    def _lite_mode_section(self) -> ConfigDict:
+        return {
+            "enabled": self.lite_mode.enabled,
+            "restart_after_requests": self.lite_mode.restart_after_requests,
+            "restart_after_jobs": self.lite_mode.restart_after_jobs,
+            "restart_idle_seconds": self.lite_mode.restart_idle_seconds,
+            "request_drain_seconds": self.lite_mode.request_drain_seconds,
+            "job_drain_seconds": self.lite_mode.job_drain_seconds,
+        }
+
     def _gunicorn_section(self) -> ConfigDict:
         return {
             "workers": self.gunicorn.workers,
@@ -728,6 +747,12 @@ _SECTIONS: tuple[_Section, ...] = (
         lambda config: config._production_section(),
     ),
     _Section(
+        "lite_mode",
+        lambda data: LiteModeConfig.from_dict(data.get("lite_mode", {})),
+        # Off by default, so an ordinary bench.toml never carries the section.
+        lambda config: config._lite_mode_section() if config.lite_mode.enabled else None,
+    ),
+    _Section(
         "gunicorn",
         lambda data: GunicornConfig.from_dict(data.get("gunicorn", {})),
         lambda config: config._gunicorn_section(),
@@ -850,6 +875,7 @@ def _bench_schema() -> _Table:
             "bench": _Table(keys=set(_BENCH_KEYS)),
             "redis": _Table(keys=_keys(RedisConfig)),
             "production": _Table(keys=_keys(ProductionConfig) | _PRODUCTION_LEGACY),
+            "lite_mode": _Table(keys=_keys(LiteModeConfig)),
             "gunicorn": _Table(keys=_keys(GunicornConfig)),
             "admin": _Table(keys=_keys(AdminConfig)),
             "s3": _Table(keys=_keys(S3Config)),
