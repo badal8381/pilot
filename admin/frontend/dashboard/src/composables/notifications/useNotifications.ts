@@ -85,14 +85,29 @@ export const useNotifications = () => {
     row.is_read = true
     unread.value = Math.max(0, unread.value - 1)
 
-    await notificationsApi.markRead(name)
+    try {
+      await notificationsApi.markRead(name)
+    } catch {
+      row.is_read = false
+      unread.value += 1
+    }
   }
 
   const markAllAsRead = async () => {
+    const wasRead = notifications.value.map((item) => item.is_read)
+    const wasUnread = unread.value
+
     for (const item of notifications.value) item.is_read = true
     unread.value = 0
 
-    await notificationsApi.markAllRead()
+    try {
+      await notificationsApi.markAllRead()
+    } catch {
+      notifications.value.forEach((item, index) => {
+        item.is_read = wasRead[index]
+      })
+      unread.value = wasUnread
+    }
   }
 
   return {
