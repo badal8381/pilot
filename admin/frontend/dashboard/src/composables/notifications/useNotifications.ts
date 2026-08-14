@@ -108,12 +108,18 @@ export const useNotifications = () => {
 
     try {
       await notificationsApi.markRead(name)
+
+      const shown = notifications.value.find((item) => item.name === name)
+
+      if (shown) shown.is_read = true
     } catch {
       await load(shownFilters)
     }
   }
 
   const markAllAsRead = async () => {
+    const request = newestRequest
+
     newestLocalChange += 1
 
     for (const item of notifications.value) item.is_read = true
@@ -121,6 +127,8 @@ export const useNotifications = () => {
 
     try {
       await notificationsApi.markAllRead()
+
+      if (request !== newestRequest) await load(shownFilters)
     } catch {
       await load(shownFilters)
     }
