@@ -78,7 +78,7 @@ class ReadState:
         """Read-modify-write under the file's lock. Two admin requests marking
         different notifications read at once would otherwise each write back the
         snapshot they started from, and the later write would drop the other's mark."""
-        with self._locked():
+        with self.lock():
             marks = self.read()
 
             if name in marks.names:
@@ -91,12 +91,18 @@ class ReadState:
         notification created after it could be marked read by another request while
         this one waited - and clearing the name set would drop that mark for a
         notification the watermark does not reach."""
-        with self._locked():
+        with self.lock():
             self._write_locked(utc_now(), frozenset())
 
     @contextmanager
-    def _locked(self) -> Iterator[None]:
-        """Read state can be written before anything has ever been logged, so the
+    def lock(self) -> Iterator[None]:
+        """The feed's write lock. Read state takes it, and so does `create` while it
+        stamps and appends: a record stamped before a watermark but appended after it
+        would be born read and never appear at all.
+
+        Nothing called while it is held may take it again - that would block on itself.
+
+        Read state can be written before anything has ever been logged, so the
         directory the lock file lives in is not guaranteed to exist yet."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with exclusive_file_lock(self.path):
@@ -131,22 +137,27 @@ class NotificationStore:
         if severity not in SEVERITIES:
             raise ValueError(f"Unknown notification severity: {severity!r}")
 
-        notification = Notification(
-            name=self._next_name(),
-            category=category,
-            event=event,
-            severity=severity,
-            title=title,
-            created_at=utc_now(),
-            is_read=False,
-            message=message,
-            site=site,
-            task_id=task_id,
-            action_route=action_route,
-        )
-        record = asdict(notification)
-        record.pop("is_read")
-        self._log.append(record)
+        # Stamped and appended under the feed lock, so "mark all read" either covers
+        # this record or writes a watermark that does not reach it. Stamping outside
+        # the lock leaves a window where it is born read and never shows up at all.
+        with self.read_state.lock():
+            notification = Notification(
+                name=self._next_name(),
+                category=category,
+                event=event,
+                severity=severity,
+                title=title,
+                created_at=utc_now(),
+                is_read=False,
+                message=message,
+                site=site,
+                task_id=task_id,
+                action_route=action_route,
+            )
+            record = asdict(notification)
+            record.pop("is_read")
+            self._log.append(record)
+
         return notification
 
     def list(self, limit: int, *, category: str | None = None, unread_only: bool = False) -> list[Notification]:

@@ -210,3 +210,30 @@ def test_mark_all_read_keeps_a_mark_made_while_it_waited_for_the_lock(tmp_path) 
         store.mark_all_read()
 
     assert store.unread_count == 0
+
+
+def test_create_holds_the_feed_lock_while_it_stamps_and_appends(tmp_path) -> None:
+    """Stamping outside the lock leaves a window: mark-all can write a later watermark
+    before the append lands, and the record is born read and never shows up at all."""
+    from unittest.mock import patch
+
+    from pilot.internal.atomic_file import exclusive_file_lock
+    from pilot.internal.jsonl_log import JsonlLog
+
+    store = _store(tmp_path)
+    real_append = JsonlLog.append
+    locked_during_append: list[bool] = []
+
+    def append_probing_the_lock(self, record):
+        try:
+            with exclusive_file_lock(store.read_state.path, blocking=False):
+                locked_during_append.append(False)
+        except BlockingIOError:
+            locked_during_append.append(True)
+        real_append(self, record)
+
+    with patch.object(JsonlLog, "append", append_probing_the_lock):
+        _create(store, "written under the feed lock")
+
+    assert locked_during_append == [True]
+    assert store.unread_count == 1
