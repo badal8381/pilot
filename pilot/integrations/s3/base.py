@@ -6,11 +6,16 @@ from typing import Any
 from pilot.config import S3Config
 from pilot.exceptions import BenchError
 
-boto3 = TransferConfig = Config = _STREAM_TRANSFER = None
+boto3: Any = None
+TransferConfig: Any = None
+Config: Any = None
+_STREAM_TRANSFER: Any = None
 
 
 class ClientError(Exception):
     """Replaced when boto3 loads."""
+
+    response: dict
 
 
 class EndpointConnectionError(Exception):
