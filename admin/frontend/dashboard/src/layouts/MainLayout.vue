@@ -39,6 +39,7 @@ useSearchShortcut()
 // click, Escape, close button) exits to it directly instead of stepping back
 // through every section/subsection push made while the dialog was open.
 const lastNonSettingsRoute = ref(null)
+
 watch(
   () => route.fullPath,
   () => {
