@@ -44,11 +44,17 @@ const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
     />
 
     <nav class="flex-1 overflow-y-auto px-2 pt-2">
-      <SidebarItem icon="lucide-search" suffix="⌘ K" class="mb-0.5 text-sm" @click="openSearch">
+      <SidebarItem
+        v-if="!isMobile"
+        icon="lucide-search"
+        suffix="⌘ K"
+        class="mb-0.5 text-sm"
+        @click="openSearch"
+      >
         Search
       </SidebarItem>
 
-      <NotificationsPanel />
+      <NotificationsPanel v-if="!isMobile" />
 
       <template v-for="section in visibleSections" :key="section.label || 'main'">
         <SidebarLabel v-if="section.label" divider class="mt-2">
