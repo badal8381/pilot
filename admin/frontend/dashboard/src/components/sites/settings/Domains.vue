@@ -1,3 +1,103 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { Badge, Button, Dropdown, ErrorMessage, LoadingText, Tooltip } from 'frappe-ui'
+
+import AddDomainDialog from '@/components/sites/settings/domains/AddDomainDialog.vue'
+import RemoveDomainDialog from '@/components/sites/settings/domains/RemoveDomainDialog.vue'
+
+import { useSite } from '@/composables/sites/useSite'
+import { apiErrorMessage } from '@/api/client'
+import { sitesApi } from '@/api/sites'
+
+const props = defineProps({ siteName: { type: String, required: true } })
+
+const { site, nginxEnabled } = useSite(props.siteName)
+
+const domains = ref([])
+const primaryDomain = ref(null)
+const loading = ref(false)
+const error = ref('')
+
+const domainRows = computed(() => {
+  const rows = [
+    {
+      domain: props.siteName,
+      isSite: true,
+      isPrimary: !primaryDomain.value || primaryDomain.value === props.siteName,
+    },
+  ]
+  for (const domain of domains.value) {
+    rows.push({ domain, isSite: false, isPrimary: primaryDomain.value === domain })
+  }
+  return rows
+})
+
+const domainMenuOptions = (row) => {
+  const options = []
+  if (!row.isPrimary) {
+    options.push({
+      label: 'Make primary',
+      icon: 'lucide-star',
+      onClick: () => setPrimary(row.domain),
+    })
+    if (!row.isSite) {
+      options.push({
+        label: 'Delete',
+        icon: 'lucide-trash-2',
+        theme: 'red',
+        onClick: () => openRemove(row.domain),
+      })
+    }
+  }
+  return options
+}
+
+const loadDomains = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const data = await sitesApi.domains.list(props.siteName)
+    domains.value = data.domains || []
+    primaryDomain.value = data.primary || null
+  } catch (e) {
+    error.value = e.message || 'Failed to load domains.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const setPrimary = async (domain) => {
+  error.value = ''
+  try {
+    const data = await sitesApi.domains.setPrimary(props.siteName, domain)
+    if (!data.task_id) {
+      error.value = apiErrorMessage(data, 'Failed to set primary domain.')
+      return
+    }
+    await loadDomains()
+  } catch (e) {
+    error.value = e.message || 'Failed to set primary domain.'
+  }
+}
+
+const showAdd = ref(false)
+const showRemove = ref(false)
+const removeTarget = ref('')
+
+const openRemove = (domain) => {
+  removeTarget.value = domain
+  showRemove.value = true
+}
+
+onMounted(() => {
+  if (nginxEnabled.value) loadDomains()
+})
+
+watch(nginxEnabled, (enabled) => {
+  if (enabled) loadDomains()
+})
+</script>
+
 <template>
   <div v-if="nginxEnabled">
     <p class="font-semibold text-ink-gray-8 text-base">Domains</p>
@@ -63,101 +163,3 @@
     @removed="loadDomains"
   />
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { Badge, Button, Dropdown, ErrorMessage, LoadingText, Tooltip } from 'frappe-ui'
-import AddDomainDialog from './domains/AddDomainDialog.vue'
-import RemoveDomainDialog from './domains/RemoveDomainDialog.vue'
-import { useSite } from '@/composables/sites/useSite'
-import { apiErrorMessage } from '@/api/client'
-import { sitesApi } from '@/api/sites'
-
-const props = defineProps({ siteName: { type: String, required: true } })
-
-const { site, nginxEnabled } = useSite(props.siteName)
-
-const domains = ref([])
-const primaryDomain = ref(null)
-const loading = ref(false)
-const error = ref('')
-
-const domainRows = computed(() => {
-  const rows = [
-    {
-      domain: props.siteName,
-      isSite: true,
-      isPrimary: !primaryDomain.value || primaryDomain.value === props.siteName,
-    },
-  ]
-  for (const domain of domains.value) {
-    rows.push({ domain, isSite: false, isPrimary: primaryDomain.value === domain })
-  }
-  return rows
-})
-
-function domainMenuOptions(row) {
-  const options = []
-  if (!row.isPrimary) {
-    options.push({
-      label: 'Make primary',
-      icon: 'lucide-star',
-      onClick: () => setPrimary(row.domain),
-    })
-    if (!row.isSite) {
-      options.push({
-        label: 'Delete',
-        icon: 'lucide-trash-2',
-        theme: 'red',
-        onClick: () => openRemove(row.domain),
-      })
-    }
-  }
-  return options
-}
-
-async function loadDomains() {
-  loading.value = true
-  error.value = ''
-  try {
-    const data = await sitesApi.domains.list(props.siteName)
-    domains.value = data.domains || []
-    primaryDomain.value = data.primary || null
-  } catch (e) {
-    error.value = e.message || 'Failed to load domains.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function setPrimary(domain) {
-  error.value = ''
-  try {
-    const data = await sitesApi.domains.setPrimary(props.siteName, domain)
-    if (!data.task_id) {
-      error.value = apiErrorMessage(data, 'Failed to set primary domain.')
-      return
-    }
-    await loadDomains()
-  } catch (e) {
-    error.value = e.message || 'Failed to set primary domain.'
-  }
-}
-
-const showAdd = ref(false)
-const showRemove = ref(false)
-const removeTarget = ref('')
-
-function openRemove(domain) {
-  removeTarget.value = domain
-  showRemove.value = true
-}
-
-onMounted(() => {
-  if (nginxEnabled.value) loadDomains()
-})
-
-watch(nginxEnabled, (enabled) => {
-  if (enabled) loadDomains()
-})
-</script>

@@ -1,3 +1,25 @@
+<script setup lang="ts">
+import { Dialog } from 'frappe-ui'
+
+import SiteRow from '@/components/sites/SiteRow.vue'
+
+defineProps({
+  sites: { type: Array, default: () => [] },
+})
+const open = defineModel('open')
+const site = defineModel('site')
+
+const siteMeta = (s) => {
+  const count = s.active_apps?.length || 0
+  return `${count} app${count === 1 ? '' : 's'}`
+}
+
+const choose = (name) => {
+  site.value = name
+  open.value = false
+}
+</script>
+
 <template>
   <Dialog v-model="open" title="Choose site" size="md">
     <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-p-sm text-center">
@@ -38,24 +60,3 @@
     </template>
   </Dialog>
 </template>
-
-<script setup>
-import { Dialog } from 'frappe-ui'
-import SiteRow from '@/components/sites/SiteRow.vue'
-
-defineProps({
-  sites: { type: Array, default: () => [] },
-})
-const open = defineModel('open')
-const site = defineModel('site')
-
-function siteMeta(s) {
-  const count = s.active_apps?.length || 0
-  return `${count} app${count === 1 ? '' : 's'}`
-}
-
-function choose(name) {
-  site.value = name
-  open.value = false
-}
-</script>

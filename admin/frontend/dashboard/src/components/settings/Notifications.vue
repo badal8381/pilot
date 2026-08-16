@@ -1,3 +1,158 @@
+<script setup lang="ts">
+import { computed, ref, onMounted } from 'vue'
+import { Button, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
+
+import EmptyState from '@/components/common/EmptyState.vue'
+import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
+
+import { apiErrorMessage } from '@/api/client'
+import { settingsApi } from '@/api/settings'
+
+// Every resource alert starts off; site uptime is the only one on by default.
+const RESOURCE_ALERTS = [
+  {
+    key: 'cpu_usage_limit',
+    label: 'CPU usage',
+    description: 'Alert when processor use on this host crosses the limit.',
+    initial: 85,
+  },
+  {
+    key: 'memory_usage_limit',
+    label: 'Memory usage',
+    description: 'Alert when memory use on this host crosses the limit.',
+    initial: 90,
+  },
+  {
+    key: 'disk_space_limit',
+    label: 'Disk usage',
+    description: 'Alert when disk use on this host crosses the limit.',
+    initial: 90,
+  },
+]
+
+const loading = ref(true)
+const saving = ref(false)
+const error = ref('')
+// The switch owns whether an alert is on, so clearing the field keeps it mounted.
+const enabled = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key, false])))
+const limits = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key, ''])))
+const siteUptime = ref(true)
+const webhooks = ref([])
+
+const savedPayload = ref('')
+const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
+
+const buildPayload = () => {
+  return {
+    ...Object.fromEntries(
+      RESOURCE_ALERTS.map((alert) => [
+        alert.key,
+        enabled.value[alert.key] ? Number(limits.value[alert.key]) || 0 : 0,
+      ]),
+    ),
+    site_uptime: siteUptime.value,
+    // Blank token means "keep the stored one"; original_url is how it is found.
+    webhook_endpoints: webhooks.value.map((webhook) => ({
+      url: webhook.url.trim(),
+      token: webhook.token,
+      original_url: webhook.original_url,
+    })),
+  }
+}
+
+const setEnabled = (key, on) => {
+  enabled.value[key] = on
+  if (on && !Number(limits.value[key])) {
+    limits.value[key] = String(RESOURCE_ALERTS.find((alert) => alert.key === key).initial)
+  }
+}
+
+const addWebhook = () => {
+  webhooks.value.push({ url: '', token: '', token_set: false, original_url: '' })
+}
+
+const removeWebhook = (index) => {
+  webhooks.value.splice(index, 1)
+}
+
+// A row still being filled in says nothing and just holds the Save button.
+const webhookError = (webhook) => {
+  const url = webhook.url.trim()
+  if (url && (!URL.canParse(url) || !/^https?:\/\//.test(url)))
+    return 'Endpoint must be an http:// or https:// URL.'
+  return ''
+}
+
+const webhookIsComplete = (webhook) => {
+  return Boolean(webhook.url.trim()) && Boolean(webhook.token || webhook.token_set)
+}
+
+const limitError = (key) => {
+  if (!enabled.value[key]) return ''
+  const limit = Number(limits.value[key])
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
+    return 'Limit must be a whole percentage between 1 and 100.'
+  return ''
+}
+
+const canSave = computed(
+  () =>
+    RESOURCE_ALERTS.every((alert) => !limitError(alert.key)) &&
+    webhooks.value.every((webhook) => webhookIsComplete(webhook) && !webhookError(webhook)),
+)
+
+const save = async () => {
+  if (!canSave.value) return
+
+  error.value = ''
+  saving.value = true
+  try {
+    const payload = buildPayload()
+    const result = await settingsApi.update({ resource_limits: payload })
+    if (result.error) {
+      error.value = apiErrorMessage(result, 'Failed to save.')
+      return
+    }
+    // Drop the typed secrets once stored, so the form reads back like a reload.
+    for (const webhook of webhooks.value) {
+      webhook.token_set = webhook.token_set || Boolean(webhook.token)
+      webhook.token = ''
+      webhook.original_url = webhook.url.trim()
+    }
+    savedPayload.value = JSON.stringify(buildPayload())
+    toast.success('Notification settings saved')
+  } catch (e) {
+    error.value = e.message || 'Failed to save.'
+  } finally {
+    saving.value = false
+  }
+}
+
+onMounted(async () => {
+  try {
+    const data = await settingsApi.get()
+    const saved = data.resource_limits || {}
+    for (const alert of RESOURCE_ALERTS) {
+      const limit = Number(saved[alert.key]) || 0
+      enabled.value[alert.key] = limit > 0
+      limits.value[alert.key] = limit ? String(limit) : ''
+    }
+    siteUptime.value = saved.site_uptime ?? true
+    webhooks.value = (saved.webhook_endpoints || []).map((webhook) => ({
+      url: webhook.url || '',
+      token: '',
+      token_set: Boolean(webhook.token_set),
+      original_url: webhook.url || '',
+    }))
+    savedPayload.value = JSON.stringify(buildPayload())
+  } catch (e) {
+    error.value = e.message || 'Could not load settings.'
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
@@ -92,156 +247,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, ref, onMounted } from 'vue'
-import { Button, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
-import EmptyState from '@/components/common/EmptyState.vue'
-import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
-import { apiErrorMessage } from '@/api/client'
-import { settingsApi } from '@/api/settings'
-
-// Every resource alert starts off; site uptime is the only one on by default.
-const RESOURCE_ALERTS = [
-  {
-    key: 'cpu_usage_limit',
-    label: 'CPU usage',
-    description: 'Alert when processor use on this host crosses the limit.',
-    initial: 85,
-  },
-  {
-    key: 'memory_usage_limit',
-    label: 'Memory usage',
-    description: 'Alert when memory use on this host crosses the limit.',
-    initial: 90,
-  },
-  {
-    key: 'disk_space_limit',
-    label: 'Disk usage',
-    description: 'Alert when disk use on this host crosses the limit.',
-    initial: 90,
-  },
-]
-
-const loading = ref(true)
-const saving = ref(false)
-const error = ref('')
-// The switch owns whether an alert is on, so clearing the field keeps it mounted.
-const enabled = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key, false])))
-const limits = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key, ''])))
-const siteUptime = ref(true)
-const webhooks = ref([])
-
-const savedPayload = ref('')
-const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
-
-function buildPayload() {
-  return {
-    ...Object.fromEntries(
-      RESOURCE_ALERTS.map((alert) => [
-        alert.key,
-        enabled.value[alert.key] ? Number(limits.value[alert.key]) || 0 : 0,
-      ]),
-    ),
-    site_uptime: siteUptime.value,
-    // Blank token means "keep the stored one"; original_url is how it is found.
-    webhook_endpoints: webhooks.value.map((webhook) => ({
-      url: webhook.url.trim(),
-      token: webhook.token,
-      original_url: webhook.original_url,
-    })),
-  }
-}
-
-function setEnabled(key, on) {
-  enabled.value[key] = on
-  if (on && !Number(limits.value[key])) {
-    limits.value[key] = String(RESOURCE_ALERTS.find((alert) => alert.key === key).initial)
-  }
-}
-
-function addWebhook() {
-  webhooks.value.push({ url: '', token: '', token_set: false, original_url: '' })
-}
-
-function removeWebhook(index) {
-  webhooks.value.splice(index, 1)
-}
-
-// A row still being filled in says nothing and just holds the Save button.
-function webhookError(webhook) {
-  const url = webhook.url.trim()
-  if (url && (!URL.canParse(url) || !/^https?:\/\//.test(url)))
-    return 'Endpoint must be an http:// or https:// URL.'
-  return ''
-}
-
-function webhookIsComplete(webhook) {
-  return Boolean(webhook.url.trim()) && Boolean(webhook.token || webhook.token_set)
-}
-
-function limitError(key) {
-  if (!enabled.value[key]) return ''
-  const limit = Number(limits.value[key])
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100)
-    return 'Limit must be a whole percentage between 1 and 100.'
-  return ''
-}
-
-const canSave = computed(
-  () =>
-    RESOURCE_ALERTS.every((alert) => !limitError(alert.key)) &&
-    webhooks.value.every((webhook) => webhookIsComplete(webhook) && !webhookError(webhook)),
-)
-
-async function save() {
-  if (!canSave.value) return
-
-  error.value = ''
-  saving.value = true
-  try {
-    const payload = buildPayload()
-    const result = await settingsApi.update({ resource_limits: payload })
-    if (result.error) {
-      error.value = apiErrorMessage(result, 'Failed to save.')
-      return
-    }
-    // Drop the typed secrets once stored, so the form reads back like a reload.
-    for (const webhook of webhooks.value) {
-      webhook.token_set = webhook.token_set || Boolean(webhook.token)
-      webhook.token = ''
-      webhook.original_url = webhook.url.trim()
-    }
-    savedPayload.value = JSON.stringify(buildPayload())
-    toast.success('Notification settings saved')
-  } catch (e) {
-    error.value = e.message || 'Failed to save.'
-  } finally {
-    saving.value = false
-  }
-}
-
-onMounted(async () => {
-  try {
-    const data = await settingsApi.get()
-    const saved = data.resource_limits || {}
-    for (const alert of RESOURCE_ALERTS) {
-      const limit = Number(saved[alert.key]) || 0
-      enabled.value[alert.key] = limit > 0
-      limits.value[alert.key] = limit ? String(limit) : ''
-    }
-    siteUptime.value = saved.site_uptime ?? true
-    webhooks.value = (saved.webhook_endpoints || []).map((webhook) => ({
-      url: webhook.url || '',
-      token: '',
-      token_set: Boolean(webhook.token_set),
-      original_url: webhook.url || '',
-    }))
-    savedPayload.value = JSON.stringify(buildPayload())
-  } catch (e) {
-    error.value = e.message || 'Could not load settings.'
-  } finally {
-    loading.value = false
-  }
-})
-</script>

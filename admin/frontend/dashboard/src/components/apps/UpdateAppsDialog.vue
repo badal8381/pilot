@@ -1,3 +1,75 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Button, Checkbox, Dialog, ErrorMessage, LoadingText } from 'frappe-ui'
+
+import AppIcon from '@/components/apps/AppIcon.vue'
+
+import { updatesApi } from '@/api/updates'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
+import { useAppUpdates } from '@/composables/apps/useAppUpdates'
+
+const open = defineModel()
+const router = useRouter()
+
+const { updates, appsWithUpdates, checking } = useAppUpdates()
+const { titleMap, load: loadRegistry } = useAppRegistry()
+
+const appNames = computed(() => {
+  const names = [...appsWithUpdates.value]
+  const frappeIndex = names.indexOf('frappe')
+  if (frappeIndex > 0) {
+    names.splice(frappeIndex, 1)
+    names.unshift('frappe')
+  }
+  return names
+})
+
+const selected = ref(new Set())
+const safeguard = ref(true)
+const updating = ref(false)
+const error = ref('')
+
+watch(open, (isOpen) => {
+  if (isOpen) loadRegistry()
+})
+watch(
+  appNames,
+  (names) => {
+    selected.value = new Set(names)
+  },
+  { immediate: true },
+)
+
+const toggle = (name) => {
+  const next = new Set(selected.value)
+  next.has(name) ? next.delete(name) : next.add(name)
+  selected.value = next
+}
+
+const toggleAll = () => {
+  selected.value = selected.value.size === appNames.value.length ? new Set() : new Set(appNames.value)
+}
+
+const runUpdate = async () => {
+  if (!selected.value.size) return
+  updating.value = true
+  error.value = ''
+  try {
+    const res = await updatesApi.createUpdate({
+      apps: [...selected.value],
+      disable_safeguards: !safeguard.value,
+    })
+    open.value = false
+    router.push({ name: 'UpdateDetail', params: { operationId: res.operation.id } })
+  } catch (e) {
+    error.value = e.message || 'Failed to start update.'
+  } finally {
+    updating.value = false
+  }
+}
+</script>
+
 <template>
   <Dialog v-model="open" title="Updates" size="md">
     <div class="flex flex-col gap-4">
@@ -83,73 +155,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { computed, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import { Button, Checkbox, Dialog, ErrorMessage, LoadingText } from 'frappe-ui'
-import { updatesApi } from '@/api/updates'
-import AppIcon from '@/components/apps/AppIcon.vue'
-import { useAppRegistry } from '@/composables/apps/useAppRegistry'
-import { useAppUpdates } from '@/composables/apps/useAppUpdates'
-
-const open = defineModel()
-const router = useRouter()
-
-const { updates, appsWithUpdates, checking } = useAppUpdates()
-const { titleMap, load: loadRegistry } = useAppRegistry()
-
-const appNames = computed(() => {
-  const names = [...appsWithUpdates.value]
-  const frappeIndex = names.indexOf('frappe')
-  if (frappeIndex > 0) {
-    names.splice(frappeIndex, 1)
-    names.unshift('frappe')
-  }
-  return names
-})
-
-const selected = ref(new Set())
-const safeguard = ref(true)
-const updating = ref(false)
-const error = ref('')
-
-watch(open, (isOpen) => {
-  if (isOpen) loadRegistry()
-})
-watch(
-  appNames,
-  (names) => {
-    selected.value = new Set(names)
-  },
-  { immediate: true },
-)
-
-function toggle(name) {
-  const next = new Set(selected.value)
-  next.has(name) ? next.delete(name) : next.add(name)
-  selected.value = next
-}
-
-function toggleAll() {
-  selected.value = selected.value.size === appNames.value.length ? new Set() : new Set(appNames.value)
-}
-
-async function runUpdate() {
-  if (!selected.value.size) return
-  updating.value = true
-  error.value = ''
-  try {
-    const res = await updatesApi.createUpdate({
-      apps: [...selected.value],
-      disable_safeguards: !safeguard.value,
-    })
-    open.value = false
-    router.push({ name: 'UpdateDetail', params: { operationId: res.operation.id } })
-  } catch (e) {
-    error.value = e.message || 'Failed to start update.'
-  } finally {
-    updating.value = false
-  }
-}
-</script>

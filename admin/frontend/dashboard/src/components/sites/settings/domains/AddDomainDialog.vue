@@ -1,3 +1,85 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+import { Button, Dialog, ErrorMessage, TextInput } from 'frappe-ui'
+
+import SimpleTable from '@/components/common/SimpleTable.vue'
+
+import { apiErrorMessage } from '@/api/client'
+import { sitesApi } from '@/api/sites'
+
+const DNS_RECORD_COLUMNS = [
+  { key: 'type', label: 'Type' },
+  { key: 'host', label: 'Host' },
+  { key: 'value', label: 'Points to' },
+]
+
+const props = defineProps({ siteName: { type: String, required: true } })
+const emit = defineEmits(['added'])
+
+const show = defineModel({ default: false })
+
+const step = ref('input')
+const domain = ref('')
+const error = ref('')
+const continuing = ref(false)
+const adding = ref(false)
+const dnsRecordGroups = ref([])
+
+// Reset to a blank first step each time the dialog opens.
+watch(show, (open) => {
+  if (!open) return
+  step.value = 'input'
+  domain.value = ''
+  error.value = ''
+  dnsRecordGroups.value = []
+})
+
+const toRecordGroups = (records) => {
+  const groups = []
+  if (records?.cname?.length) groups.push({ type: 'CNAME', records: records.cname })
+  if (records?.a?.length) groups.push({ type: 'A', records: records.a })
+  return groups
+}
+
+const continueAdd = async () => {
+  const value = domain.value.trim()
+  if (!value) return
+  error.value = ''
+  continuing.value = true
+  try {
+    const data = await sitesApi.domains.dnsRecords(props.siteName, value)
+    if (data.error) {
+      error.value = apiErrorMessage(data, 'Could not generate DNS records.')
+      return
+    }
+    dnsRecordGroups.value = toRecordGroups(data)
+    step.value = 'records'
+  } catch (e) {
+    error.value = e.message || 'Failed to validate domain.'
+  } finally {
+    continuing.value = false
+  }
+}
+
+const confirmAdd = async () => {
+  error.value = ''
+  adding.value = true
+  try {
+    const data = await sitesApi.domains.add(props.siteName, domain.value.trim())
+    if (!data.task_id) {
+      error.value = apiErrorMessage(data, 'Failed to add domain.')
+      return
+    }
+    show.value = false
+    emit('added')
+  } catch (e) {
+    error.value = e.message || 'Failed to add domain.'
+  } finally {
+    adding.value = false
+  }
+}
+</script>
+
 <template>
   <Dialog v-model="show" title="Use your own domain" size="lg">
     <template v-if="step === 'input'">
@@ -63,83 +145,3 @@
     </template>
   </Dialog>
 </template>
-
-<script setup>
-import { ref, watch } from 'vue'
-import { Button, Dialog, ErrorMessage, TextInput } from 'frappe-ui'
-import SimpleTable from '@/components/common/SimpleTable.vue'
-import { apiErrorMessage } from '@/api/client'
-import { sitesApi } from '@/api/sites'
-
-const DNS_RECORD_COLUMNS = [
-  { key: 'type', label: 'Type' },
-  { key: 'host', label: 'Host' },
-  { key: 'value', label: 'Points to' },
-]
-
-const props = defineProps({ siteName: { type: String, required: true } })
-const emit = defineEmits(['added'])
-
-const show = defineModel({ default: false })
-
-const step = ref('input')
-const domain = ref('')
-const error = ref('')
-const continuing = ref(false)
-const adding = ref(false)
-const dnsRecordGroups = ref([])
-
-// Reset to a blank first step each time the dialog opens.
-watch(show, (open) => {
-  if (!open) return
-  step.value = 'input'
-  domain.value = ''
-  error.value = ''
-  dnsRecordGroups.value = []
-})
-
-function toRecordGroups(records) {
-  const groups = []
-  if (records?.cname?.length) groups.push({ type: 'CNAME', records: records.cname })
-  if (records?.a?.length) groups.push({ type: 'A', records: records.a })
-  return groups
-}
-
-async function continueAdd() {
-  const value = domain.value.trim()
-  if (!value) return
-  error.value = ''
-  continuing.value = true
-  try {
-    const data = await sitesApi.domains.dnsRecords(props.siteName, value)
-    if (data.error) {
-      error.value = apiErrorMessage(data, 'Could not generate DNS records.')
-      return
-    }
-    dnsRecordGroups.value = toRecordGroups(data)
-    step.value = 'records'
-  } catch (e) {
-    error.value = e.message || 'Failed to validate domain.'
-  } finally {
-    continuing.value = false
-  }
-}
-
-async function confirmAdd() {
-  error.value = ''
-  adding.value = true
-  try {
-    const data = await sitesApi.domains.add(props.siteName, domain.value.trim())
-    if (!data.task_id) {
-      error.value = apiErrorMessage(data, 'Failed to add domain.')
-      return
-    }
-    show.value = false
-    emit('added')
-  } catch (e) {
-    error.value = e.message || 'Failed to add domain.'
-  } finally {
-    adding.value = false
-  }
-}
-</script>

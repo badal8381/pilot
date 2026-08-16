@@ -1,3 +1,28 @@
+<script setup lang="ts">
+import { ref, watch } from 'vue'
+
+import { monitorApi } from '@/api/monitor'
+
+const props = defineProps({ window: { type: String, default: '24h' } })
+
+const data = ref(null)
+
+// The WAF log has no per-second "live" feed; fall back to the shortest window.
+const resolveWindow = (w) => {
+  return w === 'live' ? '30m' : w
+}
+
+const load = async () => {
+  try {
+    data.value = await monitorApi.waf(resolveWindow(props.window))
+  } catch {
+    data.value = null
+  }
+}
+
+watch(() => props.window, load, { immediate: true })
+</script>
+
 <template>
   <div v-if="data && data.log_present" class="mb-6">
     <div class="flex items-center gap-2 mb-3">
@@ -65,27 +90,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, watch } from 'vue'
-import { monitorApi } from '@/api/monitor'
-
-const props = defineProps({ window: { type: String, default: '24h' } })
-
-const data = ref(null)
-
-// The WAF log has no per-second "live" feed; fall back to the shortest window.
-function resolveWindow(w) {
-  return w === 'live' ? '30m' : w
-}
-
-async function load() {
-  try {
-    data.value = await monitorApi.waf(resolveWindow(props.window))
-  } catch {
-    data.value = null
-  }
-}
-
-watch(() => props.window, load, { immediate: true })
-</script>

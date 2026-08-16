@@ -1,3 +1,7 @@
+<script setup lang="ts">
+defineProps({ icon: { type: String, default: '' } })
+</script>
+
 <template>
   <div
     class="relative -mx-3 sm:-mx-4 -mt-3 sm:-mt-4 px-3 sm:px-4 pt-3 sm:pt-4 pb-2 overflow-hidden"
@@ -36,9 +40,7 @@
   </div>
 </template>
 
-<script setup>
-defineProps({ icon: { type: String, default: '' } })
-</script>
+
 
 <style scoped>
 .dot-field {

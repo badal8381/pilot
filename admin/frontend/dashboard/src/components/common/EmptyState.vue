@@ -1,3 +1,15 @@
+<script setup lang="ts">
+defineProps({
+  icon: { type: String, default: '' },
+  title: { type: String, required: true },
+  description: { type: String, default: '' },
+  // Off when the state already sits inside a bordered panel.
+  bordered: { type: Boolean, default: true },
+  // For empty states that sit among other content rather than filling a page.
+  compact: { type: Boolean, default: false },
+})
+</script>
+
 <template>
   <div
     class="flex flex-col items-center px-6 text-center"
@@ -20,15 +32,3 @@
     <slot />
   </div>
 </template>
-
-<script setup>
-defineProps({
-  icon: { type: String, default: '' },
-  title: { type: String, required: true },
-  description: { type: String, default: '' },
-  // Off when the state already sits inside a bordered panel.
-  bordered: { type: Boolean, default: true },
-  // For empty states that sit among other content rather than filling a page.
-  compact: { type: Boolean, default: false },
-})
-</script>

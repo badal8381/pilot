@@ -1,3 +1,26 @@
+<script setup lang="ts">
+import { ref, nextTick } from 'vue'
+
+defineProps({
+  lines: { type: Array, default: () => [] },
+  streaming: { type: Boolean, default: false },
+  lineNumbers: { type: Boolean, default: false },
+  emptyText: { type: String, default: 'No output.' },
+  maxHeight: { type: String, default: '65vh' },
+  fill: { type: Boolean, default: false },
+})
+
+const el = ref(null)
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (el.value) el.value.scrollTop = el.value.scrollHeight
+  })
+}
+
+defineExpose({ scrollToBottom })
+</script>
+
 <template>
   <div
     ref="el"
@@ -18,28 +41,7 @@
   </div>
 </template>
 
-<script setup>
-import { ref, nextTick } from 'vue'
 
-defineProps({
-  lines: { type: Array, default: () => [] },
-  streaming: { type: Boolean, default: false },
-  lineNumbers: { type: Boolean, default: false },
-  emptyText: { type: String, default: 'No output.' },
-  maxHeight: { type: String, default: '65vh' },
-  fill: { type: Boolean, default: false },
-})
-
-const el = ref(null)
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (el.value) el.value.scrollTop = el.value.scrollHeight
-  })
-}
-
-defineExpose({ scrollToBottom })
-</script>
 
 <style scoped>
 .terminal {

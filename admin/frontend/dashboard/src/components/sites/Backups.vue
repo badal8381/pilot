@@ -1,3 +1,196 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import {
+  Button,
+  Dialog,
+  Dropdown,
+  ErrorMessage,
+  LoadingText,
+} from 'frappe-ui'
+import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
+import EmptyState from '@/components/common/EmptyState.vue'
+import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
+import { apiErrorMessage } from '@/api/client'
+import { sitesApi } from '@/api/sites'
+import { tasksApi } from '@/api/tasks'
+import { useSite } from '@/composables/sites/useSite'
+import { openTaskDetailPage } from '@/utils/taskRoute'
+import { fmtDateTime } from '@/utils/taskFormat'
+import { cronToLabel } from '@/utils/backup'
+
+const props = defineProps({ siteName: { type: String, required: true } })
+const router = useRouter()
+
+const {
+  backups,
+  backupsLoading,
+  backupsHasMore,
+  backupsLimit,
+  loadBackups,
+  loadMoreBackups,
+  setBackupsPageLength,
+} = useSite(props.siteName)
+
+const footerOptions = computed(() => ({
+  rowCount: backups.value.length,
+  // ListFooter shows "Load More" only when rowCount < totalCount; we don't know
+  // the true total (S3 metadata is read lazily), so nudge it past rowCount
+  // whenever the backend signals there may be another page.
+  totalCount: backupsHasMore.value ? backups.value.length + 1 : backups.value.length,
+  pageLengthOptions: [20, 50, 100],
+}))
+
+const backingUp = ref(false)
+const error = ref('')
+
+const configRef = ref(null)
+const config = ref(null)
+const enabled = computed(() => !!config.value?.schedule)
+
+const scheduleSummary = computed(() =>
+  enabled.value
+    ? `${cronToLabel(config.value.schedule)}.`
+    : 'Manual backups are kept until you delete them.',
+)
+
+const loadConfig = async () => {
+  try {
+    config.value = await sitesApi.backups.schedule.get(props.siteName)
+  } catch {
+    config.value = null
+  }
+}
+
+const backupNow = async () => {
+  backingUp.value = true
+  error.value = ''
+  try {
+    const result = await sitesApi.backups.create(props.siteName)
+    if (result.task_id) openTaskDetailPage(router, result.task_id)
+    else error.value = apiErrorMessage(result, 'Backup failed.')
+  } catch (e) {
+    error.value = e.message || 'Backup failed.'
+  } finally {
+    backingUp.value = false
+  }
+}
+
+const columns = [
+  { label: 'Date', key: 'timestamp', align: 'left', width: 2 },
+  { label: 'Database', key: 'database', align: 'center', width: 1 },
+  { label: 'Public', key: 'public', align: 'center', width: 1 },
+  { label: 'Private', key: 'private', align: 'center', width: 1 },
+  { label: 'Offsite', key: 'offsite', align: 'center', width: 1 },
+  { label: '', key: 'actions', align: 'right', width: '3rem' },
+]
+
+const fileOf = (set, kind) => set.files?.find((f) => f.kind === kind) ?? null
+const fmtSize = (b) =>
+  !b ? '-' : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 ** 2).toFixed(1)} MB`
+
+const rows = computed(() =>
+  backups.value.map((set) => ({
+    name: set.created_at,
+    timestamp: fmtDateTime(set.created_at),
+    database: fmtSize(fileOf(set, 'database')?.size_bytes),
+    public: fmtSize(fileOf(set, 'public-file')?.size_bytes),
+    private: fmtSize(fileOf(set, 'private-file')?.size_bytes),
+    set,
+  })),
+)
+
+// The offsite metadata's file_type keys don't match the UI's kind names;
+// this is the same mapping BackupReader uses to merge remote-only files in.
+const OFFSITE_KIND_KEYS = {
+  database: 'database',
+  'public-file': 'files',
+  'private-file': 'private_files',
+  site_config: 'site_config',
+}
+
+const menuOptions = (set) => {
+  const kinds = [
+    ['database', 'Download Database'],
+    ['public-file', 'Download Public'],
+    ['private-file', 'Download Private'],
+    ['site_config', 'Download Config'],
+  ]
+  return [
+    ...kinds
+      .filter(([k]) => fileOf(set, k))
+      .map(([k, label]) => ({
+        label,
+        icon: 'lucide-download',
+        onClick: () => downloadFile(set, k),
+      })),
+    {
+      label: 'Delete backup',
+      icon: 'lucide-trash-2',
+      theme: 'red',
+      onClick: () => {
+        deleteTarget.value = set
+        showDelete.value = true
+      },
+    },
+  ]
+}
+
+const downloadFile = async (set, kind) => {
+  const file = fileOf(set, kind)
+  if (file?.path) {
+    window.location.href = sitesApi.backups.download(props.siteName, set.timestamp, file.filename)
+    return
+  }
+  // Offsite-only file: fetch a direct, time-limited S3 link and open it -
+  // this server never proxies or re-downloads the transfer.
+  error.value = ''
+  try {
+    const links = await sitesApi.backups.downloadLinks(props.siteName, set.timestamp)
+    if (links.error) {
+      error.value = apiErrorMessage(links, 'Could not load offsite backup.')
+      return
+    }
+    const url = links[OFFSITE_KIND_KEYS[kind]]
+    if (!url) {
+      error.value = 'Backup file not found offsite.'
+      return
+    }
+    window.open(url, '_blank')
+  } catch (e) {
+    error.value = e.message || 'Failed to get offsite download link.'
+  }
+}
+
+const showDelete = ref(false)
+const deleteTarget = ref(null)
+const deleting = ref(false)
+const deleteError = ref('')
+
+const confirmDelete = async () => {
+  deleting.value = true
+  deleteError.value = ''
+  try {
+    const filenames = deleteTarget.value.files.map((f) => f.filename)
+    const data = await tasksApi.run('delete-backup', { site: props.siteName, filenames })
+    if (data.task_id) {
+      showDelete.value = false
+      openTaskDetailPage(router, data.task_id)
+    } else deleteError.value = apiErrorMessage(data, 'Delete failed.')
+  } catch (e) {
+    deleteError.value = e.message || 'Delete failed.'
+  } finally {
+    deleting.value = false
+  }
+}
+
+onMounted(() => {
+  loadBackups()
+  loadConfig()
+})
+</script>
+
 <template>
   <div class="space-y-4 mt-5">
     <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
@@ -100,195 +293,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  Button,
-  Dialog,
-  Dropdown,
-  ErrorMessage,
-  LoadingText,
-} from 'frappe-ui'
-import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
-import EmptyState from '@/components/common/EmptyState.vue'
-import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
-import { apiErrorMessage } from '@/api/client'
-import { sitesApi } from '@/api/sites'
-import { tasksApi } from '@/api/tasks'
-import { useSite } from '@/composables/sites/useSite'
-import { openTaskDetailPage } from '@/utils/taskRoute'
-import { fmtDateTime } from '@/utils/taskFormat'
-import { cronToLabel } from '@/utils/backup'
-
-const props = defineProps({ siteName: { type: String, required: true } })
-const router = useRouter()
-
-const {
-  backups,
-  backupsLoading,
-  backupsHasMore,
-  backupsLimit,
-  loadBackups,
-  loadMoreBackups,
-  setBackupsPageLength,
-} = useSite(props.siteName)
-
-const footerOptions = computed(() => ({
-  rowCount: backups.value.length,
-  // ListFooter shows "Load More" only when rowCount < totalCount; we don't know
-  // the true total (S3 metadata is read lazily), so nudge it past rowCount
-  // whenever the backend signals there may be another page.
-  totalCount: backupsHasMore.value ? backups.value.length + 1 : backups.value.length,
-  pageLengthOptions: [20, 50, 100],
-}))
-
-const backingUp = ref(false)
-const error = ref('')
-
-const configRef = ref(null)
-const config = ref(null)
-const enabled = computed(() => !!config.value?.schedule)
-
-const scheduleSummary = computed(() =>
-  enabled.value
-    ? `${cronToLabel(config.value.schedule)}.`
-    : 'Manual backups are kept until you delete them.',
-)
-
-async function loadConfig() {
-  try {
-    config.value = await sitesApi.backups.schedule.get(props.siteName)
-  } catch {
-    config.value = null
-  }
-}
-
-async function backupNow() {
-  backingUp.value = true
-  error.value = ''
-  try {
-    const result = await sitesApi.backups.create(props.siteName)
-    if (result.task_id) openTaskDetailPage(router, result.task_id)
-    else error.value = apiErrorMessage(result, 'Backup failed.')
-  } catch (e) {
-    error.value = e.message || 'Backup failed.'
-  } finally {
-    backingUp.value = false
-  }
-}
-
-const columns = [
-  { label: 'Date', key: 'timestamp', align: 'left', width: 2 },
-  { label: 'Database', key: 'database', align: 'center', width: 1 },
-  { label: 'Public', key: 'public', align: 'center', width: 1 },
-  { label: 'Private', key: 'private', align: 'center', width: 1 },
-  { label: 'Offsite', key: 'offsite', align: 'center', width: 1 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
-]
-
-const fileOf = (set, kind) => set.files?.find((f) => f.kind === kind) ?? null
-const fmtSize = (b) =>
-  !b ? '-' : b < 1024 ** 2 ? `${(b / 1024).toFixed(1)} KB` : `${(b / 1024 ** 2).toFixed(1)} MB`
-
-const rows = computed(() =>
-  backups.value.map((set) => ({
-    name: set.created_at,
-    timestamp: fmtDateTime(set.created_at),
-    database: fmtSize(fileOf(set, 'database')?.size_bytes),
-    public: fmtSize(fileOf(set, 'public-file')?.size_bytes),
-    private: fmtSize(fileOf(set, 'private-file')?.size_bytes),
-    set,
-  })),
-)
-
-// The offsite metadata's file_type keys don't match the UI's kind names;
-// this is the same mapping BackupReader uses to merge remote-only files in.
-const OFFSITE_KIND_KEYS = {
-  database: 'database',
-  'public-file': 'files',
-  'private-file': 'private_files',
-  site_config: 'site_config',
-}
-
-function menuOptions(set) {
-  const kinds = [
-    ['database', 'Download Database'],
-    ['public-file', 'Download Public'],
-    ['private-file', 'Download Private'],
-    ['site_config', 'Download Config'],
-  ]
-  return [
-    ...kinds
-      .filter(([k]) => fileOf(set, k))
-      .map(([k, label]) => ({
-        label,
-        icon: 'lucide-download',
-        onClick: () => downloadFile(set, k),
-      })),
-    {
-      label: 'Delete backup',
-      icon: 'lucide-trash-2',
-      theme: 'red',
-      onClick: () => {
-        deleteTarget.value = set
-        showDelete.value = true
-      },
-    },
-  ]
-}
-
-async function downloadFile(set, kind) {
-  const file = fileOf(set, kind)
-  if (file?.path) {
-    window.location.href = sitesApi.backups.download(props.siteName, set.timestamp, file.filename)
-    return
-  }
-  // Offsite-only file: fetch a direct, time-limited S3 link and open it -
-  // this server never proxies or re-downloads the transfer.
-  error.value = ''
-  try {
-    const links = await sitesApi.backups.downloadLinks(props.siteName, set.timestamp)
-    if (links.error) {
-      error.value = apiErrorMessage(links, 'Could not load offsite backup.')
-      return
-    }
-    const url = links[OFFSITE_KIND_KEYS[kind]]
-    if (!url) {
-      error.value = 'Backup file not found offsite.'
-      return
-    }
-    window.open(url, '_blank')
-  } catch (e) {
-    error.value = e.message || 'Failed to get offsite download link.'
-  }
-}
-
-const showDelete = ref(false)
-const deleteTarget = ref(null)
-const deleting = ref(false)
-const deleteError = ref('')
-
-async function confirmDelete() {
-  deleting.value = true
-  deleteError.value = ''
-  try {
-    const filenames = deleteTarget.value.files.map((f) => f.filename)
-    const data = await tasksApi.run('delete-backup', { site: props.siteName, filenames })
-    if (data.task_id) {
-      showDelete.value = false
-      openTaskDetailPage(router, data.task_id)
-    } else deleteError.value = apiErrorMessage(data, 'Delete failed.')
-  } catch (e) {
-    deleteError.value = e.message || 'Delete failed.'
-  } finally {
-    deleting.value = false
-  }
-}
-
-onMounted(() => {
-  loadBackups()
-  loadConfig()
-})
-</script>

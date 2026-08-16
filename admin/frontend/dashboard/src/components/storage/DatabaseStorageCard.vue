@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Badge } from 'frappe-ui'
 import { computed, ref } from 'vue'
+
 import BinlogPurgeAlert from '@/components/storage/BinlogPurgeAlert.vue'
 import UsageMeter from '@/components/common/UsageMeter.vue'
+
 import type { DatabaseBreakdown } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
 

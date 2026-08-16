@@ -1,3 +1,200 @@
+<script setup lang="ts">
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import {
+  Badge,
+  Button,
+  Dialog,
+  ErrorMessage,
+  Skeleton,
+  Spinner,
+  Tooltip,
+} from 'frappe-ui'
+import AppIcon from '@/components/apps/AppIcon.vue'
+import JobRow from '@/components/updates/JobRow.vue'
+import LogView from '@/components/logs/LogView.vue'
+import UpdateSection from '@/components/updates/UpdateSection.vue'
+import UpdateStateBadge from '@/components/updates/UpdateStateBadge.vue'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
+import { processLine } from '@/utils/ansi'
+import { updatesApi, isActive, isResolved, needsAttention } from '@/api/updates'
+import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
+import { fmtDateTime, fmtDuration } from '@/utils/taskFormat'
+import { opTitle, patchSkipped, pendingActionLabel, siteStatus } from '@/utils/updateFormat'
+
+const props = defineProps({ operationId: { type: String, required: true } })
+const router = useRouter()
+const { setBreadcrumbs } = useBreadcrumbs()
+
+const op = ref(null)
+const loading = ref(false)
+const refreshing = ref(false)
+const acting = ref(false)
+const error = ref('')
+const confirmSkip = ref(false)
+const confirmRestore = ref(false)
+let timer = null
+
+const title = computed(() => opTitle(op.value))
+const isAttention = computed(() => needsAttention(op.value))
+const pending = computed(() => op.value?.pending_action || null)
+const pendingLabel = computed(() => pendingActionLabel(pending.value))
+const patchAlreadySkipped = computed(() => patchSkipped(op.value))
+
+const durationSeconds = computed(() => {
+  if (!op.value?.started_at) return null
+  // Paused on a failure, waiting for the user: the clock is not running.
+  if (!isResolved(op.value) && !isActive(op.value)) return null
+  const end = op.value.finished_at ? new Date(op.value.finished_at).getTime() : Date.now()
+  return Math.max(0, (end - new Date(op.value.started_at).getTime()) / 1000)
+})
+
+// Bench-wide chain tasks (update, revert apps, restart); site-bound ones live in the site tree.
+const serverJobs = computed(() => (op.value?.task_logs || []).filter((log) => !log.site))
+
+const alertTitle = computed(() =>
+  op.value?.state === 'revert_failed' ? 'Restore failed' : 'This update needs attention',
+)
+
+const showOutput = ref(false)
+const outputLines = computed(() =>
+  (op.value?.diagnosis?.output_excerpt || '').split('\n').map(processLine),
+)
+
+const sitesCount = computed(() => {
+  const sites = op.value?.sites || []
+  if (sites.length > 1 && !isResolved(op.value)) {
+    const migrated = sites.filter((site) =>
+      ['success', 'recovered'].includes(site.migration_status),
+    ).length
+    return `${migrated}/${sites.length}`
+  }
+  return `${sites.length}`
+})
+
+const metaLine = computed(() => {
+  const parts = []
+  if (op.value.started_at) parts.push(`Started ${fmtDateTime(op.value.started_at)}`)
+  const duration = fmtDuration(durationSeconds.value)
+  if (duration) parts.push(isActive(op.value) ? `running for ${duration}` : `took ${duration}`)
+  return parts.join(' · ')
+})
+
+const openTaskLog = (log) => router.push({ name: 'TaskDetail', params: { taskId: log.id } })
+
+const expandedSites = ref(new Set())
+
+const toggleSiteJobs = (siteName) => {
+  if (!siteJobs(siteName).length) return
+  const expanded = new Set(expandedSites.value)
+  if (!expanded.delete(siteName)) expanded.add(siteName)
+  expandedSites.value = expanded
+}
+
+const siteJobs = (siteName) => {
+  return (op.value?.task_logs || []).filter((log) => log.site === siteName)
+}
+
+const load = async () => {
+  try {
+    op.value = await updatesApi.detail(props.operationId)
+    error.value = ''
+    applyOpenDefaults()
+    setBreadcrumbs([{ label: 'Updates', route: { name: 'Updates' } }, { label: title.value }])
+  } catch (e) {
+    error.value = e?.message || 'Could not load this update.'
+  } finally {
+    schedule()
+  }
+}
+
+const refresh = async () => {
+  refreshing.value = true
+  try {
+    await load()
+  } finally {
+    refreshing.value = false
+  }
+}
+
+const schedule = () => {
+  clearTimeout(timer)
+  if (op.value && !isResolved(op.value) && (!isAttention.value || pending.value)) {
+    timer = setTimeout(load, 3000)
+  }
+}
+
+const runAction = async (action) => {
+  acting.value = true
+  try {
+    op.value = (await action()).operation || op.value
+    await load()
+  } catch (e) {
+    error.value = e?.message || 'Action failed.'
+  } finally {
+    acting.value = false
+  }
+}
+
+const doRetry = () => runAction(() => updatesApi.retry(props.operationId))
+const doRestore = () => {
+  confirmRestore.value = false
+  return runAction(() => updatesApi.restore(props.operationId))
+}
+const doSkip = () => {
+  confirmSkip.value = false
+  return runAction(() => updatesApi.bypassPatch(props.operationId, op.value.diagnosis.patch))
+}
+
+const shortSha = (sha) => sha?.slice(0, 7) || '—'
+
+// Green sha = the checkout happened; gray = still just the plan.
+const revisionHint = (app) => {
+  const target = shortSha(app.updated_sha || app.target_sha)
+  return app.updated_sha ? `Updated to ${target}` : `Will update to ${target}`
+}
+
+const anythingFailed = computed(
+  () =>
+    (op.value?.sites || []).some((site) => siteStatus(site).value === 'failed') ||
+    serverJobs.value.some((job) => job.status === 'failed'),
+)
+
+// A settled run starts collapsed; anything unresolved or failed starts open.
+const sitesOpen = ref(true)
+const appsOpen = ref(true)
+const serverOpen = ref(true)
+let openDefaultsSet = false
+
+const applyOpenDefaults = () => {
+  if (openDefaultsSet || !op.value) return
+  openDefaultsSet = true
+  const settled = isResolved(op.value) && !anythingFailed.value
+  serverOpen.value = !settled
+  sitesOpen.value = !settled
+  appsOpen.value = !settled
+}
+
+const siteCaption = (site) => {
+  const status = siteStatus(site)
+  if (status.value === 'pending') return ''
+  if (status.value === 'success') return 'Migrated'
+  return status.label
+}
+
+onMounted(async () => {
+  useAppRegistry().load()
+  loading.value = true
+  try {
+    await load()
+  } finally {
+    loading.value = false
+  }
+})
+onUnmounted(() => clearTimeout(timer))
+</script>
+
 <template>
   <div class="mx-auto max-w-3xl">
     <!-- Skeleton mirrors the page: meta row, then a card of rows. -->
@@ -310,199 +507,3 @@
     </template>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import {
-  Badge,
-  Button,
-  Dialog,
-  ErrorMessage,
-  Skeleton,
-  Spinner,
-  Tooltip,
-} from 'frappe-ui'
-import AppIcon from '@/components/apps/AppIcon.vue'
-import JobRow from '@/components/updates/JobRow.vue'
-import LogView from '@/components/logs/LogView.vue'
-import UpdateSection from '@/components/updates/UpdateSection.vue'
-import UpdateStateBadge from '@/components/updates/UpdateStateBadge.vue'
-import { useAppRegistry } from '@/composables/apps/useAppRegistry'
-import { processLine } from '@/utils/ansi'
-import { updatesApi, isActive, isResolved, needsAttention } from '@/api/updates'
-import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
-import { fmtDateTime, fmtDuration } from '@/utils/taskFormat'
-import { opTitle, patchSkipped, pendingActionLabel, siteStatus } from '@/utils/updateFormat'
-
-const props = defineProps({ operationId: { type: String, required: true } })
-const router = useRouter()
-const { setBreadcrumbs } = useBreadcrumbs()
-
-const op = ref(null)
-const loading = ref(false)
-const refreshing = ref(false)
-const acting = ref(false)
-const error = ref('')
-const confirmSkip = ref(false)
-const confirmRestore = ref(false)
-let timer = null
-
-const title = computed(() => opTitle(op.value))
-const isAttention = computed(() => needsAttention(op.value))
-const pending = computed(() => op.value?.pending_action || null)
-const pendingLabel = computed(() => pendingActionLabel(pending.value))
-const patchAlreadySkipped = computed(() => patchSkipped(op.value))
-
-const durationSeconds = computed(() => {
-  if (!op.value?.started_at) return null
-  // Paused on a failure, waiting for the user: the clock is not running.
-  if (!isResolved(op.value) && !isActive(op.value)) return null
-  const end = op.value.finished_at ? new Date(op.value.finished_at).getTime() : Date.now()
-  return Math.max(0, (end - new Date(op.value.started_at).getTime()) / 1000)
-})
-
-// Bench-wide chain tasks (update, revert apps, restart); site-bound ones live in the site tree.
-const serverJobs = computed(() => (op.value?.task_logs || []).filter((log) => !log.site))
-
-const alertTitle = computed(() =>
-  op.value?.state === 'revert_failed' ? 'Restore failed' : 'This update needs attention',
-)
-
-const showOutput = ref(false)
-const outputLines = computed(() =>
-  (op.value?.diagnosis?.output_excerpt || '').split('\n').map(processLine),
-)
-
-const sitesCount = computed(() => {
-  const sites = op.value?.sites || []
-  if (sites.length > 1 && !isResolved(op.value)) {
-    const migrated = sites.filter((site) =>
-      ['success', 'recovered'].includes(site.migration_status),
-    ).length
-    return `${migrated}/${sites.length}`
-  }
-  return `${sites.length}`
-})
-
-const metaLine = computed(() => {
-  const parts = []
-  if (op.value.started_at) parts.push(`Started ${fmtDateTime(op.value.started_at)}`)
-  const duration = fmtDuration(durationSeconds.value)
-  if (duration) parts.push(isActive(op.value) ? `running for ${duration}` : `took ${duration}`)
-  return parts.join(' · ')
-})
-
-const openTaskLog = (log) => router.push({ name: 'TaskDetail', params: { taskId: log.id } })
-
-const expandedSites = ref(new Set())
-
-function toggleSiteJobs(siteName) {
-  if (!siteJobs(siteName).length) return
-  const expanded = new Set(expandedSites.value)
-  if (!expanded.delete(siteName)) expanded.add(siteName)
-  expandedSites.value = expanded
-}
-
-function siteJobs(siteName) {
-  return (op.value?.task_logs || []).filter((log) => log.site === siteName)
-}
-
-async function load() {
-  try {
-    op.value = await updatesApi.detail(props.operationId)
-    error.value = ''
-    applyOpenDefaults()
-    setBreadcrumbs([{ label: 'Updates', route: { name: 'Updates' } }, { label: title.value }])
-  } catch (e) {
-    error.value = e?.message || 'Could not load this update.'
-  } finally {
-    schedule()
-  }
-}
-
-async function refresh() {
-  refreshing.value = true
-  try {
-    await load()
-  } finally {
-    refreshing.value = false
-  }
-}
-
-function schedule() {
-  clearTimeout(timer)
-  if (op.value && !isResolved(op.value) && (!isAttention.value || pending.value)) {
-    timer = setTimeout(load, 3000)
-  }
-}
-
-async function runAction(action) {
-  acting.value = true
-  try {
-    op.value = (await action()).operation || op.value
-    await load()
-  } catch (e) {
-    error.value = e?.message || 'Action failed.'
-  } finally {
-    acting.value = false
-  }
-}
-
-const doRetry = () => runAction(() => updatesApi.retry(props.operationId))
-const doRestore = () => {
-  confirmRestore.value = false
-  return runAction(() => updatesApi.restore(props.operationId))
-}
-const doSkip = () => {
-  confirmSkip.value = false
-  return runAction(() => updatesApi.bypassPatch(props.operationId, op.value.diagnosis.patch))
-}
-
-const shortSha = (sha) => sha?.slice(0, 7) || '—'
-
-// Green sha = the checkout happened; gray = still just the plan.
-function revisionHint(app) {
-  const target = shortSha(app.updated_sha || app.target_sha)
-  return app.updated_sha ? `Updated to ${target}` : `Will update to ${target}`
-}
-
-const anythingFailed = computed(
-  () =>
-    (op.value?.sites || []).some((site) => siteStatus(site).value === 'failed') ||
-    serverJobs.value.some((job) => job.status === 'failed'),
-)
-
-// A settled run starts collapsed; anything unresolved or failed starts open.
-const sitesOpen = ref(true)
-const appsOpen = ref(true)
-const serverOpen = ref(true)
-let openDefaultsSet = false
-
-function applyOpenDefaults() {
-  if (openDefaultsSet || !op.value) return
-  openDefaultsSet = true
-  const settled = isResolved(op.value) && !anythingFailed.value
-  serverOpen.value = !settled
-  sitesOpen.value = !settled
-  appsOpen.value = !settled
-}
-
-function siteCaption(site) {
-  const status = siteStatus(site)
-  if (status.value === 'pending') return ''
-  if (status.value === 'success') return 'Migrated'
-  return status.label
-}
-
-onMounted(async () => {
-  useAppRegistry().load()
-  loading.value = true
-  try {
-    await load()
-  } finally {
-    loading.value = false
-  }
-})
-onUnmounted(() => clearTimeout(timer))
-</script>

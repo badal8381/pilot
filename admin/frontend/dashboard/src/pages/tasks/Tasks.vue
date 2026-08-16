@@ -1,94 +1,16 @@
-<template>
-  <div class="mx-auto max-w-3xl">
-    <StickyToolbar class="flex sm:flex-row flex-col sm:items-center gap-2">
-      <TabButtons
-        class="shrink-0"
-        :size="isMobile ? 'md' : 'sm'"
-        :options="filterOptions"
-        :modelValue="statusFilter"
-        @update:modelValue="onFilterChange"
-      />
-      <div class="flex flex-1 items-center gap-2 min-w-0">
-        <Dropdown :options="typeMenu">
-          <template #default="{ open }">
-            <Button
-              variant="subtle"
-              :size="isMobile ? 'md' : 'sm'"
-              :active="open"
-              class="[&>.truncate]:text-left text-base"
-            >
-              <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-              {{ typeLabel }}
-            </Button>
-          </template>
-        </Dropdown>
-        <div class="flex-1 sm:flex-none min-w-0">
-          <Dropdown :options="siteMenu">
-            <template #default="{ open }">
-              <Button
-                variant="subtle"
-                :size="isMobile ? 'md' : 'sm'"
-                :active="open"
-                class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto min-w-0"
-              >
-                <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-                {{ siteLabelText }}
-              </Button>
-            </template>
-          </Dropdown>
-        </div>
-        <Button
-          class="ml-auto sm:ml-auto"
-          variant="subtle"
-          :size="isMobile ? 'md' : 'sm'"
-          icon="lucide-refresh-cw"
-          label="Refresh"
-          tooltip="Refresh"
-          :loading="loading"
-          @click="load(statusFilter)"
-        />
-      </div>
-    </StickyToolbar>
-
-    <div v-if="loading" class="-mx-3 mt-4">
-      <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
-    </div>
-    <div v-else-if="error" class="mt-4">
-      <ErrorMessage :message="error" />
-    </div>
-
-    <StatusListView
-      v-else-if="rows.length"
-      class="mt-4"
-      :columns="columns"
-      :rows="rows"
-      :get-row-route="getRowRoute"
-    />
-
-    <EmptyState
-      v-else
-      class="mt-8"
-      icon="lucide-list-checks"
-      :title="isFiltered ? 'No matching tasks' : 'No tasks yet'"
-      :description="
-        isFiltered
-          ? 'No background jobs match the filters you have applied.'
-          : 'Background jobs - backups, deploys, migrations and more - appear here as they run.'
-      "
-    />
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
 import StatusListView from '@/components/common/StatusListView.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
+
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useTasks } from '@/composables/tasks/useTasks'
+
 import {
   commandLabel,
   siteLabel,
@@ -179,7 +101,7 @@ const typeLabel = computed(
 const siteLabelText = computed(() => siteFilter.value || 'All sites')
 
 // Patch, not replace: changing one filter must not clear the other.
-function setFilterQuery(patch) {
+const setFilterQuery = (patch) => {
   const query = { ...route.query, ...patch }
   for (const key of Object.keys(query)) if (!query[key]) delete query[key]
   router.replace({ name: 'Tasks', query })
@@ -194,10 +116,91 @@ const isFiltered = computed(
   () => statusFilter.value !== 'all' || Boolean(siteFilter.value) || Boolean(typeFilter.value),
 )
 
-function onFilterChange(value) {
+const onFilterChange = (value) => {
   setFilterQuery({ status: value === 'all' ? '' : value })
   load(value)
 }
 
 onMounted(() => load(statusFilter.value))
 </script>
+
+<template>
+  <div class="mx-auto max-w-3xl">
+    <StickyToolbar class="flex sm:flex-row flex-col sm:items-center gap-2">
+      <TabButtons
+        class="shrink-0"
+        :size="isMobile ? 'md' : 'sm'"
+        :options="filterOptions"
+        :modelValue="statusFilter"
+        @update:modelValue="onFilterChange"
+      />
+      <div class="flex flex-1 items-center gap-2 min-w-0">
+        <Dropdown :options="typeMenu">
+          <template #default="{ open }">
+            <Button
+              variant="subtle"
+              :size="isMobile ? 'md' : 'sm'"
+              :active="open"
+              class="[&>.truncate]:text-left text-base"
+            >
+              <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
+              {{ typeLabel }}
+            </Button>
+          </template>
+        </Dropdown>
+        <div class="flex-1 sm:flex-none min-w-0">
+          <Dropdown :options="siteMenu">
+            <template #default="{ open }">
+              <Button
+                variant="subtle"
+                :size="isMobile ? 'md' : 'sm'"
+                :active="open"
+                class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto min-w-0"
+              >
+                <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
+                {{ siteLabelText }}
+              </Button>
+            </template>
+          </Dropdown>
+        </div>
+        <Button
+          class="ml-auto sm:ml-auto"
+          variant="subtle"
+          :size="isMobile ? 'md' : 'sm'"
+          icon="lucide-refresh-cw"
+          label="Refresh"
+          tooltip="Refresh"
+          :loading="loading"
+          @click="load(statusFilter)"
+        />
+      </div>
+    </StickyToolbar>
+
+    <div v-if="loading" class="-mx-3 mt-4">
+      <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
+    </div>
+    <div v-else-if="error" class="mt-4">
+      <ErrorMessage :message="error" />
+    </div>
+
+    <StatusListView
+      v-else-if="rows.length"
+      class="mt-4"
+      :columns="columns"
+      :rows="rows"
+      :get-row-route="getRowRoute"
+    />
+
+    <EmptyState
+      v-else
+      class="mt-8"
+      icon="lucide-list-checks"
+      :title="isFiltered ? 'No matching tasks' : 'No tasks yet'"
+      :description="
+        isFiltered
+          ? 'No background jobs match the filters you have applied.'
+          : 'Background jobs - backups, deploys, migrations and more - appear here as they run.'
+      "
+    />
+  </div>
+</template>

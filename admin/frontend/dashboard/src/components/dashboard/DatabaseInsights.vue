@@ -1,39 +1,11 @@
-<template>
-  <div>
-    <div v-if="loading" class="gap-4 grid grid-cols-1 sm:grid-cols-2">
-      <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
-    </div>
-    <ErrorMessage v-else-if="error" :message="error" />
-    <EmptyState
-      v-else-if="unsupported"
-      icon="lucide-database"
-      title="DB analyzer supports MariaDB only"
-    />
-    <EmptyState
-      v-else-if="empty"
-      icon="lucide-database"
-      title="No data for the selected range"
-      description="The monitor hasn't sampled the database in this range yet."
-    />
-
-    <div v-else class="gap-4 grid grid-cols-1 sm:grid-cols-2">
-      <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
-        <AxisChart
-          :config="chart.config"
-          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
-        />
-      </ChartCard>
-      <SlowQueries v-if="!unsupported" :overview="data?.slow_queries" />
-    </div>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { AxisChart, ErrorMessage, Skeleton } from 'frappe-ui'
+
 import ChartCard from '@/components/common/ChartCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import SlowQueries from '@/components/dashboard/SlowQueries.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 import { formatBytes } from '@/utils/format'
@@ -72,7 +44,7 @@ const xAxis = computed(() => ({
   },
 }))
 
-function areaSeries(name, color) {
+const areaSeries = (name, color) => {
   return {
     name,
     type: 'line',
@@ -89,13 +61,13 @@ function areaSeries(name, color) {
   }
 }
 
-function transparent(hex, opacity) {
+const transparent = (hex, opacity) => {
   const v = parseInt(hex.slice(1), 16)
   return `rgba(${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}, ${opacity})`
 }
 
 // Full formatter (frappe-ui overrides valueFormatter) so bytes read as GB/MB.
-function bytesTooltip(paramsInput) {
+const bytesTooltip = (paramsInput) => {
   const params = (Array.isArray(paramsInput) ? paramsInput : [paramsInput]).filter(
     (p) => p.value?.[1] != null,
   )
@@ -182,7 +154,7 @@ const charts = computed(() => [
   },
 ])
 
-function thresholdMarkLine(entries) {
+const thresholdMarkLine = (entries) => {
   return {
     symbol: 'none',
     silent: true,
@@ -193,7 +165,7 @@ function thresholdMarkLine(entries) {
 }
 
 // InnoDB buffer pool as a % of RAM, with the standard too-low / too-high guides.
-function bufferPoolRamSeries() {
+const bufferPoolRamSeries = () => {
   const series = areaSeries('Buffer Pool % RAM', PALETTE[0])
   series.echartOptions.markLine = thresholdMarkLine([
     [65, 'Too High InnoDB Buffer Pool (65%)'],
@@ -203,7 +175,7 @@ function bufferPoolRamSeries() {
 }
 
 // InnoDB buffer pool miss rate, with the standard too-high guide.
-function bufferPoolMissSeries() {
+const bufferPoolMissSeries = () => {
   const series = areaSeries('Buffer Pool Miss %', PALETTE[1])
   series.echartOptions.markLine = thresholdMarkLine([[1, 'Too High Buffer Pool Miss (1%)']])
   return series
@@ -212,7 +184,7 @@ function bufferPoolMissSeries() {
 // Out-of-order window switches: only the latest load writes state.
 let loadGeneration = 0
 
-async function load() {
+const load = async () => {
   const generation = ++loadGeneration
   if (!data.value) loading.value = true
   error.value = ''
@@ -246,3 +218,33 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(refreshTimer))
 </script>
+
+<template>
+  <div>
+    <div v-if="loading" class="gap-4 grid grid-cols-1 sm:grid-cols-2">
+      <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
+    </div>
+    <ErrorMessage v-else-if="error" :message="error" />
+    <EmptyState
+      v-else-if="unsupported"
+      icon="lucide-database"
+      title="DB analyzer supports MariaDB only"
+    />
+    <EmptyState
+      v-else-if="empty"
+      icon="lucide-database"
+      title="No data for the selected range"
+      description="The monitor hasn't sampled the database in this range yet."
+    />
+
+    <div v-else class="gap-4 grid grid-cols-1 sm:grid-cols-2">
+      <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
+        <AxisChart
+          :config="chart.config"
+          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
+        />
+      </ChartCard>
+      <SlowQueries v-if="!unsupported" :overview="data?.slow_queries" />
+    </div>
+  </div>
+</template>

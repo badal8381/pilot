@@ -1,27 +1,10 @@
-<template>
-  <slot
-    :lines="lines"
-    :raw-lines="rawLines"
-    :streaming="streaming"
-    :set-terminal="setTerminal"
-    :scroll-to-bottom="stream.scrollToBottom"
-  >
-    <TerminalOutput
-      ref="terminal"
-      :lines="lines"
-      :streaming="streaming"
-      :line-numbers="lineNumbers"
-      :empty-text="emptyText"
-      :max-height="maxHeight"
-    />
-  </slot>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { onMounted, watch } from 'vue'
-import TerminalOutput from '../common/TerminalOutput.vue'
-import { useTaskStream } from '../../composables/tasks/useTaskStream.js'
-import { processLine } from '../../utils/ansi.js'
+
+import TerminalOutput from '@/components/common/TerminalOutput.vue'
+
+import { useTaskStream } from '@/composables/tasks/useTaskStream'
+import { processLine } from '@/utils/ansi'
 
 const props = defineProps({
   url: { type: String, default: '' },
@@ -38,16 +21,16 @@ const emit = defineEmits(['line', 'status', 'done', 'error'])
 const stream = useTaskStream({ guardHiddenTab: props.guardHiddenTab })
 const { terminal, lines, rawLines, streaming } = stream
 
-function setTerminal(el) {
+const setTerminal = (el) => {
   terminal.value = el
 }
 
-function seed(initial) {
+const seed = (initial) => {
   rawLines.value = [...initial]
   lines.value = initial.map(processLine)
 }
 
-function start(url = props.url) {
+const start = (url = props.url) => {
   if (!url) return
   if (props.reset) {
     rawLines.value = []
@@ -83,3 +66,22 @@ defineExpose({
   streaming,
 })
 </script>
+
+<template>
+  <slot
+    :lines="lines"
+    :raw-lines="rawLines"
+    :streaming="streaming"
+    :set-terminal="setTerminal"
+    :scroll-to-bottom="stream.scrollToBottom"
+  >
+    <TerminalOutput
+      ref="terminal"
+      :lines="lines"
+      :streaming="streaming"
+      :line-numbers="lineNumbers"
+      :empty-text="emptyText"
+      :max-height="maxHeight"
+    />
+  </slot>
+</template>

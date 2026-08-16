@@ -1,17 +1,4 @@
-<template>
-  <!-- Pins under the shell header (`sticky top-0 min-h-12`, hence top-12).
-       Negative margins bleed the background through the shell's p-3/p-4
-       gutters; padding is its own since sibling gaps scroll away. -->
-  <div
-    ref="bar"
-    :data-stuck="stuck || undefined"
-    class="top-12 z-10 sticky bg-surface-base -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 sm:py-3 sticky-toolbar"
-  >
-    <slot />
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 
 // Mirrors `top-12` above.
@@ -34,6 +21,21 @@ onMounted(() => {
 
 onBeforeUnmount(() => observer?.disconnect())
 </script>
+
+<template>
+  <!-- Pins under the shell header (`sticky top-0 min-h-12`, hence top-12).
+       Negative margins bleed the background through the shell's p-3/p-4
+       gutters; padding is its own since sibling gaps scroll away. -->
+  <div
+    ref="bar"
+    :data-stuck="stuck || undefined"
+    class="top-12 z-10 sticky bg-surface-base -mx-3 sm:-mx-4 px-3 sm:px-4 py-2 sm:py-3 sticky-toolbar"
+  >
+    <slot />
+  </div>
+</template>
+
+
 
 <style scoped>
 /* Lets content dissolve under the bar instead of being cut at its edge. Only

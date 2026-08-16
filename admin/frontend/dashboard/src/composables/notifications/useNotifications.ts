@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+
 import { notificationsApi } from '@/api/notifications'
 import type { Notification } from '@/types/notification'
 

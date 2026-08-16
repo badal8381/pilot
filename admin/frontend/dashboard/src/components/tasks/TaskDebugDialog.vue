@@ -1,3 +1,64 @@
+<script setup lang="ts">
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { Alert, Button, Dialog, LoadingText } from 'frappe-ui'
+import { markdownToHTML } from 'frappe-ui/markdown'
+import DOMPurify from 'dompurify'
+
+import { tasksApi } from '@/api/tasks'
+
+const props = defineProps({ taskId: { type: String, required: true } })
+const show = defineModel({ type: Boolean, default: false })
+
+const text = ref('')
+// frappe-ui renders the markdown; sanitize because LLM output is model-generated.
+const html = computed(() => DOMPurify.sanitize(markdownToHTML(text.value || '')))
+const streaming = ref(false)
+const error = ref('')
+let source = null
+
+const close = () => {
+  if (source) {
+    source.close()
+    source = null
+  }
+  streaming.value = false
+}
+
+// Answers are cached per task, so reopening replays the previous one instantly.
+// `refresh` asks the model again and replaces it.
+const start = ({ refresh = false } = {}) => {
+  close()
+  text.value = ''
+  error.value = ''
+  streaming.value = true
+  source = new EventSource(tasksApi.debugUrl(props.taskId, refresh))
+  source.onmessage = (message) => {
+    let event
+    try {
+      event = JSON.parse(message.data)
+    } catch {
+      return
+    }
+    if (event.type === 'delta') {
+      text.value += event.text
+    } else if (event.type === 'done') {
+      close()
+    } else if (event.type === 'error') {
+      error.value = event.message || 'AI debugging failed.'
+      close()
+    }
+  }
+  source.onerror = () => {
+    if (source?.readyState !== EventSource.CLOSED) return
+    if (!text.value) error.value = 'Could not reach the AI assistant.'
+    close()
+  }
+}
+
+watch(show, (open) => (open ? start() : close()))
+onBeforeUnmount(close)
+</script>
+
 <template>
   <Dialog v-model="show" title="Debug with AI Assistant" size="2xl">
     <div class="space-y-3">
@@ -32,63 +93,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { Alert, Button, Dialog, LoadingText } from 'frappe-ui'
-import { markdownToHTML } from 'frappe-ui/markdown'
-import DOMPurify from 'dompurify'
-import { tasksApi } from '@/api/tasks'
-
-const props = defineProps({ taskId: { type: String, required: true } })
-const show = defineModel({ type: Boolean, default: false })
-
-const text = ref('')
-// frappe-ui renders the markdown; sanitize because LLM output is model-generated.
-const html = computed(() => DOMPurify.sanitize(markdownToHTML(text.value || '')))
-const streaming = ref(false)
-const error = ref('')
-let source = null
-
-function close() {
-  if (source) {
-    source.close()
-    source = null
-  }
-  streaming.value = false
-}
-
-// Answers are cached per task, so reopening replays the previous one instantly.
-// `refresh` asks the model again and replaces it.
-function start({ refresh = false } = {}) {
-  close()
-  text.value = ''
-  error.value = ''
-  streaming.value = true
-  source = new EventSource(tasksApi.debugUrl(props.taskId, refresh))
-  source.onmessage = (message) => {
-    let event
-    try {
-      event = JSON.parse(message.data)
-    } catch {
-      return
-    }
-    if (event.type === 'delta') {
-      text.value += event.text
-    } else if (event.type === 'done') {
-      close()
-    } else if (event.type === 'error') {
-      error.value = event.message || 'AI debugging failed.'
-      close()
-    }
-  }
-  source.onerror = () => {
-    if (source?.readyState !== EventSource.CLOSED) return
-    if (!text.value) error.value = 'Could not reach the AI assistant.'
-    close()
-  }
-}
-
-watch(show, (open) => (open ? start() : close()))
-onBeforeUnmount(close)
-</script>

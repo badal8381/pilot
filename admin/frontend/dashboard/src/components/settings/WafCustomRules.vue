@@ -1,3 +1,147 @@
+<script setup lang="ts">
+import { computed, onUnmounted, ref } from 'vue'
+import { Badge, Button, Dialog, FormControl, Select, Switch, TextInput } from 'frappe-ui'
+
+import EmptyState from '@/components/common/EmptyState.vue'
+
+import {
+  ACTION_LABELS,
+  FIELD_LABELS,
+  OPERATOR_LABELS,
+  actionLabel,
+  ruleProblem,
+  ruleSummary,
+} from '@/utils/wafRules'
+
+// Two-way bound so the child owns list edits without mutating a prop.
+const rules = defineModel({ type: Array, default: () => [] })
+const props = defineProps({
+  fields: { type: Array, default: () => [] },
+  operators: { type: Array, default: () => [] },
+  actions: { type: Array, default: () => [] },
+})
+
+const PLACEHOLDERS = {
+  source_ip: '10.0.0.0/8, 203.0.113.4',
+  method: 'POST',
+  uri_path: '/admin',
+  host: 'example.com',
+}
+const MATCH_OPTIONS = [
+  { label: 'All', value: 'all' },
+  { label: 'Any', value: 'any' },
+]
+
+const fieldOptions = computed(() =>
+  props.fields.map((f) => ({ label: FIELD_LABELS[f] || f, value: f })),
+)
+const operatorOptions = computed(() =>
+  props.operators.map((o) => ({ label: OPERATOR_LABELS[o] || o, value: o })),
+)
+const actionOptions = computed(() =>
+  props.actions.map((a) => ({ label: ACTION_LABELS[a] || a, value: a })),
+)
+
+const placeholder = (field) => {
+  return PLACEHOLDERS[field] || 'value'
+}
+
+// Identity-based :key. Index keys re-key rows on delete and Vue patches the
+// inputs in place, jumping a focused caret to the wrong row.
+const keys = new WeakMap()
+let nextKey = 0
+const keyOf = (object) => {
+  if (!keys.has(object)) keys.set(object, `k${(nextKey += 1)}`)
+  return keys.get(object)
+}
+
+// One key, not a set: opening a rule closes the one before it.
+const openKey = ref('')
+const isOpen = (rule) => openKey.value === keyOf(rule)
+const toggleOpen = (rule) => {
+  const key = keyOf(rule)
+  openKey.value = openKey.value === key ? '' : key
+}
+
+// Same predicate as the save path, so add and save cannot disagree.
+const flaggedKey = ref('')
+const root = ref(null)
+let flagTimer = null
+
+const flagUnfinished = () => {
+  const rule = rules.value.find((candidate) => ruleProblem(candidate))
+  if (!rule) return false
+  const key = keyOf(rule)
+  openKey.value = key
+  flaggedKey.value = key
+  clearTimeout(flagTimer)
+  flagTimer = setTimeout(() => (flaggedKey.value = ''), 900)
+  root.value?.querySelector(`[data-rule-key="${key}"]`)?.scrollIntoView({
+    block: 'nearest',
+    behavior: 'smooth',
+  })
+  return true
+}
+
+onUnmounted(() => clearTimeout(flagTimer))
+
+// Live reorder on dragover; identity keys keep row state through the splice.
+const dragKey = ref('')
+const onDragStart = (rule, event) => {
+  dragKey.value = keyOf(rule)
+  openKey.value = ''
+  event.dataTransfer.effectAllowed = 'move'
+}
+const onDragOver = (rule) => {
+  if (!dragKey.value || dragKey.value === keyOf(rule)) return
+  const from = rules.value.findIndex((r) => keyOf(r) === dragKey.value)
+  const to = rules.value.findIndex((r) => keyOf(r) === keyOf(rule))
+  if (from === -1 || to === -1) return
+  const [moved] = rules.value.splice(from, 1)
+  rules.value.splice(to, 0, moved)
+}
+const onDragEnd = () => {
+  dragKey.value = ''
+}
+
+const newCondition = () => {
+  return { field: 'uri_path', operator: 'contains', value: '', header_name: '' }
+}
+const addRule = () => {
+  if (flagUnfinished()) return
+  const rule = {
+    name: '',
+    action: 'block',
+    match: 'all',
+    enabled: true,
+    conditions: [newCondition()],
+  }
+  rules.value.push(rule)
+  // Key the reactive proxy the template iterates, not the raw local object.
+  openKey.value = keyOf(rules.value[rules.value.length - 1])
+}
+const addCondition = (rule) => {
+  rule.conditions.push(newCondition())
+}
+const removeCondition = (rule, index) => {
+  rule.conditions.splice(index, 1)
+}
+
+const showRemove = ref(false)
+const removingRule = ref(null)
+const removingLabel = computed(() => removingRule.value?.name || 'this rule')
+const promptRemove = (rule) => {
+  removingRule.value = rule
+  showRemove.value = true
+}
+const confirmRemove = () => {
+  const index = rules.value.indexOf(removingRule.value)
+  if (index !== -1) rules.value.splice(index, 1)
+  showRemove.value = false
+  removingRule.value = null
+}
+</script>
+
 <template>
   <div class="space-y-3" ref="root">
     <div class="flex justify-between items-start gap-4">
@@ -206,146 +350,3 @@
     </Dialog>
   </div>
 </template>
-
-<script setup>
-import { computed, onUnmounted, ref } from 'vue'
-import { Badge, Button, Dialog, FormControl, Select, Switch, TextInput } from 'frappe-ui'
-import EmptyState from '@/components/common/EmptyState.vue'
-import {
-  ACTION_LABELS,
-  FIELD_LABELS,
-  OPERATOR_LABELS,
-  actionLabel,
-  ruleProblem,
-  ruleSummary,
-} from '@/utils/wafRules'
-
-// Two-way bound so the child owns list edits without mutating a prop.
-const rules = defineModel({ type: Array, default: () => [] })
-const props = defineProps({
-  fields: { type: Array, default: () => [] },
-  operators: { type: Array, default: () => [] },
-  actions: { type: Array, default: () => [] },
-})
-
-const PLACEHOLDERS = {
-  source_ip: '10.0.0.0/8, 203.0.113.4',
-  method: 'POST',
-  uri_path: '/admin',
-  host: 'example.com',
-}
-const MATCH_OPTIONS = [
-  { label: 'All', value: 'all' },
-  { label: 'Any', value: 'any' },
-]
-
-const fieldOptions = computed(() =>
-  props.fields.map((f) => ({ label: FIELD_LABELS[f] || f, value: f })),
-)
-const operatorOptions = computed(() =>
-  props.operators.map((o) => ({ label: OPERATOR_LABELS[o] || o, value: o })),
-)
-const actionOptions = computed(() =>
-  props.actions.map((a) => ({ label: ACTION_LABELS[a] || a, value: a })),
-)
-
-function placeholder(field) {
-  return PLACEHOLDERS[field] || 'value'
-}
-
-// Identity-based :key. Index keys re-key rows on delete and Vue patches the
-// inputs in place, jumping a focused caret to the wrong row.
-const keys = new WeakMap()
-let nextKey = 0
-function keyOf(object) {
-  if (!keys.has(object)) keys.set(object, `k${(nextKey += 1)}`)
-  return keys.get(object)
-}
-
-// One key, not a set: opening a rule closes the one before it.
-const openKey = ref('')
-const isOpen = (rule) => openKey.value === keyOf(rule)
-function toggleOpen(rule) {
-  const key = keyOf(rule)
-  openKey.value = openKey.value === key ? '' : key
-}
-
-// Same predicate as the save path, so add and save cannot disagree.
-const flaggedKey = ref('')
-const root = ref(null)
-let flagTimer = null
-
-function flagUnfinished() {
-  const rule = rules.value.find((candidate) => ruleProblem(candidate))
-  if (!rule) return false
-  const key = keyOf(rule)
-  openKey.value = key
-  flaggedKey.value = key
-  clearTimeout(flagTimer)
-  flagTimer = setTimeout(() => (flaggedKey.value = ''), 900)
-  root.value?.querySelector(`[data-rule-key="${key}"]`)?.scrollIntoView({
-    block: 'nearest',
-    behavior: 'smooth',
-  })
-  return true
-}
-
-onUnmounted(() => clearTimeout(flagTimer))
-
-// Live reorder on dragover; identity keys keep row state through the splice.
-const dragKey = ref('')
-function onDragStart(rule, event) {
-  dragKey.value = keyOf(rule)
-  openKey.value = ''
-  event.dataTransfer.effectAllowed = 'move'
-}
-function onDragOver(rule) {
-  if (!dragKey.value || dragKey.value === keyOf(rule)) return
-  const from = rules.value.findIndex((r) => keyOf(r) === dragKey.value)
-  const to = rules.value.findIndex((r) => keyOf(r) === keyOf(rule))
-  if (from === -1 || to === -1) return
-  const [moved] = rules.value.splice(from, 1)
-  rules.value.splice(to, 0, moved)
-}
-function onDragEnd() {
-  dragKey.value = ''
-}
-
-function newCondition() {
-  return { field: 'uri_path', operator: 'contains', value: '', header_name: '' }
-}
-function addRule() {
-  if (flagUnfinished()) return
-  const rule = {
-    name: '',
-    action: 'block',
-    match: 'all',
-    enabled: true,
-    conditions: [newCondition()],
-  }
-  rules.value.push(rule)
-  // Key the reactive proxy the template iterates, not the raw local object.
-  openKey.value = keyOf(rules.value[rules.value.length - 1])
-}
-function addCondition(rule) {
-  rule.conditions.push(newCondition())
-}
-function removeCondition(rule, index) {
-  rule.conditions.splice(index, 1)
-}
-
-const showRemove = ref(false)
-const removingRule = ref(null)
-const removingLabel = computed(() => removingRule.value?.name || 'this rule')
-function promptRemove(rule) {
-  removingRule.value = rule
-  showRemove.value = true
-}
-function confirmRemove() {
-  const index = rules.value.indexOf(removingRule.value)
-  if (index !== -1) rules.value.splice(index, 1)
-  showRemove.value = false
-  removingRule.value = null
-}
-
-</script>

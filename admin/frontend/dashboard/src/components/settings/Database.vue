@@ -1,3 +1,13 @@
+<script setup lang="ts">
+import DatabaseQuickActions from '@/components/settings/DatabaseQuickActions.vue'
+import SettingsRow from '@/components/settings/SettingsRow.vue'
+
+import { DATABASE_SECTIONS } from '@/components/settings/sections'
+
+const openSection = defineModel('openSection')
+const configurationSection = DATABASE_SECTIONS.find((section) => section.id === 'configurations')
+</script>
+
 <template>
   <component v-if="openSection" :is="openSection.component" />
 
@@ -21,12 +31,3 @@
     </div>
   </template>
 </template>
-
-<script setup>
-import DatabaseQuickActions from '@/components/settings/DatabaseQuickActions.vue'
-import SettingsRow from '@/components/settings/SettingsRow.vue'
-import { DATABASE_SECTIONS } from '@/components/settings/sections'
-
-const openSection = defineModel('openSection')
-const configurationSection = DATABASE_SECTIONS.find((section) => section.id === 'configurations')
-</script>

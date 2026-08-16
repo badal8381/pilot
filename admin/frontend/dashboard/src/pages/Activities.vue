@@ -2,12 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
 import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Skeleton } from 'frappe-ui'
+
+import Table from '@/components/common/Table.vue'
+
 import { useActivities } from '@/composables/activities/useActivities'
 import { useSites } from '@/composables/sites/useSites'
 import { commandLabel, relativeTime } from '@/utils/taskFormat'
 import type { AuditEntry } from '@/types/audit'
-
-import Table from '@/components/common/Table.vue'
 
 const props = defineProps<{ siteName?: string }>()
 

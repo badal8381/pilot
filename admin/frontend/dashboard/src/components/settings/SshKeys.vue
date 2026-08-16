@@ -1,3 +1,105 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import {
+  Button,
+  Dialog,
+  ErrorMessage,
+  FormControl,
+  Spinner,
+  toast,
+} from 'frappe-ui'
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
+import EmptyState from '@/components/common/EmptyState.vue'
+import { apiErrorMessage } from '@/api/client'
+import { sshKeysApi } from '@/api/sshKeys'
+
+// Numeric widths are fr units (ListView convention) so Name/Fingerprint stretch to
+// fill the row instead of leaving dead space; actions stays a fixed icon-sized column.
+const columns = [
+  { label: 'Name', key: 'label', align: 'left', width: 1 },
+  { label: 'Fingerprint', key: 'fingerprint', align: 'left', width: 2 },
+  { label: '', key: 'actions', align: 'right', width: '3rem' },
+]
+
+const loading = ref(true)
+const adding = ref(false)
+const error = ref('')
+const loadError = ref('')
+const keys = ref([])
+const newKey = ref('')
+const showAdd = ref(false)
+const showRemove = ref(false)
+const removing = ref(null)
+const removingBusy = ref(false)
+
+const rows = computed(() =>
+  keys.value.map((k) => ({ fingerprint: k.fingerprint, label: k.comment || 'Unnamed key' })),
+)
+const isLastKey = computed(() => rows.value.length <= 1)
+
+const load = async () => {
+  loading.value = true
+  loadError.value = ''
+  try {
+    keys.value = (await sshKeysApi.list()).keys || []
+  } catch (e) {
+    loadError.value = e.message || 'Could not load SSH keys.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const openAdd = () => {
+  newKey.value = ''
+  error.value = ''
+  showAdd.value = true
+}
+
+const add = async () => {
+  adding.value = true
+  error.value = ''
+  try {
+    const result = await sshKeysApi.add(newKey.value.trim())
+    if (result.fingerprint) {
+      showAdd.value = false
+      toast.success('Key added')
+      await load()
+    } else {
+      error.value = apiErrorMessage(result, 'Could not add key.')
+    }
+  } catch (e) {
+    error.value = e.message || 'Could not add key.'
+  } finally {
+    adding.value = false
+  }
+}
+
+const promptRemove = (row) => {
+  removing.value = row
+  showRemove.value = true
+}
+
+const confirmRemove = async () => {
+  removingBusy.value = true
+  try {
+    const response = await sshKeysApi.remove(removing.value.fingerprint)
+    if (response.ok) {
+      toast.success('Key removed')
+      showRemove.value = false
+      await load()
+    } else {
+      toast.error(apiErrorMessage(await response.json(), 'Could not remove key.'))
+    }
+  } catch (e) {
+    toast.error(e.message || 'Could not remove key.')
+  } finally {
+    removingBusy.value = false
+  }
+}
+
+onMounted(load)
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
@@ -77,105 +179,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { computed, onMounted, ref } from 'vue'
-import {
-  Button,
-  Dialog,
-  ErrorMessage,
-  FormControl,
-  Spinner,
-  toast,
-} from 'frappe-ui'
-import { ListRowItem, ListView } from 'frappe-ui/experimental'
-import EmptyState from '@/components/common/EmptyState.vue'
-import { apiErrorMessage } from '@/api/client'
-import { sshKeysApi } from '@/api/sshKeys'
-
-// Numeric widths are fr units (ListView convention) so Name/Fingerprint stretch to
-// fill the row instead of leaving dead space; actions stays a fixed icon-sized column.
-const columns = [
-  { label: 'Name', key: 'label', align: 'left', width: 1 },
-  { label: 'Fingerprint', key: 'fingerprint', align: 'left', width: 2 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
-]
-
-const loading = ref(true)
-const adding = ref(false)
-const error = ref('')
-const loadError = ref('')
-const keys = ref([])
-const newKey = ref('')
-const showAdd = ref(false)
-const showRemove = ref(false)
-const removing = ref(null)
-const removingBusy = ref(false)
-
-const rows = computed(() =>
-  keys.value.map((k) => ({ fingerprint: k.fingerprint, label: k.comment || 'Unnamed key' })),
-)
-const isLastKey = computed(() => rows.value.length <= 1)
-
-async function load() {
-  loading.value = true
-  loadError.value = ''
-  try {
-    keys.value = (await sshKeysApi.list()).keys || []
-  } catch (e) {
-    loadError.value = e.message || 'Could not load SSH keys.'
-  } finally {
-    loading.value = false
-  }
-}
-
-function openAdd() {
-  newKey.value = ''
-  error.value = ''
-  showAdd.value = true
-}
-
-async function add() {
-  adding.value = true
-  error.value = ''
-  try {
-    const result = await sshKeysApi.add(newKey.value.trim())
-    if (result.fingerprint) {
-      showAdd.value = false
-      toast.success('Key added')
-      await load()
-    } else {
-      error.value = apiErrorMessage(result, 'Could not add key.')
-    }
-  } catch (e) {
-    error.value = e.message || 'Could not add key.'
-  } finally {
-    adding.value = false
-  }
-}
-
-function promptRemove(row) {
-  removing.value = row
-  showRemove.value = true
-}
-
-async function confirmRemove() {
-  removingBusy.value = true
-  try {
-    const response = await sshKeysApi.remove(removing.value.fingerprint)
-    if (response.ok) {
-      toast.success('Key removed')
-      showRemove.value = false
-      await load()
-    } else {
-      toast.error(apiErrorMessage(await response.json(), 'Could not remove key.'))
-    }
-  } catch (e) {
-    toast.error(e.message || 'Could not remove key.')
-  } finally {
-    removingBusy.value = false
-  }
-}
-
-onMounted(load)
-</script>

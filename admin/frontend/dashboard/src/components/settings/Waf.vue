@@ -1,3 +1,168 @@
+<script setup lang="ts">
+import { computed, ref, onMounted, onUnmounted } from 'vue'
+import { RouterLink } from 'vue-router'
+import { Button, ErrorMessage, FormControl, Spinner, TabButtons, toast } from 'frappe-ui'
+
+import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
+import WafCustomRules from '@/components/settings/WafCustomRules.vue'
+
+import { settingsApi } from '@/api/settings'
+import { ruleProblem } from '@/utils/wafRules'
+import { useUnsavedChanges } from '@/composables/common/useUnsavedChanges'
+
+// "Paused" leaves the module loaded and idle; the Enable switch drops it from
+// the server config. The stored value stays "Off" - only the label differs.
+const ACTION_OPTIONS = [
+  { label: 'Paused', value: 'Off' },
+  { label: 'Log only', value: 'DetectionOnly' },
+  { label: 'Block', value: 'On' },
+]
+const SENSITIVITY_OPTIONS = [
+  { label: 'Low', value: 1 },
+  { label: 'Medium', value: 2 },
+  { label: 'High', value: 3 },
+  { label: 'Very High', value: 4 },
+]
+// CRS paranoia levels.
+const SENSITIVITY_HINTS = {
+  1: 'Very few false positives. Start here.',
+  2: 'Admin tooling may start tripping it.',
+  3: 'Expect to add exclusions.',
+  4: 'Most coverage, most false positives.',
+}
+// DetectionOnly's hint lives in the template - it carries a link.
+const ACTION_HINTS = {
+  Off: 'Loaded but idle. Nothing is inspected.',
+  On: 'Matching requests are rejected.',
+}
+
+const loading = ref(true)
+const saving = ref(false)
+const error = ref('')
+
+const enabled = ref(false)
+const installed = ref(false)
+const production = ref(true)
+const mode = ref('DetectionOnly')
+const paranoia = ref(1)
+const inboundThreshold = ref(5)
+const bodyLimit = ref('50m')
+const inspectResponses = ref(false)
+const exclusionsText = ref('')
+const exemptPathsText = ref('')
+const customRules = ref([])
+const ruleFields = ref([])
+const ruleOperators = ref([])
+const ruleActions = ref([])
+
+const sensitivityHint = computed(() => SENSITIVITY_HINTS[Number(paranoia.value)] || '')
+
+// `installed` only means anything in production, so at most one applies.
+const setupNote = computed(() => {
+  if (!enabled.value) return ''
+  if (!production.value)
+    return "Enforced in production only. This bench isn't deployed - run pilot setup production first."
+  if (!installed.value)
+    return 'ModSecurity is not installed on this host. Redeploy production to install it.'
+  return ''
+})
+
+const linesToArray = (text) => {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+const buildPayload = () => {
+  return {
+    enabled: enabled.value,
+    mode: mode.value,
+    paranoia: Number(paranoia.value),
+    inbound_threshold: Number(inboundThreshold.value),
+    body_limit: bodyLimit.value.trim(),
+    inspect_responses: inspectResponses.value,
+    exclusions: linesToArray(exclusionsText.value),
+    exempt_paths: linesToArray(exemptPathsText.value),
+    custom_rules: customRules.value,
+  }
+}
+
+const savedPayload = ref('')
+const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
+
+// After `dirty`: useUnsavedChanges evaluates its argument immediately, and a
+// route-level guard never fires for the shell's param-only navigation.
+useUnsavedChanges(dirty)
+
+const warnIfDirty = (event) => {
+  if (!dirty.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+onMounted(() => window.addEventListener('beforeunload', warnIfDirty))
+onUnmounted(() => window.removeEventListener('beforeunload', warnIfDirty))
+
+const thresholdError = computed(() => {
+  const threshold = Number(inboundThreshold.value)
+  if (Number.isInteger(threshold) && threshold >= 1) return ''
+  return 'Must be a positive whole number.'
+})
+const canSave = computed(
+  () =>
+    !thresholdError.value &&
+    Boolean(bodyLimit.value.trim()) &&
+    !customRules.value.some((rule) => ruleProblem(rule)),
+)
+
+const save = async () => {
+  saving.value = true
+  try {
+    const payload = buildPayload()
+    const result = await settingsApi.update({ waf: payload })
+    if (!result.ok) {
+      error.value = result.error || 'Failed to save.'
+      return
+    }
+    savedPayload.value = JSON.stringify(payload)
+    toast.success('Web application firewall updated')
+    if (result.nginx_error) toast.error(result.nginx_error)
+  } catch (e) {
+    error.value = e.message || 'Failed to save.'
+  } finally {
+    saving.value = false
+  }
+}
+
+onMounted(async () => {
+  try {
+    const data = await settingsApi.get()
+    production.value = !!data.production?.enabled
+    const waf = data.waf || {}
+    enabled.value = !!waf.enabled
+    installed.value = !!waf.installed
+    mode.value = waf.mode || 'DetectionOnly'
+    // TabButtons matches by Object.is; a stringy "2" would fall back to Low.
+    paranoia.value = Number(waf.paranoia) || 1
+    inboundThreshold.value = waf.inbound_threshold ?? 5
+    bodyLimit.value = waf.body_limit || '50m'
+    inspectResponses.value = !!waf.inspect_responses
+    exclusionsText.value = (waf.exclusions || []).join('\n')
+    exemptPathsText.value = (waf.exempt_paths || []).join('\n')
+    customRules.value = waf.custom_rules || []
+    ruleFields.value = waf.rule_fields || []
+    ruleOperators.value = waf.rule_operators || []
+    ruleActions.value = waf.rule_actions || []
+    // Same builder as the save payload, so normalisation is not an edit.
+    savedPayload.value = JSON.stringify(buildPayload())
+  } catch (e) {
+    error.value = e.message || 'Could not load settings.'
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
@@ -119,166 +284,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { RouterLink } from 'vue-router'
-import { Button, ErrorMessage, FormControl, Spinner, TabButtons, toast } from 'frappe-ui'
-import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
-import WafCustomRules from '@/components/settings/WafCustomRules.vue'
-import { settingsApi } from '@/api/settings'
-import { ruleProblem } from '@/utils/wafRules'
-import { useUnsavedChanges } from '@/composables/common/useUnsavedChanges'
-
-// "Paused" leaves the module loaded and idle; the Enable switch drops it from
-// the server config. The stored value stays "Off" - only the label differs.
-const ACTION_OPTIONS = [
-  { label: 'Paused', value: 'Off' },
-  { label: 'Log only', value: 'DetectionOnly' },
-  { label: 'Block', value: 'On' },
-]
-const SENSITIVITY_OPTIONS = [
-  { label: 'Low', value: 1 },
-  { label: 'Medium', value: 2 },
-  { label: 'High', value: 3 },
-  { label: 'Very High', value: 4 },
-]
-// CRS paranoia levels.
-const SENSITIVITY_HINTS = {
-  1: 'Very few false positives. Start here.',
-  2: 'Admin tooling may start tripping it.',
-  3: 'Expect to add exclusions.',
-  4: 'Most coverage, most false positives.',
-}
-// DetectionOnly's hint lives in the template - it carries a link.
-const ACTION_HINTS = {
-  Off: 'Loaded but idle. Nothing is inspected.',
-  On: 'Matching requests are rejected.',
-}
-
-const loading = ref(true)
-const saving = ref(false)
-const error = ref('')
-
-const enabled = ref(false)
-const installed = ref(false)
-const production = ref(true)
-const mode = ref('DetectionOnly')
-const paranoia = ref(1)
-const inboundThreshold = ref(5)
-const bodyLimit = ref('50m')
-const inspectResponses = ref(false)
-const exclusionsText = ref('')
-const exemptPathsText = ref('')
-const customRules = ref([])
-const ruleFields = ref([])
-const ruleOperators = ref([])
-const ruleActions = ref([])
-
-const sensitivityHint = computed(() => SENSITIVITY_HINTS[Number(paranoia.value)] || '')
-
-// `installed` only means anything in production, so at most one applies.
-const setupNote = computed(() => {
-  if (!enabled.value) return ''
-  if (!production.value)
-    return "Enforced in production only. This bench isn't deployed - run pilot setup production first."
-  if (!installed.value)
-    return 'ModSecurity is not installed on this host. Redeploy production to install it.'
-  return ''
-})
-
-function linesToArray(text) {
-  return text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
-function buildPayload() {
-  return {
-    enabled: enabled.value,
-    mode: mode.value,
-    paranoia: Number(paranoia.value),
-    inbound_threshold: Number(inboundThreshold.value),
-    body_limit: bodyLimit.value.trim(),
-    inspect_responses: inspectResponses.value,
-    exclusions: linesToArray(exclusionsText.value),
-    exempt_paths: linesToArray(exemptPathsText.value),
-    custom_rules: customRules.value,
-  }
-}
-
-const savedPayload = ref('')
-const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
-
-// After `dirty`: useUnsavedChanges evaluates its argument immediately, and a
-// route-level guard never fires for the shell's param-only navigation.
-useUnsavedChanges(dirty)
-
-function warnIfDirty(event) {
-  if (!dirty.value) return
-  event.preventDefault()
-  event.returnValue = ''
-}
-onMounted(() => window.addEventListener('beforeunload', warnIfDirty))
-onUnmounted(() => window.removeEventListener('beforeunload', warnIfDirty))
-
-const thresholdError = computed(() => {
-  const threshold = Number(inboundThreshold.value)
-  if (Number.isInteger(threshold) && threshold >= 1) return ''
-  return 'Must be a positive whole number.'
-})
-const canSave = computed(
-  () =>
-    !thresholdError.value &&
-    Boolean(bodyLimit.value.trim()) &&
-    !customRules.value.some((rule) => ruleProblem(rule)),
-)
-
-async function save() {
-  saving.value = true
-  try {
-    const payload = buildPayload()
-    const result = await settingsApi.update({ waf: payload })
-    if (!result.ok) {
-      error.value = result.error || 'Failed to save.'
-      return
-    }
-    savedPayload.value = JSON.stringify(payload)
-    toast.success('Web application firewall updated')
-    if (result.nginx_error) toast.error(result.nginx_error)
-  } catch (e) {
-    error.value = e.message || 'Failed to save.'
-  } finally {
-    saving.value = false
-  }
-}
-
-onMounted(async () => {
-  try {
-    const data = await settingsApi.get()
-    production.value = !!data.production?.enabled
-    const waf = data.waf || {}
-    enabled.value = !!waf.enabled
-    installed.value = !!waf.installed
-    mode.value = waf.mode || 'DetectionOnly'
-    // TabButtons matches by Object.is; a stringy "2" would fall back to Low.
-    paranoia.value = Number(waf.paranoia) || 1
-    inboundThreshold.value = waf.inbound_threshold ?? 5
-    bodyLimit.value = waf.body_limit || '50m'
-    inspectResponses.value = !!waf.inspect_responses
-    exclusionsText.value = (waf.exclusions || []).join('\n')
-    exemptPathsText.value = (waf.exempt_paths || []).join('\n')
-    customRules.value = waf.custom_rules || []
-    ruleFields.value = waf.rule_fields || []
-    ruleOperators.value = waf.rule_operators || []
-    ruleActions.value = waf.rule_actions || []
-    // Same builder as the save payload, so normalisation is not an edit.
-    savedPayload.value = JSON.stringify(buildPayload())
-  } catch (e) {
-    error.value = e.message || 'Could not load settings.'
-  } finally {
-    loading.value = false
-  }
-})
-</script>

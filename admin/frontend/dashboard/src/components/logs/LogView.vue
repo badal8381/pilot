@@ -1,3 +1,55 @@
+<script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
+
+const props = defineProps({
+  lines: { type: Array, default: () => [] },
+  streaming: { type: Boolean, default: false },
+  lineNumbers: { type: Boolean, default: false },
+  wrap: { type: Boolean, default: false },
+  rounded: { type: Boolean, default: true },
+  fill: { type: Boolean, default: false },
+  rows: { type: Boolean, default: false },
+  emptyText: { type: String, default: 'No output.' },
+})
+
+const el = ref(null)
+
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (el.value) el.value.scrollTop = el.value.scrollHeight
+  })
+}
+
+// Follow the tail while streaming; scrolling up pauses it, returning to the
+// bottom resumes it.
+const follow = ref(true)
+
+const onScroll = () => {
+  const box = el.value
+  if (!box) return
+  follow.value = box.scrollHeight - box.scrollTop - box.clientHeight < 8
+}
+
+watch(
+  () => props.streaming,
+  (on) => {
+    if (!on) return
+    follow.value = true
+    scrollToBottom()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.lines.length,
+  () => {
+    if (props.streaming && follow.value) scrollToBottom()
+  },
+)
+
+defineExpose({ scrollToBottom })
+</script>
+
 <template>
   <!-- text-p-sm: a log body is stacked copy; text-sm's 1.15 line-height packs
        it solid. gray-2: the solid ramp steps much harder in dark mode. -->
@@ -33,55 +85,3 @@
     >
   </div>
 </template>
-
-<script setup>
-import { nextTick, ref, watch } from 'vue'
-
-const props = defineProps({
-  lines: { type: Array, default: () => [] },
-  streaming: { type: Boolean, default: false },
-  lineNumbers: { type: Boolean, default: false },
-  wrap: { type: Boolean, default: false },
-  rounded: { type: Boolean, default: true },
-  fill: { type: Boolean, default: false },
-  rows: { type: Boolean, default: false },
-  emptyText: { type: String, default: 'No output.' },
-})
-
-const el = ref(null)
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (el.value) el.value.scrollTop = el.value.scrollHeight
-  })
-}
-
-// Follow the tail while streaming; scrolling up pauses it, returning to the
-// bottom resumes it.
-const follow = ref(true)
-
-function onScroll() {
-  const box = el.value
-  if (!box) return
-  follow.value = box.scrollHeight - box.scrollTop - box.clientHeight < 8
-}
-
-watch(
-  () => props.streaming,
-  (on) => {
-    if (!on) return
-    follow.value = true
-    scrollToBottom()
-  },
-  { immediate: true },
-)
-
-watch(
-  () => props.lines.length,
-  () => {
-    if (props.streaming && follow.value) scrollToBottom()
-  },
-)
-
-defineExpose({ scrollToBottom })
-</script>

@@ -1,3 +1,88 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { Button, Dialog, ErrorMessage, TextInput } from 'frappe-ui'
+
+import { useSite } from '@/composables/sites/useSite'
+import { apiErrorMessage } from '@/api/client'
+import { sitesApi } from '@/api/sites'
+import { openTaskDetailPage } from '@/utils/taskRoute'
+
+const props = defineProps({ siteName: { type: String, required: true } })
+const router = useRouter()
+
+const { site, nginxEnabled } = useSite(props.siteName)
+
+const error = ref('')
+
+const sslLoading = ref(false)
+const showSslEmail = ref(false)
+const sslEmail = ref('')
+const sslEmailError = ref('')
+
+const enableSsl = async (email) => {
+  error.value = ''
+  sslEmailError.value = ''
+  sslLoading.value = true
+  try {
+    const data = await sitesApi.enableTls(props.siteName, email)
+    if (data.task_id) {
+      showSslEmail.value = false
+      openTaskDetailPage(router, data.task_id)
+    } else if (data.error?.details?.needs_email) {
+      showSslEmail.value = true
+      if (email) sslEmailError.value = apiErrorMessage(data, 'Could not enable SSL.')
+    } else {
+      error.value = apiErrorMessage(data, 'Could not enable SSL.')
+    }
+  } catch (e) {
+    if (showSslEmail.value) sslEmailError.value = e.message
+    else error.value = e.message
+  } finally {
+    sslLoading.value = false
+  }
+}
+
+const clearingCache = ref(false)
+
+const clearCache = async () => {
+  error.value = ''
+  clearingCache.value = true
+  try {
+    const data = await sitesApi.clearCache(props.siteName)
+    if (data.task_id) openTaskDetailPage(router, data.task_id)
+    else error.value = apiErrorMessage(data, 'Failed to clear cache.')
+  } catch (e) {
+    error.value = e.message || 'Failed to clear cache.'
+  } finally {
+    clearingCache.value = false
+  }
+}
+
+// Each action only appears once its `condition` passes.
+const Actions = [
+  {
+    key: 'enable_ssl',
+    label: 'Enable SSL',
+    description: "Issue a Let's Encrypt certificate and serve this site over HTTPS.",
+    condition: () => nginxEnabled.value && !site.value?.ssl,
+    loading: () => sslLoading.value,
+    onClick: () => enableSsl(),
+  },
+  {
+    key: 'clear_cache',
+    label: 'Clear cache',
+    buttonLabel: 'Clear',
+    description: "Clear this site's cache if something looks stale.",
+    condition: () => true,
+    loading: () => clearingCache.value,
+    onClick: () => clearCache(),
+  },
+]
+
+const rows = computed(() => Actions.filter((row) => row.condition()))
+</script>
+
 <template>
   <div v-if="rows.length">
     <p class="font-semibold text-ink-gray-8 text-base">Actions</p>
@@ -55,87 +140,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { Button, Dialog, ErrorMessage, TextInput } from 'frappe-ui'
-import { useSite } from '@/composables/sites/useSite'
-import { apiErrorMessage } from '@/api/client'
-import { sitesApi } from '@/api/sites'
-import { openTaskDetailPage } from '@/utils/taskRoute'
-
-const props = defineProps({ siteName: { type: String, required: true } })
-const router = useRouter()
-
-const { site, nginxEnabled } = useSite(props.siteName)
-
-const error = ref('')
-
-const sslLoading = ref(false)
-const showSslEmail = ref(false)
-const sslEmail = ref('')
-const sslEmailError = ref('')
-
-async function enableSsl(email) {
-  error.value = ''
-  sslEmailError.value = ''
-  sslLoading.value = true
-  try {
-    const data = await sitesApi.enableTls(props.siteName, email)
-    if (data.task_id) {
-      showSslEmail.value = false
-      openTaskDetailPage(router, data.task_id)
-    } else if (data.error?.details?.needs_email) {
-      showSslEmail.value = true
-      if (email) sslEmailError.value = apiErrorMessage(data, 'Could not enable SSL.')
-    } else {
-      error.value = apiErrorMessage(data, 'Could not enable SSL.')
-    }
-  } catch (e) {
-    if (showSslEmail.value) sslEmailError.value = e.message
-    else error.value = e.message
-  } finally {
-    sslLoading.value = false
-  }
-}
-
-const clearingCache = ref(false)
-
-async function clearCache() {
-  error.value = ''
-  clearingCache.value = true
-  try {
-    const data = await sitesApi.clearCache(props.siteName)
-    if (data.task_id) openTaskDetailPage(router, data.task_id)
-    else error.value = apiErrorMessage(data, 'Failed to clear cache.')
-  } catch (e) {
-    error.value = e.message || 'Failed to clear cache.'
-  } finally {
-    clearingCache.value = false
-  }
-}
-
-// Each action only appears once its `condition` passes.
-const Actions = [
-  {
-    key: 'enable_ssl',
-    label: 'Enable SSL',
-    description: "Issue a Let's Encrypt certificate and serve this site over HTTPS.",
-    condition: () => nginxEnabled.value && !site.value?.ssl,
-    loading: () => sslLoading.value,
-    onClick: () => enableSsl(),
-  },
-  {
-    key: 'clear_cache',
-    label: 'Clear cache',
-    buttonLabel: 'Clear',
-    description: "Clear this site's cache if something looks stale.",
-    condition: () => true,
-    loading: () => clearingCache.value,
-    onClick: () => clearCache(),
-  },
-]
-
-const rows = computed(() => Actions.filter((row) => row.condition()))
-</script>

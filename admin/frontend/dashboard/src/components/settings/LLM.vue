@@ -1,3 +1,174 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { Alert, Button, Combobox, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
+
+import { apiErrorMessage } from '@/api/client'
+import { settingsApi } from '@/api/settings'
+
+const loading = ref(true)
+const saving = ref(false)
+const disconnecting = ref(false)
+const modelsLoading = ref(false)
+const error = ref('')
+const provider = ref('')
+const model = ref('')
+const apiKey = ref('')
+const maxTokens = ref(4096)
+const apiBase = ref('')
+const systemPrompt = ref('')
+const apiKeySet = ref(false)
+const providers = ref([])
+const models = ref([])
+const modelsError = ref('')
+
+const connected = computed(() => Boolean(provider.value && apiKeySet.value))
+const selectedProvider = computed(() => providers.value.find((p) => p.value === provider.value))
+const providerLabel = computed(() => selectedProvider.value?.label || provider.value)
+const needsApiBase = computed(() => Boolean(selectedProvider.value?.requires_api_base))
+const freeTextModel = computed(() => Boolean(selectedProvider.value?.free_text_model))
+const modelsNeedApiKey = computed(() => Boolean(selectedProvider.value?.models_need_api_key))
+const hasApiKey = computed(() => Boolean(apiKey.value.trim() || apiKeySet.value))
+
+const providerOptions = computed(() =>
+  providers.value.map((p) => ({ label: p.label, value: p.value })),
+)
+const modelOptions = computed(() => models.value.map((m) => ({ label: m, value: m })))
+const hasApiBase = computed(() => Boolean(apiBase.value.trim()))
+const apiBaseError = computed(() => {
+  if (!provider.value || !needsApiBase.value || hasApiBase.value) return ''
+  return `${providerLabel.value} needs the endpoint of your server, e.g. http://your-host:8000/v1`
+})
+
+// Connect stays dead until every required field is filled.
+const canSave = computed(
+  () =>
+    Boolean(provider.value) &&
+    Boolean(model.value.trim()) &&
+    hasApiKey.value &&
+    (!needsApiBase.value || hasApiBase.value),
+)
+
+const modelPlaceholder = computed(() => {
+  if (!provider.value) return 'Select a provider first'
+  if (needsApiBase.value && !hasApiBase.value) return 'Enter the API base URL to load models'
+  if (!models.value.length && !hasApiKey.value) return 'Enter the API key to load models'
+  return 'Search models…'
+})
+// An empty picklist with no key entered is a missing key - say so.
+const modelsHint = computed(() => {
+  if (!provider.value || modelsLoading.value || models.value.length) return ''
+  if (needsApiBase.value && !hasApiBase.value) return ''
+  if (hasApiKey.value) return ''
+  return `Enter the ${providerLabel.value} API key above to load models.`
+})
+
+const fetchModels = async (providerValue) => {
+  models.value = []
+  modelsError.value = ''
+  if (!providerValue || freeTextModel.value) return
+  // The key is sent along; the backend falls back to the saved one.
+  if (modelsNeedApiKey.value && !hasApiKey.value) return
+  if (needsApiBase.value && !hasApiBase.value) return
+  modelsLoading.value = true
+  try {
+    const result = await settingsApi.llmModels(providerValue, apiKey.value.trim(), apiBase.value.trim())
+    if (result?.error) modelsError.value = apiErrorMessage(result, 'Could not load models.')
+    else models.value = result || []
+  } catch (e) {
+    modelsError.value = e.message || 'Could not load models.'
+  } finally {
+    modelsLoading.value = false
+  }
+}
+
+const onProviderSelect = (value) => {
+  provider.value = value || ''
+  model.value = ''
+  fetchModels(provider.value)
+}
+
+// A key-gated provider can only list models once a key exists, so reload when it settles.
+let apiKeyDebounce = null
+watch([apiKey, apiBase], () => {
+  if (!modelsNeedApiKey.value || !provider.value) return
+  clearTimeout(apiKeyDebounce)
+  apiKeyDebounce = setTimeout(() => fetchModels(provider.value), 600)
+})
+
+const load = async () => {
+  loading.value = true
+  try {
+    const data = await settingsApi.get()
+    providers.value = data.llm_providers || []
+    const llm = data.llm || {}
+    provider.value = llm.provider || ''
+    model.value = llm.model || ''
+    maxTokens.value = llm.max_tokens || 4096
+    systemPrompt.value = llm.system_prompt || ''
+    apiBase.value = llm.api_base || ''
+    apiKeySet.value = !!llm.api_key_set
+    if (provider.value) await fetchModels(provider.value)
+  } finally {
+    loading.value = false
+  }
+}
+
+const save = async () => {
+  saving.value = true
+  error.value = ''
+  try {
+    const result = await settingsApi.update({
+      llm: {
+        provider: provider.value,
+        api_key: apiKey.value.trim(),
+        model: model.value.trim(),
+        max_tokens: Number(maxTokens.value) || 4096,
+        api_base: apiBase.value.trim(),
+        system_prompt: systemPrompt.value,
+      },
+    })
+    if (!result.error) {
+      apiKey.value = ''
+      toast.success('AI assistant settings saved')
+      await load()
+    } else {
+      error.value = apiErrorMessage(result, 'Could not save AI assistant settings.')
+    }
+  } catch (e) {
+    error.value = e.message || 'Could not save AI assistant settings.'
+  } finally {
+    saving.value = false
+  }
+}
+
+const disconnect = async () => {
+  disconnecting.value = true
+  try {
+    const result = await settingsApi.update({ llm: { disconnect: true } })
+    if (!result.error) {
+      provider.value = ''
+      model.value = ''
+      apiKey.value = ''
+      maxTokens.value = 4096
+      apiBase.value = ''
+      systemPrompt.value = ''
+      apiKeySet.value = false
+      models.value = []
+      modelsError.value = ''
+      toast.success('AI assistant disconnected')
+    } else {
+      toast.error(apiErrorMessage(result, 'Could not disconnect the AI assistant.'))
+    }
+  } catch (e) {
+    toast.error(e.message || 'Could not disconnect the AI assistant.')
+  } finally {
+    disconnecting.value = false
+  }
+}
+
+onMounted(load)
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
@@ -111,173 +282,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { Alert, Button, Combobox, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
-import { apiErrorMessage } from '@/api/client'
-import { settingsApi } from '@/api/settings'
-
-const loading = ref(true)
-const saving = ref(false)
-const disconnecting = ref(false)
-const modelsLoading = ref(false)
-const error = ref('')
-const provider = ref('')
-const model = ref('')
-const apiKey = ref('')
-const maxTokens = ref(4096)
-const apiBase = ref('')
-const systemPrompt = ref('')
-const apiKeySet = ref(false)
-const providers = ref([])
-const models = ref([])
-const modelsError = ref('')
-
-const connected = computed(() => Boolean(provider.value && apiKeySet.value))
-const selectedProvider = computed(() => providers.value.find((p) => p.value === provider.value))
-const providerLabel = computed(() => selectedProvider.value?.label || provider.value)
-const needsApiBase = computed(() => Boolean(selectedProvider.value?.requires_api_base))
-const freeTextModel = computed(() => Boolean(selectedProvider.value?.free_text_model))
-const modelsNeedApiKey = computed(() => Boolean(selectedProvider.value?.models_need_api_key))
-const hasApiKey = computed(() => Boolean(apiKey.value.trim() || apiKeySet.value))
-
-const providerOptions = computed(() =>
-  providers.value.map((p) => ({ label: p.label, value: p.value })),
-)
-const modelOptions = computed(() => models.value.map((m) => ({ label: m, value: m })))
-const hasApiBase = computed(() => Boolean(apiBase.value.trim()))
-const apiBaseError = computed(() => {
-  if (!provider.value || !needsApiBase.value || hasApiBase.value) return ''
-  return `${providerLabel.value} needs the endpoint of your server, e.g. http://your-host:8000/v1`
-})
-
-// Connect stays dead until every required field is filled.
-const canSave = computed(
-  () =>
-    Boolean(provider.value) &&
-    Boolean(model.value.trim()) &&
-    hasApiKey.value &&
-    (!needsApiBase.value || hasApiBase.value),
-)
-
-const modelPlaceholder = computed(() => {
-  if (!provider.value) return 'Select a provider first'
-  if (needsApiBase.value && !hasApiBase.value) return 'Enter the API base URL to load models'
-  if (!models.value.length && !hasApiKey.value) return 'Enter the API key to load models'
-  return 'Search models…'
-})
-// An empty picklist with no key entered is a missing key - say so.
-const modelsHint = computed(() => {
-  if (!provider.value || modelsLoading.value || models.value.length) return ''
-  if (needsApiBase.value && !hasApiBase.value) return ''
-  if (hasApiKey.value) return ''
-  return `Enter the ${providerLabel.value} API key above to load models.`
-})
-
-async function fetchModels(providerValue) {
-  models.value = []
-  modelsError.value = ''
-  if (!providerValue || freeTextModel.value) return
-  // The key is sent along; the backend falls back to the saved one.
-  if (modelsNeedApiKey.value && !hasApiKey.value) return
-  if (needsApiBase.value && !hasApiBase.value) return
-  modelsLoading.value = true
-  try {
-    const result = await settingsApi.llmModels(providerValue, apiKey.value.trim(), apiBase.value.trim())
-    if (result?.error) modelsError.value = apiErrorMessage(result, 'Could not load models.')
-    else models.value = result || []
-  } catch (e) {
-    modelsError.value = e.message || 'Could not load models.'
-  } finally {
-    modelsLoading.value = false
-  }
-}
-
-function onProviderSelect(value) {
-  provider.value = value || ''
-  model.value = ''
-  fetchModels(provider.value)
-}
-
-// A key-gated provider can only list models once a key exists, so reload when it settles.
-let apiKeyDebounce = null
-watch([apiKey, apiBase], () => {
-  if (!modelsNeedApiKey.value || !provider.value) return
-  clearTimeout(apiKeyDebounce)
-  apiKeyDebounce = setTimeout(() => fetchModels(provider.value), 600)
-})
-
-async function load() {
-  loading.value = true
-  try {
-    const data = await settingsApi.get()
-    providers.value = data.llm_providers || []
-    const llm = data.llm || {}
-    provider.value = llm.provider || ''
-    model.value = llm.model || ''
-    maxTokens.value = llm.max_tokens || 4096
-    systemPrompt.value = llm.system_prompt || ''
-    apiBase.value = llm.api_base || ''
-    apiKeySet.value = !!llm.api_key_set
-    if (provider.value) await fetchModels(provider.value)
-  } finally {
-    loading.value = false
-  }
-}
-
-async function save() {
-  saving.value = true
-  error.value = ''
-  try {
-    const result = await settingsApi.update({
-      llm: {
-        provider: provider.value,
-        api_key: apiKey.value.trim(),
-        model: model.value.trim(),
-        max_tokens: Number(maxTokens.value) || 4096,
-        api_base: apiBase.value.trim(),
-        system_prompt: systemPrompt.value,
-      },
-    })
-    if (!result.error) {
-      apiKey.value = ''
-      toast.success('AI assistant settings saved')
-      await load()
-    } else {
-      error.value = apiErrorMessage(result, 'Could not save AI assistant settings.')
-    }
-  } catch (e) {
-    error.value = e.message || 'Could not save AI assistant settings.'
-  } finally {
-    saving.value = false
-  }
-}
-
-async function disconnect() {
-  disconnecting.value = true
-  try {
-    const result = await settingsApi.update({ llm: { disconnect: true } })
-    if (!result.error) {
-      provider.value = ''
-      model.value = ''
-      apiKey.value = ''
-      maxTokens.value = 4096
-      apiBase.value = ''
-      systemPrompt.value = ''
-      apiKeySet.value = false
-      models.value = []
-      modelsError.value = ''
-      toast.success('AI assistant disconnected')
-    } else {
-      toast.error(apiErrorMessage(result, 'Could not disconnect the AI assistant.'))
-    }
-  } catch (e) {
-    toast.error(e.message || 'Could not disconnect the AI assistant.')
-  } finally {
-    disconnecting.value = false
-  }
-}
-
-onMounted(load)
-</script>

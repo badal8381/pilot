@@ -1,3 +1,49 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { Spinner } from 'frappe-ui'
+
+import LogView from '@/components/logs/LogView.vue'
+
+const props = defineProps({
+  label: { type: String, required: true },
+  status: { type: String, default: 'pending' },
+  duration: { type: String, default: null },
+  lines: { type: Array, default: () => [] },
+  hasOutput: { type: Boolean, default: false },
+  streaming: { type: Boolean, default: false },
+})
+
+// Open while running or failed; anything else settles closed unless toggled.
+const shouldExpand = (status) => {
+  return status === 'running' || status === 'failed'
+}
+
+const expanded = ref(shouldExpand(props.status))
+let userOverridden = false
+
+watch(
+  () => props.status,
+  (status) => {
+    if (!userOverridden) expanded.value = shouldExpand(status)
+  },
+)
+
+const toggle = () => {
+  if (!props.hasOutput) return
+  userOverridden = true
+  expanded.value = !expanded.value
+}
+
+const STATUS_ICON_BG = {
+  done: 'bg-surface-gray-2 text-ink-gray-6',
+  running: 'bg-surface-amber-2 text-ink-amber-7',
+  failed: 'bg-surface-red-2 text-ink-red-7',
+  pending: 'bg-surface-gray-2',
+}
+
+const iconBg = computed(() => STATUS_ICON_BG[props.status] || STATUS_ICON_BG.pending)
+</script>
+
 <template>
   <div>
     <div
@@ -31,48 +77,3 @@
     <LogView v-if="expanded && hasOutput" class="mt-1" :lines="lines" :streaming="streaming" />
   </div>
 </template>
-
-<script setup>
-import { computed, ref, watch } from 'vue'
-import { Spinner } from 'frappe-ui'
-import LogView from '../logs/LogView.vue'
-
-const props = defineProps({
-  label: { type: String, required: true },
-  status: { type: String, default: 'pending' },
-  duration: { type: String, default: null },
-  lines: { type: Array, default: () => [] },
-  hasOutput: { type: Boolean, default: false },
-  streaming: { type: Boolean, default: false },
-})
-
-// Open while running or failed; anything else settles closed unless toggled.
-function shouldExpand(status) {
-  return status === 'running' || status === 'failed'
-}
-
-const expanded = ref(shouldExpand(props.status))
-let userOverridden = false
-
-watch(
-  () => props.status,
-  (status) => {
-    if (!userOverridden) expanded.value = shouldExpand(status)
-  },
-)
-
-function toggle() {
-  if (!props.hasOutput) return
-  userOverridden = true
-  expanded.value = !expanded.value
-}
-
-const STATUS_ICON_BG = {
-  done: 'bg-surface-gray-2 text-ink-gray-6',
-  running: 'bg-surface-amber-2 text-ink-amber-7',
-  failed: 'bg-surface-red-2 text-ink-red-7',
-  pending: 'bg-surface-gray-2',
-}
-
-const iconBg = computed(() => STATUS_ICON_BG[props.status] || STATUS_ICON_BG.pending)
-</script>

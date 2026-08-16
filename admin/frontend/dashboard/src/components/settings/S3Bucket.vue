@@ -1,3 +1,122 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { Alert, Button, ErrorMessage, FormControl, Select, Spinner, toast } from 'frappe-ui'
+
+import { apiErrorMessage } from '@/api/client'
+import { settingsApi } from '@/api/settings'
+
+const loading = ref(true)
+const saving = ref(false)
+const disconnecting = ref(false)
+const error = ref('')
+const accessKey = ref('')
+const secretKey = ref('')
+const bucket = ref('')
+const provider = ref('')
+const region = ref('')
+const secretKeySet = ref(false)
+const providers = ref([])
+
+const connected = computed(() => Boolean(accessKey.value && bucket.value && secretKeySet.value))
+const providerLabel = computed(
+  () => providers.value.find((p) => p.value === provider.value)?.label || provider.value,
+)
+const providerOptions = computed(() =>
+  providers.value.map((p) => ({ label: p.label, value: p.value })),
+)
+const regionOptions = computed(
+  () =>
+    providers.value
+      .find((p) => p.value === provider.value)
+      ?.regions.map((r) => ({ label: r, value: r })) || [],
+)
+
+watch(provider, () => {
+  if (!regionOptions.value.some((o) => o.value === region.value)) {
+    region.value = regionOptions.value[0]?.value || ''
+  }
+})
+
+// Every required field, so Connect stays dead until the form could succeed.
+const canSave = computed(
+  () =>
+    Boolean(accessKey.value.trim()) &&
+    Boolean(bucket.value.trim()) &&
+    Boolean(provider.value) &&
+    Boolean(region.value) &&
+    (secretKeySet.value || Boolean(secretKey.value.trim())),
+)
+
+const load = async () => {
+  loading.value = true
+  try {
+    const data = await settingsApi.get()
+    providers.value = data.s3_providers || []
+    const s3 = data.s3 || {}
+    accessKey.value = s3.access_key || ''
+    bucket.value = s3.bucket || ''
+    provider.value = s3.provider || providers.value[0]?.value || ''
+    region.value = s3.region || ''
+    secretKeySet.value = !!s3.secret_key_set
+  } catch (e) {
+    error.value = e.message || 'Could not load settings.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const save = async () => {
+  saving.value = true
+  error.value = ''
+  try {
+    const result = await settingsApi.update({
+      s3: {
+        access_key: accessKey.value.trim(),
+        secret_key: secretKey.value.trim(),
+        bucket: bucket.value.trim(),
+        provider: provider.value,
+        region: region.value,
+      },
+    })
+    if (!result.error) {
+      secretKey.value = ''
+      toast.success('Object storage settings saved')
+      await load()
+    } else {
+      error.value = apiErrorMessage(result, 'Could not save object storage settings.')
+    }
+  } catch (e) {
+    error.value = e.message || 'Could not save object storage settings.'
+  } finally {
+    saving.value = false
+  }
+}
+
+const disconnect = async () => {
+  disconnecting.value = true
+  try {
+    const result = await settingsApi.update({ s3: { disconnect: true } })
+    if (!result.error) {
+      accessKey.value = ''
+      secretKey.value = ''
+      bucket.value = ''
+      provider.value = providers.value[0]?.value || ''
+      region.value = ''
+      secretKeySet.value = false
+      toast.success('Object storage disconnected')
+    } else {
+      toast.error(apiErrorMessage(result, 'Could not disconnect object storage.'))
+    }
+  } catch (e) {
+    toast.error(e.message || 'Could not disconnect object storage.')
+  } finally {
+    disconnecting.value = false
+  }
+}
+
+onMounted(load)
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
@@ -60,121 +179,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, Select, Spinner, toast } from 'frappe-ui'
-import { apiErrorMessage } from '@/api/client'
-import { settingsApi } from '@/api/settings'
-
-const loading = ref(true)
-const saving = ref(false)
-const disconnecting = ref(false)
-const error = ref('')
-const accessKey = ref('')
-const secretKey = ref('')
-const bucket = ref('')
-const provider = ref('')
-const region = ref('')
-const secretKeySet = ref(false)
-const providers = ref([])
-
-const connected = computed(() => Boolean(accessKey.value && bucket.value && secretKeySet.value))
-const providerLabel = computed(
-  () => providers.value.find((p) => p.value === provider.value)?.label || provider.value,
-)
-const providerOptions = computed(() =>
-  providers.value.map((p) => ({ label: p.label, value: p.value })),
-)
-const regionOptions = computed(
-  () =>
-    providers.value
-      .find((p) => p.value === provider.value)
-      ?.regions.map((r) => ({ label: r, value: r })) || [],
-)
-
-watch(provider, () => {
-  if (!regionOptions.value.some((o) => o.value === region.value)) {
-    region.value = regionOptions.value[0]?.value || ''
-  }
-})
-
-// Every required field, so Connect stays dead until the form could succeed.
-const canSave = computed(
-  () =>
-    Boolean(accessKey.value.trim()) &&
-    Boolean(bucket.value.trim()) &&
-    Boolean(provider.value) &&
-    Boolean(region.value) &&
-    (secretKeySet.value || Boolean(secretKey.value.trim())),
-)
-
-async function load() {
-  loading.value = true
-  try {
-    const data = await settingsApi.get()
-    providers.value = data.s3_providers || []
-    const s3 = data.s3 || {}
-    accessKey.value = s3.access_key || ''
-    bucket.value = s3.bucket || ''
-    provider.value = s3.provider || providers.value[0]?.value || ''
-    region.value = s3.region || ''
-    secretKeySet.value = !!s3.secret_key_set
-  } catch (e) {
-    error.value = e.message || 'Could not load settings.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function save() {
-  saving.value = true
-  error.value = ''
-  try {
-    const result = await settingsApi.update({
-      s3: {
-        access_key: accessKey.value.trim(),
-        secret_key: secretKey.value.trim(),
-        bucket: bucket.value.trim(),
-        provider: provider.value,
-        region: region.value,
-      },
-    })
-    if (!result.error) {
-      secretKey.value = ''
-      toast.success('Object storage settings saved')
-      await load()
-    } else {
-      error.value = apiErrorMessage(result, 'Could not save object storage settings.')
-    }
-  } catch (e) {
-    error.value = e.message || 'Could not save object storage settings.'
-  } finally {
-    saving.value = false
-  }
-}
-
-async function disconnect() {
-  disconnecting.value = true
-  try {
-    const result = await settingsApi.update({ s3: { disconnect: true } })
-    if (!result.error) {
-      accessKey.value = ''
-      secretKey.value = ''
-      bucket.value = ''
-      provider.value = providers.value[0]?.value || ''
-      region.value = ''
-      secretKeySet.value = false
-      toast.success('Object storage disconnected')
-    } else {
-      toast.error(apiErrorMessage(result, 'Could not disconnect object storage.'))
-    }
-  } catch (e) {
-    toast.error(e.message || 'Could not disconnect object storage.')
-  } finally {
-    disconnecting.value = false
-  }
-}
-
-onMounted(load)
-</script>

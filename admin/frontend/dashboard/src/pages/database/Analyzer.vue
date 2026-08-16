@@ -1,3 +1,426 @@
+<script setup lang="ts">
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  ErrorMessage,
+  FormControl,
+  LoadingText,
+  Tooltip,
+  toast,
+} from 'frappe-ui'
+import {
+  ListHeader,
+  ListRowItem,
+  ListRows,
+  ListView,
+} from 'frappe-ui/experimental'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { apiErrorMessage } from '@/api/client'
+import { databaseApi } from '@/api/database'
+import DatabasePanel from '@/components/database/DatabasePanel.vue'
+import SizeBreakup from '@/components/database/SizeBreakup.vue'
+import TableSizesDialog from '@/components/database/TableSizesDialog.vue'
+import { formatBytes } from '@/utils/format'
+import { relativeTime } from '@/utils/taskFormat'
+
+const AUTO_REFRESH_INTERVAL_MS = 2000
+
+const processColumns = [
+  { label: '#', key: 'number', align: 'left', width: '2.5rem' },
+  { label: 'ID', key: 'id', align: 'left', width: 1 },
+  { label: 'State', key: 'state', align: 'left', width: 1 },
+  { label: 'Time', key: 'time', align: 'right', width: 1 },
+  { label: 'User', key: 'user', align: 'left', width: 1 },
+  { label: 'Host', key: 'host', align: 'left', width: 1.5 },
+  { label: 'Command', key: 'command', align: 'left', width: 1 },
+  { label: 'Query', key: 'query', align: 'left', width: 3 },
+  { label: '', key: 'actions', align: 'right', width: '5rem' },
+]
+
+const lockColumns = [
+  { label: '#', key: 'number', align: 'left', width: '2rem' },
+  { label: 'ID', key: 'id', align: 'left', width: 0.8 },
+  { label: 'Type', key: 'type', align: 'left', width: 0.8 },
+  { label: 'Mode', key: 'mode', align: 'left', width: 0.8 },
+  { label: 'Table', key: 'table', align: 'left', width: 1.2 },
+  { label: 'Index', key: 'index', align: 'left', width: 0.8 },
+  { label: 'State', key: 'state', align: 'left', width: 0.8 },
+  { label: 'Started', key: 'started', align: 'left', width: 1.2 },
+  { label: 'Query', key: 'query', align: 'left', width: 1.5 },
+  { label: 'Rows Locked', key: 'rowsLocked', align: 'right', width: 0.9 },
+  { label: 'Rows Modified', key: 'rowsModified', align: 'right', width: 1 },
+]
+
+const binlogColumns = [
+  { label: '#', key: 'number', align: 'left', width: '2rem' },
+  { label: '', key: 'selected', align: 'left', width: '2rem' },
+  { label: 'File', key: 'name', align: 'left', width: 2 },
+  { label: 'Date', key: 'date', align: 'left', width: 1.5 },
+  { label: 'Size', key: 'size', align: 'right', width: 1 },
+  { label: '', key: 'actions', align: 'right', width: '3rem' },
+]
+
+const route = useRoute()
+
+const loading = ref(false)
+const error = ref('')
+const diagnostics = ref(null)
+const configuredEngine = ref('')
+const sites = ref([])
+const selectedSite = ref('')
+
+const processes = ref([])
+const processesLoading = ref(false)
+const processesError = ref('')
+
+const lockWaits = ref([])
+const lockWaitsLoading = ref(false)
+const lockWaitsError = ref('')
+const autoRefreshLocks = ref(true)
+let lockWaitsTimer = null
+let lockWaitsPollVersion = 0
+let lockWaitsRequest = null
+let lockWaitsRequestSite = null
+let lockWaitsReloadQueued = false
+
+const binlogs = ref([])
+const binlogsLoading = ref(false)
+const binlogsError = ref('')
+
+const size = ref(null)
+const sizeLoading = ref(false)
+const sizeError = ref('')
+const showTableSizes = ref(false)
+
+const killTarget = ref(null)
+const showKillDialog = ref(false)
+const killing = ref(false)
+const killError = ref('')
+
+const selectedIndex = ref(-1)
+const showPurgeDialog = ref(false)
+const pendingIndex = ref(-1)
+const purging = ref(false)
+const purgeError = ref('')
+
+const processRows = computed(() =>
+  processes.value.map((process, index) => ({
+    number: index + 1,
+    id: process.id,
+    state: process.state || '—',
+    time: formatSeconds(process.duration_seconds),
+    user: process.user || '—',
+    host: process.host || '—',
+    command: process.command || '—',
+    query: truncateQuery(process.query),
+    process,
+  })),
+)
+
+const lockRows = computed(() =>
+  lockWaits.value.map((row, index) => ({
+    number: index + 1,
+    id: row.id,
+    type: row.type,
+    mode: row.mode,
+    table: row.table || '—',
+    index: row.index || '—',
+    state: row.state || '—',
+    started: row.started || '—',
+    query: truncateQuery(row.query),
+    rowsLocked: row.rows_locked ?? '—',
+    rowsModified: row.rows_modified ?? '—',
+  })),
+)
+
+const binlogRows = computed(() =>
+  binlogs.value.map((file, index) => ({
+    number: index + 1,
+    name: file.name,
+    date: fileAge(file),
+    size: formatBytes(file.size_bytes),
+    index,
+    isActive: index === binlogs.value.length - 1,
+  })),
+)
+
+const killDetails = computed(() => {
+  const process = killTarget.value
+  if (!process) return []
+  return [
+    { label: 'User', value: process.user || '—' },
+    { label: 'Database', value: process.database || '—' },
+    { label: 'State', value: process.command || '—' },
+    { label: 'Running for', value: formatSeconds(process.duration_seconds) },
+  ]
+})
+
+const killQuery = computed(() => killTarget.value?.query || '')
+
+const pendingFiles = computed(() =>
+  pendingIndex.value < 0 ? [] : binlogs.value.slice(0, pendingIndex.value + 1),
+)
+const pendingSize = computed(() =>
+  formatBytes(pendingFiles.value.reduce((total, file) => total + file.size_bytes, 0)),
+)
+
+// Deletion is always a contiguous run from the oldest file, so the range says
+// everything a list of names would - and stays readable at hundreds of files.
+const purgeDetails = computed(() => {
+  const files = pendingFiles.value
+  if (!files.length) return []
+  const kept = binlogs.value[pendingIndex.value + 1]
+  return [
+    { label: 'Oldest deleted', value: files[0].name },
+    { label: 'Newest deleted', value: files[files.length - 1].name },
+    { label: 'Kept from', value: kept ? kept.name : '—' },
+  ]
+})
+
+const lockColumnsBadge = computed(() =>
+  configuredEngine.value === 'postgres' ? "Some columns aren't available for PostgreSQL" : '',
+)
+
+// Binary logs are a MariaDB concept; the engine reports no status when it has none.
+const hasBinlogs = computed(() => Boolean(diagnostics.value?.binlog))
+
+// Only sites on this server can be scoped to; a SQLite site owns a file, not a
+// database on the bench's engine.
+const siteOptions = computed(() => [
+  { label: 'All databases', value: '' },
+  ...sites.value
+    .filter((site) => site.db_type === configuredEngine.value)
+    .map((site) => ({ label: site.name, value: site.name })),
+])
+
+const scopeBadge = computed(() => selectedSite.value)
+
+const MAX_QUERY_LENGTH = 120
+
+// Long queries can be arbitrarily large single-line strings that would
+// otherwise force the table wider than the page.
+const truncateQuery = (query) => {
+  if (!query) return '—'
+  return query.length > MAX_QUERY_LENGTH ? `${query.slice(0, MAX_QUERY_LENGTH)}…` : query
+}
+
+const formatSeconds = (seconds) => {
+  return seconds == null ? '—' : `${Math.round(seconds)}s`
+}
+
+const fileAge = (file) => {
+  return file.modified_ms ? relativeTime(new Date(file.modified_ms).toISOString()) : '—'
+}
+
+// Purging is contiguous from the oldest file, so ticking one file ticks every
+// older file with it and unticking one clears everything newer.
+const toggle = (index, checked) => {
+  selectedIndex.value = checked ? index : index - 1
+}
+
+const confirmKill = (process) => {
+  killTarget.value = process
+  killError.value = ''
+  showKillDialog.value = true
+}
+
+const kill = async () => {
+  killing.value = true
+  killError.value = ''
+  try {
+    const result = await databaseApi.killProcess(killTarget.value.id)
+    if (result.error) throw new Error(apiErrorMessage(result, 'Could not kill the process.'))
+    showKillDialog.value = false
+    toast.success(`Killed process ${killTarget.value.id}`)
+    await loadProcesses()
+  } catch (e) {
+    killError.value = e.message || 'Could not kill the process.'
+  } finally {
+    killing.value = false
+  }
+}
+
+const confirmPurge = (index) => {
+  pendingIndex.value = index
+  purgeError.value = ''
+  showPurgeDialog.value = true
+}
+
+const purge = async () => {
+  // PURGE keeps the named file, so target the one just after the last selected.
+  const keepFrom = binlogs.value[pendingIndex.value + 1]
+  if (!keepFrom) return
+  purging.value = true
+  purgeError.value = ''
+  try {
+    const result = await databaseApi.binlogs.purge(keepFrom.name)
+    if (result.error) throw new Error(apiErrorMessage(result, 'Could not delete binary logs.'))
+    showPurgeDialog.value = false
+    selectedIndex.value = -1
+    toast.success('Binary logs deleted')
+    await loadBinlogs()
+  } catch (e) {
+    purgeError.value = e.message || 'Could not delete binary logs.'
+  } finally {
+    purging.value = false
+  }
+}
+
+const loadProcesses = async () => {
+  processesLoading.value = true
+  processesError.value = ''
+  try {
+    const result = await databaseApi.processList(selectedSite.value)
+    if (result?.error)
+      throw new Error(apiErrorMessage(result, 'Could not load database processes.'))
+    processes.value = Array.isArray(result) ? result : []
+  } catch (e) {
+    processesError.value = e.message || 'Could not load database processes.'
+  } finally {
+    processesLoading.value = false
+  }
+}
+
+const loadLockWaits = () => {
+  if (lockWaitsRequest) {
+    if (lockWaitsRequestSite !== selectedSite.value) lockWaitsReloadQueued = true
+    return lockWaitsRequest
+  }
+  lockWaitsRequest = drainLockWaitsRequests()
+  return lockWaitsRequest
+}
+
+const drainLockWaitsRequests = async () => {
+  lockWaitsLoading.value = true
+  try {
+    do {
+      lockWaitsReloadQueued = false
+      await fetchLockWaits()
+    } while (lockWaitsReloadQueued)
+  } finally {
+    lockWaitsLoading.value = false
+    lockWaitsRequest = null
+    lockWaitsRequestSite = null
+  }
+}
+
+const fetchLockWaits = async () => {
+  const site = selectedSite.value
+  lockWaitsRequestSite = site
+  lockWaitsError.value = ''
+  try {
+    const result = await databaseApi.lockWaitRows(site)
+    if (site !== selectedSite.value) {
+      lockWaitsReloadQueued = true
+      return
+    }
+    if (result?.error)
+      throw new Error(apiErrorMessage(result, 'Could not load database lock waits.'))
+    lockWaits.value = Array.isArray(result) ? result : []
+  } catch (e) {
+    if (site !== selectedSite.value) lockWaitsReloadQueued = true
+    else lockWaitsError.value = e.message || 'Could not load database lock waits.'
+  }
+}
+
+const loadSize = async () => {
+  sizeLoading.value = true
+  sizeError.value = ''
+  try {
+    const result = await databaseApi.size(selectedSite.value)
+    if (result?.error) throw new Error(apiErrorMessage(result, 'Could not read the database size.'))
+    size.value = result
+  } catch (e) {
+    size.value = null
+    sizeError.value = e.message || 'Could not read the database size.'
+  } finally {
+    sizeLoading.value = false
+  }
+}
+
+const loadBinlogs = async () => {
+  binlogsLoading.value = true
+  binlogsError.value = ''
+  try {
+    const result = await databaseApi.binlogs.list()
+    if (result?.error) throw new Error(apiErrorMessage(result, 'Could not load binary logs.'))
+    binlogs.value = Array.isArray(result) ? result : []
+    selectedIndex.value = -1
+  } catch (e) {
+    binlogsError.value = e.message || 'Could not load binary logs.'
+  } finally {
+    binlogsLoading.value = false
+  }
+}
+
+const pollLockWaits = async (version) => {
+  await loadLockWaits()
+  if (version !== lockWaitsPollVersion || !autoRefreshLocks.value) return
+  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
+}
+
+const startLockWaitsAutoRefresh = () => {
+  stopLockWaitsAutoRefresh()
+  const version = lockWaitsPollVersion
+  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
+}
+
+const stopLockWaitsAutoRefresh = () => {
+  lockWaitsPollVersion += 1
+  if (lockWaitsTimer) clearTimeout(lockWaitsTimer)
+  lockWaitsTimer = null
+}
+
+watch(autoRefreshLocks, (enabled) => {
+  if (enabled) startLockWaitsAutoRefresh()
+  else stopLockWaitsAutoRefresh()
+})
+
+// Binary logs are server-wide, so only the scoped panels refetch.
+watch(selectedSite, () => {
+  loadProcesses()
+  loadLockWaits()
+  loadSize()
+})
+
+onUnmounted(stopLockWaitsAutoRefresh)
+
+const load = async () => {
+  loading.value = true
+  error.value = ''
+  if (route.query.site) selectedSite.value = String(route.query.site)
+  try {
+    const result = await databaseApi.diagnostics()
+    if (result.error)
+      throw new Error(apiErrorMessage(result, 'Could not load database diagnostics.'))
+    diagnostics.value = result
+    configuredEngine.value = result.engine
+    if (!result.supported) return
+    const panels = [loadSites(), loadSize(), loadProcesses(), loadLockWaits()]
+    if (hasBinlogs.value) panels.push(loadBinlogs())
+    await Promise.all(panels)
+    if (autoRefreshLocks.value) startLockWaitsAutoRefresh()
+  } catch (e) {
+    error.value = e.message || 'Could not load database diagnostics.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadSites = async () => {
+  try {
+    const result = await databaseApi.sites()
+    sites.value = Array.isArray(result) ? result : []
+  } catch {
+    sites.value = [] // Scoping is optional - the page still works server-wide.
+  }
+}
+
+onMounted(load)
+</script>
+
 <template>
   <Teleport defer to="#header-actions">
     <FormControl
@@ -232,428 +655,7 @@
   </Dialog>
 </template>
 
-<script setup>
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  ErrorMessage,
-  FormControl,
-  LoadingText,
-  Tooltip,
-  toast,
-} from 'frappe-ui'
-import {
-  ListHeader,
-  ListRowItem,
-  ListRows,
-  ListView,
-} from 'frappe-ui/experimental'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { apiErrorMessage } from '@/api/client'
-import { databaseApi } from '@/api/database'
-import DatabasePanel from '@/components/database/DatabasePanel.vue'
-import SizeBreakup from '@/components/database/SizeBreakup.vue'
-import TableSizesDialog from '@/components/database/TableSizesDialog.vue'
-import { formatBytes } from '@/utils/format'
-import { relativeTime } from '@/utils/taskFormat'
 
-const AUTO_REFRESH_INTERVAL_MS = 2000
-
-const processColumns = [
-  { label: '#', key: 'number', align: 'left', width: '2.5rem' },
-  { label: 'ID', key: 'id', align: 'left', width: 1 },
-  { label: 'State', key: 'state', align: 'left', width: 1 },
-  { label: 'Time', key: 'time', align: 'right', width: 1 },
-  { label: 'User', key: 'user', align: 'left', width: 1 },
-  { label: 'Host', key: 'host', align: 'left', width: 1.5 },
-  { label: 'Command', key: 'command', align: 'left', width: 1 },
-  { label: 'Query', key: 'query', align: 'left', width: 3 },
-  { label: '', key: 'actions', align: 'right', width: '5rem' },
-]
-
-const lockColumns = [
-  { label: '#', key: 'number', align: 'left', width: '2rem' },
-  { label: 'ID', key: 'id', align: 'left', width: 0.8 },
-  { label: 'Type', key: 'type', align: 'left', width: 0.8 },
-  { label: 'Mode', key: 'mode', align: 'left', width: 0.8 },
-  { label: 'Table', key: 'table', align: 'left', width: 1.2 },
-  { label: 'Index', key: 'index', align: 'left', width: 0.8 },
-  { label: 'State', key: 'state', align: 'left', width: 0.8 },
-  { label: 'Started', key: 'started', align: 'left', width: 1.2 },
-  { label: 'Query', key: 'query', align: 'left', width: 1.5 },
-  { label: 'Rows Locked', key: 'rowsLocked', align: 'right', width: 0.9 },
-  { label: 'Rows Modified', key: 'rowsModified', align: 'right', width: 1 },
-]
-
-const binlogColumns = [
-  { label: '#', key: 'number', align: 'left', width: '2rem' },
-  { label: '', key: 'selected', align: 'left', width: '2rem' },
-  { label: 'File', key: 'name', align: 'left', width: 2 },
-  { label: 'Date', key: 'date', align: 'left', width: 1.5 },
-  { label: 'Size', key: 'size', align: 'right', width: 1 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
-]
-
-const route = useRoute()
-
-const loading = ref(false)
-const error = ref('')
-const diagnostics = ref(null)
-const configuredEngine = ref('')
-const sites = ref([])
-const selectedSite = ref('')
-
-const processes = ref([])
-const processesLoading = ref(false)
-const processesError = ref('')
-
-const lockWaits = ref([])
-const lockWaitsLoading = ref(false)
-const lockWaitsError = ref('')
-const autoRefreshLocks = ref(true)
-let lockWaitsTimer = null
-let lockWaitsPollVersion = 0
-let lockWaitsRequest = null
-let lockWaitsRequestSite = null
-let lockWaitsReloadQueued = false
-
-const binlogs = ref([])
-const binlogsLoading = ref(false)
-const binlogsError = ref('')
-
-const size = ref(null)
-const sizeLoading = ref(false)
-const sizeError = ref('')
-const showTableSizes = ref(false)
-
-const killTarget = ref(null)
-const showKillDialog = ref(false)
-const killing = ref(false)
-const killError = ref('')
-
-const selectedIndex = ref(-1)
-const showPurgeDialog = ref(false)
-const pendingIndex = ref(-1)
-const purging = ref(false)
-const purgeError = ref('')
-
-const processRows = computed(() =>
-  processes.value.map((process, index) => ({
-    number: index + 1,
-    id: process.id,
-    state: process.state || '—',
-    time: formatSeconds(process.duration_seconds),
-    user: process.user || '—',
-    host: process.host || '—',
-    command: process.command || '—',
-    query: truncateQuery(process.query),
-    process,
-  })),
-)
-
-const lockRows = computed(() =>
-  lockWaits.value.map((row, index) => ({
-    number: index + 1,
-    id: row.id,
-    type: row.type,
-    mode: row.mode,
-    table: row.table || '—',
-    index: row.index || '—',
-    state: row.state || '—',
-    started: row.started || '—',
-    query: truncateQuery(row.query),
-    rowsLocked: row.rows_locked ?? '—',
-    rowsModified: row.rows_modified ?? '—',
-  })),
-)
-
-const binlogRows = computed(() =>
-  binlogs.value.map((file, index) => ({
-    number: index + 1,
-    name: file.name,
-    date: fileAge(file),
-    size: formatBytes(file.size_bytes),
-    index,
-    isActive: index === binlogs.value.length - 1,
-  })),
-)
-
-const killDetails = computed(() => {
-  const process = killTarget.value
-  if (!process) return []
-  return [
-    { label: 'User', value: process.user || '—' },
-    { label: 'Database', value: process.database || '—' },
-    { label: 'State', value: process.command || '—' },
-    { label: 'Running for', value: formatSeconds(process.duration_seconds) },
-  ]
-})
-
-const killQuery = computed(() => killTarget.value?.query || '')
-
-const pendingFiles = computed(() =>
-  pendingIndex.value < 0 ? [] : binlogs.value.slice(0, pendingIndex.value + 1),
-)
-const pendingSize = computed(() =>
-  formatBytes(pendingFiles.value.reduce((total, file) => total + file.size_bytes, 0)),
-)
-
-// Deletion is always a contiguous run from the oldest file, so the range says
-// everything a list of names would - and stays readable at hundreds of files.
-const purgeDetails = computed(() => {
-  const files = pendingFiles.value
-  if (!files.length) return []
-  const kept = binlogs.value[pendingIndex.value + 1]
-  return [
-    { label: 'Oldest deleted', value: files[0].name },
-    { label: 'Newest deleted', value: files[files.length - 1].name },
-    { label: 'Kept from', value: kept ? kept.name : '—' },
-  ]
-})
-
-const lockColumnsBadge = computed(() =>
-  configuredEngine.value === 'postgres' ? "Some columns aren't available for PostgreSQL" : '',
-)
-
-// Binary logs are a MariaDB concept; the engine reports no status when it has none.
-const hasBinlogs = computed(() => Boolean(diagnostics.value?.binlog))
-
-// Only sites on this server can be scoped to; a SQLite site owns a file, not a
-// database on the bench's engine.
-const siteOptions = computed(() => [
-  { label: 'All databases', value: '' },
-  ...sites.value
-    .filter((site) => site.db_type === configuredEngine.value)
-    .map((site) => ({ label: site.name, value: site.name })),
-])
-
-const scopeBadge = computed(() => selectedSite.value)
-
-const MAX_QUERY_LENGTH = 120
-
-// Long queries can be arbitrarily large single-line strings that would
-// otherwise force the table wider than the page.
-function truncateQuery(query) {
-  if (!query) return '—'
-  return query.length > MAX_QUERY_LENGTH ? `${query.slice(0, MAX_QUERY_LENGTH)}…` : query
-}
-
-function formatSeconds(seconds) {
-  return seconds == null ? '—' : `${Math.round(seconds)}s`
-}
-
-function fileAge(file) {
-  return file.modified_ms ? relativeTime(new Date(file.modified_ms).toISOString()) : '—'
-}
-
-// Purging is contiguous from the oldest file, so ticking one file ticks every
-// older file with it and unticking one clears everything newer.
-function toggle(index, checked) {
-  selectedIndex.value = checked ? index : index - 1
-}
-
-function confirmKill(process) {
-  killTarget.value = process
-  killError.value = ''
-  showKillDialog.value = true
-}
-
-async function kill() {
-  killing.value = true
-  killError.value = ''
-  try {
-    const result = await databaseApi.killProcess(killTarget.value.id)
-    if (result.error) throw new Error(apiErrorMessage(result, 'Could not kill the process.'))
-    showKillDialog.value = false
-    toast.success(`Killed process ${killTarget.value.id}`)
-    await loadProcesses()
-  } catch (e) {
-    killError.value = e.message || 'Could not kill the process.'
-  } finally {
-    killing.value = false
-  }
-}
-
-function confirmPurge(index) {
-  pendingIndex.value = index
-  purgeError.value = ''
-  showPurgeDialog.value = true
-}
-
-async function purge() {
-  // PURGE keeps the named file, so target the one just after the last selected.
-  const keepFrom = binlogs.value[pendingIndex.value + 1]
-  if (!keepFrom) return
-  purging.value = true
-  purgeError.value = ''
-  try {
-    const result = await databaseApi.binlogs.purge(keepFrom.name)
-    if (result.error) throw new Error(apiErrorMessage(result, 'Could not delete binary logs.'))
-    showPurgeDialog.value = false
-    selectedIndex.value = -1
-    toast.success('Binary logs deleted')
-    await loadBinlogs()
-  } catch (e) {
-    purgeError.value = e.message || 'Could not delete binary logs.'
-  } finally {
-    purging.value = false
-  }
-}
-
-async function loadProcesses() {
-  processesLoading.value = true
-  processesError.value = ''
-  try {
-    const result = await databaseApi.processList(selectedSite.value)
-    if (result?.error)
-      throw new Error(apiErrorMessage(result, 'Could not load database processes.'))
-    processes.value = Array.isArray(result) ? result : []
-  } catch (e) {
-    processesError.value = e.message || 'Could not load database processes.'
-  } finally {
-    processesLoading.value = false
-  }
-}
-
-function loadLockWaits() {
-  if (lockWaitsRequest) {
-    if (lockWaitsRequestSite !== selectedSite.value) lockWaitsReloadQueued = true
-    return lockWaitsRequest
-  }
-  lockWaitsRequest = drainLockWaitsRequests()
-  return lockWaitsRequest
-}
-
-async function drainLockWaitsRequests() {
-  lockWaitsLoading.value = true
-  try {
-    do {
-      lockWaitsReloadQueued = false
-      await fetchLockWaits()
-    } while (lockWaitsReloadQueued)
-  } finally {
-    lockWaitsLoading.value = false
-    lockWaitsRequest = null
-    lockWaitsRequestSite = null
-  }
-}
-
-async function fetchLockWaits() {
-  const site = selectedSite.value
-  lockWaitsRequestSite = site
-  lockWaitsError.value = ''
-  try {
-    const result = await databaseApi.lockWaitRows(site)
-    if (site !== selectedSite.value) {
-      lockWaitsReloadQueued = true
-      return
-    }
-    if (result?.error)
-      throw new Error(apiErrorMessage(result, 'Could not load database lock waits.'))
-    lockWaits.value = Array.isArray(result) ? result : []
-  } catch (e) {
-    if (site !== selectedSite.value) lockWaitsReloadQueued = true
-    else lockWaitsError.value = e.message || 'Could not load database lock waits.'
-  }
-}
-
-async function loadSize() {
-  sizeLoading.value = true
-  sizeError.value = ''
-  try {
-    const result = await databaseApi.size(selectedSite.value)
-    if (result?.error) throw new Error(apiErrorMessage(result, 'Could not read the database size.'))
-    size.value = result
-  } catch (e) {
-    size.value = null
-    sizeError.value = e.message || 'Could not read the database size.'
-  } finally {
-    sizeLoading.value = false
-  }
-}
-
-async function loadBinlogs() {
-  binlogsLoading.value = true
-  binlogsError.value = ''
-  try {
-    const result = await databaseApi.binlogs.list()
-    if (result?.error) throw new Error(apiErrorMessage(result, 'Could not load binary logs.'))
-    binlogs.value = Array.isArray(result) ? result : []
-    selectedIndex.value = -1
-  } catch (e) {
-    binlogsError.value = e.message || 'Could not load binary logs.'
-  } finally {
-    binlogsLoading.value = false
-  }
-}
-
-async function pollLockWaits(version) {
-  await loadLockWaits()
-  if (version !== lockWaitsPollVersion || !autoRefreshLocks.value) return
-  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
-}
-
-function startLockWaitsAutoRefresh() {
-  stopLockWaitsAutoRefresh()
-  const version = lockWaitsPollVersion
-  lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
-}
-
-function stopLockWaitsAutoRefresh() {
-  lockWaitsPollVersion += 1
-  if (lockWaitsTimer) clearTimeout(lockWaitsTimer)
-  lockWaitsTimer = null
-}
-
-watch(autoRefreshLocks, (enabled) => {
-  if (enabled) startLockWaitsAutoRefresh()
-  else stopLockWaitsAutoRefresh()
-})
-
-// Binary logs are server-wide, so only the scoped panels refetch.
-watch(selectedSite, () => {
-  loadProcesses()
-  loadLockWaits()
-  loadSize()
-})
-
-onUnmounted(stopLockWaitsAutoRefresh)
-
-async function load() {
-  loading.value = true
-  error.value = ''
-  if (route.query.site) selectedSite.value = String(route.query.site)
-  try {
-    const result = await databaseApi.diagnostics()
-    if (result.error)
-      throw new Error(apiErrorMessage(result, 'Could not load database diagnostics.'))
-    diagnostics.value = result
-    configuredEngine.value = result.engine
-    if (!result.supported) return
-    const panels = [loadSites(), loadSize(), loadProcesses(), loadLockWaits()]
-    if (hasBinlogs.value) panels.push(loadBinlogs())
-    await Promise.all(panels)
-    if (autoRefreshLocks.value) startLockWaitsAutoRefresh()
-  } catch (e) {
-    error.value = e.message || 'Could not load database diagnostics.'
-  } finally {
-    loading.value = false
-  }
-}
-
-async function loadSites() {
-  try {
-    const result = await databaseApi.sites()
-    sites.value = Array.isArray(result) ? result : []
-  } catch {
-    sites.value = [] // Scoping is optional - the page still works server-wide.
-  }
-}
-
-onMounted(load)
-</script>
 
 <style scoped>
 /* A `1fr` grid track takes its minimum from the item's min-content width, so a

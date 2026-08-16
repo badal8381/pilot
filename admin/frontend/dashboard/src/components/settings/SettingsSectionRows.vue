@@ -1,3 +1,16 @@
+<script setup lang="ts">
+import SettingsRow from '@/components/settings/SettingsRow.vue'
+
+defineProps({ sections: { type: Array, required: true } })
+const emit = defineEmits(['passwordChanged'])
+const openSection = defineModel('openSection')
+
+const handlePasswordChanged = () => {
+  openSection.value = null
+  emit('passwordChanged')
+}
+</script>
+
 <template>
   <div v-if="openSection">
     <component :is="openSection.component" @passwordChanged="handlePasswordChanged" />
@@ -19,16 +32,3 @@
     </SettingsRow>
   </div>
 </template>
-
-<script setup>
-import SettingsRow from '@/components/settings/SettingsRow.vue'
-
-defineProps({ sections: { type: Array, required: true } })
-const emit = defineEmits(['passwordChanged'])
-const openSection = defineModel('openSection')
-
-function handlePasswordChanged() {
-  openSection.value = null
-  emit('passwordChanged')
-}
-</script>

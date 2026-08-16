@@ -1,3 +1,50 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { Button, ErrorMessage, toast } from 'frappe-ui'
+
+import PasswordInput from '@/components/common/PasswordInput.vue'
+import PasswordStrengthMeter from '@/components/common/PasswordStrengthMeter.vue'
+
+import { settingsApi } from '@/api/settings'
+import { meetsPasswordRequirements } from '@/utils/passwordStrength'
+
+const emit = defineEmits(['passwordChanged'])
+
+const newPassword = ref('')
+const confirmPassword = ref('')
+const saving = ref(false)
+const error = ref('')
+
+const canSubmit = computed(() => meetsPasswordRequirements(newPassword.value))
+
+const validationError = () => {
+  if (newPassword.value !== confirmPassword.value) return 'New passwords do not match.'
+  return ''
+}
+
+const reset = () => {
+  newPassword.value = ''
+  confirmPassword.value = ''
+}
+
+const save = async () => {
+  error.value = validationError()
+  if (error.value) return
+
+  saving.value = true
+  try {
+    await settingsApi.changeAdminPassword({ new_password: newPassword.value })
+    reset()
+    toast.success('Password changed')
+    emit('passwordChanged')
+  } catch (e) {
+    error.value = e.message || 'Could not change the password.'
+  } finally {
+    saving.value = false
+  }
+}
+</script>
+
 <template>
   <div class="space-y-4">
     <div class="space-y-2">
@@ -24,48 +71,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, ref } from 'vue'
-import { Button, ErrorMessage, toast } from 'frappe-ui'
-import PasswordInput from '@/components/common/PasswordInput.vue'
-import PasswordStrengthMeter from '@/components/common/PasswordStrengthMeter.vue'
-import { settingsApi } from '@/api/settings'
-import { meetsPasswordRequirements } from '@/utils/passwordStrength'
-
-const emit = defineEmits(['passwordChanged'])
-
-const newPassword = ref('')
-const confirmPassword = ref('')
-const saving = ref(false)
-const error = ref('')
-
-const canSubmit = computed(() => meetsPasswordRequirements(newPassword.value))
-
-function validationError() {
-  if (newPassword.value !== confirmPassword.value) return 'New passwords do not match.'
-  return ''
-}
-
-function reset() {
-  newPassword.value = ''
-  confirmPassword.value = ''
-}
-
-async function save() {
-  error.value = validationError()
-  if (error.value) return
-
-  saving.value = true
-  try {
-    await settingsApi.changeAdminPassword({ new_password: newPassword.value })
-    reset()
-    toast.success('Password changed')
-    emit('passwordChanged')
-  } catch (e) {
-    error.value = e.message || 'Could not change the password.'
-  } finally {
-    saving.value = false
-  }
-}
-</script>

@@ -1,3 +1,223 @@
+<script setup lang="ts">
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Button, ErrorMessage, FormControl, LoadingText, Tooltip } from 'frappe-ui'
+
+import EmptyState from '@/components/common/EmptyState.vue'
+import LogView from '@/components/logs/LogView.vue'
+
+import { logsApi } from '@/api/logs'
+import { escapeHtml, processLine } from '@/utils/ansi'
+import { formatBytes } from '@/utils/format'
+import { useBench } from '@/composables/benches/useBench'
+import { useIsMobile } from '@/composables/common/useIsMobile'
+
+const route = useRoute()
+const router = useRouter()
+
+const { name: benchName, load: loadBench } = useBench()
+
+const shortRelativeTime = (iso) => {
+  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return `${Math.floor(hours / 24)}d ago`
+}
+
+const hasErrors = (log) => {
+  return log.filename.endsWith('.error.log') && log.size_bytes > 0
+}
+
+// ── Log list ─────────────────────────────────────────────────────────────
+const logs = ref([])
+const logsLoading = ref(true)
+const logsError = ref('')
+const fileSearch = ref('')
+
+const filteredLogs = computed(() => {
+  const term = fileSearch.value.trim().toLowerCase()
+  return term ? logs.value.filter((log) => log.filename.toLowerCase().includes(term)) : logs.value
+})
+
+const totalLineCount = computed(
+  () =>
+    logs.value.find((log) => log.filename === selectedFile.value)?.line_count ??
+    rawLines.value.length,
+)
+
+const loadLogs = async () => {
+  logsLoading.value = true
+  logsError.value = ''
+  try {
+    // Sort once here (most recently active first) - filteredLogs only needs to filter.
+    logs.value = (await logsApi.list()).sort(
+      (a, b) => new Date(b.last_modified) - new Date(a.last_modified),
+    )
+  } catch (caught) {
+    logsError.value = caught.message || 'Failed to load logs'
+  } finally {
+    logsLoading.value = false
+  }
+}
+
+// ── Viewer ───────────────────────────────────────────────────────────────
+const selectedFile = ref(route.query.file || '')
+const rawLines = ref([])
+const contentLoading = ref(false)
+const contentError = ref('')
+const search = ref('')
+const linesCount = ref(200)
+const liveMode = ref(false)
+const terminal = ref(null)
+const viewer = ref(null)
+const activeMatch = ref(0)
+const matchTotal = ref(0)
+let eventSource = null
+let lastTerm = ''
+
+// Matches the `md:` classes that switch the list/viewer layout.
+const isSinglePane = useIsMobile(768)
+
+const isSearching = computed(() => search.value.trim().length > 0)
+
+// Re-run ANSI processing per fetch, not per search keystroke.
+const processedLines = computed(() => rawLines.value.map(processLine))
+
+const searchPattern = computed(() => {
+  const term = search.value.trim()
+  return term ? new RegExp(escapeRegExp(escapeHtml(term)), 'gi') : null
+})
+
+// Search highlights in place; data-mi tags matches for jumping.
+const visibleLines = computed(() => {
+  const pattern = searchPattern.value
+  return pattern
+    ? processedLines.value.map((line) => highlight(line, pattern))
+    : processedLines.value
+})
+
+watch(visibleLines, () => nextTick(syncMatches))
+watch(linesCount, () => loadContent())
+
+const syncMatches = () => {
+  // Skip the DOM scan entirely when there's nothing to highlight - matters
+  // most during live tail, where visibleLines otherwise changes every line.
+  if (!isSearching.value) {
+    matchTotal.value = 0
+    activeMatch.value = -1
+    return
+  }
+  const marks = matchEls()
+  matchTotal.value = marks.length
+  const term = search.value.trim()
+  if (term !== lastTerm) {
+    lastTerm = term
+    activeMatch.value = marks.length ? 0 : -1
+    paintMatches(!liveMode.value)
+  } else {
+    if (activeMatch.value >= marks.length) activeMatch.value = marks.length - 1
+    paintMatches(false)
+  }
+}
+
+const gotoMatch = (delta) => {
+  const marks = matchEls()
+  if (!marks.length) return
+  activeMatch.value = (activeMatch.value + delta + marks.length) % marks.length
+  paintMatches(true)
+}
+
+const matchEls = () => {
+  return viewer.value ? [...viewer.value.querySelectorAll('mark[data-mi]')] : []
+}
+
+const paintMatches = (scroll) => {
+  matchEls().forEach((el, index) => {
+    const active = index === activeMatch.value
+    el.classList.toggle('log-match--active', active)
+    if (active && scroll) el.scrollIntoView({ block: 'center' })
+  })
+}
+
+watch(selectedFile, (filename) => {
+  router.replace({ path: '/insights/logs', query: filename ? { file: filename } : {} })
+  stopLive()
+  rawLines.value = []
+  search.value = ''
+  if (filename) loadContent()
+})
+
+const loadContent = async () => {
+  if (!selectedFile.value) return
+  contentLoading.value = true
+  contentError.value = ''
+  try {
+    const data = await logsApi.read(selectedFile.value, linesCount.value)
+    rawLines.value = data.lines
+    if (!isSearching.value) {
+      await nextTick()
+      terminal.value?.scrollToBottom()
+    }
+  } catch (caught) {
+    contentError.value = caught.message || 'Failed to load log'
+  } finally {
+    contentLoading.value = false
+  }
+}
+
+const startLive = () => {
+  liveMode.value = true
+  rawLines.value = []
+  eventSource = new EventSource(logsApi.streamUrl(selectedFile.value))
+  eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data)
+    rawLines.value.push(data.error ? `ERROR: ${data.error}` : data.line)
+    if (rawLines.value.length > 2000) rawLines.value.shift()
+  }
+  eventSource.onerror = () => stopLive()
+}
+
+const stopLive = () => {
+  liveMode.value = false
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
+  }
+}
+
+// Wrap matches in rendered HTML, touching only text between tags so ANSI
+// <span>s stay intact; the pattern is built from an HTML-escaped term.
+const highlight = (html, pattern) => {
+  return html.replace(
+    /(<[^>]+>)|([^<]+)/g,
+    (_, tag, text) =>
+      tag ||
+      text.replace(pattern, (match) => `<mark data-mi class="log-match">${match}</mark>`),
+  )
+}
+
+const escapeRegExp = (text) => {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+onMounted(async () => {
+  loadBench()
+  await loadLogs()
+  if (selectedFile.value) {
+    loadContent()
+  } else if (filteredLogs.value.length && !isSinglePane.value) {
+    // Desktop shows both panes, so preselect the most recently active log. On
+    // mobile (< md) only one pane is visible at a time - leave the list showing instead.
+    selectedFile.value = filteredLogs.value[0].filename
+  }
+})
+
+onUnmounted(() => stopLive())
+</script>
+
 <template>
   <!-- 5rem = 3rem sticky header + the shell's 2rem vertical page padding -->
   <div class="flex flex-col h-[calc(100dvh-5rem)]">
@@ -208,223 +428,7 @@
   </div>
 </template>
 
-<script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Button, ErrorMessage, FormControl, LoadingText, Tooltip } from 'frappe-ui'
-import EmptyState from '@/components/common/EmptyState.vue'
-import LogView from '@/components/logs/LogView.vue'
-import { logsApi } from '@/api/logs'
-import { escapeHtml, processLine } from '@/utils/ansi'
-import { formatBytes } from '@/utils/format'
-import { useBench } from '@/composables/benches/useBench'
-import { useIsMobile } from '@/composables/common/useIsMobile'
 
-const route = useRoute()
-const router = useRouter()
-
-const { name: benchName, load: loadBench } = useBench()
-
-function shortRelativeTime(iso) {
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
-
-function hasErrors(log) {
-  return log.filename.endsWith('.error.log') && log.size_bytes > 0
-}
-
-// ── Log list ─────────────────────────────────────────────────────────────
-const logs = ref([])
-const logsLoading = ref(true)
-const logsError = ref('')
-const fileSearch = ref('')
-
-const filteredLogs = computed(() => {
-  const term = fileSearch.value.trim().toLowerCase()
-  return term ? logs.value.filter((log) => log.filename.toLowerCase().includes(term)) : logs.value
-})
-
-const totalLineCount = computed(
-  () =>
-    logs.value.find((log) => log.filename === selectedFile.value)?.line_count ??
-    rawLines.value.length,
-)
-
-async function loadLogs() {
-  logsLoading.value = true
-  logsError.value = ''
-  try {
-    // Sort once here (most recently active first) - filteredLogs only needs to filter.
-    logs.value = (await logsApi.list()).sort(
-      (a, b) => new Date(b.last_modified) - new Date(a.last_modified),
-    )
-  } catch (caught) {
-    logsError.value = caught.message || 'Failed to load logs'
-  } finally {
-    logsLoading.value = false
-  }
-}
-
-// ── Viewer ───────────────────────────────────────────────────────────────
-const selectedFile = ref(route.query.file || '')
-const rawLines = ref([])
-const contentLoading = ref(false)
-const contentError = ref('')
-const search = ref('')
-const linesCount = ref(200)
-const liveMode = ref(false)
-const terminal = ref(null)
-const viewer = ref(null)
-const activeMatch = ref(0)
-const matchTotal = ref(0)
-let eventSource = null
-let lastTerm = ''
-
-// Matches the `md:` classes that switch the list/viewer layout.
-const isSinglePane = useIsMobile(768)
-
-const isSearching = computed(() => search.value.trim().length > 0)
-
-// Re-run ANSI processing per fetch, not per search keystroke.
-const processedLines = computed(() => rawLines.value.map(processLine))
-
-const searchPattern = computed(() => {
-  const term = search.value.trim()
-  return term ? new RegExp(escapeRegExp(escapeHtml(term)), 'gi') : null
-})
-
-// Search highlights in place; data-mi tags matches for jumping.
-const visibleLines = computed(() => {
-  const pattern = searchPattern.value
-  return pattern
-    ? processedLines.value.map((line) => highlight(line, pattern))
-    : processedLines.value
-})
-
-watch(visibleLines, () => nextTick(syncMatches))
-watch(linesCount, () => loadContent())
-
-function syncMatches() {
-  // Skip the DOM scan entirely when there's nothing to highlight - matters
-  // most during live tail, where visibleLines otherwise changes every line.
-  if (!isSearching.value) {
-    matchTotal.value = 0
-    activeMatch.value = -1
-    return
-  }
-  const marks = matchEls()
-  matchTotal.value = marks.length
-  const term = search.value.trim()
-  if (term !== lastTerm) {
-    lastTerm = term
-    activeMatch.value = marks.length ? 0 : -1
-    paintMatches(!liveMode.value)
-  } else {
-    if (activeMatch.value >= marks.length) activeMatch.value = marks.length - 1
-    paintMatches(false)
-  }
-}
-
-function gotoMatch(delta) {
-  const marks = matchEls()
-  if (!marks.length) return
-  activeMatch.value = (activeMatch.value + delta + marks.length) % marks.length
-  paintMatches(true)
-}
-
-function matchEls() {
-  return viewer.value ? [...viewer.value.querySelectorAll('mark[data-mi]')] : []
-}
-
-function paintMatches(scroll) {
-  matchEls().forEach((el, index) => {
-    const active = index === activeMatch.value
-    el.classList.toggle('log-match--active', active)
-    if (active && scroll) el.scrollIntoView({ block: 'center' })
-  })
-}
-
-watch(selectedFile, (filename) => {
-  router.replace({ path: '/insights/logs', query: filename ? { file: filename } : {} })
-  stopLive()
-  rawLines.value = []
-  search.value = ''
-  if (filename) loadContent()
-})
-
-async function loadContent() {
-  if (!selectedFile.value) return
-  contentLoading.value = true
-  contentError.value = ''
-  try {
-    const data = await logsApi.read(selectedFile.value, linesCount.value)
-    rawLines.value = data.lines
-    if (!isSearching.value) {
-      await nextTick()
-      terminal.value?.scrollToBottom()
-    }
-  } catch (caught) {
-    contentError.value = caught.message || 'Failed to load log'
-  } finally {
-    contentLoading.value = false
-  }
-}
-
-function startLive() {
-  liveMode.value = true
-  rawLines.value = []
-  eventSource = new EventSource(logsApi.streamUrl(selectedFile.value))
-  eventSource.onmessage = (event) => {
-    const data = JSON.parse(event.data)
-    rawLines.value.push(data.error ? `ERROR: ${data.error}` : data.line)
-    if (rawLines.value.length > 2000) rawLines.value.shift()
-  }
-  eventSource.onerror = () => stopLive()
-}
-
-function stopLive() {
-  liveMode.value = false
-  if (eventSource) {
-    eventSource.close()
-    eventSource = null
-  }
-}
-
-// Wrap matches in rendered HTML, touching only text between tags so ANSI
-// <span>s stay intact; the pattern is built from an HTML-escaped term.
-function highlight(html, pattern) {
-  return html.replace(
-    /(<[^>]+>)|([^<]+)/g,
-    (_, tag, text) =>
-      tag ||
-      text.replace(pattern, (match) => `<mark data-mi class="log-match">${match}</mark>`),
-  )
-}
-
-function escapeRegExp(text) {
-  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-onMounted(async () => {
-  loadBench()
-  await loadLogs()
-  if (selectedFile.value) {
-    loadContent()
-  } else if (filteredLogs.value.length && !isSinglePane.value) {
-    // Desktop shows both panes, so preselect the most recently active log. On
-    // mobile (< md) only one pane is visible at a time - leave the list showing instead.
-    selectedFile.value = filteredLogs.value[0].filename
-  }
-})
-
-onUnmounted(() => stopLive())
-</script>
 
 <!-- Unscoped: the <mark>s are injected via v-html and never get the scope attribute. -->
 <style>

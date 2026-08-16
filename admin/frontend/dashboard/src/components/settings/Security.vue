@@ -1,3 +1,32 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { Button, Dialog, toast } from 'frappe-ui'
+
+import SettingsSectionRows from '@/components/settings/SettingsSectionRows.vue'
+
+import { SECURITY_SECTIONS as sections } from '@/components/settings/sections'
+import { sessionApi } from '@/api/session'
+
+const openSection = defineModel('openSection')
+
+const showRevokePrompt = ref(false)
+const revoking = ref(false)
+
+const revokeOtherSessions = async () => {
+  revoking.value = true
+  try {
+    const result = await sessionApi.revokeAll()
+    const others = Math.max((result.revoked_sessions || 0) - 1, 0)
+    toast.success(others ? `${others} other session${others === 1 ? '' : 's'} signed out` : 'No other sessions to revoke')
+    showRevokePrompt.value = false
+  } catch (e) {
+    toast.error(e.message || 'Could not revoke other sessions.')
+  } finally {
+    revoking.value = false
+  }
+}
+</script>
+
 <template>
   <SettingsSectionRows
     :sections="sections"
@@ -20,30 +49,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { ref } from 'vue'
-import { Button, Dialog, toast } from 'frappe-ui'
-import SettingsSectionRows from '@/components/settings/SettingsSectionRows.vue'
-import { SECURITY_SECTIONS as sections } from '@/components/settings/sections'
-import { sessionApi } from '@/api/session'
-
-const openSection = defineModel('openSection')
-
-const showRevokePrompt = ref(false)
-const revoking = ref(false)
-
-async function revokeOtherSessions() {
-  revoking.value = true
-  try {
-    const result = await sessionApi.revokeAll()
-    const others = Math.max((result.revoked_sessions || 0) - 1, 0)
-    toast.success(others ? `${others} other session${others === 1 ? '' : 's'} signed out` : 'No other sessions to revoke')
-    showRevokePrompt.value = false
-  } catch (e) {
-    toast.error(e.message || 'Could not revoke other sessions.')
-  } finally {
-    revoking.value = false
-  }
-}
-</script>

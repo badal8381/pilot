@@ -1,3 +1,16 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { Skeleton } from 'frappe-ui'
+
+const props = defineProps({
+  // Index-based width cycle: varied bars, stable across re-renders.
+  index: { type: Number, default: 0 },
+})
+
+const NAME_WIDTHS = ['w-32', 'w-24', 'w-40', 'w-28']
+const nameWidth = computed(() => NAME_WIDTHS[props.index % NAME_WIDTHS.length])
+</script>
+
 <template>
   <!-- The real card's classes, so nothing reflows when sites land. -->
   <div
@@ -15,16 +28,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed } from 'vue'
-import { Skeleton } from 'frappe-ui'
-
-const props = defineProps({
-  // Index-based width cycle: varied bars, stable across re-renders.
-  index: { type: Number, default: 0 },
-})
-
-const NAME_WIDTHS = ['w-32', 'w-24', 'w-40', 'w-28']
-const nameWidth = computed(() => NAME_WIDTHS[props.index % NAME_WIDTHS.length])
-</script>

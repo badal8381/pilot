@@ -1,109 +1,4 @@
-<template>
-  <div v-if="loading" class="flex justify-center items-center h-40">
-    <Spinner size="lg" class="text-ink-gray-4" />
-  </div>
-  <div v-else-if="jti">
-    <div v-if="activityLoading" class="flex justify-center items-center h-40">
-      <Spinner size="lg" class="text-ink-gray-4" />
-    </div>
-    <EmptyState
-      compact
-      v-else-if="!activity.length"
-      icon="lucide-history"
-      title="No activity recorded"
-      description="Actions taken by this session will show up here."
-    />
-    <ListView
-      v-else
-      :columns="activityColumns"
-      :rows="activityRows"
-      row-key="key"
-      :options="{ selectable: false, showTooltip: true }"
-    >
-      <template #cell="{ column, row, item }">
-        <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            icon="lucide-info"
-            label="Activity details"
-            tooltip="Details"
-            @click="openDetail(row)"
-          />
-        </div>
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
-      </template>
-    </ListView>
-  </div>
-  <div v-else class="space-y-5">
-    <div
-      v-if="loadError"
-      class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
-    >
-      {{ loadError }}
-    </div>
-    <template v-else>
-      <EmptyState
-        compact
-        v-if="!activeTokens.length"
-        icon="lucide-key-round"
-        title="No active sessions"
-        description="Sign-ins appear here while their tokens are valid."
-      />
-
-      <ListView
-        v-else
-        :columns="columns"
-        :rows="rows"
-        row-key="jti"
-        :options="{ selectable: false, showTooltip: true }"
-      >
-        <template #cell="{ column, row, item }">
-          <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row)">
-              <template #default="{ open }">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  :active="open"
-                  icon="lucide-ellipsis"
-                  label="Session actions"
-                  tooltip="Actions"
-                />
-              </template>
-            </Dropdown>
-          </div>
-          <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
-        </template>
-      </ListView>
-    </template>
-  </div>
-
-  <Dialog v-model="showRevoke" title="Revoke session" size="md">
-    <p class="text-ink-gray-7 text-p-base">
-      Revoke this session? Its token stops working immediately and whoever holds it must sign in
-      again.
-    </p>
-    <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
-        Revoke
-      </Button>
-    </div>
-  </Dialog>
-
-  <Dialog v-model="showDetail" title="Activity details" size="md">
-    <div class="space-y-2 max-h-96 overflow-y-auto">
-      <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
-        <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
-        <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
-      </div>
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import {
   Button,
@@ -214,7 +109,7 @@ const activityRows = computed(() =>
 const showDetail = ref(false)
 const viewingDetail = ref(null)
 
-function openDetail(row) {
+const openDetail = (row) => {
   viewingDetail.value = row.raw
   showDetail.value = true
 }
@@ -234,7 +129,7 @@ const detailEntries = computed(() => {
 
 const AUDIT_TYPE_LABELS = { ssh_key: 'SSH Key' }
 
-function auditTypeLabel(type) {
+const auditTypeLabel = (type) => {
   if (!type) return ''
   return AUDIT_TYPE_LABELS[type] || type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -258,39 +153,39 @@ const DETAIL_KEYS = [
 
 // Short enough to fit the column without forcing the row wider than its container -
 // full context (below) only shows up in the hover tooltip.
-function auditEntryHead(entry) {
+const auditEntryHead = (entry) => {
   const label = entry.type === 'task' ? commandLabel(entry.command) : auditTypeLabel(entry.type)
   return entry.event ? `${label} ${entry.event}` : label
 }
 
-function auditEntryDetail(entry) {
+const auditEntryDetail = (entry) => {
   const source = { ...entry, ...entry.args }
   const detail = [...new Set(DETAIL_KEYS.map((key) => source[key]).filter(Boolean))].join(' · ')
   const head = auditEntryHead(entry)
   return detail ? `${head} — ${detail}` : head
 }
 
-function relativeTimeOrDash(seconds) {
+const relativeTimeOrDash = (seconds) => {
   return seconds ? relativeTime(new Date(seconds * 1000).toISOString()) : '-'
 }
 
-function formatDate(seconds) {
+const formatDate = (seconds) => {
   return seconds ? fmtDateTime(new Date(seconds * 1000).toISOString()) : '-'
 }
 
-function menuOptions(row) {
+const menuOptions = (row) => {
   return [
     { label: 'View activity', icon: 'lucide-history', onClick: () => (jti.value = row.jti) },
     { label: 'Revoke session', icon: 'lucide-log-out', theme: 'red', onClick: () => promptRevoke(row) },
   ]
 }
 
-function promptRevoke(row) {
+const promptRevoke = (row) => {
   revoking.value = row
   showRevoke.value = true
 }
 
-async function confirmRevoke() {
+const confirmRevoke = async () => {
   revokeBusy.value = true
   try {
     const response = await sessionApi.revoke(revoking.value.jti)
@@ -308,7 +203,7 @@ async function confirmRevoke() {
   }
 }
 
-async function load() {
+const load = async () => {
   try {
     const data = await sessionApi.list()
     activeTokens.value = data.active_tokens || []
@@ -322,3 +217,108 @@ async function load() {
 
 onMounted(load)
 </script>
+
+<template>
+  <div v-if="loading" class="flex justify-center items-center h-40">
+    <Spinner size="lg" class="text-ink-gray-4" />
+  </div>
+  <div v-else-if="jti">
+    <div v-if="activityLoading" class="flex justify-center items-center h-40">
+      <Spinner size="lg" class="text-ink-gray-4" />
+    </div>
+    <EmptyState
+      compact
+      v-else-if="!activity.length"
+      icon="lucide-history"
+      title="No activity recorded"
+      description="Actions taken by this session will show up here."
+    />
+    <ListView
+      v-else
+      :columns="activityColumns"
+      :rows="activityRows"
+      row-key="key"
+      :options="{ selectable: false, showTooltip: true }"
+    >
+      <template #cell="{ column, row, item }">
+        <div v-if="column.key === 'actions'" class="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="lucide-info"
+            label="Activity details"
+            tooltip="Details"
+            @click="openDetail(row)"
+          />
+        </div>
+        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      </template>
+    </ListView>
+  </div>
+  <div v-else class="space-y-5">
+    <div
+      v-if="loadError"
+      class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
+    >
+      {{ loadError }}
+    </div>
+    <template v-else>
+      <EmptyState
+        compact
+        v-if="!activeTokens.length"
+        icon="lucide-key-round"
+        title="No active sessions"
+        description="Sign-ins appear here while their tokens are valid."
+      />
+
+      <ListView
+        v-else
+        :columns="columns"
+        :rows="rows"
+        row-key="jti"
+        :options="{ selectable: false, showTooltip: true }"
+      >
+        <template #cell="{ column, row, item }">
+          <div v-if="column.key === 'actions'" class="flex justify-end">
+            <Dropdown :options="menuOptions(row)">
+              <template #default="{ open }">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  :active="open"
+                  icon="lucide-ellipsis"
+                  label="Session actions"
+                  tooltip="Actions"
+                />
+              </template>
+            </Dropdown>
+          </div>
+          <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+        </template>
+      </ListView>
+    </template>
+  </div>
+
+  <Dialog v-model="showRevoke" title="Revoke session" size="md">
+    <p class="text-ink-gray-7 text-p-base">
+      Revoke this session? Its token stops working immediately and whoever holds it must sign in
+      again.
+    </p>
+    <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
+        Revoke
+      </Button>
+    </div>
+  </Dialog>
+
+  <Dialog v-model="showDetail" title="Activity details" size="md">
+    <div class="space-y-2 max-h-96 overflow-y-auto">
+      <div v-for="d in detailEntries" :key="d.key" class="flex gap-3 text-p-sm">
+        <span class="w-28 shrink-0 text-ink-gray-5 capitalize">{{ d.key.replace(/_/g, ' ') }}</span>
+        <span class="text-ink-gray-8 break-all">{{ d.value }}</span>
+      </div>
+    </div>
+  </Dialog>
+</template>

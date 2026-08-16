@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import {
   Badge,
@@ -68,12 +68,12 @@ const rows = computed(() =>
   })),
 )
 
-function isCurrentBench(bench) {
+const isCurrentBench = (bench) => {
   if (bench.domain) return bench.domain === currentHost
   return String(bench.port) === String(currentPort)
 }
 
-function benchUrl(bench) {
+const benchUrl = (bench) => {
   // Production benches carry a backend-computed admin_url on the scheme nginx
   // actually serves (http until the cert is in place, so a not-yet-set-up bench
   // opens over http even from this https page); dev benches use their admin port.
@@ -81,11 +81,11 @@ function benchUrl(bench) {
   return `${window.location.protocol}//${currentHost}:${bench.port}`
 }
 
-function benchMode(bench) {
+const benchMode = (bench) => {
   return bench.production ? 'Production' : 'Development'
 }
 
-function benchManager(bench) {
+const benchManager = (bench) => {
   const mgr = bench.process_manager || 'foreground'
   return mgr.charAt(0).toUpperCase() + mgr.slice(1)
 }
@@ -94,7 +94,7 @@ function benchManager(bench) {
 // being up is "Running"; if it's down but the admin control plane is still up
 // (socket-activated) the bench is "Admin active" rather than fully "Stopped" —
 // e.g. provisioned but setup not finished. null means we couldn't tell (up).
-function benchState(bench) {
+const benchState = (bench) => {
   if (!bench.production) return bench.reachable ? 'running' : 'stopped'
   if (bench.workload_running !== false) return 'running'
   if (bench.admin_running !== false) return 'admin'
@@ -107,27 +107,27 @@ const STATUS = {
   stopped: { label: 'Stopped', theme: 'gray' },
 }
 
-function statusLabel(bench) {
+const statusLabel = (bench) => {
   return STATUS[benchState(bench)].label
 }
 
-function statusTheme(bench) {
+const statusTheme = (bench) => {
   return STATUS[benchState(bench)].theme
 }
 
 // Production benches route through nginx, which socket-activates the admin on
 // demand, so they can always be opened. A dev bench is only reachable while up.
-function canOpen(bench) {
+const canOpen = (bench) => {
   if (isCurrentBench(bench)) return false
   return bench.production || bench.reachable
 }
 
-function openBench(bench) {
+const openBench = (bench) => {
   // Open the bench's admin URL in a new tab so the manage view stays put.
   window.open(benchUrl(bench), '_blank', 'noopener')
 }
 
-function menuOptions(bench) {
+const menuOptions = (bench) => {
   const opts = []
   if (canOpen(bench))
     opts.push({ label: 'Open', icon: LucideExternalLink, onClick: () => openBench(bench) })
@@ -166,12 +166,12 @@ function menuOptions(bench) {
   return opts
 }
 
-function confirmDrop(bench) {
+const confirmDrop = (bench) => {
   controlError.value = ''
   benchToDrop.value = bench
 }
 
-async function dropBench() {
+const dropBench = async () => {
   const bench = benchToDrop.value
   if (!bench) return
   dropping.value = true
@@ -182,7 +182,7 @@ async function dropBench() {
   }
 }
 
-function newBench() {
+const newBench = () => {
   show.value = false
   emit('new-bench')
 }

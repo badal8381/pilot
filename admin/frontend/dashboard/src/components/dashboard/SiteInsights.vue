@@ -1,37 +1,10 @@
-<template>
-  <div class="gap-4 grid grid-cols-1 sm:grid-cols-2">
-    <SiteUptime :site-name="siteName" :window="window" />
-
-    <template v-if="loading">
-      <Skeleton v-for="i in 12" :key="i" class="rounded-6 h-[340px]" />
-    </template>
-    <ErrorMessage v-else-if="error" :message="error" class="sm:col-span-2" />
-
-    <template v-else>
-      <ChartCard v-for="chart in charts" :key="chart.key" :title="chart.title">
-        <div
-          v-if="!chart.config.series.length"
-          class="flex flex-col flex-1 justify-center items-center gap-1 min-h-[300px] text-center"
-        >
-          <span class="size-6 text-ink-gray-3 lucide-chart-bar" />
-          <p class="font-medium text-ink-gray-7 text-xs">No usage yet</p>
-          <p class="text-ink-gray-5 text-xs">Data will appear here once activity is tracked</p>
-        </div>
-        <AxisChart
-          v-else
-          :config="chart.config"
-          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
-        />
-      </ChartCard>
-    </template>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { AxisChart, ErrorMessage, Skeleton } from 'frappe-ui'
+
 import ChartCard from '@/components/common/ChartCard.vue'
 import SiteUptime from '@/components/dashboard/SiteUptime.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 
@@ -72,7 +45,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => HTML_ESCA
 
 // Custom tooltip: lets the label wrap without breaking the number, and reuses
 // ECharts' own marker HTML so the dot color always matches the bar/legend.
-function tooltipFormatter(paramsInput) {
+const tooltipFormatter = (paramsInput) => {
   const params = (Array.isArray(paramsInput) ? paramsInput : [paramsInput]).filter(
     (p) => p.value?.[1],
   )
@@ -98,7 +71,7 @@ const axisMax = computed(() => data.value?.now ?? Date.now())
 const axisMin = computed(() => axisMax.value - (data.value?.window_seconds ?? 0) * 1000)
 
 // series.name must match the data key holding that category's value.
-function timelineConfig(timeline, valueLabel, chartType = 'bar') {
+const timelineConfig = (timeline, valueLabel, chartType = 'bar') => {
   const categories = timeline?.categories ?? []
   return {
     data: timeline?.points ?? [],
@@ -147,7 +120,7 @@ const charts = computed(() =>
 // started load is allowed to write to state.
 let loadGeneration = 0
 
-async function load() {
+const load = async () => {
   const generation = ++loadGeneration
   loading.value = true
   error.value = ''
@@ -167,3 +140,32 @@ async function load() {
 watch(() => [props.siteName, props.window], load)
 onMounted(load)
 </script>
+
+<template>
+  <div class="gap-4 grid grid-cols-1 sm:grid-cols-2">
+    <SiteUptime :site-name="siteName" :window="window" />
+
+    <template v-if="loading">
+      <Skeleton v-for="i in 12" :key="i" class="rounded-6 h-[340px]" />
+    </template>
+    <ErrorMessage v-else-if="error" :message="error" class="sm:col-span-2" />
+
+    <template v-else>
+      <ChartCard v-for="chart in charts" :key="chart.key" :title="chart.title">
+        <div
+          v-if="!chart.config.series.length"
+          class="flex flex-col flex-1 justify-center items-center gap-1 min-h-[300px] text-center"
+        >
+          <span class="size-6 text-ink-gray-3 lucide-chart-bar" />
+          <p class="font-medium text-ink-gray-7 text-xs">No usage yet</p>
+          <p class="text-ink-gray-5 text-xs">Data will appear here once activity is tracked</p>
+        </div>
+        <AxisChart
+          v-else
+          :config="chart.config"
+          class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
+        />
+      </ChartCard>
+    </template>
+  </div>
+</template>

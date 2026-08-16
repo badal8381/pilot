@@ -1,3 +1,20 @@
+<script setup lang="ts">
+defineProps({
+  // [{ key, label }]
+  columns: { type: Array, required: true },
+  // plain objects keyed by each column's `key`
+  rows: { type: Array, required: true },
+  bordered: { type: Boolean, default: true },
+  showIndex: { type: Boolean, default: false },
+  indexOffset: { type: Number, default: 0 },
+  minHeight: { type: String, default: '' },
+  mono: { type: Boolean, default: true },
+  truncate: { type: Boolean, default: false },
+  showNull: { type: Boolean, default: false },
+  emptyText: { type: String, default: '' },
+})
+</script>
+
 <template>
   <div :class="bordered ? 'border rounded-6 border-outline-gray-2 overflow-hidden' : ''">
     <div class="overflow-x-auto hover-scrollbar" :style="minHeight && !rows.length ? { minHeight } : {}">
@@ -41,20 +58,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-defineProps({
-  // [{ key, label }]
-  columns: { type: Array, required: true },
-  // plain objects keyed by each column's `key`
-  rows: { type: Array, required: true },
-  bordered: { type: Boolean, default: true },
-  showIndex: { type: Boolean, default: false },
-  indexOffset: { type: Number, default: 0 },
-  minHeight: { type: String, default: '' },
-  mono: { type: Boolean, default: true },
-  truncate: { type: Boolean, default: false },
-  showNull: { type: Boolean, default: false },
-  emptyText: { type: String, default: '' },
-})
-</script>

@@ -1,22 +1,7 @@
-<template>
-  <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
-    <div
-      v-if="!chart.keys.length"
-      class="flex justify-center items-center min-h-[280px] text-ink-gray-5 text-xs"
-    >
-      No slow queries recorded yet
-    </div>
-    <AxisChart
-      v-else
-      :config="chart.config"
-      class="w-full min-w-0 h-full min-h-[320px] px-2 sm:px-4 pb-2"
-    />
-  </ChartCard>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { AxisChart } from 'frappe-ui'
+
 import ChartCard from '@/components/common/ChartCard.vue'
 
 const props = defineProps({ overview: { type: Object, default: null } })
@@ -24,7 +9,7 @@ const props = defineProps({ overview: { type: Object, default: null } })
 const GRID = { show: true, lineStyle: { type: 'dashed', color: 'var(--outline-gray-2)' } }
 const PALETTE = ['#10b981', '#ef4444', '#f59e0b', '#2490ef', '#8b5cf6', '#06b6d4', '#ec4899']
 
-function bucketLabel(ms, bucketMs) {
+const bucketLabel = (ms, bucketMs) => {
   const date = new Date(ms)
   return bucketMs >= 24 * 3600_000
     ? date.toLocaleDateString([], { month: 'short', day: 'numeric' })
@@ -33,7 +18,7 @@ function bucketLabel(ms, bucketMs) {
 
 // Buckets (and their sizing) come pre-computed from the backend, keyed by
 // whichever dimension the chart stacks by — site or query text.
-function seriesConfig(rows, keys, yLabel) {
+const seriesConfig = (rows, keys, yLabel) => {
   const bucketMs = rows.length > 1 ? rows[1].bucket - rows[0].bucket : 300_000
   return {
     data: rows.map((row) => ({ ...row, bucket: bucketLabel(row.bucket, bucketMs) })),
@@ -68,3 +53,19 @@ const charts = computed(() => {
   ]
 })
 </script>
+
+<template>
+  <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
+    <div
+      v-if="!chart.keys.length"
+      class="flex justify-center items-center min-h-[280px] text-ink-gray-5 text-xs"
+    >
+      No slow queries recorded yet
+    </div>
+    <AxisChart
+      v-else
+      :config="chart.config"
+      class="w-full min-w-0 h-full min-h-[320px] px-2 sm:px-4 pb-2"
+    />
+  </ChartCard>
+</template>

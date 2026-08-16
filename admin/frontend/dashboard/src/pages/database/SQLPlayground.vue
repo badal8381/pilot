@@ -1,3 +1,223 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Alert, Button, Dialog, FormControl, TabButtons } from 'frappe-ui'
+
+import SQLCodeEditor from '@/components/database/SQLCodeEditor.vue'
+import SQLSchemaDialog from '@/components/database/SQLSchemaDialog.vue'
+import SimpleTable from '@/components/common/SimpleTable.vue'
+
+import { apiErrorMessage } from '@/api/client'
+import { databaseApi } from '@/api/database'
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+const route = useRoute()
+const router = useRouter()
+
+const sites = ref([])
+const selectedSite = ref(route.query.site || '')
+const query = ref('')
+const modeStr = ref('readonly')
+const readOnly = computed(() => modeStr.value === 'readonly')
+const running = ref(false)
+const results = ref([])
+const activeTab = ref(0)
+const error = ref('')
+const showSql = ref(false)
+const showSchema = ref(false)
+const schema = ref([])
+const editorRef = ref(null)
+
+const siteOptions = computed(() => [
+  { label: 'Select site', value: '' },
+  ...sites.value.map((s) => ({ label: s.name, value: s.name })),
+])
+
+const selectedSiteDbType = computed(
+  () => sites.value.find((s) => s.name === selectedSite.value)?.db_type || 'mariadb',
+)
+
+const modeOptions = [
+  { label: 'Read-only', value: 'readonly' },
+  { label: 'Read/Write', value: 'readwrite' },
+]
+
+const currentResult = computed(() => results.value[activeTab.value] || null)
+
+const tabOptions = computed(() =>
+  results.value.map((r, i) => ({ label: `Query ${i + 1}`, value: i })),
+)
+
+// ── Pagination ────────────────────────────────────────────────────────────────
+
+const page = ref(1)
+const perPage = ref(10)
+const pageOptions = [
+  { label: '10', value: 10 },
+  { label: '25', value: 25 },
+  { label: '50', value: 50 },
+  { label: '100', value: 100 },
+]
+
+const resultColumns = computed(() =>
+  currentResult.value ? currentResult.value.columns.map((c) => ({ key: c, label: c })) : [],
+)
+
+const paginatedRowObjects = computed(() => {
+  if (!currentResult.value) return []
+  const { columns, rows } = currentResult.value
+  return rows
+    .slice((page.value - 1) * perPage.value, page.value * perPage.value)
+    .map((row) => Object.fromEntries(columns.map((col, i) => [col, row[i]])))
+})
+
+const totalPages = computed(() =>
+  currentResult.value ? Math.ceil(currentResult.value.row_count / perPage.value) : 0,
+)
+
+const rowRange = computed(() => {
+  if (!currentResult.value) return ''
+  const start = (page.value - 1) * perPage.value + 1
+  const end = Math.min(page.value * perPage.value, currentResult.value.row_count)
+  return currentResult.value.row_count ? `${start}–${end}` : '0–0'
+})
+
+// ── Query execution ───────────────────────────────────────────────────────────
+
+const showConfirm = ref(false)
+const pendingQuery = ref('')
+
+const runQuery = () => {
+  const raw = editorRef.value?.getQueryToRun() ?? query.value
+  if (!raw?.trim()) return
+  if (!readOnly.value) {
+    pendingQuery.value = raw
+    showConfirm.value = true
+    return
+  }
+  executeQuery(raw)
+}
+
+const confirmRunQuery = () => {
+  showConfirm.value = false
+  executeQuery(pendingQuery.value)
+}
+
+// MariaDB quotes identifiers with backticks; Postgres and SQLite use the
+// standard double-quote (MariaDB treats double quotes as a string literal
+// unless ANSI_QUOTES is set, so backticks aren't a safe cross-engine default).
+const quoteIdentifier = (name, dbType) => {
+  return dbType === 'mariadb' ? `\`${name}\`` : `"${name}"`
+}
+
+const previewTable = (tableName) => {
+  modeStr.value = 'readonly'
+  query.value = `SELECT * FROM ${quoteIdentifier(tableName, selectedSiteDbType.value)} LIMIT 100;`
+  executeQuery(query.value)
+}
+
+const executeQuery = async (raw) => {
+  if (!selectedSite.value || !raw?.trim()) return
+  const statements = raw
+    .split(';')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  if (!statements.length) return
+
+  running.value = true
+  error.value = ''
+  results.value = []
+  activeTab.value = 0
+  page.value = 1
+  showSql.value = false
+
+  try {
+    const executed = []
+    for (const stmt of statements) {
+      const data = await databaseApi.execute(selectedSite.value, stmt, readOnly.value)
+      if (data.error) throw new Error(apiErrorMessage(data, 'Query failed.'))
+      executed.push({ ...data, query: stmt })
+    }
+    results.value = executed
+    if (!readOnly.value) refreshSchema()
+  } catch (e) {
+    error.value = e.message || 'Query failed'
+  } finally {
+    running.value = false
+  }
+}
+
+// ── CSV export ────────────────────────────────────────────────────────────────
+
+const exportCsv = () => {
+  if (!currentResult.value) return
+  const { columns, rows } = currentResult.value
+  const escape = (v) => {
+    if (v === null) return ''
+    const s = String(v)
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
+  }
+  const csv = [columns.join(','), ...rows.map((r) => r.map(escape).join(','))].join('\n')
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
+    download: `${selectedSite.value}-query.csv`,
+  })
+  a.click()
+  URL.revokeObjectURL(a.href)
+}
+
+// ── Schema ────────────────────────────────────────────────────────────────────
+
+const refreshSchema = async () => {
+  if (!selectedSite.value) return
+  try {
+    const data = await databaseApi.schema(selectedSite.value)
+    if (!data.error) schema.value = data
+  } catch {
+    // keep last known schema on failure
+  }
+}
+
+// ── Watchers ──────────────────────────────────────────────────────────────────
+
+watch(
+  selectedSite,
+  (site) => {
+    if ((route.query.site || '') !== site) {
+      router.replace({ path: route.path, query: site ? { site } : {} })
+    }
+    query.value = site ? localStorage.getItem(`last_sql_query_${site}`) || '' : ''
+    results.value = []
+    error.value = ''
+    schema.value = []
+    if (!site) return
+    refreshSchema()
+  },
+  { immediate: true },
+)
+
+watch(query, (value) => {
+  if (selectedSite.value) localStorage.setItem(`last_sql_query_${selectedSite.value}`, value)
+})
+
+watch(activeTab, () => {
+  page.value = 1
+})
+watch(perPage, () => {
+  page.value = 1
+})
+
+// ── Lifecycle ─────────────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  try {
+    sites.value = await databaseApi.sites()
+    if (!selectedSite.value && sites.value.length === 1) selectedSite.value = sites.value[0].name
+  } catch {}
+})
+</script>
+
 <template>
   <Teleport v-if="selectedSite" defer to="#header-actions">
     <FormControl
@@ -208,221 +428,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Alert, Button, Dialog, FormControl, TabButtons } from 'frappe-ui'
-import SQLCodeEditor from '@/components/database/SQLCodeEditor.vue'
-import SQLSchemaDialog from '@/components/database/SQLSchemaDialog.vue'
-import SimpleTable from '@/components/common/SimpleTable.vue'
-import { apiErrorMessage } from '@/api/client'
-import { databaseApi } from '@/api/database'
-
-// ── State ─────────────────────────────────────────────────────────────────────
-
-const route = useRoute()
-const router = useRouter()
-
-const sites = ref([])
-const selectedSite = ref(route.query.site || '')
-const query = ref('')
-const modeStr = ref('readonly')
-const readOnly = computed(() => modeStr.value === 'readonly')
-const running = ref(false)
-const results = ref([])
-const activeTab = ref(0)
-const error = ref('')
-const showSql = ref(false)
-const showSchema = ref(false)
-const schema = ref([])
-const editorRef = ref(null)
-
-const siteOptions = computed(() => [
-  { label: 'Select site', value: '' },
-  ...sites.value.map((s) => ({ label: s.name, value: s.name })),
-])
-
-const selectedSiteDbType = computed(
-  () => sites.value.find((s) => s.name === selectedSite.value)?.db_type || 'mariadb',
-)
-
-const modeOptions = [
-  { label: 'Read-only', value: 'readonly' },
-  { label: 'Read/Write', value: 'readwrite' },
-]
-
-const currentResult = computed(() => results.value[activeTab.value] || null)
-
-const tabOptions = computed(() =>
-  results.value.map((r, i) => ({ label: `Query ${i + 1}`, value: i })),
-)
-
-// ── Pagination ────────────────────────────────────────────────────────────────
-
-const page = ref(1)
-const perPage = ref(10)
-const pageOptions = [
-  { label: '10', value: 10 },
-  { label: '25', value: 25 },
-  { label: '50', value: 50 },
-  { label: '100', value: 100 },
-]
-
-const resultColumns = computed(() =>
-  currentResult.value ? currentResult.value.columns.map((c) => ({ key: c, label: c })) : [],
-)
-
-const paginatedRowObjects = computed(() => {
-  if (!currentResult.value) return []
-  const { columns, rows } = currentResult.value
-  return rows
-    .slice((page.value - 1) * perPage.value, page.value * perPage.value)
-    .map((row) => Object.fromEntries(columns.map((col, i) => [col, row[i]])))
-})
-
-const totalPages = computed(() =>
-  currentResult.value ? Math.ceil(currentResult.value.row_count / perPage.value) : 0,
-)
-
-const rowRange = computed(() => {
-  if (!currentResult.value) return ''
-  const start = (page.value - 1) * perPage.value + 1
-  const end = Math.min(page.value * perPage.value, currentResult.value.row_count)
-  return currentResult.value.row_count ? `${start}–${end}` : '0–0'
-})
-
-// ── Query execution ───────────────────────────────────────────────────────────
-
-const showConfirm = ref(false)
-const pendingQuery = ref('')
-
-function runQuery() {
-  const raw = editorRef.value?.getQueryToRun() ?? query.value
-  if (!raw?.trim()) return
-  if (!readOnly.value) {
-    pendingQuery.value = raw
-    showConfirm.value = true
-    return
-  }
-  executeQuery(raw)
-}
-
-function confirmRunQuery() {
-  showConfirm.value = false
-  executeQuery(pendingQuery.value)
-}
-
-// MariaDB quotes identifiers with backticks; Postgres and SQLite use the
-// standard double-quote (MariaDB treats double quotes as a string literal
-// unless ANSI_QUOTES is set, so backticks aren't a safe cross-engine default).
-function quoteIdentifier(name, dbType) {
-  return dbType === 'mariadb' ? `\`${name}\`` : `"${name}"`
-}
-
-function previewTable(tableName) {
-  modeStr.value = 'readonly'
-  query.value = `SELECT * FROM ${quoteIdentifier(tableName, selectedSiteDbType.value)} LIMIT 100;`
-  executeQuery(query.value)
-}
-
-async function executeQuery(raw) {
-  if (!selectedSite.value || !raw?.trim()) return
-  const statements = raw
-    .split(';')
-    .map((s) => s.trim())
-    .filter(Boolean)
-  if (!statements.length) return
-
-  running.value = true
-  error.value = ''
-  results.value = []
-  activeTab.value = 0
-  page.value = 1
-  showSql.value = false
-
-  try {
-    const executed = []
-    for (const stmt of statements) {
-      const data = await databaseApi.execute(selectedSite.value, stmt, readOnly.value)
-      if (data.error) throw new Error(apiErrorMessage(data, 'Query failed.'))
-      executed.push({ ...data, query: stmt })
-    }
-    results.value = executed
-    if (!readOnly.value) refreshSchema()
-  } catch (e) {
-    error.value = e.message || 'Query failed'
-  } finally {
-    running.value = false
-  }
-}
-
-// ── CSV export ────────────────────────────────────────────────────────────────
-
-function exportCsv() {
-  if (!currentResult.value) return
-  const { columns, rows } = currentResult.value
-  const escape = (v) => {
-    if (v === null) return ''
-    const s = String(v)
-    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s
-  }
-  const csv = [columns.join(','), ...rows.map((r) => r.map(escape).join(','))].join('\n')
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(new Blob([csv], { type: 'text/csv' })),
-    download: `${selectedSite.value}-query.csv`,
-  })
-  a.click()
-  URL.revokeObjectURL(a.href)
-}
-
-// ── Schema ────────────────────────────────────────────────────────────────────
-
-async function refreshSchema() {
-  if (!selectedSite.value) return
-  try {
-    const data = await databaseApi.schema(selectedSite.value)
-    if (!data.error) schema.value = data
-  } catch {
-    // keep last known schema on failure
-  }
-}
-
-// ── Watchers ──────────────────────────────────────────────────────────────────
-
-watch(
-  selectedSite,
-  (site) => {
-    if ((route.query.site || '') !== site) {
-      router.replace({ path: route.path, query: site ? { site } : {} })
-    }
-    query.value = site ? localStorage.getItem(`last_sql_query_${site}`) || '' : ''
-    results.value = []
-    error.value = ''
-    schema.value = []
-    if (!site) return
-    refreshSchema()
-  },
-  { immediate: true },
-)
-
-watch(query, (value) => {
-  if (selectedSite.value) localStorage.setItem(`last_sql_query_${selectedSite.value}`, value)
-})
-
-watch(activeTab, () => {
-  page.value = 1
-})
-watch(perPage, () => {
-  page.value = 1
-})
-
-// ── Lifecycle ─────────────────────────────────────────────────────────────────
-
-onMounted(async () => {
-  try {
-    sites.value = await databaseApi.sites()
-    if (!selectedSite.value && sites.value.length === 1) selectedSite.value = sites.value[0].name
-  } catch {}
-})
-</script>

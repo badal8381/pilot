@@ -1,3 +1,141 @@
+<script setup lang="ts">
+import { ref, computed, nextTick, watch } from 'vue'
+import { Button, Checkbox, Dialog, ErrorMessage, FormControl, Spinner } from 'frappe-ui'
+
+import AppIcon from '@/components/apps/AppIcon.vue'
+
+import { apiErrorMessage } from '@/api/client'
+import { appsApi } from '@/api/apps'
+import { sitesApi } from '@/api/sites'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
+import { buildSiteAppChoices } from '@/utils/siteApps'
+
+defineProps({
+  sites: { type: Array, default: () => [] },
+})
+
+const emit = defineEmits(['started'])
+const open = defineModel()
+
+const { registry, load: loadRegistry } = useAppRegistry()
+const benchApps = ref([])
+
+const newSiteName = ref('')
+const sitePrefix = ref('')
+const wildcardDomains = ref([])
+const selectedSuffix = ref('')
+const loading = ref(false)
+const creating = ref(false)
+const error = ref('')
+
+const selectedApps = ref([])
+
+const hasSingleDomain = computed(() => wildcardDomains.value.length === 1)
+
+// Fade only the edges that can still scroll, so a clipped row reads as "more
+// below" and the last app is never dimmed at rest.
+const appList = ref(null)
+const fadeEdges = ref('')
+
+const updateFadeEdges = () => {
+  const el = appList.value
+  if (!el) return
+  const top = el.scrollTop > 1
+  const bottom = Math.ceil(el.scrollTop + el.clientHeight) < el.scrollHeight - 1
+  fadeEdges.value = top && bottom ? 'both' : top ? 'top' : bottom ? 'bottom' : ''
+}
+
+const availableApps = computed(() =>
+  buildSiteAppChoices(registry.value, benchApps.value),
+)
+
+// Also `loading`: apps resolve while the spinner is still up, so the rows only
+// exist once it flips.
+watch([availableApps, loading], () => nextTick(updateFadeEdges))
+
+watch([sitePrefix, selectedSuffix], () => {
+  if (wildcardDomains.value.length && sitePrefix.value) {
+    newSiteName.value = `${sitePrefix.value.trim()}${selectedSuffix.value}`
+  } else {
+    newSiteName.value = ''
+  }
+})
+
+watch(open, (visible) => {
+  if (!visible) return
+  reset()
+})
+
+const reset = async () => {
+  newSiteName.value = ''
+  sitePrefix.value = ''
+  error.value = ''
+  selectedApps.value = []
+  loading.value = true
+  await Promise.all([loadWildcardDomains(), loadRegistry(), loadBenchApps()])
+  loading.value = false
+}
+
+const loadBenchApps = async () => {
+  try {
+    benchApps.value = await appsApi.installed()
+  } catch {
+    benchApps.value = []
+  }
+}
+
+const toggleApp = (name) => {
+  const index = selectedApps.value.indexOf(name)
+  if (index === -1) selectedApps.value.push(name)
+  else selectedApps.value.splice(index, 1)
+}
+
+const loadWildcardDomains = async () => {
+  try {
+    const { domains } = await sitesApi.domains.wildcardList()
+    wildcardDomains.value = domains || []
+    selectedSuffix.value = wildcardDomains.value[0] || ''
+  } catch {
+    wildcardDomains.value = []
+  }
+}
+
+const validate = (name) => {
+  if (!name) return 'Site name is required.'
+  if (!/^[a-zA-Z0-9][a-zA-Z0-9\-.]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(name))
+    return 'Site name must be a valid hostname.'
+  return null
+}
+
+const submit = async () => {
+  const name = newSiteName.value.trim()
+  const validationError = validate(name)
+  if (validationError) {
+    error.value = validationError
+    return
+  }
+
+  creating.value = true
+  error.value = ''
+  try {
+    const result = await sitesApi.create({
+      name,
+      apps: selectedApps.value,
+    })
+    if (result.task_id) {
+      open.value = false
+      emit('started', result.task_id)
+    } else {
+      error.value = apiErrorMessage(result, 'Could not create site.')
+    }
+  } catch (caught) {
+    error.value = caught.message || 'Could not create site.'
+  } finally {
+    creating.value = false
+  }
+}
+</script>
+
 <template>
   <Dialog v-model="open" title="New Site" size="2xl">
     <div v-if="loading" class="flex justify-center items-center h-80">
@@ -105,141 +243,7 @@
   </Dialog>
 </template>
 
-<script setup>
-import { ref, computed, nextTick, watch } from 'vue'
-import { Button, Checkbox, Dialog, ErrorMessage, FormControl, Spinner } from 'frappe-ui'
-import AppIcon from '@/components/apps/AppIcon.vue'
-import { apiErrorMessage } from '@/api/client'
-import { appsApi } from '@/api/apps'
-import { sitesApi } from '@/api/sites'
-import { useAppRegistry } from '@/composables/apps/useAppRegistry'
-import { buildSiteAppChoices } from '@/utils/siteApps'
 
-defineProps({
-  sites: { type: Array, default: () => [] },
-})
-
-const emit = defineEmits(['started'])
-const open = defineModel()
-
-const { registry, load: loadRegistry } = useAppRegistry()
-const benchApps = ref([])
-
-const newSiteName = ref('')
-const sitePrefix = ref('')
-const wildcardDomains = ref([])
-const selectedSuffix = ref('')
-const loading = ref(false)
-const creating = ref(false)
-const error = ref('')
-
-const selectedApps = ref([])
-
-const hasSingleDomain = computed(() => wildcardDomains.value.length === 1)
-
-// Fade only the edges that can still scroll, so a clipped row reads as "more
-// below" and the last app is never dimmed at rest.
-const appList = ref(null)
-const fadeEdges = ref('')
-
-function updateFadeEdges() {
-  const el = appList.value
-  if (!el) return
-  const top = el.scrollTop > 1
-  const bottom = Math.ceil(el.scrollTop + el.clientHeight) < el.scrollHeight - 1
-  fadeEdges.value = top && bottom ? 'both' : top ? 'top' : bottom ? 'bottom' : ''
-}
-
-const availableApps = computed(() =>
-  buildSiteAppChoices(registry.value, benchApps.value),
-)
-
-// Also `loading`: apps resolve while the spinner is still up, so the rows only
-// exist once it flips.
-watch([availableApps, loading], () => nextTick(updateFadeEdges))
-
-watch([sitePrefix, selectedSuffix], () => {
-  if (wildcardDomains.value.length && sitePrefix.value) {
-    newSiteName.value = `${sitePrefix.value.trim()}${selectedSuffix.value}`
-  } else {
-    newSiteName.value = ''
-  }
-})
-
-watch(open, (visible) => {
-  if (!visible) return
-  reset()
-})
-
-async function reset() {
-  newSiteName.value = ''
-  sitePrefix.value = ''
-  error.value = ''
-  selectedApps.value = []
-  loading.value = true
-  await Promise.all([loadWildcardDomains(), loadRegistry(), loadBenchApps()])
-  loading.value = false
-}
-
-async function loadBenchApps() {
-  try {
-    benchApps.value = await appsApi.installed()
-  } catch {
-    benchApps.value = []
-  }
-}
-
-function toggleApp(name) {
-  const index = selectedApps.value.indexOf(name)
-  if (index === -1) selectedApps.value.push(name)
-  else selectedApps.value.splice(index, 1)
-}
-
-async function loadWildcardDomains() {
-  try {
-    const { domains } = await sitesApi.domains.wildcardList()
-    wildcardDomains.value = domains || []
-    selectedSuffix.value = wildcardDomains.value[0] || ''
-  } catch {
-    wildcardDomains.value = []
-  }
-}
-
-function validate(name) {
-  if (!name) return 'Site name is required.'
-  if (!/^[a-zA-Z0-9][a-zA-Z0-9\-.]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(name))
-    return 'Site name must be a valid hostname.'
-  return null
-}
-
-async function submit() {
-  const name = newSiteName.value.trim()
-  const validationError = validate(name)
-  if (validationError) {
-    error.value = validationError
-    return
-  }
-
-  creating.value = true
-  error.value = ''
-  try {
-    const result = await sitesApi.create({
-      name,
-      apps: selectedApps.value,
-    })
-    if (result.task_id) {
-      open.value = false
-      emit('started', result.task_id)
-    } else {
-      error.value = apiErrorMessage(result, 'Could not create site.')
-    }
-  } catch (caught) {
-    error.value = caught.message || 'Could not create site.'
-  } finally {
-    creating.value = false
-  }
-}
-</script>
 
 <style scoped>
 /* No transition on mask-image: `none` and a gradient aren't interpolable, and

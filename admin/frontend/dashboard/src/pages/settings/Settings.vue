@@ -1,7 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button, TabButtons, useColorScheme } from 'frappe-ui'
+
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 
 const router = useRouter()

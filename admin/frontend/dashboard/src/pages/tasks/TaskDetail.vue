@@ -1,3 +1,110 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Badge, Button, ErrorMessage, LoadingText } from 'frappe-ui'
+
+import TaskDebugDialog from '@/components/tasks/TaskDebugDialog.vue'
+import TaskSteps from '@/components/tasks/TaskSteps.vue'
+import TaskStream from '@/components/tasks/TaskStream.vue'
+
+import { apiErrorMessage } from '@/api/client'
+import { tasksApi } from '@/api/tasks'
+import { settingsApi } from '@/api/settings'
+import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
+import { useIsMobile } from '@/composables/common/useIsMobile'
+import { useTaskDetail } from '@/composables/tasks/useTaskDetail'
+
+import {
+  commandLabel,
+  fmtDateTime,
+  fmtDuration,
+  isTaskActive,
+  isTaskCancellable,
+  redirectRouteOnSuccess,
+  statusConfig,
+  taskScope,
+} from '@/utils/taskFormat'
+
+const route = useRoute()
+const router = useRouter()
+const taskId = route.params.taskId
+
+const isMobile = useIsMobile()
+const { setBreadcrumbs } = useBreadcrumbs()
+const { task, rawLines, loading, error, load } = useTaskDetail(taskId)
+
+setBreadcrumbs([{ label: 'Tasks', route: { name: 'Tasks' } }])
+watch(
+  () => task.value?.command,
+  (command) => {
+    if (!command) return
+    setBreadcrumbs([
+      { label: 'Tasks', route: { name: 'Tasks' } },
+      { label: commandLabel(command) },
+    ])
+  },
+)
+
+const actionError = ref('')
+const showDebug = ref(false)
+const aiConnected = ref(false)
+
+const loadAiStatus = async () => {
+  try {
+    const data = await settingsApi.get()
+    aiConnected.value = Boolean(data.llm?.provider && data.llm?.api_key_set)
+  } catch {
+    aiConnected.value = false
+  }
+}
+
+const scope = computed(() => taskScope(task.value))
+
+const metaLine = computed(() => {
+  const parts = []
+  if (task.value.status === 'queued' && task.value.queue_position)
+    parts.push(`#${task.value.queue_position} in queue`)
+  if (task.value.started_at) parts.push(`Started ${fmtDateTime(task.value.started_at)}`)
+  const duration = fmtDuration(task.value.duration_seconds)
+  if (duration) parts.push(`took ${duration}`)
+  return parts.join(' · ')
+})
+
+const updateStatus = (event) => {
+  if (!['queued', 'running'].includes(event.status)) return
+  task.value.status = event.status
+  task.value.queue_position = event.queue_position
+  task.value.is_cancellable = event.is_cancellable
+}
+
+const handleDone = (success) => {
+  load()
+  if (!success) return
+  const redirect = redirectRouteOnSuccess(task.value)
+  if (redirect) router.push(redirect)
+}
+
+const cancelTask = async () => {
+  actionError.value = ''
+  try {
+    const response = await tasksApi.cancel(taskId)
+    if (!response.ok) {
+      const result = await response.json()
+      actionError.value = apiErrorMessage(result, 'Failed to cancel task')
+      return
+    }
+    load()
+  } catch (caught) {
+    actionError.value = caught.message || 'Failed to cancel task'
+  }
+}
+
+onMounted(() => {
+  load()
+  loadAiStatus()
+})
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center py-12">
     <LoadingText />
@@ -82,105 +189,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, ErrorMessage, LoadingText } from 'frappe-ui'
-import { apiErrorMessage } from '@/api/client'
-import { tasksApi } from '@/api/tasks'
-import { settingsApi } from '@/api/settings'
-import TaskDebugDialog from '@/components/tasks/TaskDebugDialog.vue'
-import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
-import { useIsMobile } from '@/composables/common/useIsMobile'
-import { useTaskDetail } from '@/composables/tasks/useTaskDetail'
-import {
-  commandLabel,
-  fmtDateTime,
-  fmtDuration,
-  isTaskActive,
-  isTaskCancellable,
-  redirectRouteOnSuccess,
-  statusConfig,
-  taskScope,
-} from '@/utils/taskFormat'
-
-const route = useRoute()
-const router = useRouter()
-const taskId = route.params.taskId
-
-const isMobile = useIsMobile()
-const { setBreadcrumbs } = useBreadcrumbs()
-const { task, rawLines, loading, error, load } = useTaskDetail(taskId)
-
-setBreadcrumbs([{ label: 'Tasks', route: { name: 'Tasks' } }])
-watch(
-  () => task.value?.command,
-  (command) => {
-    if (!command) return
-    setBreadcrumbs([
-      { label: 'Tasks', route: { name: 'Tasks' } },
-      { label: commandLabel(command) },
-    ])
-  },
-)
-
-const actionError = ref('')
-const showDebug = ref(false)
-const aiConnected = ref(false)
-
-async function loadAiStatus() {
-  try {
-    const data = await settingsApi.get()
-    aiConnected.value = Boolean(data.llm?.provider && data.llm?.api_key_set)
-  } catch {
-    aiConnected.value = false
-  }
-}
-
-const scope = computed(() => taskScope(task.value))
-
-const metaLine = computed(() => {
-  const parts = []
-  if (task.value.status === 'queued' && task.value.queue_position)
-    parts.push(`#${task.value.queue_position} in queue`)
-  if (task.value.started_at) parts.push(`Started ${fmtDateTime(task.value.started_at)}`)
-  const duration = fmtDuration(task.value.duration_seconds)
-  if (duration) parts.push(`took ${duration}`)
-  return parts.join(' · ')
-})
-
-function updateStatus(event) {
-  if (!['queued', 'running'].includes(event.status)) return
-  task.value.status = event.status
-  task.value.queue_position = event.queue_position
-  task.value.is_cancellable = event.is_cancellable
-}
-
-function handleDone(success) {
-  load()
-  if (!success) return
-  const redirect = redirectRouteOnSuccess(task.value)
-  if (redirect) router.push(redirect)
-}
-
-async function cancelTask() {
-  actionError.value = ''
-  try {
-    const response = await tasksApi.cancel(taskId)
-    if (!response.ok) {
-      const result = await response.json()
-      actionError.value = apiErrorMessage(result, 'Failed to cancel task')
-      return
-    }
-    load()
-  } catch (caught) {
-    actionError.value = caught.message || 'Failed to cancel task'
-  }
-}
-
-onMounted(() => {
-  load()
-  loadAiStatus()
-})
-</script>
