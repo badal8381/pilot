@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { PASSWORD_REQUIREMENTS, meetsPasswordRequirements } from './passwordStrength.js'
+import { PASSWORD_REQUIREMENTS, meetsPasswordRequirements } from './passwordStrength.ts'
 
 // These rules must stay in step with validate_admin_password in pilot/internal/validators.py,
 // which the POST /auth/password route enforces.

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { siteStorageBytes } from './storage.js'
+import { siteStorageBytes } from './storage.ts'
 
 test('siteStorageBytes sums site files and its database schemas', () => {
   const breakdown = {

@@ -1,4 +1,4 @@
-import { toSentenceCase } from './format.js'
+import { toSentenceCase } from './format.ts'
 
 export const isFrappeApp = (app) => {
   return Boolean(app.repo?.includes('github.com/frappe/'))

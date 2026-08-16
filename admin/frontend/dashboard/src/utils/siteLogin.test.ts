@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { openSiteLogin } from './siteLogin.js'
+import { openSiteLogin } from './siteLogin.ts'
 
 const installBrowser = () => {
   const events = []

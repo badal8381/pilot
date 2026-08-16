@@ -12,7 +12,7 @@ import {
   statusConfig,
   taskScope,
   taskTiming,
-} from './taskFormat.js'
+} from './taskFormat.ts'
 
 test('queued tasks have their own presentation', () => {
   assert.equal(statusConfig({ status: 'queued' }).label, 'Queued')

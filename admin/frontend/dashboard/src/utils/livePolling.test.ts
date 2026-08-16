@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { livePollDelayMs, LIVE_POLL_MS, LIVE_WARMUP_POLL_MS } from './livePolling.js'
+import { livePollDelayMs, LIVE_POLL_MS, LIVE_WARMUP_POLL_MS } from './livePolling.ts'
 
 test('warms up while the chart cannot draw a line yet', () => {
   assert.equal(livePollDelayMs({ isLive: true, pointCount: 0 }), LIVE_WARMUP_POLL_MS)

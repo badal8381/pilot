@@ -1,4 +1,4 @@
-import { ACTIVE_STATES, ATTENTION_STATES } from '@/utils/updateFormat.js'
+import { ACTIVE_STATES, ATTENTION_STATES } from '@/utils/updateFormat.ts'
 import { request } from '@/api/client'
 
 export const updatesApi = {

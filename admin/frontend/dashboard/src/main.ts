@@ -4,7 +4,7 @@ import { FrappeUI } from 'frappe-ui'
 import 'frappe-ui/style.css'
 import '@/index.css'
 import App from '@/App.vue'
-import { router } from '@/router.js'
+import { router } from '@/router.ts'
 
 const app = createApp(App)
 app.use(router)

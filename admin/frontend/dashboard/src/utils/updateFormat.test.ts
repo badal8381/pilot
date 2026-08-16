@@ -12,8 +12,8 @@ import {
   stateLabel,
   stateTone,
   UPDATE_FILTERS,
-} from './updateFormat.js'
-import { fmtDateTime } from './taskFormat.js'
+} from './updateFormat.ts'
+import { fmtDateTime } from './taskFormat.ts'
 
 test('opTitle names the operation', () => {
   assert.equal(opTitle({ kind: 'update', apps_filter: ['erpnext'] }), 'Update erpnext')

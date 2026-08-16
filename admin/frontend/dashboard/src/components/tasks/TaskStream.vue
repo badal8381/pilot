@@ -3,8 +3,8 @@ import { onMounted, watch } from 'vue'
 
 import TerminalOutput from '@/components/common/TerminalOutput.vue'
 
-import { useTaskStream } from '@/composables/tasks/useTaskStream.js'
-import { processLine } from '@/utils/ansi.js'
+import { useTaskStream } from '@/composables/tasks/useTaskStream'
+import { processLine } from '@/utils/ansi'
 
 const props = defineProps({
   url: { type: String, default: '' },

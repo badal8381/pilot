@@ -1,6 +1,6 @@
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 
-import { processLine } from '@/utils/ansi.js'
+import { processLine } from '@/utils/ansi.ts'
 
 export const useTaskStream = ({ guardHiddenTab = false } = {}) => {
   const terminal = ref(null)

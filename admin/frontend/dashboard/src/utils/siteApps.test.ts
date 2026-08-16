@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { buildSiteAppChoices, isFrappeApp } from './siteApps.js'
+import { buildSiteAppChoices, isFrappeApp } from './siteApps.ts'
 
 const frappe = (name, extra = {}) => ({
   name,

@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { API_V1_PREFIX, apiErrorMessage, apiUrl, isSessionExpired, unwrap } from '../api/client.js'
-import { useSignedOut } from '../composables/auth/useSignedOut.js'
+import { API_V1_PREFIX, apiErrorMessage, apiUrl, isSessionExpired, unwrap } from '../api/client.ts'
+import { useSignedOut } from '../composables/auth/useSignedOut.ts'
 
 test('builds relative and cross-origin v1 API URLs', () => {
   assert.equal(API_V1_PREFIX, '/api/v1')

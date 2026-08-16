@@ -1,5 +1,5 @@
 import ky from 'ky'
-import { isSignedOut, reportSignedOut } from '../composables/auth/useSignedOut.js'
+import { isSignedOut, reportSignedOut } from '../composables/auth/useSignedOut.ts'
 
 export const API_V1_PREFIX = '/api/v1'
 

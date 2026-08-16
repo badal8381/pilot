@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { actionLabel, ruleSummary } from './wafRules.js'
+import { actionLabel, ruleSummary } from './wafRules.ts'
 
 const condition = (over = {}) => ({
   field: 'uri_path',
