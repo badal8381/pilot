@@ -4,6 +4,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, ErrorMessage, LoadingText } from 'frappe-ui'
 
 import TaskDebugDialog from '@/components/tasks/TaskDebugDialog.vue'
+import TaskSteps from '@/components/tasks/TaskSteps.vue'
+import TaskStream from '@/components/tasks/TaskStream.vue'
 
 import { apiErrorMessage } from '@/api/client'
 import { tasksApi } from '@/api/tasks'
