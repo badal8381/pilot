@@ -80,6 +80,7 @@ onMounted(load)
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <Alert v-if="!connected" theme="blue" title="Connect GitHub" :dismissible="false">
       <template #description>
@@ -105,6 +106,7 @@ onMounted(load)
         <p class="font-medium text-ink-gray-8 text-base">Connected as {{ username }}</p>
         <p class="text-ink-gray-5 text-p-sm">GitHub · Personal access token</p>
       </div>
+
       <div class="flex items-center gap-2">
         <Button
           class="flex-1 sm:flex-none"

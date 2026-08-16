@@ -62,6 +62,7 @@ defineExpose({ scrollToBottom })
     <p v-if="!lines.length" class="text-ink-gray-4" :class="rows ? 'px-4 py-3' : ''">
       {{ emptyText }}
     </p>
+
     <div
       v-for="(line, index) in lines"
       :key="index"
@@ -75,8 +76,10 @@ defineExpose({ scrollToBottom })
       >
         {{ index + 1 }}
       </span>
+
       <span class="flex-1" :class="wrap ? 'break-words' : ''" v-html="line || '&nbsp;'" />
     </div>
+
     <span
       v-if="streaming"
       class="inline-block animate-pulse"

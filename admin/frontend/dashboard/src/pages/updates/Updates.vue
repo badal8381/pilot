@@ -156,6 +156,7 @@ onMounted(load)
     <div v-if="loading && !operations.length" class="-mx-3 mt-4">
       <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
     </div>
+
     <div v-else-if="error" class="mt-4">
       <ErrorMessage :message="error" />
     </div>

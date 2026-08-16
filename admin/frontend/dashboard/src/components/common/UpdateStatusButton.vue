@@ -36,6 +36,7 @@ onMounted(start)
       </template>
       {{ status.label }}
     </Button>
+
     <UpdateAppsDialog v-model="showDialog" />
   </template>
 </template>

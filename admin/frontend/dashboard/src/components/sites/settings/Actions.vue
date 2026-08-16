@@ -96,6 +96,7 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
           <p class="font-medium text-ink-gray-8 text-base">{{ row.label }}</p>
           <p class="text-ink-gray-6 text-p-sm">{{ row.description }}</p>
         </div>
+
         <Button
           size="sm"
           variant="subtle"
@@ -107,6 +108,7 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
         </Button>
       </div>
     </div>
+
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
   </div>
 
@@ -115,6 +117,7 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
     <p class="text-ink-gray-7 text-sm">
       A Let's Encrypt email is required to issue and renew certificates.
     </p>
+
     <TextInput
       v-model="sslEmail"
       type="email"
@@ -126,6 +129,7 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
         <span class="text-sm">Let's Encrypt email</span>
       </template>
     </TextInput>
+
     <ErrorMessage v-if="sslEmailError" :message="sslEmailError" class="mt-2" />
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="outline" @click="showSslEmail = false">Cancel</Button>

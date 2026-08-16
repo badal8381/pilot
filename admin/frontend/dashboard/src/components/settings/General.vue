@@ -49,9 +49,11 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else-if="openSection">
     <component :is="openSection.component" />
   </div>
+
   <div v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
     <div class="-mx-2.5 divide-y divide-outline-alpha-gray-1 hover-merges-dividers">

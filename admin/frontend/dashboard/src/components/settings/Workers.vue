@@ -79,16 +79,19 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <div v-for="(group, index) in groups" :key="index" class="flex items-end gap-3">
       <div class="space-y-1.5 w-28">
         <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">No of Workers</p>
         <TextInput v-model="group.count" type="number" min="1" class="w-full" />
       </div>
+
       <div class="flex-1 space-y-1.5">
         <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Queues</p>
         <TextInput v-model="group.queues" placeholder="default, short, long" class="w-full" />
       </div>
+
       <Button
         variant="subtle"
         icon="lucide-x"

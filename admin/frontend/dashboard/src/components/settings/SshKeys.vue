@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
+
 import {
   Button,
   Dialog,
@@ -8,10 +11,11 @@ import {
   Spinner,
   toast,
 } from 'frappe-ui'
-import { ListRowItem, ListView } from 'frappe-ui/experimental'
+
 import EmptyState from '@/components/common/EmptyState.vue'
-import { apiErrorMessage } from '@/api/client'
+
 import { sshKeysApi } from '@/api/sshKeys'
+import { apiErrorMessage } from '@/api/client'
 
 // Numeric widths are fr units (ListView convention) so Name/Fingerprint stretch to
 // fill the row instead of leaving dead space; actions stays a fixed icon-sized column.
@@ -104,16 +108,19 @@ onMounted(load)
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <div class="flex justify-end">
       <Button variant="subtle" icon-left="lucide-plus" @click="openAdd">Add</Button>
     </div>
+
     <div
       v-if="loadError"
       class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
     >
       {{ loadError }}
     </div>
+
     <EmptyState
       compact
       v-else-if="!rows.length"
@@ -140,6 +147,7 @@ onMounted(load)
             @click="promptRemove(row)"
           />
         </div>
+
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
     </ListView>
@@ -167,10 +175,12 @@ onMounted(load)
       This is the last authorized key. It can't be removed, or you'd lose SSH access to this
       server.
     </p>
+
     <p v-else class="text-ink-gray-7 text-p-base">
       Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
       Whoever holds the matching private key loses SSH access.
     </p>
+
     <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showRemove = false">Cancel</Button>
       <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"

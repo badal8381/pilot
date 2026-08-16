@@ -157,6 +157,7 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <SettingsSwitch
       label="Site uptime"
@@ -190,6 +191,7 @@ onMounted(async () => {
         <p class="font-medium text-ink-gray-8 text-base leading-normal">Webhook endpoints</p>
         <Button variant="subtle" icon-left="lucide-plus" @click="addWebhook">Add endpoint</Button>
       </div>
+
       <p class="text-ink-gray-5 text-p-sm">
         Alerts go to Central. Endpoints listed here receive them too, as a POST carrying an
         <code>Authorization: Bearer</code> header, so the token stays out of the URL.
@@ -214,6 +216,7 @@ onMounted(async () => {
                 class="w-full"
               />
             </div>
+
             <div class="flex-1 space-y-1.5">
               <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Token</p>
               <TextInput
@@ -223,6 +226,7 @@ onMounted(async () => {
                 class="w-full"
               />
             </div>
+
             <Button
               variant="subtle"
               icon="lucide-x"
@@ -231,6 +235,7 @@ onMounted(async () => {
               @click="removeWebhook(index)"
             />
           </div>
+
           <p v-if="webhookError(webhook)" class="mt-1.5 text-ink-red-5 text-p-sm">
             {{ webhookError(webhook) }}
           </p>

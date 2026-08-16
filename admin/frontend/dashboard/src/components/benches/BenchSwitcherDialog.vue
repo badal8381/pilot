@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+
+import { ListView } from 'frappe-ui/experimental'
+
 import {
   Badge,
   Button,
@@ -7,16 +10,18 @@ import {
   ErrorMessage,
   Spinner,
 } from 'frappe-ui'
-import { ListView } from 'frappe-ui/experimental'
-import { useBenches } from '@/composables/benches/useBenches'
-import ActionMenu from '@/components/common/ActionMenu.vue'
+
 import LucidePlus from '~icons/lucide/plus'
-import LucideRefreshCw from '~icons/lucide/refresh-cw'
-import LucideExternalLink from '~icons/lucide/external-link'
 import LucidePlay from '~icons/lucide/play'
 import LucideSquare from '~icons/lucide/square'
-import LucideRotateCw from '~icons/lucide/rotate-cw'
 import LucideTrash2 from '~icons/lucide/trash-2'
+import LucideRotateCw from '~icons/lucide/rotate-cw'
+import LucideRefreshCw from '~icons/lucide/refresh-cw'
+import LucideExternalLink from '~icons/lucide/external-link'
+
+import ActionMenu from '@/components/common/ActionMenu.vue'
+
+import { useBenches } from '@/composables/benches/useBenches'
 
 const props = defineProps({ modelValue: Boolean })
 const emit = defineEmits(['update:modelValue', 'new-bench'])
@@ -201,6 +206,7 @@ watch(show, (open) => {
             <LucideRefreshCw class="w-4 h-4" />
           </template>
         </Button>
+
         <Button variant="subtle" size="sm" @click="newBench">
           <template #prefix>
             <LucidePlus class="w-4 h-4" />
@@ -214,9 +220,11 @@ watch(show, (open) => {
       <div v-if="loading && !benches.length" class="py-10 text-ink-gray-5 text-sm text-center">
         Loading…
       </div>
+
       <div v-else-if="!benches.length" class="py-10 text-ink-gray-4 text-sm text-center">
         No benches found.
       </div>
+
       <ListView
         v-else
         :columns="columns"
@@ -246,6 +254,7 @@ watch(show, (open) => {
             >
               <Spinner size="md" class="text-ink-gray-5" />
             </span>
+
             <ActionMenu
               v-else-if="menuOptions(row.bench).length"
               :options="menuOptions(row.bench)"
@@ -265,11 +274,13 @@ watch(show, (open) => {
         <p>
           Permanently delete <strong class="text-ink-gray-9">{{ benchToDrop?.name }}</strong>?
         </p>
+
         <p>
           This tears down its production services, nginx config and MariaDB instance, then removes
           the bench directory. This action cannot be undone.
         </p>
       </div>
+
       <ErrorMessage v-if="controlError" :message="controlError" />
       <div class="flex justify-end gap-2">
         <Button variant="ghost" @click="showDropConfirm = false">Cancel</Button>

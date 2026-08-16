@@ -120,6 +120,7 @@ const pollTask = async (taskId) => {
   <SettingsRow label="Pilot Version" :description="loading ? '' : versionLabel">
     <Button size="sm" variant="subtle" :loading="checking" @click="check">Update</Button>
   </SettingsRow>
+
   <ErrorMessage v-if="versionError" :message="versionError" />
 
   <Dialog v-model="dialogOpen" title="Update" size="md">
@@ -127,6 +128,7 @@ const pollTask = async (taskId) => {
       <p class="text-ink-gray-7 text-p-base">
         This is a development install. Update it from a terminal:
       </p>
+
       <pre class="p-3 bg-surface-gray-2 rounded-4 overflow-x-auto text-ink-gray-8 text-sm">git pull
 pilot admin build
 pilot admin upgrade</pre>
@@ -138,6 +140,7 @@ pilot admin upgrade</pre>
       <div v-if="!log" class="flex justify-center items-center py-8">
         <Spinner size="lg" class="text-ink-gray-4" />
       </div>
+
       <pre
         v-else
         class="p-3 bg-surface-gray-2 rounded-4 max-h-64 overflow-auto text-ink-gray-7 text-sm whitespace-pre-wrap"
@@ -149,6 +152,7 @@ pilot admin upgrade</pre>
         Version <strong>{{ latestVersion }}</strong> is available. You are on
         {{ status.current_version || 'an unknown version' }}.
       </p>
+
       <p class="text-ink-gray-5 text-p-sm">
         Pilot updates itself and restarts the admin service. Your benches keep running.
       </p>

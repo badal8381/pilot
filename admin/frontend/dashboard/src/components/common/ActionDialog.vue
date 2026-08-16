@@ -31,6 +31,7 @@ const emit = defineEmits(['confirm'])
           <Avatar v-if="subject.icon" size="xl" shape="square">
             <span class="size-4 text-ink-gray-7" :class="subject.icon" />
           </Avatar>
+
           <AppIcon
             v-else
             :name="subject.name || subject.label"
@@ -45,6 +46,7 @@ const emit = defineEmits(['confirm'])
                 {{ subject.badge }}
               </span>
             </div>
+
             <p v-if="subject.description" class="text-ink-gray-5 text-p-sm line-clamp-2">
               {{ subject.description }}
             </p>

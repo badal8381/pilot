@@ -224,6 +224,7 @@ onUnmounted(() => clearInterval(refreshTimer))
     <div v-if="loading" class="gap-4 grid grid-cols-1 sm:grid-cols-2">
       <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
     </div>
+
     <ErrorMessage v-else-if="error" :message="error" />
     <EmptyState
       v-else-if="unsupported"
@@ -244,6 +245,7 @@ onUnmounted(() => clearInterval(refreshTimer))
           class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
         />
       </ChartCard>
+
       <SlowQueries v-if="!unsupported" :overview="data?.slow_queries" />
     </div>
   </div>

@@ -21,10 +21,12 @@ defineProps({ icon: { type: String, default: '' } })
             <span class="size-4 sm:size-5" :class="icon" />
           </span>
         </slot>
+
         <div class="min-w-0">
           <div class="flex items-center gap-2 min-w-0">
             <slot name="title" />
           </div>
+
           <div
             v-if="$slots.subtitle"
             class="hidden sm:flex items-center mt-1 text-ink-gray-5 text-sm"
@@ -33,14 +35,13 @@ defineProps({ icon: { type: String, default: '' } })
           </div>
         </div>
       </div>
+
       <div class="flex items-center gap-2 shrink-0">
         <slot name="actions" />
       </div>
     </div>
   </div>
 </template>
-
-
 
 <style scoped>
 .dot-field {

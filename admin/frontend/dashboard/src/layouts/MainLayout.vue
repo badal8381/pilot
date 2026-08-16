@@ -10,6 +10,7 @@ import {
   MobileNav,
   MobileNavItem,
 } from 'frappe-ui'
+
 import Sidebar from '@/components/navigation/Sidebar.vue'
 import PilotLogo from '@/components/icons/Pilot.vue'
 import UpdateStatusButton from '@/components/common/UpdateStatusButton.vue'
@@ -17,6 +18,7 @@ import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import BenchSwitcherDialog from '@/components/benches/BenchSwitcherDialog.vue'
 import NewBenchDialog from '@/components/benches/NewBenchDialog.vue'
 import SearchDialog from '@/components/search/SearchDialog.vue'
+
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSession } from '@/composables/auth/useSession'
@@ -25,10 +27,12 @@ import { openSearch, searchOpen, useSearchShortcut } from '@/composables/common/
 
 const route = useRoute()
 const router = useRouter()
-const { items, resetBreadcrumbs } = useBreadcrumbs()
 const isMobile = useIsMobile()
+
 const { session } = useSession()
 const { showBenches, showNewBench } = useAppMenu()
+const { items, resetBreadcrumbs } = useBreadcrumbs()
+
 useSearchShortcut()
 
 // Remembers the last non-Settings route so dismissing the dialog (backdrop
@@ -149,9 +153,11 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
   </DesktopShell>
 
   <SettingsDialog v-model="showSettings" />
+
   <template v-if="session.allowBenchManagement">
     <BenchSwitcherDialog v-model="showBenches" @new-bench="showNewBench = true" />
     <NewBenchDialog v-model="showNewBench" />
   </template>
+
   <SearchDialog v-model:open="searchOpen" />
 </template>

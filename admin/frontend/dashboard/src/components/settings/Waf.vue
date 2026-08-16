@@ -167,6 +167,7 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-12">
     <div class="space-y-4">
       <SettingsSwitch
@@ -192,8 +193,10 @@ onMounted(async () => {
               >the firewall analytics</RouterLink
             >, then switch to Block.
           </p>
+
           <p v-else class="text-ink-gray-5 text-p-sm">{{ ACTION_HINTS[mode] }}</p>
         </div>
+
         <div class="space-y-1.5">
           <!-- Label markup matches frappe-ui's InputLabel. -->
           <span class="block text-ink-gray-5 text-base">Sensitivity</span>
@@ -223,6 +226,7 @@ onMounted(async () => {
           class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
         ></span>Advanced
       </summary>
+
       <div class="space-y-4 mt-4">
         <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 items-start">
           <div class="space-y-1.5">
@@ -237,11 +241,13 @@ onMounted(async () => {
               Score needed before Action applies. Sensitivity raises scores, so the two compound.
             </p>
           </div>
+
           <div class="space-y-1.5">
             <FormControl type="text" label="Max inspected body size" v-model="bodyLimit" />
             <p class="text-ink-gray-5 text-p-sm">Number with a k, m or g suffix, e.g. 50m.</p>
           </div>
         </div>
+
         <div class="space-y-1.5">
           <FormControl
             type="textarea"
@@ -254,6 +260,7 @@ onMounted(async () => {
             One path prefix per line. Requests under these skip the firewall entirely.
           </p>
         </div>
+
         <div class="space-y-1.5">
           <FormControl
             type="textarea"
@@ -266,6 +273,7 @@ onMounted(async () => {
             One SecLang directive per line. Turns a managed rule off everywhere.
           </p>
         </div>
+
         <SettingsSwitch
           label="Inspect responses"
           description="Scan outbound responses for leaks. Adds latency."

@@ -33,6 +33,7 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <div>
       <p class="mb-1 font-medium text-ink-gray-5 text-xs uppercase tracking-wide">System</p>
@@ -59,6 +60,7 @@ onMounted(async () => {
           <span class="text-ink-gray-7 text-base">{{ label }}</span>
           <span class="text-ink-gray-9 text-base">{{ value }}</span>
         </div>
+
         <p v-if="!Object.keys(info.runtime).length" class="py-2.5 text-ink-gray-5 text-p-sm">
           No runtime versions detected.
         </p>

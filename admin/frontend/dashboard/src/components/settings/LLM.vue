@@ -173,6 +173,7 @@ onMounted(load)
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <Alert v-if="!connected" theme="blue" title="Why connect an AI assistant?" :dismissible="false">
       <template #description>
@@ -218,6 +219,7 @@ onMounted(load)
         />
         <p v-if="apiBaseError" class="text-ink-red-5 text-p-sm">{{ apiBaseError }}</p>
       </div>
+
       <FormControl
         label="API Key"
         type="password"
@@ -244,6 +246,7 @@ onMounted(load)
         <p v-if="modelsError" class="text-ink-red-5 text-p-sm">{{ modelsError }}</p>
         <p v-else-if="modelsHint" class="text-ink-gray-5 text-p-sm">{{ modelsHint }}</p>
       </div>
+
       <FormControl
         label="System Prompt"
         type="textarea"
@@ -261,6 +264,7 @@ onMounted(load)
           ></span>
           Advanced
         </summary>
+
         <div class="space-y-4 pt-4">
           <FormControl
             v-if="!needsApiBase"

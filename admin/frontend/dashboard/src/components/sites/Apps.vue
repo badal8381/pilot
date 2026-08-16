@@ -103,9 +103,11 @@ onMounted(() => {
     <div v-if="appsLoading" class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
       <MarketplaceAppCardSkeleton v-for="i in 4" :key="i" :index="i - 1" />
     </div>
+
     <div v-else-if="!installedApps.length" class="py-12 text-ink-gray-5 text-sm text-center">
       No apps installed on this site.
     </div>
+
     <div v-else class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
       <MarketplaceAppCard v-for="app in appObjects" :key="app.name" :app="app">
         <template #actions>
@@ -124,6 +126,7 @@ onMounted(() => {
               />
             </template>
           </Dropdown>
+
           <span v-else class="size-7 shrink-0" />
         </template>
       </MarketplaceAppCard>

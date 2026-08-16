@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+
+import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
 
 import {
   Button,
@@ -9,16 +11,17 @@ import {
   ErrorMessage,
   LoadingText,
 } from 'frappe-ui'
-import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
-import { apiErrorMessage } from '@/api/client'
+
 import { sitesApi } from '@/api/sites'
 import { tasksApi } from '@/api/tasks'
+import { cronToLabel } from '@/utils/backup'
+import { apiErrorMessage } from '@/api/client'
+import { fmtDateTime } from '@/utils/taskFormat'
 import { useSite } from '@/composables/sites/useSite'
 import { openTaskDetailPage } from '@/utils/taskRoute'
-import { fmtDateTime } from '@/utils/taskFormat'
-import { cronToLabel } from '@/utils/backup'
 
 const props = defineProps({ siteName: { type: String, required: true } })
 const router = useRouter()
@@ -198,6 +201,7 @@ onMounted(() => {
         <p class="font-medium text-ink-gray-8 text-base">Automated backups</p>
         <p class="mt-0.5 text-ink-gray-5 text-p-sm">{{ scheduleSummary }}</p>
       </div>
+
       <div class="flex items-center gap-2 shrink-0">
         <Button variant="subtle" size="sm" @click="configRef.open()"
           >{{ enabled ? 'Configure' : 'Enable' }}</Button
@@ -217,6 +221,7 @@ onMounted(() => {
       <div v-if="backupsLoading" class="flex justify-center py-12">
         <LoadingText />
       </div>
+
       <EmptyState
         v-else-if="!backups.length"
         :bordered="false"
@@ -233,6 +238,7 @@ onMounted(() => {
           Back up now
         </Button>
       </EmptyState>
+
       <ListView
         v-else
         :columns="columns"
@@ -255,6 +261,7 @@ onMounted(() => {
               </template>
             </Dropdown>
           </div>
+
           <div v-else-if="column.key === 'offsite'" class="flex justify-center">
             <span
               v-if="row.set.is_offsite"
@@ -263,9 +270,11 @@ onMounted(() => {
             />
             <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
           </div>
+
           <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
         </template>
       </ListView>
+
       <ListFooter
         v-if="backupsHasMore || backups.length > 20"
         class="mt-2 px-1"
@@ -284,6 +293,7 @@ onMounted(() => {
       <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
       be undone.
     </p>
+
     <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showDelete = false">Cancel</Button>

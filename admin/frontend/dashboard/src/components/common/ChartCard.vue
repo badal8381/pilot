@@ -9,6 +9,7 @@ defineProps({ title: String, subtitle: String })
     <div class="flex justify-between items-baseline gap-2 px-4">
       <h3 class="font-medium text-ink-gray-8 text-base">{{ title }}</h3>
     </div>
+
     <slot />
   </div>
 </template>

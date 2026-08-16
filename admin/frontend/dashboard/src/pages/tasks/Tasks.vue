@@ -148,6 +148,7 @@ onMounted(() => load(statusFilter.value))
             </Button>
           </template>
         </Dropdown>
+
         <div class="flex-1 sm:flex-none min-w-0">
           <Dropdown :options="siteMenu">
             <template #default="{ open }">
@@ -163,6 +164,7 @@ onMounted(() => load(statusFilter.value))
             </template>
           </Dropdown>
         </div>
+
         <Button
           class="ml-auto sm:ml-auto"
           variant="subtle"
@@ -179,6 +181,7 @@ onMounted(() => load(statusFilter.value))
     <div v-if="loading" class="-mx-3 mt-4">
       <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
     </div>
+
     <div v-else-if="error" class="mt-4">
       <ErrorMessage :message="error" />
     </div>

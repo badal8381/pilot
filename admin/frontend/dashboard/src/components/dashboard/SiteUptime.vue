@@ -95,6 +95,7 @@ onMounted(load)
         tracking uptime.
       </p>
     </div>
+
     <div
       v-else-if="!data || data.overall_percent === null"
       class="flex flex-col flex-1 justify-center items-center gap-1 py-10 text-center"
@@ -102,15 +103,18 @@ onMounted(load)
       <span class="size-6 text-ink-gray-3 lucide-activity" />
       <p class="text-ink-gray-5 text-xs">No uptime data yet</p>
     </div>
+
     <div v-else class="flex flex-col flex-1 justify-center gap-2 px-4 py-6">
       <div class="flex justify-between items-center gap-2 text-ink-gray-5 text-sm">
         <div v-if="hovered !== null" class="min-w-0 truncate">
           <span class="font-bold" :style="percentTextStyle(data.buckets[hovered].percent)">
             {{ formatPercent(data.buckets[hovered].percent) }}
           </span>
+
           <span class="mx-1 text-base leading-none">·</span>
           <span>{{ formatFullTime(data.buckets[hovered].time) }}</span>
         </div>
+
         <div v-else />
         <div class="flex items-center gap-1 shrink-0">
           <span>{{ formatPercent(data.overall_percent) }}</span>

@@ -76,19 +76,23 @@ const runUpdate = async () => {
       <div v-if="checking" class="flex justify-center py-8">
         <LoadingText />
       </div>
+
       <p v-else-if="!appNames.length" class="py-6 text-ink-gray-5 text-sm text-center">
         Your bench is up to date.
       </p>
+
       <template v-else>
         <div class="flex flex-col gap-2">
           <div class="flex items-center justify-between">
             <span class="text-ink-gray-5 text-sm">
               {{ selected.size }} of {{ appNames.length }} selected
             </span>
+
             <Button variant="ghost" size="sm" @click="toggleAll">
               {{ selected.size === appNames.length ? 'Unselect all' : 'Select all' }}
             </Button>
           </div>
+
           <!-- The row is the checkbox; the inner Checkbox is inert decoration
                (tabindex/aria-hidden reach its <input> via attr passthrough). -->
           <div class="flex flex-col gap-3 max-h-80 overflow-y-auto">
@@ -106,6 +110,7 @@ const runUpdate = async () => {
                 <p class="font-medium text-ink-gray-8 text-base truncate">
                   {{ titleMap[name] || name }}
                 </p>
+
                 <p
                   v-if="updates[name]"
                   class="flex items-center gap-1 mt-0.5 font-mono text-ink-gray-5 text-p-xs truncate"
@@ -115,6 +120,7 @@ const runUpdate = async () => {
                   <span class="text-ink-green-6">{{ updates[name].target }}</span>
                 </p>
               </span>
+
               <Checkbox
                 :model-value="selected.has(name)"
                 class="pointer-events-none shrink-0"

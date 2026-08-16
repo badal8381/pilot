@@ -151,6 +151,7 @@ const confirmRemove = () => {
           Checked before the managed rules, top to bottom.
         </p>
       </div>
+
       <Button class="shrink-0" variant="subtle" icon-left="lucide-plus" @click="addRule">
         Add rule
       </Button>
@@ -199,6 +200,7 @@ const confirmRemove = () => {
           >
             <span class="block size-4 lucide-grip-vertical" />
           </button>
+
           <button
             type="button"
             class="flex flex-1 items-baseline gap-2 min-w-0 text-left"
@@ -211,12 +213,15 @@ const confirmRemove = () => {
             >
               {{ rule.name || 'Untitled rule' }}
             </span>
+
             <span class="min-w-0 text-ink-gray-6 text-p-sm truncate">
               {{ ruleSummary(rule) }}
             </span>
+
             <!-- What the rule does outranks what it matches on: never truncate it. -->
             <span class="shrink-0 text-ink-gray-6 text-p-sm">→ {{ actionLabel(rule) }}</span>
           </button>
+
           <!-- The nginx renderer silently drops broken rules. -->
           <Badge v-if="ruleProblem(rule)" class="shrink-0" theme="amber">Incomplete</Badge>
           <!-- A bare Switch has no accessible name (attrs land on the wrapper);
@@ -252,6 +257,7 @@ const confirmRemove = () => {
               <Select v-model="rule.match" :options="MATCH_OPTIONS" />
               <span>of the following match:</span>
             </template>
+
             <span v-else>When this matches:</span>
           </div>
 
@@ -279,6 +285,7 @@ const confirmRemove = () => {
                     class="w-full"
                   />
                 </div>
+
                 <Select v-model="cond.operator" :options="operatorOptions" class="w-full" />
                 <TextInput
                   v-model="cond.value"
@@ -326,6 +333,7 @@ const confirmRemove = () => {
               Delete rule
             </Button>
           </div>
+
           <p
             v-if="rule.action === 'skip'"
             class="flex items-start gap-1.5 text-ink-amber-6 text-p-sm"
@@ -343,6 +351,7 @@ const confirmRemove = () => {
         Delete <strong>{{ removingLabel }}</strong
         >? Requests it was matching fall through to the managed ruleset.
       </p>
+
       <div class="flex justify-end gap-2 mt-4">
         <Button variant="ghost" @click="showRemove = false">Cancel</Button>
         <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>

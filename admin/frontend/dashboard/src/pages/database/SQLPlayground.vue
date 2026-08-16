@@ -238,12 +238,14 @@ onMounted(async () => {
     >
       <span class="size-5 lucide-database" />
     </span>
+
     <div>
       <p class="font-medium text-ink-gray-7 text-base">Select a site to get started</p>
       <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
         Queries run against that site's database.
       </p>
     </div>
+
     <!-- Wrapped: FormControl's own w-full beats a width utility passed to it. -->
     <div class="w-56">
       <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
@@ -262,6 +264,7 @@ onMounted(async () => {
           @run="runQuery"
         />
       </div>
+
       <div
         class="flex flex-wrap justify-between items-center gap-2 bg-surface-base px-2 py-2 border-t border-outline-gray-2"
       >
@@ -269,9 +272,11 @@ onMounted(async () => {
           <div class="sm:hidden">
             <FormControl type="select" v-model="modeStr" :options="modeOptions" />
           </div>
+
           <div class="hidden sm:block">
             <TabButtons v-model="modeStr" :options="modeOptions" />
           </div>
+
           <div class="hidden sm:block">
             <Button
               variant="outline"
@@ -287,6 +292,7 @@ onMounted(async () => {
             </Button>
           </div>
         </div>
+
         <div class="flex items-center gap-3 ml-auto">
           <Button
             variant="solid"
@@ -351,6 +357,7 @@ onMounted(async () => {
             <Button variant="ghost" size="xs" iconLeft="lucide-download" @click="exportCsv">
               Download as CSV
             </Button>
+
             <div class="flex items-center gap-3">
               <div
                 class="hidden sm:flex items-center gap-1.5 pr-3 border-r-2 border-outline-gray-2"
@@ -363,11 +370,13 @@ onMounted(async () => {
                   :options="pageOptions"
                 />
               </div>
+
               <span class="hidden sm:inline tabular-nums text-ink-gray-5 text-xs whitespace-nowrap">
                 {{ rowRange }}
                 of {{ currentResult.row_count }} rows
                 <span v-if="currentResult.truncated">(truncated)</span>
               </span>
+
               <div class="flex items-center ">
                 <Button
                   variant="ghost"
@@ -400,6 +409,7 @@ onMounted(async () => {
           <span class="size-3" :class="showSql ? 'lucide-chevron-down' : 'lucide-chevron-right'" />
           View SQL Query
         </button>
+
         <pre
           v-if="showSql"
           class="bg-surface-gray-1 mt-1.5 px-3 py-2 border rounded-6 border-outline-gray-2 overflow-x-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
@@ -418,6 +428,7 @@ onMounted(async () => {
       This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
       the database. Are you sure you want to continue?
     </p>
+
     <pre
       class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-6 border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
       style="font-family: ui-monospace, SFMono-Regular, monospace;"

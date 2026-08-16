@@ -67,6 +67,7 @@ const {
         <p v-show="isConfiguring" class="mb-1 text-ink-gray-4 text-xs">
           Step {{ stepNumber }} of {{ stepSequence.length }}
         </p>
+
         <h1 class="font-semibold text-ink-gray-9 text-lg">{{ stepTitle }}</h1>
         <p v-show="stepSubtitle" class="mt-0.5 text-ink-gray-5 text-p-base">{{ stepSubtitle }}</p>
       </div>
@@ -96,6 +97,7 @@ const {
                 :placeholder="dbPortPlaceholder"
               />
             </div>
+
             <TextInput label="Root username" v-model="dbUser" :placeholder="rootUserPlaceholder" />
             <Password
               label="Root user password"
@@ -108,6 +110,7 @@ const {
               @keydown.enter="goToNextStep"
             />
           </template>
+
           <ErrorMessage v-show="errorMessage" :message="errorMessage" />
         </div>
 
@@ -132,6 +135,7 @@ const {
             />
             {{ showStreamDetails ? 'Hide details' : 'Show details' }}
           </button>
+
           <div v-show="showStreamDetails">
             <TaskStream
               ref="terminal"
@@ -142,6 +146,7 @@ const {
               @error="failInstall('Lost connection to the setup process.')"
             />
           </div>
+
           <ErrorMessage v-show="errorMessage" :message="errorMessage" />
         </div>
 
@@ -161,6 +166,7 @@ const {
           <p class="text-ink-gray-7 text-sm">
             Your bench is ready. Run one of these in your terminal:
           </p>
+
           <div>
             <p class="font-medium text-ink-gray-6 text-xs">Develop locally</p>
             <code
@@ -169,6 +175,7 @@ const {
               start</code
             >
           </div>
+
           <div>
             <p class="font-medium text-ink-gray-6 text-xs">Deploy to production</p>
             <code
@@ -178,6 +185,7 @@ const {
               &lt;you@example.com&gt;</code
             >
           </div>
+
           <p class="text-ink-gray-5 text-xs">
             <code class="font-mono">{{ pilotCommand }} start</code>
             reloads this page automatically once the bench is back.
@@ -195,6 +203,7 @@ const {
         >
           Back to configuration
         </Button>
+
         <Button
           v-show="isConfiguring && stepNumber > 1"
           variant="subtle"
@@ -203,6 +212,7 @@ const {
         >
           Back
         </Button>
+
         <Button
           v-show="isConfiguring && currentStep === 'database' && dbMode === 'external'"
           variant="solid"
@@ -212,6 +222,7 @@ const {
         >
           Verify credentials
         </Button>
+
         <Button
           v-show="isConfiguring && currentStep === 'database' && dbMode !== 'external'"
           variant="solid"
@@ -220,6 +231,7 @@ const {
         >
           Next
         </Button>
+
         <Button
           v-show="isConfiguring && currentStep !== 'database' && !isLastConfigStep"
           variant="solid"
@@ -228,6 +240,7 @@ const {
         >
           Next
         </Button>
+
         <Button
           v-show="isConfiguring && currentStep !== 'database' && isLastConfigStep"
           variant="solid"

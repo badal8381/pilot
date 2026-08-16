@@ -247,11 +247,13 @@ const createBench = async () => {
           <p class="font-semibold text-ink-gray-9 text-lg">This may take a few minutes</p>
           <p class="max-w-xs text-ink-gray-6 text-sm">Opens automatically when ready.</p>
         </div>
+
         <span
           class="bg-surface-gray-2 px-2.5 py-1 rounded-full font-medium text-ink-gray-6 text-xs"
         >
           Elapsed {{ elapsedLabel }}
         </span>
+
         <Button variant="subtle" @click="openWizardInNewTab">Open setup now</Button>
       </div>
 
@@ -270,6 +272,7 @@ const createBench = async () => {
           This bench is running in development mode, so new benches can be created from the
           command line :
         </p>
+
         <pre
           class="bg-surface-gray-2 px-3 py-2.5 rounded-6 text-ink-gray-8 text-sm select-all"
         >pilot new my-bench</pre>
@@ -304,6 +307,7 @@ const createBench = async () => {
             </button>
           </div>
         </div>
+
         <div>
           <template v-if="wildcardDomains.length === 0">
             <FormControl
@@ -319,6 +323,7 @@ const createBench = async () => {
               isn't provisioned automatically, so setup can't be reached until it resolves here.
             </p>
           </template>
+
           <div v-else>
             <span class="block mb-1.5 text-ink-gray-5 text-xs">Admin domain</span>
             <div class="flex items-stretch gap-2">
@@ -343,19 +348,23 @@ const createBench = async () => {
               >
             </div>
           </div>
+
           <p class="mt-1.5 text-ink-gray-5 text-xs">
             The web address you'll use to open this bench.
           </p>
         </div>
+
         <ErrorMessage v-if="error" :message="error" />
         <p v-if="status" class="text-ink-gray-6 text-sm">{{ status }}</p>
       </template>
     </div>
+
     <template #actions v-if="!provisioning">
       <div class="flex justify-end gap-2">
         <Button variant="ghost" @click="show = false">
           {{ isProduction === false ? 'Close' : 'Cancel' }}
         </Button>
+
         <Button
           v-if="isProduction === true"
           variant="solid"

@@ -246,9 +246,11 @@ const submit = async () => {
                 <span class="font-medium text-ink-gray-9">{{ gitStatus.username }}</span>
               </span>
             </div>
+
             <div v-if="reposLoading" class="flex justify-center items-center h-32">
               <LoadingText />
             </div>
+
             <div v-else class="flex items-end gap-2 mt-2">
               <Combobox
                 label="Repository"

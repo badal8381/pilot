@@ -22,6 +22,7 @@ const nameWidth = computed(() => NAME_WIDTHS[props.index % NAME_WIDTHS.length])
       <div class="flex items-center h-6">
         <Skeleton class="rounded-4 h-3.5" :class="nameWidth" />
       </div>
+
       <div class="flex items-center h-5">
         <Skeleton class="rounded-4 w-12 h-2.5" />
       </div>

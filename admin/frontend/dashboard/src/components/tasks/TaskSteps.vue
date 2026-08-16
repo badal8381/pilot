@@ -51,5 +51,6 @@ const sectionHasOutput = (section) => {
       :streaming="streaming && section.status === 'running'"
     />
   </div>
+
   <LogView v-else :lines="processedLines" :streaming="streaming" :empty-text="emptyText" />
 </template>

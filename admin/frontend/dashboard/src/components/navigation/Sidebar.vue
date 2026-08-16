@@ -61,6 +61,7 @@ const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
         <SidebarLabel v-if="section.label" divider class="mt-2">
           {{ section.label }}
         </SidebarLabel>
+
         <SidebarItem
           v-for="item in section.items"
           :key="item.to"

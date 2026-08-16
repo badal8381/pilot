@@ -104,6 +104,7 @@ watch(nginxEnabled, (enabled) => {
     <div v-if="loading" class="flex justify-center py-8">
       <LoadingText />
     </div>
+
     <template v-else>
       <div class="mt-1">
         <div
@@ -118,6 +119,7 @@ watch(nginxEnabled, (enabled) => {
                 :class="site?.ssl ? 'lucide-lock text-ink-green-5' : 'lucide-lock-open'"
               />
             </Tooltip>
+
             <div class="flex items-center gap-2 min-w-0">
               <p class="font-medium text-ink-gray-8 text-base truncate">{{ row.domain }}</p>
               <Badge
@@ -130,6 +132,7 @@ watch(nginxEnabled, (enabled) => {
               <Badge v-else-if="row.isSite" label="Included" size="sm" class="shrink-0" />
             </div>
           </div>
+
           <Dropdown
             v-if="domainMenuOptions(row).length"
             :options="domainMenuOptions(row)"
@@ -147,6 +150,7 @@ watch(nginxEnabled, (enabled) => {
           </Dropdown>
         </div>
       </div>
+
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
       <Button variant="subtle" size="sm" class="mt-4" @click="showAdd = true">
         <template #prefix><span class="size-4 lucide-plus" /></template>

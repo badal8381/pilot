@@ -118,6 +118,7 @@ const purge = async () => {
       <p v-if="!canPurge" class="text-ink-gray-7 text-sm">
         There's only one binary log file right now, so there's nothing to purge yet.
       </p>
+
       <p v-else class="text-ink-gray-7 text-sm">
         All binary logs except the most recent are deleted, freeing about
         {{ formatBytes(freedBytes) }}. The most recent log is kept so replication and

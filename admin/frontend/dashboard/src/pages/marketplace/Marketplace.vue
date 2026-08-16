@@ -79,6 +79,7 @@ onMounted(load)
       <Skeleton class="rounded-4 w-40 h-4" />
       <Skeleton class="rounded-full w-14 h-5 shrink-0" />
     </template>
+
     <template #subtitle><Skeleton class="rounded-4 w-24 h-3.5" /></template>
     <template #actions><Skeleton class="rounded-4 w-28 h-8 sm:h-7" /></template>
   </PageHero>
@@ -90,6 +91,7 @@ onMounted(load)
         <template #prefix><span class="size-2.5 lucide-box" /></template>
       </Badge>
     </template>
+
     <template #subtitle>{{ error ? '' : appCountLabel }}</template>
     <template #actions>
       <Button
@@ -123,6 +125,7 @@ onMounted(load)
       <div class="flex items-center h-4">
         <Skeleton class="rounded-4 w-32 h-3.5" />
       </div>
+
       <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
         <MarketplaceAppCardSkeleton v-for="i in 8" :key="i" :index="i - 1" />
       </div>
@@ -139,6 +142,7 @@ onMounted(load)
         <h2 class="font-medium text-ink-gray-9 text-base">
           {{ filteredHeading }}
         </h2>
+
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in filteredApps"
@@ -148,6 +152,7 @@ onMounted(load)
           />
         </div>
       </section>
+
       <p v-else class="mt-8 text-ink-gray-5 text-sm text-center">No apps found.</p>
     </template>
 

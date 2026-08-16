@@ -35,8 +35,6 @@ onBeforeUnmount(() => observer?.disconnect())
   </div>
 </template>
 
-
-
 <style scoped>
 /* Lets content dissolve under the bar instead of being cut at its edge. Only
    once pinned, or it washes out the top border of whatever sits below. */

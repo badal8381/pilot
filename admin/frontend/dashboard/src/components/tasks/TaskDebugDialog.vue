@@ -65,9 +65,11 @@ onBeforeUnmount(close)
       <div v-if="streaming && !text" class="flex justify-center py-10">
         <LoadingText text="Analyzing the failure…" />
       </div>
+
       <Alert v-if="error" theme="red" title="Couldn't debug this task" :dismissible="false">
         <template #description>{{ error }}</template>
       </Alert>
+
       <div
         v-if="text"
         class="bg-surface-gray-2 p-4 rounded-6 max-h-[60vh] overflow-y-auto prose prose-sm dark:prose-invert max-w-none"

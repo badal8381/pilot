@@ -37,11 +37,10 @@ defineExpose({ scrollToBottom })
         v-html="line || '&nbsp;'"
       />
     </div>
+
     <div v-if="streaming" class="terminal__cursor">█</div>
   </div>
 </template>
-
-
 
 <style scoped>
 .terminal {
