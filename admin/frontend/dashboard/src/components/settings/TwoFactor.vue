@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
+
 import {
   Button,
   Dialog,
@@ -8,10 +11,12 @@ import {
   Spinner,
   toast,
 } from 'frappe-ui'
-import { ListRowItem, ListView } from 'frappe-ui/experimental'
+
 import QrcodeVue from 'qrcode.vue'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
+
 import { twoFactorApi } from '@/api/twoFactor'
 import { fmtDateTime } from '@/utils/taskFormat'
 
@@ -188,6 +193,7 @@ onMounted(load)
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-5">
     <div class="flex justify-between items-center">
       <p class="font-medium text-ink-gray-8 text-base">
@@ -196,6 +202,7 @@ onMounted(load)
           ({{ devices.length }} of {{ status.max_devices }})
         </span>
       </p>
+
       <Button
         v-if="!atDeviceLimit"
         variant="subtle"
@@ -236,12 +243,15 @@ onMounted(load)
         >
           {{ row.name }}
         </span>
+
         <span v-else-if="column.key === 'confirmed_at'" class="text-ink-gray-6 text-sm">
           {{ fmtTimestamp(row.confirmed_at) }}
         </span>
+
         <span v-else-if="column.key === 'last_used_at'" class="text-ink-gray-6 text-sm">
           {{ fmtTimestamp(row.last_used_at) }}
         </span>
+
         <div v-else-if="column.key === 'actions'" class="flex justify-end">
           <Button
             variant="ghost"
@@ -253,6 +263,7 @@ onMounted(load)
             @click="promptRemove(row)"
           />
         </div>
+
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
     </ListView>
@@ -286,9 +297,11 @@ onMounted(load)
         <p class="text-ink-gray-6 text-p-base">
           Scan with Authy, Bitwarden, Microsoft Authenticator or any TOTP app.
         </p>
+
         <div class="flex justify-center bg-surface-white p-4 rounded-6">
           <QrcodeVue :value="enrollment.provisioning_url" :size="176" level="M" render-as="svg" />
         </div>
+
         <details class="group">
           <summary
             class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
@@ -298,6 +311,7 @@ onMounted(load)
             ></span>
             Can't scan? Enter the key by hand
           </summary>
+
           <div class="bg-surface-gray-2 mt-2 p-3 rounded-6">
             <p class="font-mono text-ink-gray-8 text-base break-all">{{ enrollment.secret }}</p>
             <button class="mt-1 text-ink-blue-2 text-sm" @click="copy(enrollment.secret)">
@@ -305,6 +319,7 @@ onMounted(load)
             </button>
           </div>
         </details>
+
         <FormControl v-model="otp" label="Code from the app" placeholder="123456" autofocus />
       </template>
     </div>
@@ -331,6 +346,7 @@ onMounted(load)
       These are shown once. Store them somewhere safe — each one signs you in when no device
       is available, and works only once.
     </p>
+
     <div class="gap-x-6 gap-y-2 grid grid-cols-2 bg-surface-gray-2 mt-3 px-4 py-3.5 rounded-6">
       <span
         v-for="code in codes"
@@ -340,6 +356,7 @@ onMounted(load)
         {{ code }}
       </span>
     </div>
+
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="subtle" @click="copy(codes.join('\n'))">Copy all</Button>
       <Button variant="solid" icon-left="lucide-download" @click="downloadCodes">
@@ -353,6 +370,7 @@ onMounted(load)
       Remove <strong>{{ removing?.name }}</strong
       >? Its codes stop working. Removing the last device turns two-factor off.
     </p>
+
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showRemove = false">Cancel</Button>
@@ -365,6 +383,7 @@ onMounted(load)
       This replaces all existing codes, including unused ones. Anything you saved earlier stops
       working.
     </p>
+
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showRegenerate = false">Cancel</Button>

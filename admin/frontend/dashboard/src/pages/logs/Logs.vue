@@ -237,12 +237,14 @@ onUnmounted(() => stopLive())
             <template #prefix><span class="size-4 text-ink-gray-5 lucide-search" /></template>
           </FormControl>
         </div>
+
         <div class="flex flex-col flex-1 gap-1 p-1.5 sm:p-2 overflow-y-auto">
           <LoadingText v-if="logsLoading" class="p-2" />
           <ErrorMessage v-else-if="logsError" :message="logsError" class="p-2" />
           <p v-else-if="!filteredLogs.length" class="p-2 text-ink-gray-4 text-sm">
             No log files found.
           </p>
+
           <button
             v-else
             v-for="log in filteredLogs"
@@ -255,6 +257,7 @@ onUnmounted(() => stopLive())
               <span class="flex-1 font-medium text-ink-gray-8 text-base truncate">
                 {{ log.filename }}
               </span>
+
               <Tooltip v-if="hasErrors(log)" text="Contains errors">
                 <span
                   class="bg-surface-red-5 rounded-full size-1.5 shrink-0"
@@ -262,10 +265,12 @@ onUnmounted(() => stopLive())
                   aria-label="Contains errors"
                 />
               </Tooltip>
+
               <span class="text-ink-gray-4 text-xs shrink-0">
                 {{ shortRelativeTime(log.last_modified) }}
               </span>
             </div>
+
             <div class="mt-0.5 text-ink-gray-4 text-p-sm">{{ formatBytes(log.size_bytes) }}</div>
           </button>
         </div>
@@ -302,6 +307,7 @@ onUnmounted(() => stopLive())
                 {{ selectedFile }}
               </span>
             </div>
+
             <FormControl
               type="text"
               v-model="search"
@@ -353,6 +359,7 @@ onUnmounted(() => stopLive())
                   ]"
                 />
               </div>
+
               <Button
                 class="ml-auto sm:ml-0"
                 variant="subtle"
@@ -399,6 +406,7 @@ onUnmounted(() => stopLive())
             <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
               Error: {{ contentError }}
             </div>
+
             <LogView
               v-else
               ref="terminal"
@@ -427,8 +435,6 @@ onUnmounted(() => stopLive())
     </div>
   </div>
 </template>
-
-
 
 <!-- Unscoped: the <mark>s are injected via v-html and never get the scope attribute. -->
 <style>

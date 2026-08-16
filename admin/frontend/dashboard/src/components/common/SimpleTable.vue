@@ -27,6 +27,7 @@ defineProps({
             </th>
           </tr>
         </thead>
+
         <tbody>
           <tr v-for="(row, i) in rows" :key="i">
             <td
@@ -35,6 +36,7 @@ defineProps({
             >
               {{ indexOffset + i + 1 }}
             </td>
+
             <td
               v-for="(column, j) in columns"
               :key="column.key"
@@ -49,6 +51,7 @@ defineProps({
           </tr>
         </tbody>
       </table>
+
       <div
         v-if="emptyText && !rows.length"
         class="flex justify-center items-center py-16 text-ink-gray-4 text-sm"

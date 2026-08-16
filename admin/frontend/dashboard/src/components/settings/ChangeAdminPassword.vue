@@ -56,6 +56,7 @@ const save = async () => {
       />
       <PasswordStrengthMeter :password="newPassword" />
     </div>
+
     <PasswordInput
       v-model="confirmPassword"
       label="Confirm new password"

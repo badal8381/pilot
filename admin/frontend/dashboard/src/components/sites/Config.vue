@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+
+import { ListView, ListRowItem } from 'frappe-ui/experimental'
+
 import {
   Button,
   Dialog,
@@ -7,7 +10,7 @@ import {
   ErrorMessage,
   TextInput,
 } from 'frappe-ui'
-import { ListView, ListRowItem } from 'frappe-ui/experimental'
+
 import { sitesApi } from '@/api/sites'
 import { useSite } from '@/composables/sites/useSite'
 
@@ -139,6 +142,7 @@ const refresh = async () => {
       <p class="text-ink-gray-5 text-sm">
         Keys passed to this site's <code class="font-mono text-ink-gray-7">site_config.json</code>.
       </p>
+
       <div class="flex items-center gap-2 shrink-0">
         <Button
           size="sm"
@@ -163,6 +167,7 @@ const refresh = async () => {
     >
       No config keys.
     </div>
+
     <ListView
       v-else
       :columns="columns"
@@ -185,6 +190,7 @@ const refresh = async () => {
             </template>
           </Dropdown>
         </div>
+
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
     </ListView>
@@ -197,12 +203,15 @@ const refresh = async () => {
         <p class="font-medium text-ink-gray-7 text-sm">Key</p>
         <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
       </div>
+
       <div class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Value</p>
         <TextInput v-model="entryValue" placeholder="value" class="w-full" />
       </div>
+
       <ErrorMessage v-if="dialogError" :message="dialogError" />
     </div>
+
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
       <Button variant="solid" :loading="saving" @click="save">Save</Button>
@@ -215,6 +224,7 @@ const refresh = async () => {
       <p class="font-medium text-ink-gray-7 text-sm">Value</p>
       <TextInput v-model="entryValue" placeholder="value" class="w-full" />
     </div>
+
     <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
@@ -228,6 +238,7 @@ const refresh = async () => {
       Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
       <code class="text-ink-gray-9">site_config.json</code>?
     </p>
+
     <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showDelete = false">Cancel</Button>

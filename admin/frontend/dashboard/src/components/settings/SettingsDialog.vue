@@ -132,6 +132,7 @@ const goBack = () => {
           >
             Settings
           </h3>
+
           <Button
             v-if="!activeSection"
             class="sm:hidden top-3 right-3 absolute"
@@ -162,6 +163,7 @@ const goBack = () => {
             </Button>
           </div>
         </div>
+
         <!-- frappe-ui's SettingsHeader/SettingsBody padding; off below sm. -->
         <div
           class="flex-col flex-1 px-6 sm:px-[4.4rem] pt-6 sm:pt-10 pb-10 sm:pb-16 overflow-y-auto"
@@ -181,8 +183,10 @@ const goBack = () => {
               />
               <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
             </div>
+
             <div id="settings-header-actions" class="contents"></div>
           </div>
+
           <General v-if="currentSection === 'general'" v-model:open-section="guardedSubSection" />
           <Database
             v-else-if="currentSection === 'database'"
@@ -207,6 +211,7 @@ const goBack = () => {
     <p class="text-ink-gray-7 text-p-base">
       You have changes here that have not been saved. Leaving loses them.
     </p>
+
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="subtle" @click="showDiscard = false">Keep editing</Button>
       <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>

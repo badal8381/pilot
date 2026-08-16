@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+
+import { ListView } from 'frappe-ui/experimental'
 
 import {
   Badge,
@@ -11,19 +13,20 @@ import {
   TabButtons,
   toast,
 } from 'frappe-ui'
-import { ListView } from 'frappe-ui/experimental'
+
 import EmptyState from '@/components/common/EmptyState.vue'
-import NewSiteDialog from '@/components/sites/NewSiteDialog.vue'
 import SiteSkeleton from '@/components/sites/SiteSkeleton.vue'
+import NewSiteDialog from '@/components/sites/NewSiteDialog.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
-import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
-import { useIsMobile } from '@/composables/common/useIsMobile'
-import { useSites } from '@/composables/sites/useSites'
-import { apiErrorMessage } from '@/api/client'
+
 import { sitesApi } from '@/api/sites'
-import { useSiteStorage } from '@/composables/sites/useSiteStorage'
-import { openTaskDetailPage } from '@/utils/taskRoute'
+import { apiErrorMessage } from '@/api/client'
 import { openSiteLogin } from '@/utils/siteLogin'
+import { openTaskDetailPage } from '@/utils/taskRoute'
+import { useSites } from '@/composables/sites/useSites'
+import { useIsMobile } from '@/composables/common/useIsMobile'
+import { useSiteStorage } from '@/composables/sites/useSiteStorage'
+import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 
 const route = useRoute()
 const router = useRouter()
@@ -184,6 +187,7 @@ onMounted(() => {
           <span class="size-4 text-ink-gray-5 lucide-search" />
         </template>
       </FormControl>
+
       <!-- Status filter -->
       <FormControl
         v-model="statusFilter"
@@ -206,6 +210,7 @@ onMounted(() => {
     <div v-if="loading" class="gap-3 grid grid-cols-1 md:grid-cols-2 mt-1">
       <SiteSkeleton v-for="index in 4" :key="index" :index="index - 1" />
     </div>
+
     <div v-else-if="error" class="mt-16">
       <ErrorMessage :message="error" />
     </div>
@@ -233,6 +238,7 @@ onMounted(() => {
             >
               <span class="size-4 lucide-globe"></span>
             </div>
+
             <div class="flex-1 min-w-0">
               <!-- First Line -->
               <div class="gap-2 grid grid-cols-[3fr_1fr]">
@@ -292,6 +298,7 @@ onMounted(() => {
               {{ row.site.name }}
             </RouterLink>
           </div>
+
           <div v-else-if="column.key === 'status'">
             <Badge
               v-if="statusBadge(row.site)"
@@ -300,12 +307,14 @@ onMounted(() => {
               size="sm"
             />
           </div>
+
           <div
             v-else-if="column.key === 'storage' || column.key === 'apps'"
             class="text-ink-gray-6 text-sm"
           >
             {{ item }}
           </div>
+
           <div v-else-if="column.key === 'actions'" class="flex justify-end">
             <Dropdown :options="siteMenuOptions(row.site)">
               <template #default="{ open }">

@@ -148,6 +148,7 @@ onMounted(load)
     <template v-if="loading">
       <Skeleton v-for="i in 12" :key="i" class="rounded-6 h-[340px]" />
     </template>
+
     <ErrorMessage v-else-if="error" :message="error" class="sm:col-span-2" />
 
     <template v-else>
@@ -160,6 +161,7 @@ onMounted(load)
           <p class="font-medium text-ink-gray-7 text-xs">No usage yet</p>
           <p class="text-ink-gray-5 text-xs">Data will appear here once activity is tracked</p>
         </div>
+
         <AxisChart
           v-else
           :config="chart.config"

@@ -619,14 +619,17 @@ onUnmounted(() => clearTimeout(statsTimer))
           <template #prefix>
             <span class="size-4" :class="isServerScope ? 'lucide-server' : 'lucide-globe'" />
           </template>
+
           <span class="truncate">{{ targetLabel }}</span>
         </ToolbarSelect>
       </div>
+
       <div v-if="isServerScope" class="shrink-0">
         <ToolbarSelect :options="metricOptions" class="[&>.truncate]:text-left text-base">
           {{ viewLabel }}
         </ToolbarSelect>
       </div>
+
       <div class="shrink-0">
         <ToolbarSelect :options="windowOptions" class="[&>.truncate]:text-left text-base">
           <template #prefix>
@@ -676,6 +679,7 @@ onUnmounted(() => clearTimeout(statsTimer))
               <span class="text-ink-gray-6 text-sm">{{ meter.label }}</span>
               <span class="text-ink-gray-6 text-sm shrink-0">{{ meter.value }}</span>
             </div>
+
             <div class="bg-surface-gray-2 rounded-full h-1 overflow-hidden">
               <div
                 class="bg-surface-gray-9 rounded-full h-full"

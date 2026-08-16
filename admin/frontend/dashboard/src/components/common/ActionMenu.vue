@@ -51,6 +51,7 @@ onBeforeUnmount(close)
         <span class="size-4 lucide-ellipsis-vertical" />
       </template>
     </Button>
+
     <Teleport to="body">
       <div
         v-if="open"

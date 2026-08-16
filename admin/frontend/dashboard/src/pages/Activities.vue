@@ -244,6 +244,7 @@ onMounted(() => {
           >
             <span class="size-3.5" :class="activityTypeMeta(row.entry).icon" />
           </span>
+
           <span class="font-medium text-ink-gray-9 text-sm">{{ row.activity }}</span>
         </template>
 

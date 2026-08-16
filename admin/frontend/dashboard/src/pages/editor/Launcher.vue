@@ -61,6 +61,7 @@ onMounted(async () => {
       <p class="font-medium text-ink-gray-9 text-base">
         Installed apps · {{ appObjects.length }}
       </p>
+
       <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
         <a
           v-for="app in appObjects"

@@ -22,6 +22,7 @@ defineProps({
       <p class="font-medium text-ink-gray-8 text-base">{{ label }}</p>
       <p v-if="description" class="text-ink-gray-6 text-p-sm">{{ description }}</p>
     </div>
+
     <div class="ml-4 shrink-0">
       <slot />
     </div>

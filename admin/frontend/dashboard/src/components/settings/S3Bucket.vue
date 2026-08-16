@@ -121,6 +121,7 @@ onMounted(load)
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <Alert v-if="!connected" theme="blue" title="Why connect object storage?" :dismissible="false">
       <template #description>
@@ -138,6 +139,7 @@ onMounted(load)
         <p class="font-medium text-ink-gray-8 text-base">Connected to {{ bucket }}</p>
         <p class="text-ink-gray-5 text-p-sm">{{ providerLabel }} · Access key {{ accessKey }}</p>
       </div>
+
       <Button
         class="flex-1 sm:flex-none"
         variant="subtle"
@@ -154,6 +156,7 @@ onMounted(load)
         <Select label="Provider" v-model="provider" :options="providerOptions" class="w-full" />
         <Select label="Region" v-model="region" :options="regionOptions" class="w-full" />
       </div>
+
       <div class="flex sm:flex-row flex-col gap-4">
         <FormControl
           label="Access Key"
@@ -170,6 +173,7 @@ onMounted(load)
           class="w-full"
         />
       </div>
+
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
         <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">

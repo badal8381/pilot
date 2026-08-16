@@ -158,10 +158,12 @@ onUnmounted(() => clearInterval(badgeTimer))
               <span class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base">
                 {{ item.title }}
               </span>
+
               <span class="text-ink-gray-5 text-xs whitespace-nowrap shrink-0">
                 {{ relativeTime(item.created_at) }}
               </span>
             </span>
+
             <span v-if="item.message" class="block mt-0.5 text-ink-gray-6 text-p-sm">
               {{ item.message }}
             </span>

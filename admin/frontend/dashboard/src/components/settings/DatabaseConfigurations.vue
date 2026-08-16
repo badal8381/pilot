@@ -162,6 +162,7 @@ onMounted(load)
   <div v-if="loading && !snapshot" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
 
@@ -193,6 +194,7 @@ onMounted(load)
           <h4 class="mb-1 font-medium text-ink-gray-6 text-sm">
             {{ group.name }}
           </h4>
+
           <div class="divide-y divide-outline-alpha-gray-1">
             <div
               v-for="variable in group.variables"
@@ -204,6 +206,7 @@ onMounted(load)
                   {{ variable.name }}
                 </code>
               </div>
+
               <div class="flex items-center justify-between sm:justify-end gap-3 sm:ml-6 shrink-0">
                 <span
                   class="max-w-48 text-right text-ink-gray-8 text-sm font-mono break-all"
@@ -211,6 +214,7 @@ onMounted(load)
                 >
                   {{ formatValue(variable) }}
                 </span>
+
                 <Button
                   v-if="variable.editable"
                   size="sm"
@@ -232,6 +236,7 @@ onMounted(load)
           </div>
         </section>
       </div>
+
       <p v-else class="py-10 text-center text-ink-gray-5 text-sm">
         No database variables match this search.
       </p>
@@ -253,6 +258,7 @@ onMounted(load)
           @update:model-value="(value) => (draftValue = value)"
         />
       </div>
+
       <FormControl
         v-else
         v-model.number="draftValue"
@@ -268,14 +274,17 @@ onMounted(load)
         <p v-if="Number.isInteger(editor.recommended)">
           Recommended: {{ formatConstraint(editor.recommended, editor.unit) }}
         </p>
+
         <p v-if="Number.isInteger(editor.min) && Number.isInteger(editor.max)">
           Allowed: {{ formatConstraint(editor.min, editor.unit) }} to
           {{ formatConstraint(editor.max, editor.unit) }}
         </p>
       </div>
+
       <p v-if="restartWarning" class="text-ink-orange-6 text-sm">
         {{ restartWarning }}
       </p>
+
       <ErrorMessage v-if="validationError" :message="validationError" />
       <ErrorMessage v-if="saveError" :message="saveError" />
 

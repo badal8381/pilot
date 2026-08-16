@@ -56,6 +56,7 @@ const preview = (table) => {
         >
           {{ table.name }}
         </button>
+
         <p v-if="!filteredTables.length" class="px-2 py-1.5 text-ink-gray-4 text-sm">
           No tables found.
         </p>
@@ -72,6 +73,7 @@ const preview = (table) => {
                 columns)</span
               >
             </h3>
+
             <Button variant="outline" size="sm" @click="preview(selected)">
               <template #prefix>
                 <span class="size-3.5 lucide-eye" />
@@ -79,11 +81,13 @@ const preview = (table) => {
               Preview data
             </Button>
           </div>
+
           <SimpleTable
             :columns="[{ key: 'name', label: 'Column' }, { key: 'type', label: 'Type' }]"
             :rows="selected.columns"
           />
         </template>
+
         <p
           v-else
           class="flex justify-center items-center min-h-[120px] sm:h-full text-ink-gray-4 text-sm"

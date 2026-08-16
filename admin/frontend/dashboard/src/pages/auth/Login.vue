@@ -71,9 +71,11 @@ const login = async () => {
             <code class="bg-surface-gray-2 px-1 py-0.5 rounded-4 font-mono text-ink-gray-8">pilot start</code>,
             or sign in with the admin password from when the bench was created.
           </p>
+
           <p v-else class="text-ink-gray-5 text-p-base">Welcome! Please sign in to continue.</p>
         </div>
       </div>
+
       <div class="flex flex-col gap-3 w-full">
         <TextInput
           v-if="!twoFactorRequired"
@@ -87,6 +89,7 @@ const login = async () => {
           <template #prefix>
             <LucideLock class="size-4 text-ink-gray-5" />
           </template>
+
           <template #suffix>
             <button
               type="button"
@@ -99,6 +102,7 @@ const login = async () => {
             </button>
           </template>
         </TextInput>
+
         <TextInput
           v-else
           v-model="otp"
@@ -112,9 +116,11 @@ const login = async () => {
             <LucideShield class="size-4 text-ink-gray-5" />
           </template>
         </TextInput>
+
         <p v-if="twoFactorRequired" class="text-ink-gray-5 text-p-sm">
           Enter the code from an enrolled device, or one of your recovery codes.
         </p>
+
         <button
           v-else
           type="button"
@@ -123,10 +129,12 @@ const login = async () => {
         >
           Forgot password?
         </button>
+
         <ErrorMessage v-if="errorMessage" :message="errorMessage" />
         <Button variant="solid" :loading="isSubmitting" class="w-full" @click="login">
           {{ twoFactorRequired ? 'Verify' : 'Continue' }}
         </Button>
+
         <button
           v-if="twoFactorRequired"
           type="button"

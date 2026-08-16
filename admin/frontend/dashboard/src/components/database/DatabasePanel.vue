@@ -24,8 +24,10 @@ const badges = computed(() => [props.badge].flat().filter(Boolean))
           <h3 class="font-semibold text-ink-gray-9 text-base">{{ title }}</h3>
           <Badge v-for="label in badges" :key="label" :label="label" theme="gray" size="sm" />
         </div>
+
         <p v-if="subtitle" class="mt-0.5 text-ink-gray-5 text-sm">{{ subtitle }}</p>
       </div>
+
       <div class="flex items-center gap-3 shrink-0">
         <slot name="actions" />
         <label v-if="showAutoRefresh" class="flex items-center gap-2 cursor-pointer">
@@ -36,6 +38,7 @@ const badges = computed(() => [props.badge].flat().filter(Boolean))
           />
           <span class="text-ink-gray-7 text-sm">Auto Refresh</span>
         </label>
+
         <Button
           variant="subtle"
           size="sm"
@@ -47,6 +50,7 @@ const badges = computed(() => [props.badge].flat().filter(Boolean))
         />
       </div>
     </div>
+
     <div class="border-t border-outline-gray-2">
       <slot />
     </div>

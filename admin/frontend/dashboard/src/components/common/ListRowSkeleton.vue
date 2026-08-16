@@ -23,6 +23,7 @@ const subtitleWidth = computed(() => SUBTITLE_WIDTHS[props.index % SUBTITLE_WIDT
       <div class="flex items-center h-4">
         <Skeleton class="rounded-4 h-3" :class="titleWidth" />
       </div>
+
       <div class="flex items-center mt-0.5 h-5">
         <Skeleton class="rounded-4 h-2.5" :class="subtitleWidth" />
       </div>

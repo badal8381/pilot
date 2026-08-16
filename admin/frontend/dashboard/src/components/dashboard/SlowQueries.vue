@@ -62,6 +62,7 @@ const charts = computed(() => {
     >
       No slow queries recorded yet
     </div>
+
     <AxisChart
       v-else
       :config="chart.config"

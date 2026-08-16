@@ -109,9 +109,11 @@ onMounted(() => {
   <div v-if="loading" class="flex justify-center py-12">
     <LoadingText />
   </div>
+
   <div v-else-if="error" class="py-12">
     <ErrorMessage :message="error" />
   </div>
+
   <div v-else-if="task" class="mx-auto max-w-3xl">
     <Teleport defer to="#header-badge">
       <Badge
@@ -143,6 +145,7 @@ onMounted(() => {
         >
           Debug with AI
         </Button>
+
         <Button
           v-if="isTaskCancellable(task)"
           variant="subtle"
@@ -168,6 +171,7 @@ onMounted(() => {
           class="opacity-0 group-hover:opacity-100 size-4 text-ink-gray-5 transition-opacity shrink-0 lucide-arrow-up-right"
         />
       </RouterLink>
+
       <p class="text-ink-gray-8 text-base shrink-0">{{ metaLine }}</p>
     </div>
 
@@ -185,6 +189,7 @@ onMounted(() => {
       >
         <TaskSteps :raw-lines="streamedLines" :streaming="streaming" :task-status="task.status" />
       </TaskStream>
+
       <TaskSteps v-else :raw-lines="rawLines" :task-status="task.status" />
     </div>
   </div>

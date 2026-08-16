@@ -25,10 +25,12 @@ defineProps({
     >
       <span :class="[compact ? 'size-4' : 'size-5', icon]" />
     </span>
+
     <div>
       <p class="font-medium text-ink-gray-7 text-base">{{ title }}</p>
       <p v-if="description" class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">{{ description }}</p>
     </div>
+
     <slot />
   </div>
 </template>

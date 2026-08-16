@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import { useRoute } from 'vue-router'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+
 import {
   Button,
   Checkbox,
@@ -9,20 +12,21 @@ import {
   Tooltip,
   toast,
 } from 'frappe-ui'
+
 import {
   ListHeader,
   ListRowItem,
   ListRows,
   ListView,
 } from 'frappe-ui/experimental'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
-import { apiErrorMessage } from '@/api/client'
-import { databaseApi } from '@/api/database'
-import DatabasePanel from '@/components/database/DatabasePanel.vue'
+
 import SizeBreakup from '@/components/database/SizeBreakup.vue'
+import DatabasePanel from '@/components/database/DatabasePanel.vue'
 import TableSizesDialog from '@/components/database/TableSizesDialog.vue'
+
+import { databaseApi } from '@/api/database'
 import { formatBytes } from '@/utils/format'
+import { apiErrorMessage } from '@/api/client'
 import { relativeTime } from '@/utils/taskFormat'
 
 const AUTO_REFRESH_INTERVAL_MS = 2000
@@ -459,10 +463,12 @@ onMounted(load)
         <template v-if="selectedSite" #actions>
           <Button variant="subtle" size="sm" @click="showTableSizes = true">View Details</Button>
         </template>
+
         <ErrorMessage v-if="sizeError" :message="sizeError" class="m-4" />
         <p v-else-if="!size" class="py-6 text-ink-gray-5 text-sm text-center">
           No results to display
         </p>
+
         <SizeBreakup v-else :size="size" />
       </DatabasePanel>
 
@@ -494,8 +500,10 @@ onMounted(load)
                 Kill
               </Button>
             </div>
+
             <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
           </template>
+
           <ListHeader />
           <ListRows v-if="processRows.length" />
           <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
@@ -524,6 +532,7 @@ onMounted(load)
           <template #cell="{ column, row, item }">
             <ListRowItem :column="column" :row="row" :item="item" :align="column.align" />
           </template>
+
           <ListHeader />
           <ListRows v-if="lockRows.length" />
           <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
@@ -566,8 +575,10 @@ onMounted(load)
                   />
                 </Tooltip>
               </div>
+
               <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
             </template>
+
             <ListHeader />
             <ListRows v-if="binlogRows.length" />
             <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
@@ -578,6 +589,7 @@ onMounted(load)
               The newest log is in use and cannot be deleted. Selecting a file also selects every
               older one, because the server can only purge them together.
             </p>
+
             <Button
               v-if="selectedIndex >= 0"
               variant="subtle"
@@ -611,6 +623,7 @@ onMounted(load)
         <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
         <dd class="font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
       </div>
+
       <div v-if="killQuery" class="space-y-1.5 pt-1.5 border-t border-outline-gray-2">
         <dt class="text-ink-gray-5">Query</dt>
         <dd class="max-h-24 overflow-y-auto font-mono font-medium text-ink-gray-8 break-all">
@@ -654,8 +667,6 @@ onMounted(load)
     </div>
   </Dialog>
 </template>
-
-
 
 <style scoped>
 /* A `1fr` grid track takes its minimum from the item's min-content width, so a

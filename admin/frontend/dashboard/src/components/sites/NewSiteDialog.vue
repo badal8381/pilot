@@ -141,6 +141,7 @@ const submit = async () => {
     <div v-if="loading" class="flex justify-center items-center h-80">
       <Spinner size="lg" class="text-ink-gray-4" />
     </div>
+
     <div v-else @pointerdown.stop class="space-y-5">
       <!-- Site name -->
       <div>
@@ -172,6 +173,7 @@ const submit = async () => {
                 </span>
               </template>
             </FormControl>
+
             <!-- Multiple wildcards available -->
             <FormControl
               v-if="!hasSingleDomain"
@@ -181,6 +183,7 @@ const submit = async () => {
               :options="wildcardDomains.map((d) => ({ label: d, value: d }))"
             />
           </div>
+
           <!-- Example site name -->
           <p class="mt-1.5 text-ink-gray-5 text-p-sm">
             Web address:
@@ -197,6 +200,7 @@ const submit = async () => {
           <span class="text-ink-gray-7 text-p-sm-medium">Choose apps</span>
           <span class="text-ink-gray-5 text-xs"> {{ selectedApps.length }} selected </span>
         </div>
+
         <!-- Cancels the dialog gutter and re-applies it as padding, so the
              scrollbar rides the modal edge rather than the checkboxes. -->
         <div
@@ -216,6 +220,7 @@ const submit = async () => {
             <span class="flex-1 min-w-0 text-ink-gray-8 text-base truncate">
               {{ app.title || app.name }}
             </span>
+
             <Checkbox
               :model-value="selectedApps.includes(app.name)"
               class="pointer-events-none shrink-0"
@@ -242,8 +247,6 @@ const submit = async () => {
     </div>
   </Dialog>
 </template>
-
-
 
 <style scoped>
 /* No transition on mask-image: `none` and a gradient aren't interpolable, and

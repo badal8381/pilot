@@ -117,6 +117,7 @@ onMounted(async () => {
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <Alert v-if="!production" title="Not enforced yet" theme="amber" :dismissible="false">
       <template #description>
@@ -179,14 +180,17 @@ onMounted(async () => {
               <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Action</p>
               <Select v-model="rule.action" :options="ACTION_OPTIONS" class="w-full" />
             </div>
+
             <div class="flex-1 space-y-1.5">
               <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">IP / CIDR</p>
               <TextInput v-model="rule.ip" placeholder="203.0.113.4 or 10.0.0.0/8" class="w-full" />
             </div>
+
             <div class="flex-1 space-y-1.5">
               <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Note</p>
               <TextInput v-model="rule.description" placeholder="optional" class="w-full" />
             </div>
+
             <Button
               variant="subtle"
               icon="lucide-x"
@@ -195,6 +199,7 @@ onMounted(async () => {
               @click="removeRule(index)"
             />
           </div>
+
           <!-- Under the row it belongs to, not pooled at the bottom of the page. -->
           <p v-if="ipError(rule)" class="mt-1.5 text-ink-red-5 text-p-sm">{{ ipError(rule) }}</p>
         </div>

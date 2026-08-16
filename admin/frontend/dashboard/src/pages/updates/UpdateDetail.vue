@@ -203,11 +203,13 @@ onUnmounted(() => clearTimeout(timer))
         <Skeleton class="rounded-4 w-44 h-4" />
         <Skeleton class="rounded-4 w-24 h-4" />
       </div>
+
       <div class="mt-6 p-1 border border-outline-gray-2 rounded-6">
         <div class="flex justify-between items-center px-2.5 py-2">
           <Skeleton class="rounded-4 w-24 h-4" />
           <Skeleton class="rounded-4 w-12 h-3" />
         </div>
+
         <div
           v-for="index in 3"
           :key="index"
@@ -218,6 +220,7 @@ onUnmounted(() => clearTimeout(timer))
         </div>
       </div>
     </div>
+
     <ErrorMessage v-else-if="error && !op" class="mt-4" :message="error" />
 
     <template v-else-if="op">
@@ -251,6 +254,7 @@ onUnmounted(() => clearTimeout(timer))
               {{ alertTitle }}
             </h2>
           </div>
+
           <!-- Tool output indents and box-draws; keep it preformatted. -->
           <pre
             v-if="op.diagnosis?.message"
@@ -264,6 +268,7 @@ onUnmounted(() => clearTimeout(timer))
               {{ op.diagnosis.patch }}
             </code>
           </p>
+
           <p
             v-if="patchAlreadySkipped"
             class="mt-2 flex items-center gap-1 text-p-sm font-medium text-ink-green-6"
@@ -271,6 +276,7 @@ onUnmounted(() => clearTimeout(timer))
             <span class="lucide-check size-4" />
             Patch skipped
           </p>
+
           <p class="mt-3 text-p-sm text-ink-gray-6">
             <template v-if="op.state === 'revert_failed'"
               >Fix the cause and run the restore again.</template
@@ -292,6 +298,7 @@ onUnmounted(() => clearTimeout(timer))
             {{ pendingLabel }}
             <span class="lucide-square-terminal size-4" />
           </button>
+
           <!-- Skip patch leads: it is the cheapest recovery, ahead of a restore. -->
           <div v-else class="mt-4 flex flex-wrap gap-2">
             <Button
@@ -303,6 +310,7 @@ onUnmounted(() => clearTimeout(timer))
             >
               Skip patch
             </Button>
+
             <Button
               v-if="op.state === 'needs_attention'"
               variant="subtle"
@@ -311,6 +319,7 @@ onUnmounted(() => clearTimeout(timer))
             >
               Retry update
             </Button>
+
             <Button
               v-if="op.can_restore"
               variant="subtle"
@@ -335,6 +344,7 @@ onUnmounted(() => clearTimeout(timer))
               />
             </template>
           </Button>
+
           <LogView v-if="showOutput" class="mt-1 mb-2" :lines="outputLines" wrap />
         </div>
       </section>
@@ -363,6 +373,7 @@ onUnmounted(() => clearTimeout(timer))
                   {{ app.name }}
                 </p>
               </div>
+
               <Tooltip :text="revisionHint(app)">
                 <component
                   :is="app.compare_url ? 'a' : 'div'"
@@ -377,6 +388,7 @@ onUnmounted(() => clearTimeout(timer))
                   <span :class="app.updated_sha ? 'text-ink-green-6' : 'text-ink-gray-5'">
                     {{ shortSha(app.updated_sha || app.target_sha) }}
                   </span>
+
                   <span
                     v-if="app.compare_url"
                     class="lucide-external-link size-3.5 text-ink-gray-4"
@@ -430,6 +442,7 @@ onUnmounted(() => clearTimeout(timer))
                 <p class="flex-1 min-w-0 text-ink-gray-9 text-base truncate">
                   {{ site.name }}
                 </p>
+
                 <span
                   v-if="siteCaption(site)"
                   class="flex items-center gap-1.5 text-sm shrink-0"
@@ -439,6 +452,7 @@ onUnmounted(() => clearTimeout(timer))
                   {{ siteCaption(site) }}
                 </span>
               </div>
+
               <div
                 v-if="expandedSites.has(site.name)"
                 class="mb-1 ml-4 pl-3 border-l border-outline-gray-2"
@@ -483,6 +497,7 @@ onUnmounted(() => clearTimeout(timer))
           <b class="text-ink-gray-9">{{ op.failed_site }}</b> without running it. This cannot be
           undone, and the migration carries on from where it stopped.
         </p>
+
         <template #actions>
           <div class="flex flex-row justify-end">
             <Button variant="solid" theme="red" :loading="acting" @click="doSkip"
@@ -498,6 +513,7 @@ onUnmounted(() => clearTimeout(timer))
           Apps return to their previous revisions, and migrated sites get their pre-update data
           back from the recovery backup. Sites that were not migrated yet are left untouched.
         </p>
+
         <template #actions>
           <Button variant="solid" theme="red" :loading="acting" @click="doRestore"
             >Restore backup</Button

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+
+import { ListRowItem, ListView } from 'frappe-ui/experimental'
+
 import {
   Button,
   Dialog,
@@ -7,10 +10,11 @@ import {
   Spinner,
   toast,
 } from 'frappe-ui'
-import { ListRowItem, ListView } from 'frappe-ui/experimental'
+
 import EmptyState from '@/components/common/EmptyState.vue'
-import { sessionApi } from '@/api/session'
+
 import { auditApi } from '@/api/audit'
+import { sessionApi } from '@/api/session'
 import { commandLabel, fmtDateTime, relativeTime } from '@/utils/taskFormat'
 
 const nestedView = defineModel('nestedView')
@@ -222,10 +226,12 @@ onMounted(load)
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else-if="jti">
     <div v-if="activityLoading" class="flex justify-center items-center h-40">
       <Spinner size="lg" class="text-ink-gray-4" />
     </div>
+
     <EmptyState
       compact
       v-else-if="!activity.length"
@@ -251,10 +257,12 @@ onMounted(load)
             @click="openDetail(row)"
           />
         </div>
+
         <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
     </ListView>
   </div>
+
   <div v-else class="space-y-5">
     <div
       v-if="loadError"
@@ -262,6 +270,7 @@ onMounted(load)
     >
       {{ loadError }}
     </div>
+
     <template v-else>
       <EmptyState
         compact
@@ -293,6 +302,7 @@ onMounted(load)
               </template>
             </Dropdown>
           </div>
+
           <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
         </template>
       </ListView>
@@ -304,6 +314,7 @@ onMounted(load)
       Revoke this session? Its token stops working immediately and whoever holds it must sign in
       again.
     </p>
+
     <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showRevoke = false">Cancel</Button>

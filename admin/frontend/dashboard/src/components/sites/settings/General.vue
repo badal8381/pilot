@@ -87,6 +87,7 @@ const toggle = async (s, value) => {
         />
       </div>
     </div>
+
     <ErrorMessage v-if="error" :message="error" class="mt-4" />
   </div>
 </template>

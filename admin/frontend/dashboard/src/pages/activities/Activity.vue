@@ -48,6 +48,7 @@ onMounted(reload)
           A trail of actions taken on this bench - logins, backups, app changes and more.
         </p>
       </div>
+
       <Button
         variant="subtle"
         size="sm"
@@ -78,12 +79,14 @@ onMounted(reload)
       <p class="flex-1 min-w-0 text-p-sm text-ink-blue-7 truncate">
         Activity on <span class="font-semibold">{{ siteFilter }}</span>
       </p>
+
       <Button variant="ghost" size="sm" icon="lucide-x" @click="clearSiteFilter" />
     </div>
 
     <div v-if="loading" class="flex flex-1 justify-center items-center">
       <LoadingText />
     </div>
+
     <div v-else-if="error" class="mt-4">
       <ErrorMessage :message="error" />
     </div>
@@ -104,6 +107,7 @@ onMounted(reload)
               <th class="px-4 py-2.5 font-medium text-right">Date/time</th>
             </tr>
           </thead>
+
           <tbody class="divide-outline-gray-1 divide-y">
             <tr
               v-for="(entry, index) in activities"
@@ -118,11 +122,13 @@ onMounted(reload)
                   >
                     <span class="size-4" :class="activityTypeMeta(entry).icon" />
                   </span>
+
                   <span class="font-medium text-ink-gray-9 text-sm">{{
                     activityLabel(entry)
                   }}</span>
                 </div>
               </td>
+
               <td class="px-4 py-3">
                 <RouterLink
                   v-if="activityResourceRoute(entry)"
@@ -131,11 +137,14 @@ onMounted(reload)
                 >
                   {{ activityResourceLabel(entry) }}
                 </RouterLink>
+
                 <span v-else class="text-ink-gray-3 text-sm">-</span>
               </td>
+
               <td class="px-4 py-3 text-ink-gray-6 text-sm truncate max-w-[12rem]">
                 {{ activityActorLabel(entry) }}
               </td>
+
               <td
                 class="px-4 py-3 text-ink-gray-5 text-sm text-right tabular-nums whitespace-nowrap"
                 :title="entry.logged_at"

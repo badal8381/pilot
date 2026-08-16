@@ -205,6 +205,7 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
           <template v-else>{{ enabledHint }}</template>
         </p>
       </div>
+
       <div class="flex items-center gap-2 shrink-0">
         <Button v-if="disabled" size="sm" :loading="loading" @click="enable"
           >Enable {{ noun }}</Button
@@ -217,6 +218,7 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
             </Button>
           </template>
         </Dropdown>
+
         <slot name="actions" />
       </div>
     </div>
@@ -231,21 +233,26 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
         <p class="font-medium text-ink-gray-7 text-sm">Frequency</p>
         <Select v-model="schedFrequency" :options="FREQ_OPTIONS" class="w-full" />
       </div>
+
       <div v-if="schedFrequency === 'weekly'" class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Day of week</p>
         <Select v-model="schedWeekday" :options="WEEKDAY_OPTIONS" class="w-full" />
       </div>
+
       <div v-if="schedFrequency === 'monthly'" class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Day of month</p>
         <Select v-model="schedMonthDay" :options="monthDayOptions" class="w-full" />
       </div>
+
       <div class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Time</p>
         <Select v-model="schedHour" :options="hourOptions" class="w-full" />
       </div>
+
       <p v-if="retentionHint" class="text-ink-gray-4 text-p-sm">{{ retentionHint }}</p>
       <ErrorMessage v-if="error" :message="error" />
     </div>
+
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" @click="showCustomDialog = false">Cancel</Button>
       <Button variant="solid" :loading="scheduleSaving" @click="saveCustomSchedule"

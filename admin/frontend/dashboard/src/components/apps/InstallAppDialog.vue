@@ -108,6 +108,7 @@ const confirmInstall = async () => {
         <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
           {{ siteMeta(targetSite) }}
         </span>
+
         <span
           v-if="targetInstalled"
           class="size-4 text-ink-gray-9 shrink-0 lucide-check"
@@ -144,6 +145,7 @@ const confirmInstall = async () => {
           <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
             {{ siteMeta(s) }}
           </span>
+
           <span
             v-if="isInstalled(s)"
             class="size-4 text-ink-gray-9 shrink-0 lucide-check"

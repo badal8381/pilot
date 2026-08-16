@@ -234,6 +234,7 @@ onMounted(load)
   <div v-if="loading && !capabilities" class="flex justify-center items-center h-40">
     <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
   </div>
+
   <div v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
 
@@ -327,11 +328,13 @@ onMounted(load)
     <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
       {{ confirmation.message }}
     </p>
+
     <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="ghost" :disabled="Boolean(activeAction)" @click="confirmationOpen = false">
         Cancel
       </Button>
+
       <Button variant="solid" :loading="Boolean(activeAction)" @click="runConfirmedAction">
         {{ confirmation?.buttonLabel }}
       </Button>
@@ -354,21 +357,25 @@ onMounted(load)
           Recommended:
           {{ formatSizingValue(sizingAction.recommended, sizingAction.unit) }}
         </p>
+
         <p>
           Allowed: {{ formatSizingValue(sizingAction.min, sizingAction.unit) }} to
           {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}
         </p>
       </div>
+
       <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-sm">
         MariaDB will restart because this value is above its current live Buffer Pool ceiling of
         {{ formatSizingValue(sizingAction.dynamicMax, 'MB') }}.
       </p>
+
       <ErrorMessage v-if="sizingValidationError" :message="sizingValidationError" />
       <ErrorMessage v-if="actionError" :message="actionError" />
       <div class="flex justify-end gap-2">
         <Button variant="ghost" :disabled="Boolean(activeAction)" @click="sizingOpen = false">
           Cancel
         </Button>
+
         <Button
           variant="solid"
           :loading="Boolean(activeAction)"

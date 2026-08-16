@@ -199,12 +199,14 @@ onMounted(() => {
         <Skeleton class="rounded-4 w-40 h-4" />
         <Skeleton class="rounded-full w-14 h-5 shrink-0" />
       </template>
+
       <template #actions>
         <Skeleton class="hidden sm:block rounded-4 w-28 h-7" />
         <Skeleton class="hidden sm:block rounded-4 w-24 h-7" />
         <Skeleton class="rounded-4 size-7" />
       </template>
     </PageHero>
+
     <div class="mx-auto w-full max-w-3xl">
       <StickyToolbar>
         <Skeleton class="rounded-4 w-64 h-7 sm:h-8" />
@@ -222,6 +224,7 @@ onMounted(() => {
         <h1 class="font-medium text-ink-gray-9 text-lg truncate">
           {{ site.name }}
         </h1>
+
         <Badge
           :label="statusLabel"
           :theme="statusBadgeTheme"
@@ -230,16 +233,19 @@ onMounted(() => {
           class="shrink-0"
         />
       </template>
+
       <template v-if="storageUsed" #subtitle>{{ storageUsed }} used</template>
       <template #actions>
         <Button variant="ghost" size="sm" class="hidden sm:flex" @click="goToAnalytics">
           <template #prefix><span class="size-4 lucide-chart-line" /></template>
           View analytics
         </Button>
+
         <Button size="sm" class="hidden sm:flex" @click="goToMarketplace">
           <template #prefix><span class="size-4 lucide-plus" /></template>
           Install app
         </Button>
+
         <Dropdown :options="menuOptions">
           <template #default="{ open }">
             <Button
