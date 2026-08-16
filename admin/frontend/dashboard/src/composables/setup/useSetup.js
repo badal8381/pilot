@@ -1,8 +1,9 @@
 import { ref, computed, watch, onMounted } from 'vue'
-import { useSetupHandoff } from './useSetupHandoff'
-import { apiErrorMessage } from '../../api/client'
-import { setupApi } from '../../api/setup'
-import { generateRandomPassword } from '../../utils/randomPassword'
+
+import { useSetupHandoff } from '@/composables/setup/useSetupHandoff'
+import { apiErrorMessage } from '@/api/client'
+import { setupApi } from '@/api/setup'
+import { generateRandomPassword } from '@/utils/randomPassword'
 
 // Static dropdown options
 const DB_TYPE_OPTIONS = [

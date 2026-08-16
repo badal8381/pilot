@@ -1,3 +1,64 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Button, Dialog, TextInput, ErrorMessage } from 'frappe-ui'
+import LucideLock from '~icons/lucide/lock'
+import LucideShield from '~icons/lucide/shield'
+import LucideEye from '~icons/lucide/eye'
+import LucideEyeOff from '~icons/lucide/eye-off'
+
+import PilotLogo from '@/components/icons/Pilot.vue'
+
+import { apiErrorMessage } from '@/api/client'
+import { authApi } from '@/api/auth'
+import { useSession } from '@/composables/auth/useSession'
+import { redirectAfterLogin } from '@/utils/redirect'
+import { useIsMobile } from '@/composables/common/useIsMobile'
+
+const route = useRoute()
+const router = useRouter()
+const { session, loadSession } = useSession()
+const password = ref('')
+const errorMessage = ref('')
+const isSubmitting = ref(false)
+const showPassword = ref(false)
+const showForgotPassword = ref(false)
+const otp = ref('')
+const twoFactorRequired = ref(false)
+const isMobile = useIsMobile()
+
+function cancelTwoFactor() {
+  twoFactorRequired.value = false
+  otp.value = ''
+  errorMessage.value = ''
+}
+
+async function login() {
+  if (twoFactorRequired.value ? !otp.value : !password.value) return
+  isSubmitting.value = true
+  errorMessage.value = ''
+  try {
+    const result = await authApi.login(password.value, otp.value)
+    if (result.two_factor_required) {
+      // Password accepted; the sign-in still needs a code.
+      twoFactorRequired.value = true
+      return
+    }
+    if (result.authenticated !== true) {
+      errorMessage.value = apiErrorMessage(result, 'Login failed')
+      return
+    }
+    await loadSession()
+    redirectAfterLogin(router, route.query.redirect)
+  } catch (e) {
+    console.error(e)
+    errorMessage.value = 'Could not reach the server'
+  } finally {
+    isSubmitting.value = false
+  }
+}
+</script>
+
 <template>
   <div class="flex flex-col sm:justify-center items-center bg-surface-base p-4 sm:p-15 h-screen">
     <div class="flex flex-col items-start gap-5 p-6 w-full max-w-[371px]">
@@ -96,62 +157,3 @@
     </Dialog>
   </div>
 </template>
-
-<script setup>
-import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Button, Dialog, TextInput, ErrorMessage } from 'frappe-ui'
-import LucideLock from '~icons/lucide/lock'
-import LucideShield from '~icons/lucide/shield'
-import LucideEye from '~icons/lucide/eye'
-import LucideEyeOff from '~icons/lucide/eye-off'
-import PilotLogo from '@/components/icons/Pilot.vue'
-import { apiErrorMessage } from '../../api/client'
-import { authApi } from '../../api/auth'
-import { useSession } from '../../composables/auth/useSession'
-import { redirectAfterLogin } from '../../utils/redirect'
-import { useIsMobile } from '../../composables/common/useIsMobile'
-
-const route = useRoute()
-const router = useRouter()
-const { session, loadSession } = useSession()
-const password = ref('')
-const errorMessage = ref('')
-const isSubmitting = ref(false)
-const showPassword = ref(false)
-const showForgotPassword = ref(false)
-const otp = ref('')
-const twoFactorRequired = ref(false)
-const isMobile = useIsMobile()
-
-function cancelTwoFactor() {
-  twoFactorRequired.value = false
-  otp.value = ''
-  errorMessage.value = ''
-}
-
-async function login() {
-  if (twoFactorRequired.value ? !otp.value : !password.value) return
-  isSubmitting.value = true
-  errorMessage.value = ''
-  try {
-    const result = await authApi.login(password.value, otp.value)
-    if (result.two_factor_required) {
-      // Password accepted; the sign-in still needs a code.
-      twoFactorRequired.value = true
-      return
-    }
-    if (result.authenticated !== true) {
-      errorMessage.value = apiErrorMessage(result, 'Login failed')
-      return
-    }
-    await loadSession()
-    redirectAfterLogin(router, route.query.redirect)
-  } catch (e) {
-    console.error(e)
-    errorMessage.value = 'Could not reach the server'
-  } finally {
-    isSubmitting.value = false
-  }
-}
-</script>

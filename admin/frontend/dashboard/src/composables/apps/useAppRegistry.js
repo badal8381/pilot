@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+
 import { appsApi } from '@/api/apps'
 
 const THEMES = ['violet', 'blue', 'green', 'amber', 'red']

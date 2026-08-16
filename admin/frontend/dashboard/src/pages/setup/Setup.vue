@@ -1,3 +1,60 @@
+<script setup lang="ts">
+import {
+  Button,
+  Select,
+  TextInput,
+  FormLabel,
+  Password,
+  ErrorMessage,
+  LoadingText,
+} from 'frappe-ui'
+import TaskStream from '@/components/tasks/TaskStream.vue'
+import { useSetup } from '@/composables/setup/useSetup'
+
+const {
+  currentStep,
+  errorMessage,
+  isSubmitting,
+  isLinux,
+  isProductionHandoff,
+  isDone,
+  pilotCommand,
+  terminal,
+  streamUrl,
+  streamStatus,
+  showStreamDetails,
+  dbType,
+  dbUser,
+  dbPassword,
+  dbMode,
+  dbModeOptions,
+  dbHost,
+  dbPort,
+  dbPortPlaceholder,
+  appRepo,
+  appBranch,
+  rootUserPlaceholder,
+  dbTypeOptions,
+  branchOptions,
+  stepSequence,
+  stepNumber,
+  isConfiguring,
+  isInstalling,
+  isLastConfigStep,
+  modalWidthClass,
+  stepTitle,
+  stepSubtitle,
+  goToNextStep,
+  goToPreviousStep,
+  startSetup,
+  backToConfiguration,
+  toggleStreamDetails,
+  updateStreamStatus,
+  onStreamDone,
+  failInstall,
+} = useSetup()
+</script>
+
 <template>
   <div class="flex justify-center items-center p-4 h-screen">
     <div
@@ -184,60 +241,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import {
-  Button,
-  Select,
-  TextInput,
-  FormLabel,
-  Password,
-  ErrorMessage,
-  LoadingText,
-} from 'frappe-ui'
-import TaskStream from '../../components/tasks/TaskStream.vue'
-import { useSetup } from '../../composables/setup/useSetup'
-
-const {
-  currentStep,
-  errorMessage,
-  isSubmitting,
-  isLinux,
-  isProductionHandoff,
-  isDone,
-  pilotCommand,
-  terminal,
-  streamUrl,
-  streamStatus,
-  showStreamDetails,
-  dbType,
-  dbUser,
-  dbPassword,
-  dbMode,
-  dbModeOptions,
-  dbHost,
-  dbPort,
-  dbPortPlaceholder,
-  appRepo,
-  appBranch,
-  rootUserPlaceholder,
-  dbTypeOptions,
-  branchOptions,
-  stepSequence,
-  stepNumber,
-  isConfiguring,
-  isInstalling,
-  isLastConfigStep,
-  modalWidthClass,
-  stepTitle,
-  stepSubtitle,
-  goToNextStep,
-  goToPreviousStep,
-  startSetup,
-  backToConfiguration,
-  toggleStreamDetails,
-  updateStreamStatus,
-  onStreamDone,
-  failInstall,
-} = useSetup()
-</script>

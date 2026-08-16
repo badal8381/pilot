@@ -1,3 +1,44 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Button, ErrorMessage, FormControl, LoadingText } from 'frappe-ui'
+
+import { useActivities } from '@/composables/activities/useActivities'
+
+import {
+  activityActorLabel,
+  activityLabel,
+  activityResourceLabel,
+  activityResourceRoute,
+  activityTime,
+  activityTypeMeta,
+  activityTypeOptions,
+} from '@/utils/activityFormat'
+
+const route = useRoute()
+const router = useRouter()
+const { activities, loading, loadingMore, error, hasMore, load, loadMore } = useActivities()
+
+const typeFilter = ref('')
+
+const siteFilter = computed(() => (typeof route.query.site === 'string' ? route.query.site : ''))
+const currentFilters = computed(() => ({
+  type: typeFilter.value || undefined,
+  site: siteFilter.value || undefined,
+}))
+
+function reload() {
+  load(currentFilters.value)
+}
+
+function clearSiteFilter() {
+  router.replace({ name: 'Activity' })
+}
+
+watch(siteFilter, reload)
+onMounted(reload)
+</script>
+
 <template>
   <div class="flex flex-col mx-auto max-w-4xl h-[calc(100vh-5rem)]">
     <div class="flex justify-between items-center gap-3 shrink-0">
@@ -122,42 +163,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Button, ErrorMessage, FormControl, LoadingText } from 'frappe-ui'
-import { useActivities } from '@/composables/activities/useActivities'
-import {
-  activityActorLabel,
-  activityLabel,
-  activityResourceLabel,
-  activityResourceRoute,
-  activityTime,
-  activityTypeMeta,
-  activityTypeOptions,
-} from '@/utils/activityFormat'
-
-const route = useRoute()
-const router = useRouter()
-const { activities, loading, loadingMore, error, hasMore, load, loadMore } = useActivities()
-
-const typeFilter = ref('')
-
-const siteFilter = computed(() => (typeof route.query.site === 'string' ? route.query.site : ''))
-const currentFilters = computed(() => ({
-  type: typeFilter.value || undefined,
-  site: siteFilter.value || undefined,
-}))
-
-function reload() {
-  load(currentFilters.value)
-}
-
-function clearSiteFilter() {
-  router.replace({ name: 'Activity' })
-}
-
-watch(siteFilter, reload)
-onMounted(reload)
-</script>

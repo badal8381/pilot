@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+
 import { tasksApi } from '@/api/tasks'
 
 const HIDDEN_COMMANDS = new Set(['fetch-all-app-updates'])

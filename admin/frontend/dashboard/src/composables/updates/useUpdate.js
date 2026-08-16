@@ -1,4 +1,5 @@
 import { computed, onUnmounted, ref } from 'vue'
+
 import { updatesApi, isActive, isPending, needsAttention } from '@/api/updates'
 import { useAppUpdates } from '@/composables/apps/useAppUpdates'
 import { pendingActionLabel, stateLabel } from '@/utils/updateFormat'

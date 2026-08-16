@@ -1,4 +1,4 @@
-import { request } from './client'
+import { request } from '@/api/client'
 
 export const activitiesApi = {
   list: ({ type, site, status, cursor, limit = 50 } = {}) => {

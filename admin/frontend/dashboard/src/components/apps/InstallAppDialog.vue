@@ -1,75 +1,10 @@
-<template>
-  <ActionDialog
-    v-model:open="open"
-    :title="`Install ${appLabel} on`"
-    :error="error"
-    confirm-label="Install"
-    :loading="installing"
-    :disabled="!selection || targetInstalled"
-    @confirm="confirmInstall"
-  >
-    <SiteRow v-if="targetSite" :label="targetSite.name" selected :interactive="false">
-      <template #suffix>
-        <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
-          {{ siteMeta(targetSite) }}
-        </span>
-        <span
-          v-if="targetInstalled"
-          class="size-4 text-ink-gray-9 shrink-0 lucide-check"
-          role="img"
-          aria-label="Already installed"
-        />
-      </template>
-    </SiteRow>
-
-    <div v-else class="gap-1.5 grid max-h-80 overflow-y-auto">
-      <SiteRow
-        v-if="showAllSitesOption"
-        label="All sites"
-        icon="lucide-layout-grid"
-        :selected="selection === 'all'"
-        @click="selection = 'all'"
-      >
-        <template #suffix>
-          <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
-            {{ installableSites.length }} sites
-          </span>
-        </template>
-      </SiteRow>
-
-      <SiteRow
-        v-for="s in sites"
-        :key="s.name"
-        :label="s.name"
-        :disabled="isInstalled(s)"
-        :selected="selection === s.name"
-        @click="selection = s.name"
-      >
-        <template #suffix>
-          <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
-            {{ siteMeta(s) }}
-          </span>
-          <span
-            v-if="isInstalled(s)"
-            class="size-4 text-ink-gray-9 shrink-0 lucide-check"
-            role="img"
-            aria-label="Already installed"
-          />
-        </template>
-      </SiteRow>
-
-      <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-p-sm text-center">
-        No sites available on this bench.
-      </p>
-    </div>
-  </ActionDialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+
 import ActionDialog from '@/components/common/ActionDialog.vue'
 import SiteRow from '@/components/sites/SiteRow.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 import { openSitePage, openTaskDetailPage } from '@/utils/taskRoute'
@@ -157,3 +92,70 @@ async function confirmInstall() {
   }
 }
 </script>
+
+<template>
+  <ActionDialog
+    v-model:open="open"
+    :title="`Install ${appLabel} on`"
+    :error="error"
+    confirm-label="Install"
+    :loading="installing"
+    :disabled="!selection || targetInstalled"
+    @confirm="confirmInstall"
+  >
+    <SiteRow v-if="targetSite" :label="targetSite.name" selected :interactive="false">
+      <template #suffix>
+        <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
+          {{ siteMeta(targetSite) }}
+        </span>
+        <span
+          v-if="targetInstalled"
+          class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+          role="img"
+          aria-label="Already installed"
+        />
+      </template>
+    </SiteRow>
+
+    <div v-else class="gap-1.5 grid max-h-80 overflow-y-auto">
+      <SiteRow
+        v-if="showAllSitesOption"
+        label="All sites"
+        icon="lucide-layout-grid"
+        :selected="selection === 'all'"
+        @click="selection = 'all'"
+      >
+        <template #suffix>
+          <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
+            {{ installableSites.length }} sites
+          </span>
+        </template>
+      </SiteRow>
+
+      <SiteRow
+        v-for="s in sites"
+        :key="s.name"
+        :label="s.name"
+        :disabled="isInstalled(s)"
+        :selected="selection === s.name"
+        @click="selection = s.name"
+      >
+        <template #suffix>
+          <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
+            {{ siteMeta(s) }}
+          </span>
+          <span
+            v-if="isInstalled(s)"
+            class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+            role="img"
+            aria-label="Already installed"
+          />
+        </template>
+      </SiteRow>
+
+      <p v-if="!sites.length" class="py-6 text-ink-gray-5 text-p-sm text-center">
+        No sites available on this bench.
+      </p>
+    </div>
+  </ActionDialog>
+</template>

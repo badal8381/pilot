@@ -1,6 +1,7 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, FormControl, LoadingIndicator, Select } from 'frappe-ui'
+
 import { apiErrorMessage } from '@/api/client'
 import { authApi } from '@/api/auth'
 import { benchesApi } from '@/api/benches'

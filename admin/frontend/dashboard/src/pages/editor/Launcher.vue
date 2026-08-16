@@ -1,3 +1,40 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { LoadingText } from 'frappe-ui'
+
+import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
+
+import { appsApi } from '@/api/apps'
+import { useAppRegistry } from '@/composables/apps/useAppRegistry'
+import { useSession } from '@/composables/auth/useSession'
+
+const { session } = useSession()
+const { titleMap, descriptionMap, logoMap, load: loadRegistry } = useAppRegistry()
+
+const installed = ref([])
+const loading = ref(true)
+
+const appObjects = computed(() =>
+  installed.value.map((app) => ({
+    name: app.name,
+    title: titleMap.value[app.name] || app.title || app.name,
+    description: descriptionMap.value[app.name] || app.description || '',
+    logo_url: logoMap.value[app.name] || null,
+  })),
+)
+
+onMounted(async () => {
+  loadRegistry()
+  try {
+    installed.value = await appsApi.installed()
+  } catch {
+    installed.value = []
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
 <template>
   <div class="mx-auto max-w-3xl">
     <!-- Header -->
@@ -43,38 +80,3 @@
     <p v-else class="mt-16 text-ink-gray-5 text-sm text-center">No apps found in this bench.</p>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, ref } from 'vue'
-import { LoadingText } from 'frappe-ui'
-import { appsApi } from '@/api/apps'
-import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
-import { useAppRegistry } from '@/composables/apps/useAppRegistry'
-import { useSession } from '@/composables/auth/useSession'
-
-const { session } = useSession()
-const { titleMap, descriptionMap, logoMap, load: loadRegistry } = useAppRegistry()
-
-const installed = ref([])
-const loading = ref(true)
-
-const appObjects = computed(() =>
-  installed.value.map((app) => ({
-    name: app.name,
-    title: titleMap.value[app.name] || app.title || app.name,
-    description: descriptionMap.value[app.name] || app.description || '',
-    logo_url: logoMap.value[app.name] || null,
-  })),
-)
-
-onMounted(async () => {
-  loadRegistry()
-  try {
-    installed.value = await appsApi.installed()
-  } catch {
-    installed.value = []
-  } finally {
-    loading.value = false
-  }
-})
-</script>

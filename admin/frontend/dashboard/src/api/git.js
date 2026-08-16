@@ -1,4 +1,4 @@
-import { request } from './client'
+import { request } from '@/api/client'
 
 export const gitApi = {
   status: () => request.get('git/connection').json(),

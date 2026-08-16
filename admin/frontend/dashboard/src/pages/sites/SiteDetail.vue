@@ -1,100 +1,8 @@
-<template>
-  <template v-if="loading">
-    <PageHero>
-      <template #icon><Skeleton class="rounded-6 size-9 sm:size-10 shrink-0" /></template>
-      <template #title>
-        <Skeleton class="rounded-4 w-40 h-4" />
-        <Skeleton class="rounded-full w-14 h-5 shrink-0" />
-      </template>
-      <template #actions>
-        <Skeleton class="hidden sm:block rounded-4 w-28 h-7" />
-        <Skeleton class="hidden sm:block rounded-4 w-24 h-7" />
-        <Skeleton class="rounded-4 size-7" />
-      </template>
-    </PageHero>
-    <div class="mx-auto w-full max-w-3xl">
-      <StickyToolbar>
-        <Skeleton class="rounded-4 w-64 h-7 sm:h-8" />
-      </StickyToolbar>
-    </div>
-  </template>
-
-  <div v-else-if="error" class="py-12">
-    <ErrorMessage :message="error" />
-  </div>
-
-  <template v-else-if="site">
-    <PageHero icon="lucide-globe">
-      <template #title>
-        <h1 class="font-medium text-ink-gray-9 text-lg truncate">
-          {{ site.name }}
-        </h1>
-        <Badge
-          :label="statusLabel"
-          :theme="statusBadgeTheme"
-          variant="subtle"
-          size="md"
-          class="shrink-0"
-        />
-      </template>
-      <template v-if="storageUsed" #subtitle>{{ storageUsed }} used</template>
-      <template #actions>
-        <Button variant="ghost" size="sm" class="hidden sm:flex" @click="goToAnalytics">
-          <template #prefix><span class="size-4 lucide-chart-line" /></template>
-          View analytics
-        </Button>
-        <Button size="sm" class="hidden sm:flex" @click="goToMarketplace">
-          <template #prefix><span class="size-4 lucide-plus" /></template>
-          Install app
-        </Button>
-        <Dropdown :options="menuOptions">
-          <template #default="{ open }">
-            <Button
-              variant="subtle"
-              size="sm"
-              :active="open"
-              icon="lucide-ellipsis"
-              label="Site actions"
-              tooltip="Site actions"
-            />
-          </template>
-        </Dropdown>
-      </template>
-    </PageHero>
-
-    <div class="mx-auto w-full max-w-3xl">
-      <!-- Tabs -->
-      <StickyToolbar>
-        <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
-      </StickyToolbar>
-
-      <!-- Sections -->
-      <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
-      <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
-      <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />
-      <Activities v-else-if="activeTab === 'activity'" :site-name="siteName" />
-      <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
-    </div>
-  </template>
-
-  <Teleport defer to="#header-actions">
-    <Button
-      :variant="site?.setup_complete ? 'subtle' : 'solid'"
-      size="sm"
-      :loading="settingUpSite"
-      @click="site?.setup_complete ? openSite() : setupSite()"
-    >
-      <template #prefix><span class="size-4 lucide-external-link" /></template>
-      <span class="hidden sm:inline">{{ site?.setup_complete ? 'Open site' : 'Setup site' }}</span>
-      <span class="sm:hidden">{{ site?.setup_complete ? 'Open' : 'Setup' }}</span>
-    </Button>
-  </Teleport>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, Dropdown, ErrorMessage, Skeleton, TabButtons, toast } from 'frappe-ui'
+
 import SiteApps from '@/components/sites/Apps.vue'
 import SiteBackups from '@/components/sites/Backups.vue'
 import SiteConfig from '@/components/sites/Config.vue'
@@ -102,6 +10,7 @@ import SiteSettings from '@/components/sites/Settings.vue'
 import PageHero from '@/components/common/PageHero.vue'
 import Activities from '@/pages/Activities.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useSite } from '@/composables/sites/useSite'
@@ -281,3 +190,96 @@ onMounted(() => {
   loadStorage(true)
 })
 </script>
+
+<template>
+  <template v-if="loading">
+    <PageHero>
+      <template #icon><Skeleton class="rounded-6 size-9 sm:size-10 shrink-0" /></template>
+      <template #title>
+        <Skeleton class="rounded-4 w-40 h-4" />
+        <Skeleton class="rounded-full w-14 h-5 shrink-0" />
+      </template>
+      <template #actions>
+        <Skeleton class="hidden sm:block rounded-4 w-28 h-7" />
+        <Skeleton class="hidden sm:block rounded-4 w-24 h-7" />
+        <Skeleton class="rounded-4 size-7" />
+      </template>
+    </PageHero>
+    <div class="mx-auto w-full max-w-3xl">
+      <StickyToolbar>
+        <Skeleton class="rounded-4 w-64 h-7 sm:h-8" />
+      </StickyToolbar>
+    </div>
+  </template>
+
+  <div v-else-if="error" class="py-12">
+    <ErrorMessage :message="error" />
+  </div>
+
+  <template v-else-if="site">
+    <PageHero icon="lucide-globe">
+      <template #title>
+        <h1 class="font-medium text-ink-gray-9 text-lg truncate">
+          {{ site.name }}
+        </h1>
+        <Badge
+          :label="statusLabel"
+          :theme="statusBadgeTheme"
+          variant="subtle"
+          size="md"
+          class="shrink-0"
+        />
+      </template>
+      <template v-if="storageUsed" #subtitle>{{ storageUsed }} used</template>
+      <template #actions>
+        <Button variant="ghost" size="sm" class="hidden sm:flex" @click="goToAnalytics">
+          <template #prefix><span class="size-4 lucide-chart-line" /></template>
+          View analytics
+        </Button>
+        <Button size="sm" class="hidden sm:flex" @click="goToMarketplace">
+          <template #prefix><span class="size-4 lucide-plus" /></template>
+          Install app
+        </Button>
+        <Dropdown :options="menuOptions">
+          <template #default="{ open }">
+            <Button
+              variant="subtle"
+              size="sm"
+              :active="open"
+              icon="lucide-ellipsis"
+              label="Site actions"
+              tooltip="Site actions"
+            />
+          </template>
+        </Dropdown>
+      </template>
+    </PageHero>
+
+    <div class="mx-auto w-full max-w-3xl">
+      <!-- Tabs -->
+      <StickyToolbar>
+        <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
+      </StickyToolbar>
+
+      <!-- Sections -->
+      <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
+      <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
+      <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />
+      <Activities v-else-if="activeTab === 'activity'" :site-name="siteName" />
+      <SiteSettings v-else-if="activeTab === 'settings'" :site-name="siteName" />
+    </div>
+  </template>
+
+  <Teleport defer to="#header-actions">
+    <Button
+      :variant="site?.setup_complete ? 'subtle' : 'solid'"
+      size="sm"
+      :loading="settingUpSite"
+      @click="site?.setup_complete ? openSite() : setupSite()"
+    >
+      <template #prefix><span class="size-4 lucide-external-link" /></template>
+      <span class="hidden sm:inline">{{ site?.setup_complete ? 'Open site' : 'Setup site' }}</span>
+      <span class="sm:hidden">{{ site?.setup_complete ? 'Open' : 'Setup' }}</span>
+    </Button>
+  </Teleport>
+</template>

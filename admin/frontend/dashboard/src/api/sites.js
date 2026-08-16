@@ -1,4 +1,4 @@
-import { apiUrl, request, unwrap } from './client'
+import { apiUrl, request, unwrap } from '@/api/client'
 
 // App install and remove answer inline for a disabled app, so they wait on frappe.
 const INLINE_TIMEOUT = 120_000

@@ -1,24 +1,4 @@
-<template>
-  <div
-    ref="el"
-    class="terminal select-text font-mono text-sm leading-[1.6]"
-    :class="{ 'terminal--fill': fill }"
-    :style="fill ? '' : `max-height:${maxHeight}`"
-  >
-    <div v-if="!lines.length" class="terminal__empty">{{ emptyText }}</div>
-    <div v-for="(line, index) in lines" :key="index" class="terminal__row">
-      <span v-if="lineNumbers" class="terminal__lineno">{{ index + 1 }}</span>
-      <span
-        class="terminal__text"
-        :class="{ 'terminal__text--pad': !lineNumbers }"
-        v-html="line || '&nbsp;'"
-      />
-    </div>
-    <div v-if="streaming" class="terminal__cursor">█</div>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { ref, nextTick } from 'vue'
 
 defineProps({
@@ -40,6 +20,28 @@ function scrollToBottom() {
 
 defineExpose({ scrollToBottom })
 </script>
+
+<template>
+  <div
+    ref="el"
+    class="terminal select-text font-mono text-sm leading-[1.6]"
+    :class="{ 'terminal--fill': fill }"
+    :style="fill ? '' : `max-height:${maxHeight}`"
+  >
+    <div v-if="!lines.length" class="terminal__empty">{{ emptyText }}</div>
+    <div v-for="(line, index) in lines" :key="index" class="terminal__row">
+      <span v-if="lineNumbers" class="terminal__lineno">{{ index + 1 }}</span>
+      <span
+        class="terminal__text"
+        :class="{ 'terminal__text--pad': !lineNumbers }"
+        v-html="line || '&nbsp;'"
+      />
+    </div>
+    <div v-if="streaming" class="terminal__cursor">█</div>
+  </div>
+</template>
+
+
 
 <style scoped>
 .terminal {

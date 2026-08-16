@@ -1,17 +1,7 @@
-<template>
-  <Avatar
-    class="[&_img]:object-contain"
-    :image="logoUrl"
-    :label="label || name"
-    :size="size"
-    :theme="hashTheme(name)"
-    shape="square"
-  />
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { Avatar } from 'frappe-ui'
+
 import {
   FRAPPE_LOGO_URL,
   hashTheme,
@@ -33,3 +23,14 @@ const logoUrl = computed(() => {
   return props.logo || logoMap.value[props.name]
 })
 </script>
+
+<template>
+  <Avatar
+    class="[&_img]:object-contain"
+    :image="logoUrl"
+    :label="label || name"
+    :size="size"
+    :theme="hashTheme(name)"
+    shape="square"
+  />
+</template>

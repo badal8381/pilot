@@ -1,4 +1,4 @@
-import { request, unwrap } from './client'
+import { request, unwrap } from '@/api/client'
 
 export const settingsApi = {
   get: () => unwrap(request.get('settings').json()),

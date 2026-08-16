@@ -1,94 +1,10 @@
-<template>
-  <div>
-    <p class="font-semibold text-ink-gray-8 text-base">Danger</p>
-    <div class="mt-1">
-      <div
-        v-for="d in DangerActions"
-        :key="d.key"
-        class="flex justify-between items-start gap-x-2.5 py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
-      >
-        <div class="flex flex-col gap-1 min-w-0">
-          <p class="font-medium text-ink-gray-8 text-base">{{ d.label }}</p>
-          <p class="text-ink-gray-6 text-p-sm line-clamp-2 sm:line-clamp-none">
-            {{ d.description }}
-          </p>
-        </div>
-        <Button size="sm" theme="red" class="ml-4 shrink-0" @click="d.action"
-          >{{ d.buttonLabel || d.label }}</Button
-        >
-      </div>
-    </div>
-  </div>
-
-  <ActionDialog
-    v-model:open="showMigrate"
-    title="Migrate Site"
-    :subject="siteSubject"
-    :warning="{
-      title: 'The site goes down while this runs.',
-      message: `A recovery backup is taken first. If the migration fails you can retry it, or restore that backup from the update page.`,
-    }"
-    :error="migrateError"
-    confirm-label="Migrate"
-    confirm-theme="red"
-    :loading="migrating"
-    @confirm="confirmMigrate"
-  />
-
-  <ActionDialog
-    v-model:open="showReset"
-    title="Reset Site"
-    :subject="siteSubject"
-    :warning="{
-      title: `This can't be undone.`,
-      message: `Every record on ${siteName} is wiped and the database goes back to a fresh install. Installed apps stay.`,
-    }"
-    :error="resetError"
-    confirm-label="Reset site"
-    confirm-theme="red"
-    :loading="resetting"
-    :disabled="confirmName !== siteName"
-    @confirm="confirmReset"
-  >
-    <template #after-warning>
-      <TextInput v-model="confirmName" :placeholder="siteName" class="w-full">
-        <template #label>
-          <span class="text-sm break-all">Type {{ siteName }} to confirm</span>
-        </template>
-      </TextInput>
-    </template>
-  </ActionDialog>
-
-  <ActionDialog
-    v-model:open="showDrop"
-    title="Drop Site"
-    :subject="siteSubject"
-    :warning="{
-      title: `This can't be undone.`,
-      message: `The database and every file belonging to ${siteName} are deleted. Existing backups are kept for 30 days.`,
-    }"
-    :error="dropError"
-    confirm-label="Drop site"
-    confirm-theme="red"
-    :loading="dropping"
-    :disabled="confirmName !== siteName"
-    @confirm="confirmDrop"
-  >
-    <template #after-warning>
-      <TextInput v-model="confirmName" :placeholder="siteName" class="w-full">
-        <template #label>
-          <span class="text-sm break-all">Type {{ siteName }} to confirm</span>
-        </template>
-      </TextInput>
-    </template>
-  </ActionDialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button, TextInput } from 'frappe-ui'
+
 import ActionDialog from '@/components/common/ActionDialog.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 import { openTaskDetailPage } from '@/utils/taskRoute'
@@ -200,3 +116,89 @@ async function confirmDrop() {
   }
 }
 </script>
+
+<template>
+  <div>
+    <p class="font-semibold text-ink-gray-8 text-base">Danger</p>
+    <div class="mt-1">
+      <div
+        v-for="d in DangerActions"
+        :key="d.key"
+        class="flex justify-between items-start gap-x-2.5 py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
+      >
+        <div class="flex flex-col gap-1 min-w-0">
+          <p class="font-medium text-ink-gray-8 text-base">{{ d.label }}</p>
+          <p class="text-ink-gray-6 text-p-sm line-clamp-2 sm:line-clamp-none">
+            {{ d.description }}
+          </p>
+        </div>
+        <Button size="sm" theme="red" class="ml-4 shrink-0" @click="d.action"
+          >{{ d.buttonLabel || d.label }}</Button
+        >
+      </div>
+    </div>
+  </div>
+
+  <ActionDialog
+    v-model:open="showMigrate"
+    title="Migrate Site"
+    :subject="siteSubject"
+    :warning="{
+      title: 'The site goes down while this runs.',
+      message: `A recovery backup is taken first. If the migration fails you can retry it, or restore that backup from the update page.`,
+    }"
+    :error="migrateError"
+    confirm-label="Migrate"
+    confirm-theme="red"
+    :loading="migrating"
+    @confirm="confirmMigrate"
+  />
+
+  <ActionDialog
+    v-model:open="showReset"
+    title="Reset Site"
+    :subject="siteSubject"
+    :warning="{
+      title: `This can't be undone.`,
+      message: `Every record on ${siteName} is wiped and the database goes back to a fresh install. Installed apps stay.`,
+    }"
+    :error="resetError"
+    confirm-label="Reset site"
+    confirm-theme="red"
+    :loading="resetting"
+    :disabled="confirmName !== siteName"
+    @confirm="confirmReset"
+  >
+    <template #after-warning>
+      <TextInput v-model="confirmName" :placeholder="siteName" class="w-full">
+        <template #label>
+          <span class="text-sm break-all">Type {{ siteName }} to confirm</span>
+        </template>
+      </TextInput>
+    </template>
+  </ActionDialog>
+
+  <ActionDialog
+    v-model:open="showDrop"
+    title="Drop Site"
+    :subject="siteSubject"
+    :warning="{
+      title: `This can't be undone.`,
+      message: `The database and every file belonging to ${siteName} are deleted. Existing backups are kept for 30 days.`,
+    }"
+    :error="dropError"
+    confirm-label="Drop site"
+    confirm-theme="red"
+    :loading="dropping"
+    :disabled="confirmName !== siteName"
+    @confirm="confirmDrop"
+  >
+    <template #after-warning>
+      <TextInput v-model="confirmName" :placeholder="siteName" class="w-full">
+        <template #label>
+          <span class="text-sm break-all">Type {{ siteName }} to confirm</span>
+        </template>
+      </TextInput>
+    </template>
+  </ActionDialog>
+</template>

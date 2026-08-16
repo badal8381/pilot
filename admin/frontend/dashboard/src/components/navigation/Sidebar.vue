@@ -1,11 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem, SidebarCollapseToggle } from 'frappe-ui'
-import { sidebarSections } from './list'
-import { useAppMenu } from './useAppMenu'
+
 import PilotLogo from '@/components/icons/Pilot.vue'
 import NotificationsPanel from '@/components/notifications/NotificationsPanel.vue'
+
+import { sidebarSections } from '@/components/navigation/list'
+import { useAppMenu } from '@/components/navigation/useAppMenu'
 import { openSearch } from '@/composables/common/useSearch'
 
 const props = defineProps({

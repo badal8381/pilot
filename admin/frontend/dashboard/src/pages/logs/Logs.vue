@@ -1,219 +1,11 @@
-<template>
-  <!-- 5rem = 3rem sticky header + the shell's 2rem vertical page padding -->
-  <div class="flex flex-col h-[calc(100dvh-5rem)]">
-    <div class="flex flex-1 sm:gap-4 min-h-0 overflow-hidden">
-      <!-- Sidebar: log list -->
-      <div
-        class="md:flex flex-col w-full md:w-64 overflow-hidden shrink-0"
-        :class="selectedFile ? 'hidden' : 'flex'"
-      >
-        <div class="sm:px-2 pt-2 shrink-0">
-          <FormControl
-            type="text"
-            v-model="fileSearch"
-            placeholder="Search log files"
-            :size="isSinglePane ? 'md' : 'sm'"
-          >
-            <template #prefix><span class="size-4 text-ink-gray-5 lucide-search" /></template>
-          </FormControl>
-        </div>
-        <div class="flex flex-col flex-1 gap-1 p-1.5 sm:p-2 overflow-y-auto">
-          <LoadingText v-if="logsLoading" class="p-2" />
-          <ErrorMessage v-else-if="logsError" :message="logsError" class="p-2" />
-          <p v-else-if="!filteredLogs.length" class="p-2 text-ink-gray-4 text-sm">
-            No log files found.
-          </p>
-          <button
-            v-else
-            v-for="log in filteredLogs"
-            :key="log.filename"
-            class="sm:px-3 py-2.5 rounded-4 w-full text-left transition-colors shrink-0"
-            :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-1'"
-            @click="selectedFile = log.filename"
-          >
-            <div class="flex items-center gap-2">
-              <span class="flex-1 font-medium text-ink-gray-8 text-base truncate">
-                {{ log.filename }}
-              </span>
-              <Tooltip v-if="hasErrors(log)" text="Contains errors">
-                <span
-                  class="bg-surface-red-5 rounded-full size-1.5 shrink-0"
-                  role="img"
-                  aria-label="Contains errors"
-                />
-              </Tooltip>
-              <span class="text-ink-gray-4 text-xs shrink-0">
-                {{ shortRelativeTime(log.last_modified) }}
-              </span>
-            </div>
-            <div class="mt-0.5 text-ink-gray-4 text-p-sm">{{ formatBytes(log.size_bytes) }}</div>
-          </button>
-        </div>
-      </div>
-
-      <!-- Viewer -->
-      <div
-        class="md:flex flex-col flex-1 min-w-0 overflow-hidden"
-        :class="selectedFile ? 'flex' : 'hidden'"
-      >
-        <!-- Already inside a bordered panel, so no dashed box of its own. -->
-        <div v-if="!selectedFile" class="flex flex-1 justify-center items-center">
-          <EmptyState
-            :bordered="false"
-            icon="lucide-scroll-text"
-            title="Select a log file"
-            :description="`Output from ${benchName}'s services.`"
-          />
-        </div>
-
-        <template v-else>
-          <div class="flex flex-col sm:flex-row sm:items-center gap-2 py-2 shrink-0">
-            <!-- Mobile-only: back + filename, replacing the standalone filename bar -->
-            <div class="md:hidden flex items-center gap-2">
-              <Button
-                variant="subtle"
-                icon="lucide-arrow-left"
-                :size="isSinglePane ? 'md' : 'sm'"
-                label="Back to logs"
-                tooltip="Back to logs"
-                @click="selectedFile = ''"
-              />
-              <span class="flex-1 min-w-0 font-medium text-ink-gray-8 text-lg truncate">
-                {{ selectedFile }}
-              </span>
-            </div>
-            <FormControl
-              type="text"
-              v-model="search"
-              placeholder="Search this log"
-              :size="isSinglePane ? 'md' : 'sm'"
-              class="flex-1 min-w-0"
-              @keydown.enter.exact.prevent="gotoMatch(1)"
-              @keydown.enter.shift.prevent="gotoMatch(-1)"
-            />
-            <div
-              v-if="search.trim()"
-              class="flex items-center gap-1 text-ink-gray-5 text-xs shrink-0"
-            >
-              <span class="tabular-nums"
-                >{{ matchTotal ? activeMatch + 1 : 0 }}/{{ matchTotal }}</span
-              >
-              <Button
-                variant="subtle"
-                icon="lucide-chevron-up"
-                :size="isSinglePane ? 'md' : 'sm'"
-                label="Previous match"
-                tooltip="Previous (Shift+Enter)"
-                :disabled="!matchTotal"
-                @click="gotoMatch(-1)"
-              />
-              <Button
-                variant="subtle"
-                icon="lucide-chevron-down"
-                :size="isSinglePane ? 'md' : 'sm'"
-                label="Next match"
-                tooltip="Next (Enter)"
-                :disabled="!matchTotal"
-                @click="gotoMatch(1)"
-              />
-            </div>
-
-            <div class="flex items-center gap-2 shrink-0">
-              <div class="w-28 sm:w-32 min-w-0 shrink-0">
-                <FormControl
-                  type="select"
-                  v-model="linesCount"
-                  :size="isSinglePane ? 'md' : 'sm'"
-                  :disabled="liveMode"
-                  :options="[
-                    { label: '100 lines', value: 100 },
-                    { label: '200 lines', value: 200 },
-                    { label: '500 lines', value: 500 },
-                    { label: '1000 lines', value: 1000 },
-                  ]"
-                />
-              </div>
-              <Button
-                class="ml-auto sm:ml-0"
-                variant="subtle"
-                icon="lucide-refresh-cw"
-                :size="isSinglePane ? 'md' : 'sm'"
-                label="Refresh"
-                tooltip="Refresh"
-                :loading="contentLoading"
-                @click="loadContent"
-              />
-              <Button
-                v-if="!liveMode"
-                variant="subtle"
-                icon="lucide-radio"
-                :size="isSinglePane ? 'md' : 'sm'"
-                label="Live tail"
-                tooltip="Live tail"
-                @click="startLive"
-              />
-              <Button
-                v-else
-                variant="subtle"
-                theme="red"
-                icon="lucide-radio"
-                :size="isSinglePane ? 'md' : 'sm'"
-                label="Stop live tail"
-                tooltip="Stop live tail"
-                @click="() => { stopLive(); loadContent() }"
-              />
-              <a :href="logsApi.downloadUrl(selectedFile)" class="contents">
-                <Button
-                  variant="subtle"
-                  icon="lucide-download"
-                  :size="isSinglePane ? 'md' : 'sm'"
-                  label="Download"
-                  tooltip="Download"
-                />
-              </a>
-            </div>
-          </div>
-
-          <!-- Terminal area -->
-          <div ref="viewer" class="flex flex-col flex-1 mt-2 sm:mt-0 overflow-hidden">
-            <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
-              Error: {{ contentError }}
-            </div>
-            <LogView
-              v-else
-              ref="terminal"
-              :lines="visibleLines"
-              :streaming="liveMode"
-              fill
-              wrap
-              rows
-              rounded
-              class="border border-outline-gray-2"
-              :empty-text="contentLoading ? 'Loading…' : 'Log file is empty.'"
-            />
-
-            <div
-              v-if="rawLines.length"
-              class="sm:px-4 pt-2 text-ink-gray-4 text-xs shrink-0"
-            >
-              {{ totalLineCount }} lines in file
-              <template v-if="search.trim()">
-                · {{ matchTotal }} match{{ matchTotal !== 1 ? 'es' : '' }}</template
-              >
-            </div>
-          </div>
-        </template>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, ErrorMessage, FormControl, LoadingText, Tooltip } from 'frappe-ui'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import LogView from '@/components/logs/LogView.vue'
+
 import { logsApi } from '@/api/logs'
 import { escapeHtml, processLine } from '@/utils/ansi'
 import { formatBytes } from '@/utils/format'
@@ -425,6 +217,218 @@ onMounted(async () => {
 
 onUnmounted(() => stopLive())
 </script>
+
+<template>
+  <!-- 5rem = 3rem sticky header + the shell's 2rem vertical page padding -->
+  <div class="flex flex-col h-[calc(100dvh-5rem)]">
+    <div class="flex flex-1 sm:gap-4 min-h-0 overflow-hidden">
+      <!-- Sidebar: log list -->
+      <div
+        class="md:flex flex-col w-full md:w-64 overflow-hidden shrink-0"
+        :class="selectedFile ? 'hidden' : 'flex'"
+      >
+        <div class="sm:px-2 pt-2 shrink-0">
+          <FormControl
+            type="text"
+            v-model="fileSearch"
+            placeholder="Search log files"
+            :size="isSinglePane ? 'md' : 'sm'"
+          >
+            <template #prefix><span class="size-4 text-ink-gray-5 lucide-search" /></template>
+          </FormControl>
+        </div>
+        <div class="flex flex-col flex-1 gap-1 p-1.5 sm:p-2 overflow-y-auto">
+          <LoadingText v-if="logsLoading" class="p-2" />
+          <ErrorMessage v-else-if="logsError" :message="logsError" class="p-2" />
+          <p v-else-if="!filteredLogs.length" class="p-2 text-ink-gray-4 text-sm">
+            No log files found.
+          </p>
+          <button
+            v-else
+            v-for="log in filteredLogs"
+            :key="log.filename"
+            class="sm:px-3 py-2.5 rounded-4 w-full text-left transition-colors shrink-0"
+            :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-1'"
+            @click="selectedFile = log.filename"
+          >
+            <div class="flex items-center gap-2">
+              <span class="flex-1 font-medium text-ink-gray-8 text-base truncate">
+                {{ log.filename }}
+              </span>
+              <Tooltip v-if="hasErrors(log)" text="Contains errors">
+                <span
+                  class="bg-surface-red-5 rounded-full size-1.5 shrink-0"
+                  role="img"
+                  aria-label="Contains errors"
+                />
+              </Tooltip>
+              <span class="text-ink-gray-4 text-xs shrink-0">
+                {{ shortRelativeTime(log.last_modified) }}
+              </span>
+            </div>
+            <div class="mt-0.5 text-ink-gray-4 text-p-sm">{{ formatBytes(log.size_bytes) }}</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Viewer -->
+      <div
+        class="md:flex flex-col flex-1 min-w-0 overflow-hidden"
+        :class="selectedFile ? 'flex' : 'hidden'"
+      >
+        <!-- Already inside a bordered panel, so no dashed box of its own. -->
+        <div v-if="!selectedFile" class="flex flex-1 justify-center items-center">
+          <EmptyState
+            :bordered="false"
+            icon="lucide-scroll-text"
+            title="Select a log file"
+            :description="`Output from ${benchName}'s services.`"
+          />
+        </div>
+
+        <template v-else>
+          <div class="flex flex-col sm:flex-row sm:items-center gap-2 py-2 shrink-0">
+            <!-- Mobile-only: back + filename, replacing the standalone filename bar -->
+            <div class="md:hidden flex items-center gap-2">
+              <Button
+                variant="subtle"
+                icon="lucide-arrow-left"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Back to logs"
+                tooltip="Back to logs"
+                @click="selectedFile = ''"
+              />
+              <span class="flex-1 min-w-0 font-medium text-ink-gray-8 text-lg truncate">
+                {{ selectedFile }}
+              </span>
+            </div>
+            <FormControl
+              type="text"
+              v-model="search"
+              placeholder="Search this log"
+              :size="isSinglePane ? 'md' : 'sm'"
+              class="flex-1 min-w-0"
+              @keydown.enter.exact.prevent="gotoMatch(1)"
+              @keydown.enter.shift.prevent="gotoMatch(-1)"
+            />
+            <div
+              v-if="search.trim()"
+              class="flex items-center gap-1 text-ink-gray-5 text-xs shrink-0"
+            >
+              <span class="tabular-nums"
+                >{{ matchTotal ? activeMatch + 1 : 0 }}/{{ matchTotal }}</span
+              >
+              <Button
+                variant="subtle"
+                icon="lucide-chevron-up"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Previous match"
+                tooltip="Previous (Shift+Enter)"
+                :disabled="!matchTotal"
+                @click="gotoMatch(-1)"
+              />
+              <Button
+                variant="subtle"
+                icon="lucide-chevron-down"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Next match"
+                tooltip="Next (Enter)"
+                :disabled="!matchTotal"
+                @click="gotoMatch(1)"
+              />
+            </div>
+
+            <div class="flex items-center gap-2 shrink-0">
+              <div class="w-28 sm:w-32 min-w-0 shrink-0">
+                <FormControl
+                  type="select"
+                  v-model="linesCount"
+                  :size="isSinglePane ? 'md' : 'sm'"
+                  :disabled="liveMode"
+                  :options="[
+                    { label: '100 lines', value: 100 },
+                    { label: '200 lines', value: 200 },
+                    { label: '500 lines', value: 500 },
+                    { label: '1000 lines', value: 1000 },
+                  ]"
+                />
+              </div>
+              <Button
+                class="ml-auto sm:ml-0"
+                variant="subtle"
+                icon="lucide-refresh-cw"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Refresh"
+                tooltip="Refresh"
+                :loading="contentLoading"
+                @click="loadContent"
+              />
+              <Button
+                v-if="!liveMode"
+                variant="subtle"
+                icon="lucide-radio"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Live tail"
+                tooltip="Live tail"
+                @click="startLive"
+              />
+              <Button
+                v-else
+                variant="subtle"
+                theme="red"
+                icon="lucide-radio"
+                :size="isSinglePane ? 'md' : 'sm'"
+                label="Stop live tail"
+                tooltip="Stop live tail"
+                @click="() => { stopLive(); loadContent() }"
+              />
+              <a :href="logsApi.downloadUrl(selectedFile)" class="contents">
+                <Button
+                  variant="subtle"
+                  icon="lucide-download"
+                  :size="isSinglePane ? 'md' : 'sm'"
+                  label="Download"
+                  tooltip="Download"
+                />
+              </a>
+            </div>
+          </div>
+
+          <!-- Terminal area -->
+          <div ref="viewer" class="flex flex-col flex-1 mt-2 sm:mt-0 overflow-hidden">
+            <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
+              Error: {{ contentError }}
+            </div>
+            <LogView
+              v-else
+              ref="terminal"
+              :lines="visibleLines"
+              :streaming="liveMode"
+              fill
+              wrap
+              rows
+              rounded
+              class="border border-outline-gray-2"
+              :empty-text="contentLoading ? 'Loading…' : 'Log file is empty.'"
+            />
+
+            <div
+              v-if="rawLines.length"
+              class="sm:px-4 pt-2 text-ink-gray-4 text-xs shrink-0"
+            >
+              {{ totalLineCount }} lines in file
+              <template v-if="search.trim()">
+                · {{ matchTotal }} match{{ matchTotal !== 1 ? 'es' : '' }}</template
+              >
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+</template>
+
+
 
 <!-- Unscoped: the <mark>s are injected via v-html and never get the scope attribute. -->
 <style>

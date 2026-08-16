@@ -1,4 +1,4 @@
-import { apiUrl, request } from './client'
+import { apiUrl, request } from '@/api/client'
 
 const SETUP_IDEMPOTENCY_KEY = 'wizard-setup'
 

@@ -1,7 +1,8 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { authApi } from '@/api/auth'
 import { useColorScheme } from 'frappe-ui'
+
+import { authApi } from '@/api/auth'
 import { useSession } from '@/composables/auth/useSession'
 
 // dialogs

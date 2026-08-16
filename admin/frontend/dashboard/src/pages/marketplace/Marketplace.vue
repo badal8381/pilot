@@ -1,3 +1,77 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Badge, Button, ErrorMessage, Skeleton } from 'frappe-ui'
+
+import AddAppFromGithubDialog from '@/components/apps/AddAppFromGithubDialog.vue'
+import PageHero from '@/components/common/PageHero.vue'
+import ChooseSiteDialog from '@/components/sites/ChooseSiteDialog.vue'
+import InstallAppDialog from '@/components/apps/InstallAppDialog.vue'
+import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
+import MarketplaceAppCardSkeleton from '@/components/marketplace/MarketplaceAppCardSkeleton.vue'
+import MarketplaceFilters from '@/components/marketplace/MarketplaceFilters.vue'
+
+import { useMarketplace } from '@/composables/apps/useMarketplace'
+import { useIsMobile } from '@/composables/common/useIsMobile'
+
+const isMobile = useIsMobile()
+const route = useRoute()
+const router = useRouter()
+
+const {
+  loading,
+  error,
+  appCount,
+  search,
+  selectedPill,
+  worksWith,
+  worksWithOptions,
+  isFiltered,
+  filteredApps,
+  benchVersionLabel,
+  frappeApps,
+  communityApps,
+  load,
+  sites,
+  currentSiteName,
+  otherBenchApps,
+} = useMarketplace(route.query.site)
+
+const siteLabel = computed(() => currentSiteName.value || 'All sites')
+
+const appCountLabel = computed(
+  () => `${appCount.value} ${appCount.value === 1 ? 'app' : 'apps'} available`,
+)
+
+const filteredHeading = computed(() => {
+  const name = selectedPill.value !== 'All' ? selectedPill.value : 'Matching apps'
+  const count = filteredApps.value.length
+  return `${name} · ${count} ${count === 1 ? 'app' : 'apps'}`
+})
+
+const showChooseSite = ref(false)
+const showInstallApp = ref(false)
+const showAddFromGithub = ref(false)
+const installTarget = ref(null)
+
+watch(
+  () => route.query.addFromGithub,
+  (value) => {
+    if (!value) return
+    showAddFromGithub.value = true
+    router.replace({ name: 'Marketplace', query: { ...route.query, addFromGithub: undefined } })
+  },
+  { immediate: true },
+)
+
+function onInstall(app) {
+  installTarget.value = app
+  showInstallApp.value = true
+}
+
+onMounted(load)
+</script>
+
 <template>
   <PageHero v-if="loading">
     <template #icon><Skeleton class="rounded-6 size-9 sm:size-10 shrink-0" /></template>
@@ -132,75 +206,3 @@
   />
   <AddAppFromGithubDialog v-model:open="showAddFromGithub" :site-name="currentSiteName" />
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, ErrorMessage, Skeleton } from 'frappe-ui'
-import AddAppFromGithubDialog from '@/components/apps/AddAppFromGithubDialog.vue'
-import PageHero from '@/components/common/PageHero.vue'
-import ChooseSiteDialog from '@/components/sites/ChooseSiteDialog.vue'
-import InstallAppDialog from '@/components/apps/InstallAppDialog.vue'
-import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
-import MarketplaceAppCardSkeleton from '@/components/marketplace/MarketplaceAppCardSkeleton.vue'
-import MarketplaceFilters from '@/components/marketplace/MarketplaceFilters.vue'
-import { useMarketplace } from '@/composables/apps/useMarketplace'
-import { useIsMobile } from '@/composables/common/useIsMobile'
-
-const isMobile = useIsMobile()
-const route = useRoute()
-const router = useRouter()
-
-const {
-  loading,
-  error,
-  appCount,
-  search,
-  selectedPill,
-  worksWith,
-  worksWithOptions,
-  isFiltered,
-  filteredApps,
-  benchVersionLabel,
-  frappeApps,
-  communityApps,
-  load,
-  sites,
-  currentSiteName,
-  otherBenchApps,
-} = useMarketplace(route.query.site)
-
-const siteLabel = computed(() => currentSiteName.value || 'All sites')
-
-const appCountLabel = computed(
-  () => `${appCount.value} ${appCount.value === 1 ? 'app' : 'apps'} available`,
-)
-
-const filteredHeading = computed(() => {
-  const name = selectedPill.value !== 'All' ? selectedPill.value : 'Matching apps'
-  const count = filteredApps.value.length
-  return `${name} · ${count} ${count === 1 ? 'app' : 'apps'}`
-})
-
-const showChooseSite = ref(false)
-const showInstallApp = ref(false)
-const showAddFromGithub = ref(false)
-const installTarget = ref(null)
-
-watch(
-  () => route.query.addFromGithub,
-  (value) => {
-    if (!value) return
-    showAddFromGithub.value = true
-    router.replace({ name: 'Marketplace', query: { ...route.query, addFromGithub: undefined } })
-  },
-  { immediate: true },
-)
-
-function onInstall(app) {
-  installTarget.value = app
-  showInstallApp.value = true
-}
-
-onMounted(load)
-</script>

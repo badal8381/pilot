@@ -1,22 +1,7 @@
-<template>
-  <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
-    <div
-      v-if="!chart.keys.length"
-      class="flex justify-center items-center min-h-[280px] text-ink-gray-5 text-xs"
-    >
-      No slow queries recorded yet
-    </div>
-    <AxisChart
-      v-else
-      :config="chart.config"
-      class="w-full min-w-0 h-full min-h-[320px] px-2 sm:px-4 pb-2"
-    />
-  </ChartCard>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { AxisChart } from 'frappe-ui'
+
 import ChartCard from '@/components/common/ChartCard.vue'
 
 const props = defineProps({ overview: { type: Object, default: null } })
@@ -68,3 +53,19 @@ const charts = computed(() => {
   ]
 })
 </script>
+
+<template>
+  <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
+    <div
+      v-if="!chart.keys.length"
+      class="flex justify-center items-center min-h-[280px] text-ink-gray-5 text-xs"
+    >
+      No slow queries recorded yet
+    </div>
+    <AxisChart
+      v-else
+      :config="chart.config"
+      class="w-full min-w-0 h-full min-h-[320px] px-2 sm:px-4 pb-2"
+    />
+  </ChartCard>
+</template>

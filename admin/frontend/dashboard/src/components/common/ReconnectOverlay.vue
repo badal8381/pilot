@@ -1,15 +1,7 @@
-<template>
-  <div
-    v-if="down && !paused"
-    class="fixed inset-0 z-[9999] flex items-center justify-center gap-3 bg-surface-elevation-1"
-  >
-    <LoadingIndicator class="h-6 w-6 text-ink-gray-5" />
-    <p class="text-xl text-ink-gray-7">Reconnecting to bench</p>
-  </div>
-</template>
-<script setup>
+<script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { LoadingIndicator } from 'frappe-ui'
+
 import { apiUrl } from '@/api/client'
 
 const props = defineProps({ paused: { type: Boolean, default: false } })
@@ -58,3 +50,13 @@ onBeforeUnmount(() => {
   clearTimeout(timer)
 })
 </script>
+
+<template>
+  <div
+    v-if="down && !paused"
+    class="fixed inset-0 z-[9999] flex items-center justify-center gap-3 bg-surface-elevation-1"
+  >
+    <LoadingIndicator class="h-6 w-6 text-ink-gray-5" />
+    <p class="text-xl text-ink-gray-7">Reconnecting to bench</p>
+  </div>
+</template>

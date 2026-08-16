@@ -1,58 +1,12 @@
-<template>
-  <SettingsRow label="Pilot Version" :description="loading ? '' : versionLabel">
-    <Button size="sm" variant="subtle" :loading="checking" @click="check">Update</Button>
-  </SettingsRow>
-  <ErrorMessage v-if="versionError" :message="versionError" />
-
-  <Dialog v-model="dialogOpen" title="Update" size="md">
-    <div v-if="isDev" class="flex flex-col gap-3">
-      <p class="text-ink-gray-7 text-p-base">
-        This is a development install. Update it from a terminal:
-      </p>
-      <pre class="p-3 bg-surface-gray-2 rounded-4 overflow-x-auto text-ink-gray-8 text-sm">git pull
-pilot admin build
-pilot admin upgrade</pre>
-      <p class="text-ink-gray-5 text-p-sm">The last step restarts the admin service.</p>
-    </div>
-
-    <div v-else-if="updating" class="flex flex-col gap-3">
-      <p class="text-ink-gray-7 text-base">Updating to {{ latestVersion }}…</p>
-      <div v-if="!log" class="flex justify-center items-center py-8">
-        <Spinner size="lg" class="text-ink-gray-4" />
-      </div>
-      <pre
-        v-else
-        class="p-3 bg-surface-gray-2 rounded-4 max-h-64 overflow-auto text-ink-gray-7 text-sm whitespace-pre-wrap"
-      >{{ log }}</pre>
-    </div>
-
-    <div v-else-if="updateAvailable" class="flex flex-col gap-3">
-      <p class="text-ink-gray-7 text-p-base">
-        Version <strong>{{ latestVersion }}</strong> is available. You are on
-        {{ status.current_version || 'an unknown version' }}.
-      </p>
-      <p class="text-ink-gray-5 text-p-sm">
-        Pilot updates itself and restarts the admin service. Your benches keep running.
-      </p>
-    </div>
-
-    <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-3" />
-
-    <template v-if="!isDev && updateAvailable" #actions>
-      <Button variant="solid" class="w-full" :loading="updating" @click="update">
-        Update to {{ latestVersion }}
-      </Button>
-    </template>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { Button, Dialog, ErrorMessage, Spinner, toast } from 'frappe-ui'
+
+import SettingsRow from '@/components/settings/SettingsRow.vue'
+
 import { cliUpdatesApi } from '@/api/settings'
 import { tasksApi } from '@/api/tasks'
 import { isTaskActive } from '@/utils/taskFormat'
-import SettingsRow from '@/components/settings/SettingsRow.vue'
 
 const POLL_INTERVAL_MS = 1500
 
@@ -161,3 +115,51 @@ async function pollTask(taskId) {
   }
 }
 </script>
+
+<template>
+  <SettingsRow label="Pilot Version" :description="loading ? '' : versionLabel">
+    <Button size="sm" variant="subtle" :loading="checking" @click="check">Update</Button>
+  </SettingsRow>
+  <ErrorMessage v-if="versionError" :message="versionError" />
+
+  <Dialog v-model="dialogOpen" title="Update" size="md">
+    <div v-if="isDev" class="flex flex-col gap-3">
+      <p class="text-ink-gray-7 text-p-base">
+        This is a development install. Update it from a terminal:
+      </p>
+      <pre class="p-3 bg-surface-gray-2 rounded-4 overflow-x-auto text-ink-gray-8 text-sm">git pull
+pilot admin build
+pilot admin upgrade</pre>
+      <p class="text-ink-gray-5 text-p-sm">The last step restarts the admin service.</p>
+    </div>
+
+    <div v-else-if="updating" class="flex flex-col gap-3">
+      <p class="text-ink-gray-7 text-base">Updating to {{ latestVersion }}…</p>
+      <div v-if="!log" class="flex justify-center items-center py-8">
+        <Spinner size="lg" class="text-ink-gray-4" />
+      </div>
+      <pre
+        v-else
+        class="p-3 bg-surface-gray-2 rounded-4 max-h-64 overflow-auto text-ink-gray-7 text-sm whitespace-pre-wrap"
+      >{{ log }}</pre>
+    </div>
+
+    <div v-else-if="updateAvailable" class="flex flex-col gap-3">
+      <p class="text-ink-gray-7 text-p-base">
+        Version <strong>{{ latestVersion }}</strong> is available. You are on
+        {{ status.current_version || 'an unknown version' }}.
+      </p>
+      <p class="text-ink-gray-5 text-p-sm">
+        Pilot updates itself and restarts the admin service. Your benches keep running.
+      </p>
+    </div>
+
+    <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-3" />
+
+    <template v-if="!isDev && updateAvailable" #actions>
+      <Button variant="solid" class="w-full" :loading="updating" @click="update">
+        Update to {{ latestVersion }}
+      </Button>
+    </template>
+  </Dialog>
+</template>

@@ -1,4 +1,4 @@
-import { commandLabel, relativeTime } from './taskFormat'
+import { commandLabel, relativeTime } from '@/utils/taskFormat'
 
 const typeMetaMap = {
   backup: { icon: 'lucide-database', iconBg: 'bg-surface-blue-2 text-ink-blue-7' },

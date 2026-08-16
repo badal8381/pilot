@@ -1,84 +1,4 @@
-<template>
-  <div v-if="loading" class="flex justify-center items-center h-40">
-    <Spinner size="lg" class="text-ink-gray-4" />
-  </div>
-  <div v-else class="space-y-6">
-    <div class="flex justify-end">
-      <Button variant="subtle" icon-left="lucide-plus" @click="openAdd">Add</Button>
-    </div>
-    <div
-      v-if="loadError"
-      class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
-    >
-      {{ loadError }}
-    </div>
-    <EmptyState
-      compact
-      v-else-if="!rows.length"
-      icon="lucide-key-round"
-      title="No SSH keys"
-      description="Add a public key to give its holder SSH access to this server."
-    />
-    <ListView
-      v-else
-      :columns="columns"
-      :rows="rows"
-      row-key="fingerprint"
-      :options="{ selectable: false, showTooltip: false }"
-    >
-      <template #cell="{ column, row, item }">
-        <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            theme="red"
-            icon="lucide-trash-2"
-            label="Remove SSH key"
-            tooltip="Remove SSH key"
-            @click="promptRemove(row)"
-          />
-        </div>
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
-      </template>
-    </ListView>
-  </div>
-
-  <Dialog v-model="showAdd" title="Add SSH key" size="md">
-    <FormControl
-      type="textarea"
-      label="Public key"
-      v-model="newKey"
-      :rows="3"
-      placeholder="ssh-ed25519 AAAA… user@host"
-    />
-    <ErrorMessage v-if="error" :message="error" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-      <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
-        Add key
-      </Button>
-    </div>
-  </Dialog>
-
-  <Dialog v-model="showRemove" title="Remove SSH key" size="md">
-    <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
-      This is the last authorized key. It can't be removed, or you'd lose SSH access to this
-      server.
-    </p>
-    <p v-else class="text-ink-gray-7 text-p-base">
-      Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
-      Whoever holds the matching private key loses SSH access.
-    </p>
-    <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
-        >Remove</Button
-      >
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import {
   Button,
@@ -179,3 +99,83 @@ async function confirmRemove() {
 
 onMounted(load)
 </script>
+
+<template>
+  <div v-if="loading" class="flex justify-center items-center h-40">
+    <Spinner size="lg" class="text-ink-gray-4" />
+  </div>
+  <div v-else class="space-y-6">
+    <div class="flex justify-end">
+      <Button variant="subtle" icon-left="lucide-plus" @click="openAdd">Add</Button>
+    </div>
+    <div
+      v-if="loadError"
+      class="py-12 border border-dashed rounded-7 border-outline-red-2 text-ink-red-2 text-p-sm text-center"
+    >
+      {{ loadError }}
+    </div>
+    <EmptyState
+      compact
+      v-else-if="!rows.length"
+      icon="lucide-key-round"
+      title="No SSH keys"
+      description="Add a public key to give its holder SSH access to this server."
+    />
+    <ListView
+      v-else
+      :columns="columns"
+      :rows="rows"
+      row-key="fingerprint"
+      :options="{ selectable: false, showTooltip: false }"
+    >
+      <template #cell="{ column, row, item }">
+        <div v-if="column.key === 'actions'" class="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            theme="red"
+            icon="lucide-trash-2"
+            label="Remove SSH key"
+            tooltip="Remove SSH key"
+            @click="promptRemove(row)"
+          />
+        </div>
+        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      </template>
+    </ListView>
+  </div>
+
+  <Dialog v-model="showAdd" title="Add SSH key" size="md">
+    <FormControl
+      type="textarea"
+      label="Public key"
+      v-model="newKey"
+      :rows="3"
+      placeholder="ssh-ed25519 AAAA… user@host"
+    />
+    <ErrorMessage v-if="error" :message="error" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showAdd = false">Cancel</Button>
+      <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
+        Add key
+      </Button>
+    </div>
+  </Dialog>
+
+  <Dialog v-model="showRemove" title="Remove SSH key" size="md">
+    <p v-if="isLastKey" class="text-ink-gray-7 text-p-base">
+      This is the last authorized key. It can't be removed, or you'd lose SSH access to this
+      server.
+    </p>
+    <p v-else class="text-ink-gray-7 text-p-base">
+      Remove <span class="font-semibold text-ink-gray-8 break-all">{{ removing?.label }}</span>?
+      Whoever holds the matching private key loses SSH access.
+    </p>
+    <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
+        >Remove</Button
+      >
+    </div>
+  </Dialog>
+</template>

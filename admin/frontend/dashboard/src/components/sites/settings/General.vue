@@ -1,29 +1,9 @@
-<template>
-  <div>
-    <p class="font-semibold text-ink-gray-8 text-base">General</p>
-    <div class="mt-1">
-      <div
-        v-for="s in visibleSettings"
-        :key="s.key"
-        class="py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
-      >
-        <SettingsSwitch
-          :label="s.label"
-          :description="s.description"
-          :model-value="getValue(s)"
-          :disabled="savingKey === s.key"
-          @update:model-value="(v) => toggle(s, v)"
-        />
-      </div>
-    </div>
-    <ErrorMessage v-if="error" :message="error" class="mt-4" />
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ErrorMessage } from 'frappe-ui'
+
 import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
+
 import { useSite } from '@/composables/sites/useSite'
 import { sitesApi } from '@/api/sites'
 import { settingsApi } from '@/api/settings'
@@ -88,3 +68,25 @@ async function toggle(s, value) {
   }
 }
 </script>
+
+<template>
+  <div>
+    <p class="font-semibold text-ink-gray-8 text-base">General</p>
+    <div class="mt-1">
+      <div
+        v-for="s in visibleSettings"
+        :key="s.key"
+        class="py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
+      >
+        <SettingsSwitch
+          :label="s.label"
+          :description="s.description"
+          :model-value="getValue(s)"
+          :disabled="savingKey === s.key"
+          @update:model-value="(v) => toggle(s, v)"
+        />
+      </div>
+    </div>
+    <ErrorMessage v-if="error" :message="error" class="mt-4" />
+  </div>
+</template>

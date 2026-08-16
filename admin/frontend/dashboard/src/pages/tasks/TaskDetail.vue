@@ -1,99 +1,17 @@
-<template>
-  <div v-if="loading" class="flex justify-center py-12">
-    <LoadingText />
-  </div>
-  <div v-else-if="error" class="py-12">
-    <ErrorMessage :message="error" />
-  </div>
-  <div v-else-if="task" class="mx-auto max-w-3xl">
-    <Teleport defer to="#header-badge">
-      <Badge
-        :label="statusConfig(task).label"
-        :theme="statusConfig(task).theme"
-        variant="subtle"
-        size="md"
-      />
-    </Teleport>
-
-    <!-- In place on mobile; the header row has no room for these there. -->
-    <Teleport defer to="#header-actions" :disabled="isMobile">
-      <div class="flex items-center gap-2" :class="isMobile ? 'mb-4' : ''">
-        <Button
-          variant="subtle"
-          size="sm"
-          :loading="loading"
-          icon="lucide-refresh-cw"
-          label="Refresh"
-          tooltip="Refresh"
-          @click="load"
-        />
-        <Button
-          v-if="task.status === 'failed' && aiConnected"
-          variant="subtle"
-          size="sm"
-          icon-left="lucide-sparkles"
-          @click="showDebug = true"
-        >
-          Debug with AI
-        </Button>
-        <Button
-          v-if="isTaskCancellable(task)"
-          variant="subtle"
-          size="sm"
-          theme="red"
-          icon-left="lucide-x"
-          @click="cancelTask"
-        >
-          Cancel
-        </Button>
-      </div>
-    </Teleport>
-
-    <TaskDebugDialog v-model="showDebug" :task-id="taskId" />
-
-    <div class="flex justify-between items-center gap-4 mt-5 px-2 min-w-0">
-      <RouterLink
-        :to="scope.route"
-        class="group flex items-center gap-1 min-w-0 font-medium text-ink-gray-9 text-lg no-underline"
-      >
-        <span class="truncate">{{ scope.label }}</span>
-        <span
-          class="opacity-0 group-hover:opacity-100 size-4 text-ink-gray-5 transition-opacity shrink-0 lucide-arrow-up-right"
-        />
-      </RouterLink>
-      <p class="text-ink-gray-8 text-base shrink-0">{{ metaLine }}</p>
-    </div>
-
-    <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
-
-    <!-- Steps -->
-    <div class="mt-3">
-      <TaskStream
-        v-if="isTaskActive(task)"
-        :url="tasksApi.streamUrl(taskId)"
-        :empty-text="task.status === 'queued' ? 'Waiting for this task to start…' : 'No output yet…'"
-        v-slot="{ rawLines: streamedLines, streaming }"
-        @status="updateStatus"
-        @done="handleDone"
-      >
-        <TaskSteps :raw-lines="streamedLines" :streaming="streaming" :task-status="task.status" />
-      </TaskStream>
-      <TaskSteps v-else :raw-lines="rawLines" :task-status="task.status" />
-    </div>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, ErrorMessage, LoadingText } from 'frappe-ui'
+
+import TaskDebugDialog from '@/components/tasks/TaskDebugDialog.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { tasksApi } from '@/api/tasks'
 import { settingsApi } from '@/api/settings'
-import TaskDebugDialog from '@/components/tasks/TaskDebugDialog.vue'
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useTaskDetail } from '@/composables/tasks/useTaskDetail'
+
 import {
   commandLabel,
   fmtDateTime,
@@ -184,3 +102,88 @@ onMounted(() => {
   loadAiStatus()
 })
 </script>
+
+<template>
+  <div v-if="loading" class="flex justify-center py-12">
+    <LoadingText />
+  </div>
+  <div v-else-if="error" class="py-12">
+    <ErrorMessage :message="error" />
+  </div>
+  <div v-else-if="task" class="mx-auto max-w-3xl">
+    <Teleport defer to="#header-badge">
+      <Badge
+        :label="statusConfig(task).label"
+        :theme="statusConfig(task).theme"
+        variant="subtle"
+        size="md"
+      />
+    </Teleport>
+
+    <!-- In place on mobile; the header row has no room for these there. -->
+    <Teleport defer to="#header-actions" :disabled="isMobile">
+      <div class="flex items-center gap-2" :class="isMobile ? 'mb-4' : ''">
+        <Button
+          variant="subtle"
+          size="sm"
+          :loading="loading"
+          icon="lucide-refresh-cw"
+          label="Refresh"
+          tooltip="Refresh"
+          @click="load"
+        />
+        <Button
+          v-if="task.status === 'failed' && aiConnected"
+          variant="subtle"
+          size="sm"
+          icon-left="lucide-sparkles"
+          @click="showDebug = true"
+        >
+          Debug with AI
+        </Button>
+        <Button
+          v-if="isTaskCancellable(task)"
+          variant="subtle"
+          size="sm"
+          theme="red"
+          icon-left="lucide-x"
+          @click="cancelTask"
+        >
+          Cancel
+        </Button>
+      </div>
+    </Teleport>
+
+    <TaskDebugDialog v-model="showDebug" :task-id="taskId" />
+
+    <div class="flex justify-between items-center gap-4 mt-5 px-2 min-w-0">
+      <RouterLink
+        :to="scope.route"
+        class="group flex items-center gap-1 min-w-0 font-medium text-ink-gray-9 text-lg no-underline"
+      >
+        <span class="truncate">{{ scope.label }}</span>
+        <span
+          class="opacity-0 group-hover:opacity-100 size-4 text-ink-gray-5 transition-opacity shrink-0 lucide-arrow-up-right"
+        />
+      </RouterLink>
+      <p class="text-ink-gray-8 text-base shrink-0">{{ metaLine }}</p>
+    </div>
+
+    <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
+
+    <!-- Steps -->
+    <div class="mt-3">
+      <TaskStream
+        v-if="isTaskActive(task)"
+        :url="tasksApi.streamUrl(taskId)"
+        :empty-text="task.status === 'queued' ? 'Waiting for this task to start…' : 'No output yet…'"
+        v-slot="{ rawLines: streamedLines, streaming }"
+        @status="updateStatus"
+        @done="handleDone"
+      >
+        <TaskSteps :raw-lines="streamedLines" :streaming="streaming" :task-status="task.status" />
+      </TaskStream>
+      <TaskSteps v-else :raw-lines="rawLines" :task-status="task.status" />
+    </div>
+  </div>
+</template>

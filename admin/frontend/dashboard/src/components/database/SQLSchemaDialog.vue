@@ -1,3 +1,37 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { Button, Dialog, FormControl } from 'frappe-ui'
+
+import SimpleTable from '@/components/common/SimpleTable.vue'
+
+const props = defineProps({
+  schema: { type: Array, default: () => [] },
+})
+const emit = defineEmits(['preview'])
+
+const show = defineModel({ default: false })
+
+const search = ref('')
+const selected = ref(null)
+
+const filteredTables = computed(() => {
+  const query = search.value.toLowerCase().trim()
+  return props.schema.filter((t) => !query || t.name.toLowerCase().includes(query))
+})
+
+watch(show, (open) => {
+  if (open) {
+    search.value = ''
+    selected.value = null
+  }
+})
+
+function preview(table) {
+  emit('preview', table.name)
+  show.value = false
+}
+</script>
+
 <template>
   <Dialog v-model="show" title="Tables" size="3xl">
     <FormControl v-model="search" type="text" placeholder="Search tables" autocomplete="off">
@@ -60,36 +94,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { computed, ref, watch } from 'vue'
-import { Button, Dialog, FormControl } from 'frappe-ui'
-import SimpleTable from '@/components/common/SimpleTable.vue'
-
-const props = defineProps({
-  schema: { type: Array, default: () => [] },
-})
-const emit = defineEmits(['preview'])
-
-const show = defineModel({ default: false })
-
-const search = ref('')
-const selected = ref(null)
-
-const filteredTables = computed(() => {
-  const query = search.value.toLowerCase().trim()
-  return props.schema.filter((t) => !query || t.name.toLowerCase().includes(query))
-})
-
-watch(show, (open) => {
-  if (open) {
-    search.value = ''
-    selected.value = null
-  }
-})
-
-function preview(table) {
-  emit('preview', table.name)
-  show.value = false
-}
-</script>

@@ -1,19 +1,10 @@
-<template>
-  <Codemirror
-    v-model="model"
-    :extensions="extensions"
-    :autofocus="true"
-    :style="{ height: '100%' }"
-    @ready="onReady"
-  />
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, shallowRef, watch } from 'vue'
 import { Codemirror } from 'vue-codemirror'
 import { MariaSQL, PostgreSQL, SQLite as SQLiteDialect, sql } from '@codemirror/lang-sql'
 import { autocompletion } from '@codemirror/autocomplete'
 import { history, historyKeymap, defaultKeymap, indentWithTab } from '@codemirror/commands'
+
 import {
   keymap,
   EditorView,
@@ -198,3 +189,13 @@ const extensions = [
 
 defineExpose({ getQueryToRun })
 </script>
+
+<template>
+  <Codemirror
+    v-model="model"
+    :extensions="extensions"
+    :autofocus="true"
+    :style="{ height: '100%' }"
+    @ready="onReady"
+  />
+</template>

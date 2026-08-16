@@ -1,124 +1,125 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { useSession } from './composables/auth/useSession'
-import { safeRedirect } from './utils/redirect'
-import { authApi } from './api/auth'
+
+import { useSession } from '@/composables/auth/useSession'
+import { safeRedirect } from '@/utils/redirect'
+import { authApi } from '@/api/auth'
 
 const routes = [
   {
     path: '/setup',
     name: 'Setup',
-    component: () => import('./pages/setup/Setup.vue'),
+    component: () => import('@/pages/setup/Setup.vue'),
     meta: { title: 'Setup', fullScreen: true },
   },
   {
     path: '/login',
     name: 'Login',
-    component: () => import('./pages/auth/Login.vue'),
+    component: () => import('@/pages/auth/Login.vue'),
     meta: { title: 'Login', fullScreen: true },
   },
   { path: '/', redirect: '/sites' },
   {
     path: '/home',
     name: 'Home',
-    component: () => import('./pages/home/Home.vue'),
+    component: () => import('@/pages/home/Home.vue'),
     meta: { title: 'Home' },
   },
   {
     path: '/sites',
     name: 'Sites',
-    component: () => import('./pages/sites/Sites.vue'),
+    component: () => import('@/pages/sites/Sites.vue'),
     meta: { title: 'Sites', showUpdateStatus: true },
   },
   {
     path: '/sites/:name/:tab?',
     name: 'SiteDetail',
-    component: () => import('./pages/sites/SiteDetail.vue'),
+    component: () => import('@/pages/sites/SiteDetail.vue'),
     meta: { group: 'Sites' },
   },
   { path: '/server', redirect: '/storage' },
   {
     path: '/storage',
     name: 'Storage',
-    component: () => import('./pages/storage/Storage.vue'),
+    component: () => import('@/pages/storage/Storage.vue'),
     meta: { title: 'Storage' },
   },
   {
     path: '/marketplace',
     name: 'Marketplace',
-    component: () => import('./pages/marketplace/Marketplace.vue'),
+    component: () => import('@/pages/marketplace/Marketplace.vue'),
     meta: { title: 'Marketplace', showUpdateStatus: true },
   },
   {
     path: '/insights/analytics',
     name: 'Analytics',
-    component: () => import('./pages/dashboard/Analytics.vue'),
+    component: () => import('@/pages/dashboard/Analytics.vue'),
     meta: { title: 'Analytics', group: 'Insights' },
   },
   {
     path: '/insights/logs',
     name: 'Logs',
-    component: () => import('./pages/logs/Logs.vue'),
+    component: () => import('@/pages/logs/Logs.vue'),
     meta: { title: 'Logs', group: 'Insights' },
   },
   {
     path: '/insights/activity',
     name: 'Activity',
-    component: () => import('./pages/Activities.vue'),
+    component: () => import('@/pages/Activities.vue'),
     meta: { title: 'Activity', group: 'Insights' },
   },
   {
     path: '/insights/tasks',
     name: 'Tasks',
-    component: () => import('./pages/tasks/Tasks.vue'),
+    component: () => import('@/pages/tasks/Tasks.vue'),
     meta: { title: 'Tasks', group: 'Insights' },
   },
   {
     path: '/insights/tasks/:taskId',
     name: 'TaskDetail',
-    component: () => import('./pages/tasks/TaskDetail.vue'),
+    component: () => import('@/pages/tasks/TaskDetail.vue'),
     meta: { group: 'Insights' },
   },
   {
     path: '/updates',
     name: 'Updates',
-    component: () => import('./pages/updates/Updates.vue'),
+    component: () => import('@/pages/updates/Updates.vue'),
     meta: { title: 'Updates', group: 'Insights', showUpdateStatus: true },
   },
   {
     path: '/updates/:operationId',
     name: 'UpdateDetail',
-    component: () => import('./pages/updates/UpdateDetail.vue'),
+    component: () => import('@/pages/updates/UpdateDetail.vue'),
     props: true,
     meta: { title: 'Update', group: 'Insights' },
   },
   {
     path: '/database/analyzer',
     name: 'DB analyzer',
-    component: () => import('./pages/database/Analyzer.vue'),
+    component: () => import('@/pages/database/Analyzer.vue'),
     meta: { title: 'DB analyzer', group: 'Dev tools' },
   },
   {
     path: '/database/sql-playground',
     name: 'SQL playground',
-    component: () => import('./pages/database/SQLPlayground.vue'),
+    component: () => import('@/pages/database/SQLPlayground.vue'),
     meta: { title: 'SQL playground', group: 'Dev tools' },
   },
   {
     path: '/editor',
     name: 'Code editor',
-    component: () => import('./pages/editor/Launcher.vue'),
+    component: () => import('@/pages/editor/Launcher.vue'),
     meta: { title: 'Code editor', group: 'Dev tools' },
   },
   {
     path: '/mobile/settings',
     name: 'MobileSettings',
-    component: () => import('./pages/settings/Settings.vue'),
+    component: () => import('@/pages/settings/Settings.vue'),
     meta: { title: 'Settings' },
   },
   {
     path: '/settings/:section?/:subSection?',
     name: 'Settings',
-    component: () => import('./pages/settings/SettingsRoute.vue'),
+    component: () => import('@/pages/settings/SettingsRoute.vue'),
     meta: { title: 'Settings' },
   },
 ]

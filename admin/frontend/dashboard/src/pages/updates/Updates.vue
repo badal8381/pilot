@@ -1,80 +1,16 @@
-<template>
-  <div class="mx-auto max-w-3xl">
-    <!-- The tabs need a phone's full content width, so Refresh only joins them
-         once there is room to spare. -->
-    <Teleport v-if="isMobile" defer to="#header-actions">
-      <Button
-        variant="subtle"
-        size="sm"
-        :loading="loading"
-        icon="lucide-refresh-cw"
-        label="Refresh"
-        tooltip="Refresh"
-        @click="load"
-      />
-    </Teleport>
-
-    <!-- A flex item sizes to the strip's natural width and overflows the screen;
-         a block child is held to the content width and fits. -->
-    <StickyToolbar :class="isMobile ? '' : 'flex items-center gap-2'">
-      <TabButtons
-        :size="isMobile ? 'md' : 'sm'"
-        :options="UPDATE_FILTERS"
-        :modelValue="statusFilter"
-        @update:modelValue="onFilterChange"
-      />
-      <Button
-        v-if="!isMobile"
-        class="ml-auto"
-        variant="subtle"
-        size="sm"
-        :loading="loading"
-        icon="lucide-refresh-cw"
-        label="Refresh"
-        tooltip="Refresh"
-        @click="load"
-      />
-    </StickyToolbar>
-
-    <div v-if="loading && !operations.length" class="-mx-3 mt-4">
-      <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
-    </div>
-    <div v-else-if="error" class="mt-4">
-      <ErrorMessage :message="error" />
-    </div>
-
-    <StatusListView
-      v-else-if="rows.length"
-      class="mt-4"
-      :columns="columns"
-      :rows="rows"
-      :get-row-route="getRowRoute"
-    />
-
-    <EmptyState
-      v-else
-      class="mt-8"
-      icon="lucide-git-pull-request-arrow"
-      :title="isFiltered ? 'No matching updates' : 'No updates yet'"
-      :description="
-        isFiltered
-          ? 'No updates are in this state right now.'
-          : 'App updates across your sites appear here, with backup and recovery.'
-      "
-    />
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, ErrorMessage, TabButtons } from 'frappe-ui'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
 import StatusListView from '@/components/common/StatusListView.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
+
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { updatesApi } from '@/api/updates'
+
 import {
   matchesUpdateFilter,
   opTitle,
@@ -178,3 +114,70 @@ async function load() {
 
 onMounted(load)
 </script>
+
+<template>
+  <div class="mx-auto max-w-3xl">
+    <!-- The tabs need a phone's full content width, so Refresh only joins them
+         once there is room to spare. -->
+    <Teleport v-if="isMobile" defer to="#header-actions">
+      <Button
+        variant="subtle"
+        size="sm"
+        :loading="loading"
+        icon="lucide-refresh-cw"
+        label="Refresh"
+        tooltip="Refresh"
+        @click="load"
+      />
+    </Teleport>
+
+    <!-- A flex item sizes to the strip's natural width and overflows the screen;
+         a block child is held to the content width and fits. -->
+    <StickyToolbar :class="isMobile ? '' : 'flex items-center gap-2'">
+      <TabButtons
+        :size="isMobile ? 'md' : 'sm'"
+        :options="UPDATE_FILTERS"
+        :modelValue="statusFilter"
+        @update:modelValue="onFilterChange"
+      />
+      <Button
+        v-if="!isMobile"
+        class="ml-auto"
+        variant="subtle"
+        size="sm"
+        :loading="loading"
+        icon="lucide-refresh-cw"
+        label="Refresh"
+        tooltip="Refresh"
+        @click="load"
+      />
+    </StickyToolbar>
+
+    <div v-if="loading && !operations.length" class="-mx-3 mt-4">
+      <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
+    </div>
+    <div v-else-if="error" class="mt-4">
+      <ErrorMessage :message="error" />
+    </div>
+
+    <StatusListView
+      v-else-if="rows.length"
+      class="mt-4"
+      :columns="columns"
+      :rows="rows"
+      :get-row-route="getRowRoute"
+    />
+
+    <EmptyState
+      v-else
+      class="mt-8"
+      icon="lucide-git-pull-request-arrow"
+      :title="isFiltered ? 'No matching updates' : 'No updates yet'"
+      :description="
+        isFiltered
+          ? 'No updates are in this state right now.'
+          : 'App updates across your sites appear here, with backup and recovery.'
+      "
+    />
+  </div>
+</template>

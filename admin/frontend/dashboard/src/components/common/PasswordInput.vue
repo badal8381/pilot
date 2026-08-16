@@ -1,3 +1,19 @@
+<script setup lang="ts">
+import { ref } from 'vue'
+import { TextInput } from 'frappe-ui'
+import LucideEye from '~icons/lucide/eye'
+import LucideEyeOff from '~icons/lucide/eye-off'
+
+defineProps({
+  label: { type: String, default: '' },
+  placeholder: { type: String, default: '' },
+  autocomplete: { type: String, default: 'off' },
+})
+
+const password = defineModel({ type: String, default: '' })
+const visible = ref(false)
+</script>
+
 <template>
   <TextInput
     v-model="password"
@@ -20,19 +36,3 @@
     </template>
   </TextInput>
 </template>
-
-<script setup>
-import { ref } from 'vue'
-import { TextInput } from 'frappe-ui'
-import LucideEye from '~icons/lucide/eye'
-import LucideEyeOff from '~icons/lucide/eye-off'
-
-defineProps({
-  label: { type: String, default: '' },
-  placeholder: { type: String, default: '' },
-  autocomplete: { type: String, default: 'off' },
-})
-
-const password = defineModel({ type: String, default: '' })
-const visible = ref(false)
-</script>

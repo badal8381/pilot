@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
-import { authApi } from '../../api/auth'
+
+import { authApi } from '@/api/auth'
 
 const session = reactive({
   loaded: false,

@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+
 import { activitiesApi } from '@/api/activities'
 
 const activities = ref([])

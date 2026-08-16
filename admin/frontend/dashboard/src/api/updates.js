@@ -1,5 +1,5 @@
-import { ACTIVE_STATES, ATTENTION_STATES } from '../utils/updateFormat.js'
-import { request } from './client'
+import { ACTIVE_STATES, ATTENTION_STATES } from '@/utils/updateFormat.js'
+import { request } from '@/api/client'
 
 export const updatesApi = {
   list: (params = {}) => request.get('migrations', { searchParams: params }).json(),

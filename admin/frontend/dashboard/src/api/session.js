@@ -1,4 +1,4 @@
-import { request, unwrap } from './client'
+import { request, unwrap } from '@/api/client'
 
 export const sessionApi = {
   list: () => unwrap(request.get('auth/sessions').json()),

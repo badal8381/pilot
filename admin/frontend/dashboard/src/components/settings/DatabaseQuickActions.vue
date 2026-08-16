@@ -1,173 +1,11 @@
-<template>
-  <Teleport defer to="#settings-header-actions">
-    <Tooltip text="Refresh database capabilities">
-      <Button
-        variant="ghost"
-        icon="lucide-refresh-cw"
-        :loading="loading"
-        aria-label="Refresh database capabilities"
-        @click="load"
-      />
-    </Tooltip>
-  </Teleport>
-
-  <div v-if="loading && !capabilities" class="flex justify-center items-center h-40">
-    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
-  </div>
-  <div v-else>
-    <ErrorMessage v-if="error" :message="error" class="mb-4" />
-
-    <div
-      v-if="showManagedMariaDBDisclaimer"
-      class="my-4 border rounded border-outline-gray-2 bg-surface-gray-1 p-2 text-ink-gray-7 text-sm flex"
-    >
-      <span
-        class="size-4 text-ink-gray-5 lucide-circle-alert inline-block mr-2"
-        aria-hidden="true"
-      />
-      Database actions are available only for Pilot-managed MariaDB instances.
-    </div>
-
-    <div v-if="capabilities" class="divide-y divide-outline-alpha-gray-1">
-      <SettingsRow
-        class="!ps-0"
-        label="Performance Schema"
-        description="Collect database instrumentation for deeper performance diagnostics."
-      >
-        <Switch
-          :model-value="Boolean(action('performance_schema').enabled)"
-          :disabled="!action('performance_schema').available || Boolean(activeAction)"
-          aria-label="Performance Schema"
-          @update:model-value="confirmPerformanceSchema"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        class="!ps-0"
-        label="Update InnoDB Buffer Pool Size"
-        :description="bufferPoolDescription"
-      >
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="lucide-pencil"
-          :disabled="!action('innodb_buffer_pool_size').available || Boolean(activeAction)"
-          @click="openSizingAction('innodb_buffer_pool_size')"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        class="!ps-0"
-        label="Update Max DB Connections"
-        :description="maxConnectionsDescription"
-      >
-        <Button
-          size="sm"
-          variant="ghost"
-          icon="lucide-pencil"
-          :disabled="!action('max_connections').available || Boolean(activeAction)"
-          @click="openSizingAction('max_connections')"
-        />
-      </SettingsRow>
-
-      <SettingsRow
-        class="!ps-0"
-        label="Manage Binlogs"
-        description="Inspect binary logs and safely purge complete log ranges."
-      >
-        <Button
-          size="sm"
-          variant="subtle"
-          :disabled="!action('manage_binlogs').available"
-          @click="openBinlogs"
-        >
-          View
-        </Button>
-      </SettingsRow>
-
-      <SettingsRow
-        class="!ps-0"
-        label="Restart MariaDB"
-        description="Restart the database service and verify that it accepts connections."
-      >
-        <Button
-          size="sm"
-          variant="subtle"
-          :disabled="!action('restart').available || Boolean(activeAction)"
-          :loading="activeAction === 'restart'"
-          @click="confirmRestart"
-        >
-          Restart
-        </Button>
-      </SettingsRow>
-    </div>
-  </div>
-
-  <Dialog v-model="confirmationOpen" :title="confirmationTitle" size="sm">
-    <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
-      {{ confirmation.message }}
-    </p>
-    <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" :disabled="Boolean(activeAction)" @click="confirmationOpen = false">
-        Cancel
-      </Button>
-      <Button variant="solid" :loading="Boolean(activeAction)" @click="runConfirmedAction">
-        {{ confirmation?.buttonLabel }}
-      </Button>
-    </div>
-  </Dialog>
-
-  <Dialog v-model="sizingOpen" :title="sizingTitle" size="sm">
-    <div v-if="sizingAction" class="space-y-4">
-      <FormControl
-        v-model.number="sizingValue"
-        type="number"
-        :label="sizingAction.inputLabel"
-        :min="sizingAction.min"
-        :max="sizingAction.max"
-        step="1"
-        autocomplete="off"
-      />
-      <div class="text-ink-gray-6 text-sm">
-        <p>
-          Recommended:
-          {{ formatSizingValue(sizingAction.recommended, sizingAction.unit) }}
-        </p>
-        <p>
-          Allowed: {{ formatSizingValue(sizingAction.min, sizingAction.unit) }} to
-          {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}
-        </p>
-      </div>
-      <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-sm">
-        MariaDB will restart because this value is above its current live Buffer Pool ceiling of
-        {{ formatSizingValue(sizingAction.dynamicMax, 'MB') }}.
-      </p>
-      <ErrorMessage v-if="sizingValidationError" :message="sizingValidationError" />
-      <ErrorMessage v-if="actionError" :message="actionError" />
-      <div class="flex justify-end gap-2">
-        <Button variant="ghost" :disabled="Boolean(activeAction)" @click="sizingOpen = false">
-          Cancel
-        </Button>
-        <Button
-          variant="solid"
-          :loading="Boolean(activeAction)"
-          :disabled="Boolean(sizingValidationError) || sizingUnchanged"
-          @click="runSizingAction"
-        >
-          {{ sizingRequiresRestart ? 'Update and restart' : 'Update' }}
-        </Button>
-      </div>
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { Button, Dialog, ErrorMessage, FormControl, Switch, Tooltip } from 'frappe-ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { databaseApi } from '@/api/database'
+
 import SettingsRow from '@/components/settings/SettingsRow.vue'
+
+import { databaseApi } from '@/api/database'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
 const router = useRouter()
@@ -379,3 +217,167 @@ async function load() {
 
 onMounted(load)
 </script>
+
+<template>
+  <Teleport defer to="#settings-header-actions">
+    <Tooltip text="Refresh database capabilities">
+      <Button
+        variant="ghost"
+        icon="lucide-refresh-cw"
+        :loading="loading"
+        aria-label="Refresh database capabilities"
+        @click="load"
+      />
+    </Tooltip>
+  </Teleport>
+
+  <div v-if="loading && !capabilities" class="flex justify-center items-center h-40">
+    <span class="size-5 text-ink-gray-4 animate-spin lucide-loader-circle"></span>
+  </div>
+  <div v-else>
+    <ErrorMessage v-if="error" :message="error" class="mb-4" />
+
+    <div
+      v-if="showManagedMariaDBDisclaimer"
+      class="my-4 border rounded border-outline-gray-2 bg-surface-gray-1 p-2 text-ink-gray-7 text-sm flex"
+    >
+      <span
+        class="size-4 text-ink-gray-5 lucide-circle-alert inline-block mr-2"
+        aria-hidden="true"
+      />
+      Database actions are available only for Pilot-managed MariaDB instances.
+    </div>
+
+    <div v-if="capabilities" class="divide-y divide-outline-alpha-gray-1">
+      <SettingsRow
+        class="!ps-0"
+        label="Performance Schema"
+        description="Collect database instrumentation for deeper performance diagnostics."
+      >
+        <Switch
+          :model-value="Boolean(action('performance_schema').enabled)"
+          :disabled="!action('performance_schema').available || Boolean(activeAction)"
+          aria-label="Performance Schema"
+          @update:model-value="confirmPerformanceSchema"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        class="!ps-0"
+        label="Update InnoDB Buffer Pool Size"
+        :description="bufferPoolDescription"
+      >
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="lucide-pencil"
+          :disabled="!action('innodb_buffer_pool_size').available || Boolean(activeAction)"
+          @click="openSizingAction('innodb_buffer_pool_size')"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        class="!ps-0"
+        label="Update Max DB Connections"
+        :description="maxConnectionsDescription"
+      >
+        <Button
+          size="sm"
+          variant="ghost"
+          icon="lucide-pencil"
+          :disabled="!action('max_connections').available || Boolean(activeAction)"
+          @click="openSizingAction('max_connections')"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        class="!ps-0"
+        label="Manage Binlogs"
+        description="Inspect binary logs and safely purge complete log ranges."
+      >
+        <Button
+          size="sm"
+          variant="subtle"
+          :disabled="!action('manage_binlogs').available"
+          @click="openBinlogs"
+        >
+          View
+        </Button>
+      </SettingsRow>
+
+      <SettingsRow
+        class="!ps-0"
+        label="Restart MariaDB"
+        description="Restart the database service and verify that it accepts connections."
+      >
+        <Button
+          size="sm"
+          variant="subtle"
+          :disabled="!action('restart').available || Boolean(activeAction)"
+          :loading="activeAction === 'restart'"
+          @click="confirmRestart"
+        >
+          Restart
+        </Button>
+      </SettingsRow>
+    </div>
+  </div>
+
+  <Dialog v-model="confirmationOpen" :title="confirmationTitle" size="sm">
+    <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
+      {{ confirmation.message }}
+    </p>
+    <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" :disabled="Boolean(activeAction)" @click="confirmationOpen = false">
+        Cancel
+      </Button>
+      <Button variant="solid" :loading="Boolean(activeAction)" @click="runConfirmedAction">
+        {{ confirmation?.buttonLabel }}
+      </Button>
+    </div>
+  </Dialog>
+
+  <Dialog v-model="sizingOpen" :title="sizingTitle" size="sm">
+    <div v-if="sizingAction" class="space-y-4">
+      <FormControl
+        v-model.number="sizingValue"
+        type="number"
+        :label="sizingAction.inputLabel"
+        :min="sizingAction.min"
+        :max="sizingAction.max"
+        step="1"
+        autocomplete="off"
+      />
+      <div class="text-ink-gray-6 text-sm">
+        <p>
+          Recommended:
+          {{ formatSizingValue(sizingAction.recommended, sizingAction.unit) }}
+        </p>
+        <p>
+          Allowed: {{ formatSizingValue(sizingAction.min, sizingAction.unit) }} to
+          {{ formatSizingValue(sizingAction.max, sizingAction.unit) }}
+        </p>
+      </div>
+      <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-sm">
+        MariaDB will restart because this value is above its current live Buffer Pool ceiling of
+        {{ formatSizingValue(sizingAction.dynamicMax, 'MB') }}.
+      </p>
+      <ErrorMessage v-if="sizingValidationError" :message="sizingValidationError" />
+      <ErrorMessage v-if="actionError" :message="actionError" />
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" :disabled="Boolean(activeAction)" @click="sizingOpen = false">
+          Cancel
+        </Button>
+        <Button
+          variant="solid"
+          :loading="Boolean(activeAction)"
+          :disabled="Boolean(sizingValidationError) || sizingUnchanged"
+          @click="runSizingAction"
+        >
+          {{ sizingRequiresRestart ? 'Update and restart' : 'Update' }}
+        </Button>
+      </div>
+    </div>
+  </Dialog>
+</template>

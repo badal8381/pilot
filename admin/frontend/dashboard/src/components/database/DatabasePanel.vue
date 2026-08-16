@@ -1,3 +1,21 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import { Badge, Button, Switch } from 'frappe-ui'
+
+const props = defineProps({
+  title: { type: String, required: true },
+  subtitle: { type: String, default: '' },
+  badge: { type: [String, Array], default: '' },
+  loading: { type: Boolean, default: false },
+  showAutoRefresh: { type: Boolean, default: false },
+  autoRefresh: { type: Boolean, default: false },
+})
+
+defineEmits(['refresh', 'update:autoRefresh'])
+
+const badges = computed(() => [props.badge].flat().filter(Boolean))
+</script>
+
 <template>
   <div class="bg-surface-white border rounded-6 border-outline-gray-2">
     <div class="flex justify-between items-start gap-3 p-4">
@@ -34,21 +52,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed } from 'vue'
-import { Badge, Button, Switch } from 'frappe-ui'
-
-const props = defineProps({
-  title: { type: String, required: true },
-  subtitle: { type: String, default: '' },
-  badge: { type: [String, Array], default: '' },
-  loading: { type: Boolean, default: false },
-  showAutoRefresh: { type: Boolean, default: false },
-  autoRefresh: { type: Boolean, default: false },
-})
-
-defineEmits(['refresh', 'update:autoRefresh'])
-
-const badges = computed(() => [props.badge].flat().filter(Boolean))
-</script>

@@ -1,4 +1,4 @@
-import { request, unwrap } from './client'
+import { request, unwrap } from '@/api/client'
 
 // The device name is the key, so it has to be encoded for the URL path.
 const path = (name) => `auth/two-factor/${encodeURIComponent(name)}`

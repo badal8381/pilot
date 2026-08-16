@@ -1,3 +1,27 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { Badge, Button, Dialog, Tooltip } from 'frappe-ui'
+import LucideDownload from '~icons/lucide/download'
+
+import AppIcon from '@/components/apps/AppIcon.vue'
+
+const props = defineProps({
+  app: { type: Object, required: true },
+})
+defineEmits(['install'])
+
+const showIncompatible = ref(false)
+
+const requirementLabel = computed(() =>
+  props.app.needs ? `Needs Frappe ${props.app.needs}` : 'Needs a newer Frappe version',
+)
+
+const incompatibleReason = computed(
+  () =>
+    `${props.app.title} requires ${props.app.needs ? `Frappe ${props.app.needs}` : 'a newer Frappe version'} to install.`,
+)
+</script>
+
 <template>
   <div class="flex items-center gap-3">
     <AppIcon :name="app.name" :label="app.title" :logo="app.logo_url || ''" size="xl" />
@@ -57,26 +81,3 @@
     </Dialog>
   </div>
 </template>
-
-<script setup>
-import { computed, ref } from 'vue'
-import { Badge, Button, Dialog, Tooltip } from 'frappe-ui'
-import LucideDownload from '~icons/lucide/download'
-import AppIcon from '@/components/apps/AppIcon.vue'
-
-const props = defineProps({
-  app: { type: Object, required: true },
-})
-defineEmits(['install'])
-
-const showIncompatible = ref(false)
-
-const requirementLabel = computed(() =>
-  props.app.needs ? `Needs Frappe ${props.app.needs}` : 'Needs a newer Frappe version',
-)
-
-const incompatibleReason = computed(
-  () =>
-    `${props.app.title} requires ${props.app.needs ? `Frappe ${props.app.needs}` : 'a newer Frappe version'} to install.`,
-)
-</script>

@@ -1,37 +1,4 @@
-<template>
-  <div ref="root" class="inline-flex relative">
-    <Button variant="ghost" size="sm" :active="open" @click="toggle">
-      <template #icon>
-        <span class="size-4 lucide-ellipsis-vertical" />
-      </template>
-    </Button>
-    <Teleport to="body">
-      <div
-        v-if="open"
-        ref="panel"
-        data-dismissable-layer
-        class="z-[60] fixed bg-surface-elevation-1 shadow-2xl p-1 border rounded-6 border-outline-gray-2 w-40 pointer-events-auto"
-        :style="panelStyle"
-      >
-        <Button
-          v-for="option in options"
-          :key="option.label"
-          variant="ghost"
-          :theme="option.theme"
-          class="!justify-start w-full"
-          @click="select(option)"
-        >
-          <template #prefix>
-            <component :is="option.icon" class="size-4 shrink-0" />
-          </template>
-          {{ option.label }}
-        </Button>
-      </div>
-    </Teleport>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { ref, onBeforeUnmount } from 'vue'
 import { Button } from 'frappe-ui'
 
@@ -76,3 +43,36 @@ function select(option) {
 
 onBeforeUnmount(close)
 </script>
+
+<template>
+  <div ref="root" class="inline-flex relative">
+    <Button variant="ghost" size="sm" :active="open" @click="toggle">
+      <template #icon>
+        <span class="size-4 lucide-ellipsis-vertical" />
+      </template>
+    </Button>
+    <Teleport to="body">
+      <div
+        v-if="open"
+        ref="panel"
+        data-dismissable-layer
+        class="z-[60] fixed bg-surface-elevation-1 shadow-2xl p-1 border rounded-6 border-outline-gray-2 w-40 pointer-events-auto"
+        :style="panelStyle"
+      >
+        <Button
+          v-for="option in options"
+          :key="option.label"
+          variant="ghost"
+          :theme="option.theme"
+          class="!justify-start w-full"
+          @click="select(option)"
+        >
+          <template #prefix>
+            <component :is="option.icon" class="size-4 shrink-0" />
+          </template>
+          {{ option.label }}
+        </Button>
+      </div>
+    </Teleport>
+  </div>
+</template>

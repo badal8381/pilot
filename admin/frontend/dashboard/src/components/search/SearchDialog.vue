@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
+
 import Scrollbar from '@/components/common/Scrollbar.vue'
-import { useSearchIndex } from './index'
-import type { SearchItem } from './index'
-import { filterIndex, highlightMatch } from './utils'
+
+import { useSearchIndex } from '@/components/search/index'
+import type { SearchItem } from '@/components/search/index'
+import { filterIndex, highlightMatch } from '@/components/search/utils'
 
 const open = defineModel('open', { default: false })
 

@@ -1,50 +1,11 @@
-<template>
-  <div class="mt-5">
-    <div v-if="appsLoading" class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
-      <MarketplaceAppCardSkeleton v-for="i in 4" :key="i" :index="i - 1" />
-    </div>
-    <div v-else-if="!installedApps.length" class="py-12 text-ink-gray-5 text-sm text-center">
-      No apps installed on this site.
-    </div>
-    <div v-else class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
-      <MarketplaceAppCard v-for="app in appObjects" :key="app.name" :app="app">
-        <template #actions>
-          <Dropdown
-            v-if="menuOptions(app).length"
-            :options="menuOptions(app)"
-          >
-            <template #default="{ open }">
-              <Button
-                variant="ghost"
-                size="sm"
-                :active="open"
-                icon="lucide-ellipsis"
-                label="App actions"
-                tooltip="Actions"
-              />
-            </template>
-          </Dropdown>
-          <span v-else class="size-7 shrink-0" />
-        </template>
-      </MarketplaceAppCard>
-    </div>
-  </div>
-
-  <UninstallAppDialog
-    v-model:open="showUninstall"
-    :app="uninstallTarget"
-    :site-name="siteName"
-    :can-disable="canDisable(uninstallTarget)"
-    @disabled="refresh"
-  />
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Button, Dropdown } from 'frappe-ui'
+
 import MarketplaceAppCard from '@/components/marketplace/MarketplaceAppCard.vue'
 import MarketplaceAppCardSkeleton from '@/components/marketplace/MarketplaceAppCardSkeleton.vue'
 import UninstallAppDialog from '@/components/apps/UninstallAppDialog.vue'
+
 import { useSite } from '@/composables/sites/useSite'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useSession } from '@/composables/auth/useSession'
@@ -136,3 +97,44 @@ onMounted(() => {
   loadRegistry()
 })
 </script>
+
+<template>
+  <div class="mt-5">
+    <div v-if="appsLoading" class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
+      <MarketplaceAppCardSkeleton v-for="i in 4" :key="i" :index="i - 1" />
+    </div>
+    <div v-else-if="!installedApps.length" class="py-12 text-ink-gray-5 text-sm text-center">
+      No apps installed on this site.
+    </div>
+    <div v-else class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2">
+      <MarketplaceAppCard v-for="app in appObjects" :key="app.name" :app="app">
+        <template #actions>
+          <Dropdown
+            v-if="menuOptions(app).length"
+            :options="menuOptions(app)"
+          >
+            <template #default="{ open }">
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="App actions"
+                tooltip="Actions"
+              />
+            </template>
+          </Dropdown>
+          <span v-else class="size-7 shrink-0" />
+        </template>
+      </MarketplaceAppCard>
+    </div>
+  </div>
+
+  <UninstallAppDialog
+    v-model:open="showUninstall"
+    :app="uninstallTarget"
+    :site-name="siteName"
+    :can-disable="canDisable(uninstallTarget)"
+    @disabled="refresh"
+  />
+</template>

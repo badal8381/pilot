@@ -1,3 +1,34 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import { Spinner } from 'frappe-ui'
+
+import { monitorApi } from '@/api/monitor'
+import { formatBytes } from '@/utils/format'
+
+const loading = ref(true)
+const info = ref({ disk_total: 0, runtime: {} })
+
+const systemRows = computed(() => {
+  const rows = {
+    OS: info.value.os_version || '',
+    Kernel: info.value.kernel_version || '',
+    vCPUs: info.value.cpu_count || '',
+    RAM: info.value.memory_total ? formatBytes(info.value.memory_total) : '',
+    Swap: info.value.swap_total ? formatBytes(info.value.swap_total) : '',
+    'Disk size': info.value.disk_total ? formatBytes(info.value.disk_total) : '',
+  }
+  return Object.fromEntries(Object.entries(rows).filter(([, value]) => value))
+})
+
+onMounted(async () => {
+  try {
+    info.value = await monitorApi.systemInfo()
+  } finally {
+    loading.value = false
+  }
+})
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
@@ -35,33 +66,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { ref, computed, onMounted } from 'vue'
-import { Spinner } from 'frappe-ui'
-import { monitorApi } from '@/api/monitor'
-import { formatBytes } from '@/utils/format'
-
-const loading = ref(true)
-const info = ref({ disk_total: 0, runtime: {} })
-
-const systemRows = computed(() => {
-  const rows = {
-    OS: info.value.os_version || '',
-    Kernel: info.value.kernel_version || '',
-    vCPUs: info.value.cpu_count || '',
-    RAM: info.value.memory_total ? formatBytes(info.value.memory_total) : '',
-    Swap: info.value.swap_total ? formatBytes(info.value.swap_total) : '',
-    'Disk size': info.value.disk_total ? formatBytes(info.value.disk_total) : '',
-  }
-  return Object.fromEntries(Object.entries(rows).filter(([, value]) => value))
-})
-
-onMounted(async () => {
-  try {
-    info.value = await monitorApi.systemInfo()
-  } finally {
-    loading.value = false
-  }
-})
-</script>

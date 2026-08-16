@@ -1,3 +1,28 @@
+<script setup lang="ts">
+import { Avatar, Button, Dialog, ErrorMessage } from 'frappe-ui'
+
+import AppIcon from '@/components/apps/AppIcon.vue'
+
+defineProps({
+  title: { type: String, required: true },
+  size: { type: String, default: 'md' },
+  // { label, description, badge, icon } - `icon` picks a lucide tile, otherwise
+  // the app logo is used via { name, logo }.
+  subject: { type: Object, default: null },
+  // { title, message } rendered as the destructive-action callout.
+  warning: { type: Object, default: null },
+  error: { type: String, default: '' },
+  confirmLabel: { type: String, required: true },
+  confirmTheme: { type: String, default: 'gray' },
+  cancelLabel: { type: String, default: 'Cancel' },
+  loading: { type: Boolean, default: false },
+  disabled: { type: Boolean, default: false },
+})
+
+const open = defineModel('open')
+const emit = defineEmits(['confirm'])
+</script>
+
 <template>
   <Dialog v-model="open" :title="title" :size="size">
     <div class="space-y-4">
@@ -59,27 +84,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { Avatar, Button, Dialog, ErrorMessage } from 'frappe-ui'
-import AppIcon from '@/components/apps/AppIcon.vue'
-
-defineProps({
-  title: { type: String, required: true },
-  size: { type: String, default: 'md' },
-  // { label, description, badge, icon } - `icon` picks a lucide tile, otherwise
-  // the app logo is used via { name, logo }.
-  subject: { type: Object, default: null },
-  // { title, message } rendered as the destructive-action callout.
-  warning: { type: Object, default: null },
-  error: { type: String, default: '' },
-  confirmLabel: { type: String, required: true },
-  confirmTheme: { type: String, default: 'gray' },
-  cancelLabel: { type: String, default: 'Cancel' },
-  loading: { type: Boolean, default: false },
-  disabled: { type: Boolean, default: false },
-})
-
-const open = defineModel('open')
-const emit = defineEmits(['confirm'])
-</script>

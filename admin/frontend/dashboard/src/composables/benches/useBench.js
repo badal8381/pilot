@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+
 import { settingsApi } from '@/api/settings'
 
 let cached = null

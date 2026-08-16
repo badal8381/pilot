@@ -1,26 +1,9 @@
-<template>
-  <div
-    v-if="hasSteps"
-    class="flex flex-col gap-1 p-1 border border-outline-gray-2 rounded-6 min-w-0"
-  >
-    <TaskStep
-      v-for="section in stepSections"
-      :key="section.key"
-      :label="section.label"
-      :status="section.status"
-      :duration="stepDuration(section)"
-      :lines="sectionLines(section)"
-      :has-output="sectionHasOutput(section)"
-      :streaming="streaming && section.status === 'running'"
-    />
-  </div>
-  <LogView v-else :lines="processedLines" :streaming="streaming" :empty-text="emptyText" />
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, toRef } from 'vue'
-import LogView from '../logs/LogView.vue'
-import TaskStep from './TaskStep.vue'
+
+import LogView from '@/components/logs/LogView.vue'
+import TaskStep from '@/components/tasks/TaskStep.vue'
+
 import { STEP_MARKER_RE, useTaskSteps } from '@/composables/tasks/useTaskSteps'
 import { processLine } from '@/utils/ansi'
 
@@ -51,3 +34,22 @@ function sectionHasOutput(section) {
     .some((line) => line.trim() && !STEP_MARKER_RE.test(line))
 }
 </script>
+
+<template>
+  <div
+    v-if="hasSteps"
+    class="flex flex-col gap-1 p-1 border border-outline-gray-2 rounded-6 min-w-0"
+  >
+    <TaskStep
+      v-for="section in stepSections"
+      :key="section.key"
+      :label="section.label"
+      :status="section.status"
+      :duration="stepDuration(section)"
+      :lines="sectionLines(section)"
+      :has-output="sectionHasOutput(section)"
+      :streaming="streaming && section.status === 'running'"
+    />
+  </div>
+  <LogView v-else :lines="processedLines" :streaming="streaming" :empty-text="emptyText" />
+</template>

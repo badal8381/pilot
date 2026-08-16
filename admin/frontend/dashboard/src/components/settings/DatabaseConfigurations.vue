@@ -1,3 +1,151 @@
+<script setup lang="ts">
+import { Button, Dialog, ErrorMessage, FormControl, Spinner, Switch, Tooltip } from 'frappe-ui'
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+
+import { databaseApi } from '@/api/database'
+import { openTaskDetailPage } from '@/utils/taskRoute'
+
+const router = useRouter()
+
+const loading = ref(false)
+const snapshot = ref(null)
+const error = ref('')
+const search = ref('')
+const editing = ref(null)
+const draftValue = ref(null)
+const saving = ref(false)
+const saveError = ref('')
+
+const groups = computed(() => {
+  const query = search.value.trim().toLowerCase()
+  const grouped = new Map()
+  for (const variable of snapshot.value?.variables || []) {
+    const searchable = `${variable.name} ${variable.section}`.toLowerCase()
+    if (query && !searchable.includes(query)) continue
+    if (!grouped.has(variable.section)) grouped.set(variable.section, [])
+    grouped.get(variable.section).push(variable)
+  }
+  return Array.from(grouped, ([name, variables]) => ({ name, variables }))
+})
+
+const editorOpen = computed({
+  get: () => Boolean(editing.value),
+  set: (value) => {
+    if (!value && !saving.value) editing.value = null
+  },
+})
+const editor = computed(() => editing.value?.edit || null)
+const inputLabel = computed(() => {
+  if (!editor.value) return 'Value'
+  return editor.value.unit ? `Value (${editor.value.unit})` : 'Value'
+})
+const validationError = computed(() => {
+  if (!editor.value) return ''
+  if (editor.value.value_type === 'boolean') {
+    return typeof draftValue.value === 'boolean' ? '' : 'Choose enabled or disabled.'
+  }
+  if (!Number.isInteger(draftValue.value)) return 'Enter a whole number.'
+  if (Number.isInteger(editor.value.min) && draftValue.value < editor.value.min) {
+    return `Enter a value between ${editor.value.min} and ${editor.value.max}.`
+  }
+  if (Number.isInteger(editor.value.max) && draftValue.value > editor.value.max) {
+    return `Enter a value between ${editor.value.min} and ${editor.value.max}.`
+  }
+  return ''
+})
+const unchanged = computed(() => editor.value !== null && draftValue.value === editor.value.value)
+const restartWarning = computed(() => {
+  if (!editor.value) return ''
+  if (editor.value.action === 'performance_schema') {
+    return 'MariaDB will restart to apply this change.'
+  }
+  if (
+    editor.value.action === 'innodb_buffer_pool_size' &&
+    Number.isInteger(editor.value.dynamic_max) &&
+    draftValue.value > editor.value.dynamic_max
+  ) {
+    return `MariaDB will restart because this value is above its current live Buffer Pool ceiling of ${formatConstraint(editor.value.dynamic_max, editor.value.unit)}.`
+  }
+  return editor.value.requires_restart ? 'MariaDB will restart to apply this change.' : ''
+})
+
+function formatValue(variable) {
+  if (!variable.supported || variable.value === null) return 'Unavailable'
+  if (variable.value_type === 'boolean') return variable.value ? 'Enabled' : 'Disabled'
+  if (variable.unit === 'bytes' && Number.isFinite(variable.value)) {
+    return formatBytes(variable.value)
+  }
+  return formatConstraint(variable.value, variable.unit)
+}
+
+function formatBytes(value) {
+  const units = ['bytes', 'KB', 'MB', 'GB', 'TB']
+  let amount = value
+  let index = 0
+  while (Math.abs(amount) >= 1024 && index < units.length - 1) {
+    amount /= 1024
+    index += 1
+  }
+  const rounded = Number.isInteger(amount) ? amount : amount.toFixed(1)
+  return `${rounded} ${units[index]}`
+}
+
+function formatConstraint(value, unit) {
+  if (!unit) return String(value)
+  if (unit === 'percent') return `${value}%`
+  return `${value} ${unit}`
+}
+
+function openEditor(variable) {
+  if (!variable.editable || !variable.edit) return
+  saveError.value = ''
+  draftValue.value = variable.edit.value
+  editing.value = variable
+}
+
+function idempotencyKey(variable) {
+  const random = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
+  return `database-config-${variable}-${Date.now()}-${random}`
+}
+
+async function save() {
+  if (!editing.value || validationError.value || unchanged.value || saving.value) return
+  const variable = editing.value.name
+  saving.value = true
+  saveError.value = ''
+  try {
+    const task = await databaseApi.configurations.set(
+      variable,
+      draftValue.value,
+      idempotencyKey(variable),
+    )
+    editing.value = null
+    openTaskDetailPage(router, task.task_id)
+  } catch (e) {
+    saveError.value = e.message || 'Could not update the database configuration.'
+  } finally {
+    saving.value = false
+  }
+}
+
+async function load() {
+  if (loading.value) return
+  loading.value = true
+  error.value = ''
+  try {
+    snapshot.value = await databaseApi.configurations.list()
+  } catch (e) {
+    snapshot.value = null
+    error.value = e.message || 'Could not load database configurations.'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
+</script>
+
 <template>
   <Teleport defer to="#settings-header-actions">
     <Tooltip text="Refresh database configurations">
@@ -145,150 +293,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { Button, Dialog, ErrorMessage, FormControl, Spinner, Switch, Tooltip } from 'frappe-ui'
-import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { databaseApi } from '@/api/database'
-import { openTaskDetailPage } from '@/utils/taskRoute'
-
-const router = useRouter()
-
-const loading = ref(false)
-const snapshot = ref(null)
-const error = ref('')
-const search = ref('')
-const editing = ref(null)
-const draftValue = ref(null)
-const saving = ref(false)
-const saveError = ref('')
-
-const groups = computed(() => {
-  const query = search.value.trim().toLowerCase()
-  const grouped = new Map()
-  for (const variable of snapshot.value?.variables || []) {
-    const searchable = `${variable.name} ${variable.section}`.toLowerCase()
-    if (query && !searchable.includes(query)) continue
-    if (!grouped.has(variable.section)) grouped.set(variable.section, [])
-    grouped.get(variable.section).push(variable)
-  }
-  return Array.from(grouped, ([name, variables]) => ({ name, variables }))
-})
-
-const editorOpen = computed({
-  get: () => Boolean(editing.value),
-  set: (value) => {
-    if (!value && !saving.value) editing.value = null
-  },
-})
-const editor = computed(() => editing.value?.edit || null)
-const inputLabel = computed(() => {
-  if (!editor.value) return 'Value'
-  return editor.value.unit ? `Value (${editor.value.unit})` : 'Value'
-})
-const validationError = computed(() => {
-  if (!editor.value) return ''
-  if (editor.value.value_type === 'boolean') {
-    return typeof draftValue.value === 'boolean' ? '' : 'Choose enabled or disabled.'
-  }
-  if (!Number.isInteger(draftValue.value)) return 'Enter a whole number.'
-  if (Number.isInteger(editor.value.min) && draftValue.value < editor.value.min) {
-    return `Enter a value between ${editor.value.min} and ${editor.value.max}.`
-  }
-  if (Number.isInteger(editor.value.max) && draftValue.value > editor.value.max) {
-    return `Enter a value between ${editor.value.min} and ${editor.value.max}.`
-  }
-  return ''
-})
-const unchanged = computed(() => editor.value !== null && draftValue.value === editor.value.value)
-const restartWarning = computed(() => {
-  if (!editor.value) return ''
-  if (editor.value.action === 'performance_schema') {
-    return 'MariaDB will restart to apply this change.'
-  }
-  if (
-    editor.value.action === 'innodb_buffer_pool_size' &&
-    Number.isInteger(editor.value.dynamic_max) &&
-    draftValue.value > editor.value.dynamic_max
-  ) {
-    return `MariaDB will restart because this value is above its current live Buffer Pool ceiling of ${formatConstraint(editor.value.dynamic_max, editor.value.unit)}.`
-  }
-  return editor.value.requires_restart ? 'MariaDB will restart to apply this change.' : ''
-})
-
-function formatValue(variable) {
-  if (!variable.supported || variable.value === null) return 'Unavailable'
-  if (variable.value_type === 'boolean') return variable.value ? 'Enabled' : 'Disabled'
-  if (variable.unit === 'bytes' && Number.isFinite(variable.value)) {
-    return formatBytes(variable.value)
-  }
-  return formatConstraint(variable.value, variable.unit)
-}
-
-function formatBytes(value) {
-  const units = ['bytes', 'KB', 'MB', 'GB', 'TB']
-  let amount = value
-  let index = 0
-  while (Math.abs(amount) >= 1024 && index < units.length - 1) {
-    amount /= 1024
-    index += 1
-  }
-  const rounded = Number.isInteger(amount) ? amount : amount.toFixed(1)
-  return `${rounded} ${units[index]}`
-}
-
-function formatConstraint(value, unit) {
-  if (!unit) return String(value)
-  if (unit === 'percent') return `${value}%`
-  return `${value} ${unit}`
-}
-
-function openEditor(variable) {
-  if (!variable.editable || !variable.edit) return
-  saveError.value = ''
-  draftValue.value = variable.edit.value
-  editing.value = variable
-}
-
-function idempotencyKey(variable) {
-  const random = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
-  return `database-config-${variable}-${Date.now()}-${random}`
-}
-
-async function save() {
-  if (!editing.value || validationError.value || unchanged.value || saving.value) return
-  const variable = editing.value.name
-  saving.value = true
-  saveError.value = ''
-  try {
-    const task = await databaseApi.configurations.set(
-      variable,
-      draftValue.value,
-      idempotencyKey(variable),
-    )
-    editing.value = null
-    openTaskDetailPage(router, task.task_id)
-  } catch (e) {
-    saveError.value = e.message || 'Could not update the database configuration.'
-  } finally {
-    saving.value = false
-  }
-}
-
-async function load() {
-  if (loading.value) return
-  loading.value = true
-  error.value = ''
-  try {
-    snapshot.value = await databaseApi.configurations.list()
-  } catch (e) {
-    snapshot.value = null
-    error.value = e.message || 'Could not load database configurations.'
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
-</script>

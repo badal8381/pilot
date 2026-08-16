@@ -1,3 +1,173 @@
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+import {
+  Badge,
+  Button,
+  Dropdown,
+  ErrorMessage,
+  FormControl,
+  TabButtons,
+  toast,
+} from 'frappe-ui'
+import { ListView } from 'frappe-ui/experimental'
+import EmptyState from '@/components/common/EmptyState.vue'
+import NewSiteDialog from '@/components/sites/NewSiteDialog.vue'
+import SiteSkeleton from '@/components/sites/SiteSkeleton.vue'
+import StickyToolbar from '@/components/common/StickyToolbar.vue'
+import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
+import { useIsMobile } from '@/composables/common/useIsMobile'
+import { useSites } from '@/composables/sites/useSites'
+import { apiErrorMessage } from '@/api/client'
+import { sitesApi } from '@/api/sites'
+import { useSiteStorage } from '@/composables/sites/useSiteStorage'
+import { openTaskDetailPage } from '@/utils/taskRoute'
+import { openSiteLogin } from '@/utils/siteLogin'
+
+const route = useRoute()
+const router = useRouter()
+const isMobile = useIsMobile()
+const { setBreadcrumbs } = useBreadcrumbs()
+const { sites, loading, error, load } = useSites()
+const { load: loadStorage, storageLabel } = useSiteStorage()
+
+const search = ref('')
+const statusFilter = ref('all')
+const view = ref('grid')
+
+const viewOptions = [
+  { value: 'grid', icon: 'lucide-layout-grid' },
+  { value: 'list', icon: 'lucide-list' },
+]
+
+const SITE_STATUS = {
+  broken: { label: 'Broken', theme: 'red' },
+  offline: { label: 'Paused', theme: 'orange' },
+  provisioning: { label: 'Creating', theme: 'blue' },
+}
+
+const statusOptions = [
+  { label: 'Status', value: 'all' },
+  { label: 'Active', value: 'online' },
+  { label: 'Broken', value: 'broken' },
+  { label: 'Paused', value: 'offline' },
+  { label: 'Creating', value: 'provisioning' },
+]
+
+function siteStatus(site) {
+  // Provisioning wins over "offline": the site dir/site_config.json may not
+  // exist yet in the earliest moments of a new-site/reinstall task.
+  if (site.provisioning) return 'provisioning'
+  if (!site.exists) return 'offline'
+  if (site.broken) return 'broken'
+  return 'online'
+}
+
+const statusBadge = (site) => SITE_STATUS[siteStatus(site)]
+
+function appsLabel(site) {
+  const count = site.active_apps?.length || 0
+  return count === 1 ? '1 app' : `${count} apps`
+}
+
+// Storage lands after the list, so a card shows its app count alone until then.
+function metaLabel(site) {
+  const used = storageLabel(site.name)
+  return used ? `${used} · ${appsLabel(site)}` : appsLabel(site)
+}
+
+const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
+
+// The total, not the filtered list: filtering down to ten must not hide the controls.
+const showToolbar = computed(() => sites.value.length > 10)
+
+const filteredSites = computed(() => {
+  const query = search.value.toLowerCase().trim()
+  return sites.value.filter((site) => {
+    const matchesSearch = !query || site.name.toLowerCase().includes(query)
+    const matchesStatus = statusFilter.value === 'all' || siteStatus(site) === statusFilter.value
+    return matchesSearch && matchesStatus
+  })
+})
+
+const hasCount = computed(() => !loading.value || sites.value.length > 0)
+
+const listColumns = [
+  { label: 'Site', key: 'site', align: 'left', width: 3 },
+  { label: 'Status', key: 'status', align: 'left', width: 1.5 },
+  { label: 'Storage', key: 'storage', align: 'left', width: 1.5 },
+  { label: 'Apps', key: 'apps', align: 'left', width: 1.5 },
+  { label: '', key: 'actions', align: 'right', width: '3rem' },
+]
+
+const listRows = computed(() =>
+  filteredSites.value.map((site) => ({
+    name: site.name,
+    site,
+    storage: storageLabel(site.name),
+    apps: appsLabel(site),
+  })),
+)
+
+async function loginAsAdmin(site) {
+  return openSiteLogin(() => sitesApi.loginLink(site.name))
+}
+
+function openSite(site) {
+  toast.promise(loginAsAdmin(site), {
+    loading: 'Logging in as admin',
+    success: 'Logged in as admin',
+    error: 'Could not log in as admin',
+  })
+}
+
+async function backupNow(site) {
+  try {
+    const result = await sitesApi.backups.create(site.name)
+    if (result.ok) openTaskDetailPage(router, result.task_id)
+    else toast.error(apiErrorMessage(result, 'Could not start backup'))
+  } catch (caught) {
+    toast.error(caught.message || 'Could not start backup')
+  }
+}
+
+function siteMenuOptions(site) {
+  return [
+    { label: 'Open site', icon: 'lucide-external-link', onClick: () => openSite(site) },
+    { label: 'Back up now', icon: 'lucide-archive', onClick: () => backupNow(site) },
+    {
+      label: 'View analytics',
+      icon: 'lucide-chart-line',
+      onClick: () =>
+        router.push({ name: 'Analytics', query: { view: 'site', site: site.name } }),
+    },
+    {
+      label: 'View jobs',
+      icon: 'lucide-list-checks',
+      onClick: () => router.push({ name: 'Tasks', query: { site: site.name } }),
+    },
+  ]
+}
+
+const showCreate = ref(false)
+
+watch(
+  () => route.query.new,
+  (value) => {
+    if (!value) return
+    showCreate.value = true
+    router.replace({ name: 'Sites' })
+  },
+  { immediate: true },
+)
+
+onMounted(() => {
+  load()
+  loadStorage(true)
+})
+</script>
+
 <template>
   <div class="mx-auto max-w-3xl">
     <!-- Bar -->
@@ -187,172 +357,3 @@
     @started="(taskId) => openTaskDetailPage(router, taskId)"
   />
 </template>
-
-<script setup>
-import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import {
-  Badge,
-  Button,
-  Dropdown,
-  ErrorMessage,
-  FormControl,
-  TabButtons,
-  toast,
-} from 'frappe-ui'
-import { ListView } from 'frappe-ui/experimental'
-import EmptyState from '@/components/common/EmptyState.vue'
-import NewSiteDialog from '@/components/sites/NewSiteDialog.vue'
-import SiteSkeleton from '@/components/sites/SiteSkeleton.vue'
-import StickyToolbar from '@/components/common/StickyToolbar.vue'
-import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
-import { useIsMobile } from '@/composables/common/useIsMobile'
-import { useSites } from '@/composables/sites/useSites'
-import { apiErrorMessage } from '@/api/client'
-import { sitesApi } from '@/api/sites'
-import { useSiteStorage } from '@/composables/sites/useSiteStorage'
-import { openTaskDetailPage } from '@/utils/taskRoute'
-import { openSiteLogin } from '@/utils/siteLogin'
-
-const route = useRoute()
-const router = useRouter()
-const isMobile = useIsMobile()
-const { setBreadcrumbs } = useBreadcrumbs()
-const { sites, loading, error, load } = useSites()
-const { load: loadStorage, storageLabel } = useSiteStorage()
-
-const search = ref('')
-const statusFilter = ref('all')
-const view = ref('grid')
-
-const viewOptions = [
-  { value: 'grid', icon: 'lucide-layout-grid' },
-  { value: 'list', icon: 'lucide-list' },
-]
-
-const SITE_STATUS = {
-  broken: { label: 'Broken', theme: 'red' },
-  offline: { label: 'Paused', theme: 'orange' },
-  provisioning: { label: 'Creating', theme: 'blue' },
-}
-
-const statusOptions = [
-  { label: 'Status', value: 'all' },
-  { label: 'Active', value: 'online' },
-  { label: 'Broken', value: 'broken' },
-  { label: 'Paused', value: 'offline' },
-  { label: 'Creating', value: 'provisioning' },
-]
-
-function siteStatus(site) {
-  // Provisioning wins over "offline": the site dir/site_config.json may not
-  // exist yet in the earliest moments of a new-site/reinstall task.
-  if (site.provisioning) return 'provisioning'
-  if (!site.exists) return 'offline'
-  if (site.broken) return 'broken'
-  return 'online'
-}
-
-const statusBadge = (site) => SITE_STATUS[siteStatus(site)]
-
-function appsLabel(site) {
-  const count = site.active_apps?.length || 0
-  return count === 1 ? '1 app' : `${count} apps`
-}
-
-// Storage lands after the list, so a card shows its app count alone until then.
-function metaLabel(site) {
-  const used = storageLabel(site.name)
-  return used ? `${used} · ${appsLabel(site)}` : appsLabel(site)
-}
-
-const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
-
-// The total, not the filtered list: filtering down to ten must not hide the controls.
-const showToolbar = computed(() => sites.value.length > 10)
-
-const filteredSites = computed(() => {
-  const query = search.value.toLowerCase().trim()
-  return sites.value.filter((site) => {
-    const matchesSearch = !query || site.name.toLowerCase().includes(query)
-    const matchesStatus = statusFilter.value === 'all' || siteStatus(site) === statusFilter.value
-    return matchesSearch && matchesStatus
-  })
-})
-
-const hasCount = computed(() => !loading.value || sites.value.length > 0)
-
-const listColumns = [
-  { label: 'Site', key: 'site', align: 'left', width: 3 },
-  { label: 'Status', key: 'status', align: 'left', width: 1.5 },
-  { label: 'Storage', key: 'storage', align: 'left', width: 1.5 },
-  { label: 'Apps', key: 'apps', align: 'left', width: 1.5 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
-]
-
-const listRows = computed(() =>
-  filteredSites.value.map((site) => ({
-    name: site.name,
-    site,
-    storage: storageLabel(site.name),
-    apps: appsLabel(site),
-  })),
-)
-
-async function loginAsAdmin(site) {
-  return openSiteLogin(() => sitesApi.loginLink(site.name))
-}
-
-function openSite(site) {
-  toast.promise(loginAsAdmin(site), {
-    loading: 'Logging in as admin',
-    success: 'Logged in as admin',
-    error: 'Could not log in as admin',
-  })
-}
-
-async function backupNow(site) {
-  try {
-    const result = await sitesApi.backups.create(site.name)
-    if (result.ok) openTaskDetailPage(router, result.task_id)
-    else toast.error(apiErrorMessage(result, 'Could not start backup'))
-  } catch (caught) {
-    toast.error(caught.message || 'Could not start backup')
-  }
-}
-
-function siteMenuOptions(site) {
-  return [
-    { label: 'Open site', icon: 'lucide-external-link', onClick: () => openSite(site) },
-    { label: 'Back up now', icon: 'lucide-archive', onClick: () => backupNow(site) },
-    {
-      label: 'View analytics',
-      icon: 'lucide-chart-line',
-      onClick: () =>
-        router.push({ name: 'Analytics', query: { view: 'site', site: site.name } }),
-    },
-    {
-      label: 'View jobs',
-      icon: 'lucide-list-checks',
-      onClick: () => router.push({ name: 'Tasks', query: { site: site.name } }),
-    },
-  ]
-}
-
-const showCreate = ref(false)
-
-watch(
-  () => route.query.new,
-  (value) => {
-    if (!value) return
-    showCreate.value = true
-    router.replace({ name: 'Sites' })
-  },
-  { immediate: true },
-)
-
-onMounted(() => {
-  load()
-  loadStorage(true)
-})
-</script>
