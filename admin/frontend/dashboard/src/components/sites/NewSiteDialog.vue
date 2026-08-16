@@ -37,7 +37,7 @@ const hasSingleDomain = computed(() => wildcardDomains.value.length === 1)
 const appList = ref(null)
 const fadeEdges = ref('')
 
-function updateFadeEdges() {
+const updateFadeEdges = () => {
   const el = appList.value
   if (!el) return
   const top = el.scrollTop > 1
@@ -66,7 +66,7 @@ watch(open, (visible) => {
   reset()
 })
 
-async function reset() {
+const reset = async () => {
   newSiteName.value = ''
   sitePrefix.value = ''
   error.value = ''
@@ -76,7 +76,7 @@ async function reset() {
   loading.value = false
 }
 
-async function loadBenchApps() {
+const loadBenchApps = async () => {
   try {
     benchApps.value = await appsApi.installed()
   } catch {
@@ -84,13 +84,13 @@ async function loadBenchApps() {
   }
 }
 
-function toggleApp(name) {
+const toggleApp = (name) => {
   const index = selectedApps.value.indexOf(name)
   if (index === -1) selectedApps.value.push(name)
   else selectedApps.value.splice(index, 1)
 }
 
-async function loadWildcardDomains() {
+const loadWildcardDomains = async () => {
   try {
     const { domains } = await sitesApi.domains.wildcardList()
     wildcardDomains.value = domains || []
@@ -100,14 +100,14 @@ async function loadWildcardDomains() {
   }
 }
 
-function validate(name) {
+const validate = (name) => {
   if (!name) return 'Site name is required.'
   if (!/^[a-zA-Z0-9][a-zA-Z0-9\-.]*[a-zA-Z0-9]$|^[a-zA-Z0-9]$/.test(name))
     return 'Site name must be a valid hostname.'
   return null
 }
 
-async function submit() {
+const submit = async () => {
   const name = newSiteName.value.trim()
   const validationError = validate(name)
   if (validationError) {

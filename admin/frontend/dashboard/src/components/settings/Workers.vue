@@ -10,26 +10,26 @@ const saving = ref(false)
 const error = ref('')
 const groups = ref([])
 
-function toGroupForm(group) {
+const toGroupForm = (group) => {
   return { queues: (group.queues || []).join(', '), count: group.count }
 }
 
-function addGroup() {
+const addGroup = () => {
   groups.value.push({ queues: '', count: 1 })
 }
 
-function removeGroup(index) {
+const removeGroup = (index) => {
   groups.value.splice(index, 1)
 }
 
-function queueList(value) {
+const queueList = (value) => {
   return String(value || '')
     .split(',')
     .map((queue) => queue.trim())
     .filter(Boolean)
 }
 
-function validate() {
+const validate = () => {
   for (const [index, group] of groups.value.entries()) {
     if (!queueList(group.queues).length)
       return `Worker group ${index + 1} needs at least one queue.`
@@ -40,7 +40,7 @@ function validate() {
   return ''
 }
 
-async function save() {
+const save = async () => {
   error.value = validate()
   if (error.value) return
 

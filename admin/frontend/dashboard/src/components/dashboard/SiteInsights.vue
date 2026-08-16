@@ -45,7 +45,7 @@ const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (c) => HTML_ESCA
 
 // Custom tooltip: lets the label wrap without breaking the number, and reuses
 // ECharts' own marker HTML so the dot color always matches the bar/legend.
-function tooltipFormatter(paramsInput) {
+const tooltipFormatter = (paramsInput) => {
   const params = (Array.isArray(paramsInput) ? paramsInput : [paramsInput]).filter(
     (p) => p.value?.[1],
   )
@@ -71,7 +71,7 @@ const axisMax = computed(() => data.value?.now ?? Date.now())
 const axisMin = computed(() => axisMax.value - (data.value?.window_seconds ?? 0) * 1000)
 
 // series.name must match the data key holding that category's value.
-function timelineConfig(timeline, valueLabel, chartType = 'bar') {
+const timelineConfig = (timeline, valueLabel, chartType = 'bar') => {
   const categories = timeline?.categories ?? []
   return {
     data: timeline?.points ?? [],
@@ -120,7 +120,7 @@ const charts = computed(() =>
 // started load is allowed to write to state.
 let loadGeneration = 0
 
-async function load() {
+const load = async () => {
   const generation = ++loadGeneration
   loading.value = true
   error.value = ''

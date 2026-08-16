@@ -43,7 +43,7 @@ const PILL_BY_CATEGORY = {
 }
 
 // 'Featured' is a meta-tag; unknown values default to Utility.
-function pillsFor(app) {
+const pillsFor = (app) => {
   const categories = app.categories?.length ? app.categories : app.category ? [app.category] : []
   const mapped = categories
     .filter((category) => category !== 'Featured')
@@ -51,6 +51,6 @@ function pillsFor(app) {
   return new Set(mapped)
 }
 
-export function matchesPill(app, pill) {
+export const matchesPill = (app, pill) => {
   return pill === 'All' || pillsFor(app).has(pill)
 }

@@ -70,7 +70,7 @@ const restartWarning = computed(() => {
   return editor.value.requires_restart ? 'MariaDB will restart to apply this change.' : ''
 })
 
-function formatValue(variable) {
+const formatValue = (variable) => {
   if (!variable.supported || variable.value === null) return 'Unavailable'
   if (variable.value_type === 'boolean') return variable.value ? 'Enabled' : 'Disabled'
   if (variable.unit === 'bytes' && Number.isFinite(variable.value)) {
@@ -79,7 +79,7 @@ function formatValue(variable) {
   return formatConstraint(variable.value, variable.unit)
 }
 
-function formatBytes(value) {
+const formatBytes = (value) => {
   const units = ['bytes', 'KB', 'MB', 'GB', 'TB']
   let amount = value
   let index = 0
@@ -91,25 +91,25 @@ function formatBytes(value) {
   return `${rounded} ${units[index]}`
 }
 
-function formatConstraint(value, unit) {
+const formatConstraint = (value, unit) => {
   if (!unit) return String(value)
   if (unit === 'percent') return `${value}%`
   return `${value} ${unit}`
 }
 
-function openEditor(variable) {
+const openEditor = (variable) => {
   if (!variable.editable || !variable.edit) return
   saveError.value = ''
   draftValue.value = variable.edit.value
   editing.value = variable
 }
 
-function idempotencyKey(variable) {
+const idempotencyKey = (variable) => {
   const random = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
   return `database-config-${variable}-${Date.now()}-${random}`
 }
 
-async function save() {
+const save = async () => {
   if (!editing.value || validationError.value || unchanged.value || saving.value) return
   const variable = editing.value.name
   saving.value = true
@@ -129,7 +129,7 @@ async function save() {
   }
 }
 
-async function load() {
+const load = async () => {
   if (loading.value) return
   loading.value = true
   error.value = ''

@@ -10,8 +10,8 @@ const checked = ref(false)
 
 const POLL_INTERVAL_MS = 1500
 
-export function useAppUpdates() {
-  async function check() {
+export const useAppUpdates = () => {
+  const check = async () => {
     if (checking.value) return
 
     checking.value = true

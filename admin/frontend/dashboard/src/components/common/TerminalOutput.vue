@@ -12,7 +12,7 @@ defineProps({
 
 const el = ref(null)
 
-function scrollToBottom() {
+const scrollToBottom = () => {
   nextTick(() => {
     if (el.value) el.value.scrollTop = el.value.scrollHeight
   })

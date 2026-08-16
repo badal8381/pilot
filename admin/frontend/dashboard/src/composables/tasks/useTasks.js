@@ -8,8 +8,8 @@ const tasks = ref([])
 const loading = ref(false)
 const error = ref('')
 
-export function useTasks() {
-  async function load(status = 'all') {
+export const useTasks = () => {
+  const load = async (status = 'all') => {
     loading.value = true
     error.value = ''
     try {

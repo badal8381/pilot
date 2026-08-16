@@ -11,7 +11,7 @@ const router = useRouter()
 const { status, start } = useUpdate()
 const showDialog = ref(false)
 
-function onClick() {
+const onClick = () => {
   if (status.value.operationId) {
     router.push({ name: 'UpdateDetail', params: { operationId: status.value.operationId } })
   } else {

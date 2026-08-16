@@ -39,17 +39,17 @@ const elapsedLabel = computed(() => {
   return `${m}:${s}`
 })
 
-function openWizard() {
+const openWizard = () => {
   if (wizardUrl.value) window.location.href = wizardUrl.value
 }
 
 // Manual button: open in a new tab so this admin page stays put (the automatic
 // redirect on ready navigates the current tab instead).
-function openWizardInNewTab() {
+const openWizardInNewTab = () => {
   if (wizardUrl.value) window.open(wizardUrl.value, '_blank', 'noopener')
 }
 
-function stopElapsed() {
+const stopElapsed = () => {
   if (elapsedTimer) {
     clearInterval(elapsedTimer)
     elapsedTimer = null
@@ -72,7 +72,7 @@ const processManagerOptions = computed(() => [
   { value: 'supervisor', label: 'Supervisor', hint: 'Alternative' },
 ])
 
-async function loadMode() {
+const loadMode = async () => {
   isProduction.value = null
   try {
     const data = await authApi.bootstrap()
@@ -84,7 +84,7 @@ async function loadMode() {
   }
 }
 
-async function loadWildcardDomains() {
+const loadWildcardDomains = async () => {
   try {
     const data = await benchesApi.wildcardDomains()
     wildcardDomains.value = data.domains || []
@@ -122,7 +122,7 @@ watch(show, (open) => {
   loadWildcardDomains()
 })
 
-function startProvisioning(url) {
+const startProvisioning = (url) => {
   provisioning.value = true
   wizardUrl.value = url
   elapsed.value = 0
@@ -144,7 +144,7 @@ const MAX_WAIT_SECONDS = 120
 // cache: 'no-store' (plus a nonce) keeps the browser from reusing a stale answer.
 // Returns true if the A record is published (and points here when we know our IP),
 // false if it resolves but not yet, null if the lookup itself couldn't run.
-async function dnsResolved(domain, expectedIp) {
+const dnsResolved = async (domain, expectedIp) => {
   try {
     const url = `https://dns.google/resolve?name=${domain}&type=A&_=${elapsed.value}`
     const response = await fetch(url, {
@@ -164,7 +164,7 @@ async function dnsResolved(domain, expectedIp) {
 // domain has propagated, and a minimum wait elapses. The dev/port flow has no
 // domain, so it skips DoH and the wait. DoH being unreachable (null) doesn't
 // block, and a cached negative stops blocking after MAX_WAIT_SECONDS.
-async function pollReady(params, domain = '', serverIp = '') {
+const pollReady = async (params, domain = '', serverIp = '') => {
   if (!provisioning.value) return
   let serverReady = false
   try {
@@ -185,7 +185,7 @@ async function pollReady(params, domain = '', serverIp = '') {
   setTimeout(() => pollReady(params, domain, serverIp), 5000)
 }
 
-async function createBench() {
+const createBench = async () => {
   const benchName = name.value.trim()
   if (!benchName) return
   if (!/^[a-zA-Z0-9_-]+$/.test(benchName)) {

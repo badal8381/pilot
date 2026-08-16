@@ -5,7 +5,7 @@ defineProps({ sections: { type: Array, required: true } })
 const emit = defineEmits(['passwordChanged'])
 const openSection = defineModel('openSection')
 
-function handlePasswordChanged() {
+const handlePasswordChanged = () => {
   openSection.value = null
   emit('passwordChanged')
 }

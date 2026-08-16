@@ -8,11 +8,11 @@ const props = defineProps({ window: { type: String, default: '24h' } })
 const data = ref(null)
 
 // The WAF log has no per-second "live" feed; fall back to the shortest window.
-function resolveWindow(w) {
+const resolveWindow = (w) => {
   return w === 'live' ? '30m' : w
 }
 
-async function load() {
+const load = async () => {
   try {
     data.value = await monitorApi.waf(resolveWindow(props.window))
   } catch {

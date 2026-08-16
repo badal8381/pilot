@@ -9,7 +9,7 @@ const props = defineProps({ overview: { type: Object, default: null } })
 const GRID = { show: true, lineStyle: { type: 'dashed', color: 'var(--outline-gray-2)' } }
 const PALETTE = ['#10b981', '#ef4444', '#f59e0b', '#2490ef', '#8b5cf6', '#06b6d4', '#ec4899']
 
-function bucketLabel(ms, bucketMs) {
+const bucketLabel = (ms, bucketMs) => {
   const date = new Date(ms)
   return bucketMs >= 24 * 3600_000
     ? date.toLocaleDateString([], { month: 'short', day: 'numeric' })
@@ -18,7 +18,7 @@ function bucketLabel(ms, bucketMs) {
 
 // Buckets (and their sizing) come pre-computed from the backend, keyed by
 // whichever dimension the chart stacks by — site or query text.
-function seriesConfig(rows, keys, yLabel) {
+const seriesConfig = (rows, keys, yLabel) => {
   const bucketMs = rows.length > 1 ? rows[1].bucket - rows[0].bucket : 300_000
   return {
     data: rows.map((row) => ({ ...row, bucket: bucketLabel(row.bucket, bucketMs) })),

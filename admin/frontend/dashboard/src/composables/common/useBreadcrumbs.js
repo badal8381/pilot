@@ -2,7 +2,7 @@ import { ref } from 'vue'
 
 const items = ref(null)
 
-export function useBreadcrumbs() {
+export const useBreadcrumbs = () => {
   return {
     items,
     setBreadcrumbs: (value) => (items.value = value),

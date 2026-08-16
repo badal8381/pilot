@@ -51,7 +51,7 @@ watch(open, (isOpen) => {
   mode.value = props.canDisable ? 'disable' : 'uninstall'
 })
 
-async function confirmRemoval() {
+const confirmRemoval = async () => {
   if (!props.app || working.value) return
   error.value = ''
   working.value = true
@@ -65,14 +65,14 @@ async function confirmRemoval() {
   }
 }
 
-async function disableApp() {
+const disableApp = async () => {
   const result = await sitesApi.apps.remove(props.siteName, props.app.name, { mode: 'disable' })
   if (!result.disabled) throw new Error(apiErrorMessage(result, 'Could not disable app.'))
   open.value = false
   emit('disabled', props.app.name)
 }
 
-async function uninstallApp() {
+const uninstallApp = async () => {
   const result = await sitesApi.apps.remove(props.siteName, props.app.name)
   if (!result.task_id) throw new Error(apiErrorMessage(result, 'Uninstall failed.'))
   open.value = false

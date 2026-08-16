@@ -33,7 +33,7 @@ const model = computed({
 
 const view = shallowRef(null)
 
-function onReady({ view: v }) {
+const onReady = ({ view: v }) => {
   view.value = v
 }
 
@@ -50,7 +50,7 @@ const cmDialect = computed(() => dialects[props.dbType] || MariaSQL)
 
 const sqlCompartment = new Compartment()
 
-function reconfigureSql() {
+const reconfigureSql = () => {
   if (!view.value) return
   view.value.dispatch({
     effects: sqlCompartment.reconfigure(
@@ -61,12 +61,12 @@ function reconfigureSql() {
 
 watch([cmSchema, cmDialect], reconfigureSql)
 
-function getSelectedOrAll(v) {
+const getSelectedOrAll = (v) => {
   const { from, to } = v.state.selection.main
   return from !== to ? v.state.sliceDoc(from, to) : v.state.doc.toString()
 }
 
-function getQueryToRun() {
+const getQueryToRun = () => {
   return view.value ? getSelectedOrAll(view.value) : props.modelValue
 }
 

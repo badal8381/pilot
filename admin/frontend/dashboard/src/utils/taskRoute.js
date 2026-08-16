@@ -1,16 +1,16 @@
-export function taskDetailRoute(taskId) {
+export const taskDetailRoute = (taskId) => {
   return { name: 'TaskDetail', params: { taskId } }
 }
 
-export function openTaskDetailPage(router, taskId) {
+export const openTaskDetailPage = (router, taskId) => {
   router.push(taskDetailRoute(taskId))
 }
 
-export function siteDetailRoute(siteName, tab = 'apps') {
+export const siteDetailRoute = (siteName, tab = 'apps') => {
   return { name: 'SiteDetail', params: { name: siteName, tab } }
 }
 
-export function openSitePage(router, siteName, app = '') {
+export const openSitePage = (router, siteName, app = '') => {
   const route = siteDetailRoute(siteName)
   router.push(app ? { ...route, query: { app, action: 'install-app' } } : route)
 }

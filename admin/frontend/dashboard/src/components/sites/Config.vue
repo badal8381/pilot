@@ -34,7 +34,7 @@ const rows = computed(() => {
   return entries
 })
 
-function menuOptions(row) {
+const menuOptions = (row) => {
   return [
     { label: 'Edit', icon: 'lucide-pencil', onClick: () => openDialog(row.key) },
     {
@@ -59,7 +59,7 @@ const dialogError = ref('')
 const refreshing = ref(false)
 const isNew = computed(() => showAddDialog.value)
 
-function openDialog(key = null) {
+const openDialog = (key = null) => {
   dialogError.value = ''
   entryKey.value = key || ''
   if (key !== null) {
@@ -72,7 +72,7 @@ function openDialog(key = null) {
   }
 }
 
-function parseValue(raw) {
+const parseValue = (raw) => {
   try {
     return JSON.parse(raw)
   } catch {
@@ -80,7 +80,7 @@ function parseValue(raw) {
   }
 }
 
-async function save() {
+const save = async () => {
   const key = entryKey.value.trim()
   if (!key) {
     dialogError.value = 'Key is required.'
@@ -109,7 +109,7 @@ const deleteKey = ref('')
 const deleting = ref(false)
 const deleteError = ref('')
 
-async function confirmDelete() {
+const confirmDelete = async () => {
   deleting.value = true
   deleteError.value = ''
   try {
@@ -123,7 +123,7 @@ async function confirmDelete() {
   }
 }
 
-async function refresh() {
+const refresh = async () => {
   refreshing.value = true
   try {
     await reload()

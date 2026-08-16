@@ -201,32 +201,32 @@ const MAX_QUERY_LENGTH = 120
 
 // Long queries can be arbitrarily large single-line strings that would
 // otherwise force the table wider than the page.
-function truncateQuery(query) {
+const truncateQuery = (query) => {
   if (!query) return '—'
   return query.length > MAX_QUERY_LENGTH ? `${query.slice(0, MAX_QUERY_LENGTH)}…` : query
 }
 
-function formatSeconds(seconds) {
+const formatSeconds = (seconds) => {
   return seconds == null ? '—' : `${Math.round(seconds)}s`
 }
 
-function fileAge(file) {
+const fileAge = (file) => {
   return file.modified_ms ? relativeTime(new Date(file.modified_ms).toISOString()) : '—'
 }
 
 // Purging is contiguous from the oldest file, so ticking one file ticks every
 // older file with it and unticking one clears everything newer.
-function toggle(index, checked) {
+const toggle = (index, checked) => {
   selectedIndex.value = checked ? index : index - 1
 }
 
-function confirmKill(process) {
+const confirmKill = (process) => {
   killTarget.value = process
   killError.value = ''
   showKillDialog.value = true
 }
 
-async function kill() {
+const kill = async () => {
   killing.value = true
   killError.value = ''
   try {
@@ -242,13 +242,13 @@ async function kill() {
   }
 }
 
-function confirmPurge(index) {
+const confirmPurge = (index) => {
   pendingIndex.value = index
   purgeError.value = ''
   showPurgeDialog.value = true
 }
 
-async function purge() {
+const purge = async () => {
   // PURGE keeps the named file, so target the one just after the last selected.
   const keepFrom = binlogs.value[pendingIndex.value + 1]
   if (!keepFrom) return
@@ -268,7 +268,7 @@ async function purge() {
   }
 }
 
-async function loadProcesses() {
+const loadProcesses = async () => {
   processesLoading.value = true
   processesError.value = ''
   try {
@@ -283,7 +283,7 @@ async function loadProcesses() {
   }
 }
 
-function loadLockWaits() {
+const loadLockWaits = () => {
   if (lockWaitsRequest) {
     if (lockWaitsRequestSite !== selectedSite.value) lockWaitsReloadQueued = true
     return lockWaitsRequest
@@ -292,7 +292,7 @@ function loadLockWaits() {
   return lockWaitsRequest
 }
 
-async function drainLockWaitsRequests() {
+const drainLockWaitsRequests = async () => {
   lockWaitsLoading.value = true
   try {
     do {
@@ -306,7 +306,7 @@ async function drainLockWaitsRequests() {
   }
 }
 
-async function fetchLockWaits() {
+const fetchLockWaits = async () => {
   const site = selectedSite.value
   lockWaitsRequestSite = site
   lockWaitsError.value = ''
@@ -325,7 +325,7 @@ async function fetchLockWaits() {
   }
 }
 
-async function loadSize() {
+const loadSize = async () => {
   sizeLoading.value = true
   sizeError.value = ''
   try {
@@ -340,7 +340,7 @@ async function loadSize() {
   }
 }
 
-async function loadBinlogs() {
+const loadBinlogs = async () => {
   binlogsLoading.value = true
   binlogsError.value = ''
   try {
@@ -355,19 +355,19 @@ async function loadBinlogs() {
   }
 }
 
-async function pollLockWaits(version) {
+const pollLockWaits = async (version) => {
   await loadLockWaits()
   if (version !== lockWaitsPollVersion || !autoRefreshLocks.value) return
   lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
 }
 
-function startLockWaitsAutoRefresh() {
+const startLockWaitsAutoRefresh = () => {
   stopLockWaitsAutoRefresh()
   const version = lockWaitsPollVersion
   lockWaitsTimer = setTimeout(() => pollLockWaits(version), AUTO_REFRESH_INTERVAL_MS)
 }
 
-function stopLockWaitsAutoRefresh() {
+const stopLockWaitsAutoRefresh = () => {
   lockWaitsPollVersion += 1
   if (lockWaitsTimer) clearTimeout(lockWaitsTimer)
   lockWaitsTimer = null
@@ -387,7 +387,7 @@ watch(selectedSite, () => {
 
 onUnmounted(stopLockWaitsAutoRefresh)
 
-async function load() {
+const load = async () => {
   loading.value = true
   error.value = ''
   if (route.query.site) selectedSite.value = String(route.query.site)
@@ -409,7 +409,7 @@ async function load() {
   }
 }
 
-async function loadSites() {
+const loadSites = async () => {
   try {
     const result = await databaseApi.sites()
     sites.value = Array.isArray(result) ? result : []

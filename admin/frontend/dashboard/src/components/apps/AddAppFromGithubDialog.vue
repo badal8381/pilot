@@ -64,7 +64,7 @@ const needsGithubConnection = computed(
   () => tab.value === 'private' && Boolean(gitStatus.value) && !gitConnected.value,
 )
 
-function goToGithubSettings() {
+const goToGithubSettings = () => {
   open.value = false
   router.push({ name: 'Settings', params: { section: 'general', subSection: 'github' } })
 }
@@ -78,7 +78,7 @@ const canSubmit = computed(() =>
 watch(open, (isOpen) => {
   if (isOpen) reset()
 })
-watch(tab, reset)
+watch(tab, () => reset())
 // Accepts scheme-less URLs; every API call goes through normalizedRepo.
 const normalizedRepo = computed(() => {
   const url = repo.value.trim().replace(/\/+$/, '')
@@ -102,7 +102,7 @@ watch(repo, (value) => {
   repoDebounce = setTimeout(() => loadBranchesFor(url), 600)
 })
 
-function reset() {
+const reset = () => {
   clearTimeout(repoDebounce)
   repo.value = ''
   branch.value = ''
@@ -113,7 +113,7 @@ function reset() {
   if (tab.value === 'private' && !gitStatus.value) loadGitStatus()
 }
 
-async function loadBranchesFor(url) {
+const loadBranchesFor = async (url) => {
   fetching.value = true
   error.value = ''
   try {
@@ -132,7 +132,7 @@ async function loadBranchesFor(url) {
   }
 }
 
-async function loadGitStatus() {
+const loadGitStatus = async () => {
   gitStatus.value = await gitApi.status()
   if (gitConnected.value) {
     reposLoading.value = true
@@ -156,7 +156,7 @@ watch(branch, () => {
   if (repo.value.trim() && branch.value.trim()) resolveApp()
 })
 
-async function resolveApp() {
+const resolveApp = async () => {
   resolving.value = true
   foundName.value = ''
   error.value = ''
@@ -171,7 +171,7 @@ async function resolveApp() {
   }
 }
 
-async function submit() {
+const submit = async () => {
   if (!canSubmit.value || adding.value) return
   adding.value = true
   error.value = ''

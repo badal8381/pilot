@@ -21,18 +21,18 @@ const RED = '#ef4444'
 
 // Null percent (no checks in this bucket) is handled by the caller via the
 // bg-surface-gray-3 class instead - this only covers definite percentages.
-function barColor(percent) {
+const barColor = (percent) => {
   if (percent >= 100) return GREEN
   if (percent > 0) return AMBER
   return RED
 }
 
 // Percentages carry the bar palette; everything around them stays body text.
-function percentTextStyle(percent) {
+const percentTextStyle = (percent) => {
   return percent === null || percent === undefined ? {} : { color: barColor(percent) }
 }
 
-function formatPercent(percent) {
+const formatPercent = (percent) => {
   return percent === null || percent === undefined ? 'No data' : `${percent.toFixed(2)}%`
 }
 
@@ -49,16 +49,16 @@ const TIME_FORMAT = new Intl.DateTimeFormat('en-US', {
   hour12: true,
 })
 
-function formatTimeOnly(date) {
+const formatTimeOnly = (date) => {
   return TIME_FORMAT.format(date).toLowerCase()
 }
 
-function formatFullTime(ms) {
+const formatFullTime = (ms) => {
   const date = new Date(ms)
   return `${DATE_FORMAT.format(date)} ${date.getFullYear()}, ${formatTimeOnly(date)}`
 }
 
-async function load() {
+const load = async () => {
   loading.value = true
   error.value = ''
   try {

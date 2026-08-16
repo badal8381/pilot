@@ -31,12 +31,12 @@ export const UPDATE_FILTERS = [
 ]
 
 // Every state belongs to exactly one group, so no update is unreachable.
-export function matchesUpdateFilter(operation, filter) {
+export const matchesUpdateFilter = (operation, filter) => {
   if (filter === 'all') return true
   return (FILTER_STATES[filter] || []).includes(operation?.state)
 }
 
-export function opTitle(op) {
+export const opTitle = (op) => {
   if (op?.kind === 'site_migrate') return `Migrate ${op.sites?.[0]?.name || 'site'}`
   // Operations store no name; two picked apps read fine by name, more become a count.
   const picked = op?.apps_filter || []
@@ -51,18 +51,18 @@ export function opTitle(op) {
  * they collapse to a count and `siteNames` carries the full list into the cell's
  * tooltip. An operation touching no site is bench-level work.
  */
-export function sitesLabel(op) {
+export const sitesLabel = (op) => {
   const sites = op?.sites || []
   if (!sites.length) return SERVER_SCOPE
   if (sites.length === 1) return sites[0].name
   return `${sites.length} sites`
 }
 
-export function siteNames(op) {
+export const siteNames = (op) => {
   return (op?.sites || []).map((site) => site.name).join(', ')
 }
 
-export function patchSkipped(op) {
+export const patchSkipped = (op) => {
   const patch = op?.diagnosis?.patch
   if (!patch) return false
   return (op.decisions || []).some(
@@ -79,7 +79,7 @@ const ACTION_LABEL = {
   bypass_patch: 'Skip patch',
 }
 
-export function pendingActionLabel(pending) {
+export const pendingActionLabel = (pending) => {
   if (!pending) return ''
   const action = ACTION_LABEL[pending.role] || 'Action'
   return pending.status === 'running' ? `${action} in progress` : `${action} queued`
@@ -115,16 +115,16 @@ const STATE_LABEL = {
   restarting: 'Restarting services',
 }
 
-export function stateTone(state) {
+export const stateTone = (state) => {
   return STATE_TONE[state] || 'gray'
 }
 
-export function stateLabel(state) {
+export const stateLabel = (state) => {
   return STATE_LABEL[state] || state
 }
 
 // Per-site lifecycle: pending -> backing up -> running -> success / failed / recovered
-export function siteStatus(site) {
+export const siteStatus = (site) => {
   if (site.migration_status === 'recovering')
     return { label: 'Recovering', tone: 'orange', busy: true, value: 'recovering' }
   if (site.migration_status === 'recovered')

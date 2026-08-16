@@ -2,7 +2,7 @@
 // since this ends up in bench.toml, SQL statements, and shell commands.
 const CHARSET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
 
-export function generateRandomPassword(length = 32) {
+export const generateRandomPassword = (length = 32) => {
   const bytes = crypto.getRandomValues(new Uint8Array(length))
   return Array.from(bytes, (byte) => CHARSET[byte % CHARSET.length]).join('')
 }

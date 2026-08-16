@@ -55,7 +55,7 @@ const scheduleSummary = computed(() =>
     : 'Manual backups are kept until you delete them.',
 )
 
-async function loadConfig() {
+const loadConfig = async () => {
   try {
     config.value = await sitesApi.backups.schedule.get(props.siteName)
   } catch {
@@ -63,7 +63,7 @@ async function loadConfig() {
   }
 }
 
-async function backupNow() {
+const backupNow = async () => {
   backingUp.value = true
   error.value = ''
   try {
@@ -110,7 +110,7 @@ const OFFSITE_KIND_KEYS = {
   site_config: 'site_config',
 }
 
-function menuOptions(set) {
+const menuOptions = (set) => {
   const kinds = [
     ['database', 'Download Database'],
     ['public-file', 'Download Public'],
@@ -137,7 +137,7 @@ function menuOptions(set) {
   ]
 }
 
-async function downloadFile(set, kind) {
+const downloadFile = async (set, kind) => {
   const file = fileOf(set, kind)
   if (file?.path) {
     window.location.href = sitesApi.backups.download(props.siteName, set.timestamp, file.filename)
@@ -168,7 +168,7 @@ const deleteTarget = ref(null)
 const deleting = ref(false)
 const deleteError = ref('')
 
-async function confirmDelete() {
+const confirmDelete = async () => {
   deleting.value = true
   deleteError.value = ''
   try {

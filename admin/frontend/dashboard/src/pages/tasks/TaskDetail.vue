@@ -47,7 +47,7 @@ const actionError = ref('')
 const showDebug = ref(false)
 const aiConnected = ref(false)
 
-async function loadAiStatus() {
+const loadAiStatus = async () => {
   try {
     const data = await settingsApi.get()
     aiConnected.value = Boolean(data.llm?.provider && data.llm?.api_key_set)
@@ -68,21 +68,21 @@ const metaLine = computed(() => {
   return parts.join(' · ')
 })
 
-function updateStatus(event) {
+const updateStatus = (event) => {
   if (!['queued', 'running'].includes(event.status)) return
   task.value.status = event.status
   task.value.queue_position = event.queue_position
   task.value.is_cancellable = event.is_cancellable
 }
 
-function handleDone(success) {
+const handleDone = (success) => {
   load()
   if (!success) return
   const redirect = redirectRouteOnSuccess(task.value)
   if (redirect) router.push(redirect)
 }
 
-async function cancelTask() {
+const cancelTask = async () => {
   actionError.value = ''
   try {
     const response = await tasksApi.cancel(taskId)

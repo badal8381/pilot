@@ -2,19 +2,19 @@ import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 import { processLine } from '@/utils/ansi.js'
 
-export function useTaskStream({ guardHiddenTab = false } = {}) {
+export const useTaskStream = ({ guardHiddenTab = false } = {}) => {
   const terminal = ref(null)
   const lines = ref([])
   const rawLines = ref([])
   const streaming = ref(false)
   let source = null
 
-  function scrollToBottom() {
+  const scrollToBottom = () => {
     if (guardHiddenTab && document.hidden) return
     terminal.value?.scrollToBottom()
   }
 
-  function push(raw, { overwrite } = {}) {
+  const push = (raw, { overwrite } = {}) => {
     if (overwrite) {
       rawLines.value[rawLines.value.length - 1] = raw
       lines.value[lines.value.length - 1] = processLine(raw)
@@ -25,14 +25,14 @@ export function useTaskStream({ guardHiddenTab = false } = {}) {
     scrollToBottom()
   }
 
-  function close() {
+  const close = () => {
     if (source) {
       source.close()
       source = null
     }
   }
 
-  function start(url, { onDone, onLine, onStatus, onError } = {}) {
+  const start = (url, { onDone, onLine, onStatus, onError } = {}) => {
     close()
     streaming.value = true
     let volatile = false
@@ -73,7 +73,7 @@ export function useTaskStream({ guardHiddenTab = false } = {}) {
     }
   }
 
-  function stop() {
+  const stop = () => {
     close()
     streaming.value = false
   }

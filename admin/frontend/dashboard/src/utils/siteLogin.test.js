@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { openSiteLogin } from './siteLogin.js'
 
-function installBrowser() {
+const installBrowser = () => {
   const events = []
   const popup = {
     opener: {},

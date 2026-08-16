@@ -10,7 +10,7 @@ const down = ref(false)
 let timer = null
 let stopped = false
 
-async function pingOk(url) {
+const pingOk = async (url) => {
   try {
     const response = await fetch(url, { cache: 'no-store' })
     return response.status === 200
@@ -19,7 +19,7 @@ async function pingOk(url) {
   }
 }
 
-async function tick() {
+const tick = async () => {
   if (stopped) return
   if (props.paused) {
     down.value = false

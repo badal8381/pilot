@@ -34,14 +34,14 @@ watch(show, (open) => {
   dnsRecordGroups.value = []
 })
 
-function toRecordGroups(records) {
+const toRecordGroups = (records) => {
   const groups = []
   if (records?.cname?.length) groups.push({ type: 'CNAME', records: records.cname })
   if (records?.a?.length) groups.push({ type: 'A', records: records.a })
   return groups
 }
 
-async function continueAdd() {
+const continueAdd = async () => {
   const value = domain.value.trim()
   if (!value) return
   error.value = ''
@@ -61,7 +61,7 @@ async function continueAdd() {
   }
 }
 
-async function confirmAdd() {
+const confirmAdd = async () => {
   error.value = ''
   adding.value = true
   try {

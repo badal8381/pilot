@@ -9,13 +9,13 @@ const panel = ref(null)
 const open = ref(false)
 const panelStyle = ref({})
 
-function onOutside(event) {
+const onOutside = (event) => {
   if (root.value?.contains(event.target)) return
   if (panel.value?.contains(event.target)) return
   close()
 }
 
-function toggle() {
+const toggle = () => {
   if (open.value) return close()
   const rect = root.value.getBoundingClientRect()
   const opensUp = rect.bottom + props.options.length * 36 + 12 > window.innerHeight
@@ -30,13 +30,13 @@ function toggle() {
   document.addEventListener('scroll', close, true)
 }
 
-function close() {
+const close = () => {
   open.value = false
   document.removeEventListener('pointerdown', onOutside, true)
   document.removeEventListener('scroll', close, true)
 }
 
-function select(option) {
+const select = (option) => {
   close()
   option.onClick?.()
 }

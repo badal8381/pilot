@@ -42,7 +42,7 @@ const webhooks = ref([])
 const savedPayload = ref('')
 const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
 
-function buildPayload() {
+const buildPayload = () => {
   return {
     ...Object.fromEntries(
       RESOURCE_ALERTS.map((alert) => [
@@ -60,34 +60,34 @@ function buildPayload() {
   }
 }
 
-function setEnabled(key, on) {
+const setEnabled = (key, on) => {
   enabled.value[key] = on
   if (on && !Number(limits.value[key])) {
     limits.value[key] = String(RESOURCE_ALERTS.find((alert) => alert.key === key).initial)
   }
 }
 
-function addWebhook() {
+const addWebhook = () => {
   webhooks.value.push({ url: '', token: '', token_set: false, original_url: '' })
 }
 
-function removeWebhook(index) {
+const removeWebhook = (index) => {
   webhooks.value.splice(index, 1)
 }
 
 // A row still being filled in says nothing and just holds the Save button.
-function webhookError(webhook) {
+const webhookError = (webhook) => {
   const url = webhook.url.trim()
   if (url && (!URL.canParse(url) || !/^https?:\/\//.test(url)))
     return 'Endpoint must be an http:// or https:// URL.'
   return ''
 }
 
-function webhookIsComplete(webhook) {
+const webhookIsComplete = (webhook) => {
   return Boolean(webhook.url.trim()) && Boolean(webhook.token || webhook.token_set)
 }
 
-function limitError(key) {
+const limitError = (key) => {
   if (!enabled.value[key]) return ''
   const limit = Number(limits.value[key])
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
@@ -101,7 +101,7 @@ const canSave = computed(
     webhooks.value.every((webhook) => webhookIsComplete(webhook) && !webhookError(webhook)),
 )
 
-async function save() {
+const save = async () => {
   if (!canSave.value) return
 
   error.value = ''

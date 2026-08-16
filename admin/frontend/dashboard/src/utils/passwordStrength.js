@@ -5,6 +5,6 @@ export const PASSWORD_REQUIREMENTS = [
   { label: 'At least one symbol', test: (pwd) => /[^A-Za-z0-9]/.test(pwd) },
 ]
 
-export function meetsPasswordRequirements(password) {
+export const meetsPasswordRequirements = (password) => {
   return PASSWORD_REQUIREMENTS.every((req) => req.test(password))
 }

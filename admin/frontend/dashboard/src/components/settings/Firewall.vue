@@ -26,7 +26,7 @@ const myIp = ref('')
 
 const lockoutRisk = computed(() => enabled.value && defaultPolicy.value === 'deny')
 
-function addRule() {
+const addRule = () => {
   rules.value.push({
     ip: '',
     action: defaultPolicy.value === 'deny' ? 'allow' : 'deny',
@@ -34,12 +34,12 @@ function addRule() {
   })
 }
 
-function removeRule(index) {
+const removeRule = (index) => {
   rules.value.splice(index, 1)
 }
 
 // A wrong fill shows at its own row; empty or invalid IPs just hold the button.
-function ipError(rule) {
+const ipError = (rule) => {
   const ip = rule.ip.trim()
   if (!ip || IP_PATTERN.test(ip)) return ''
   return `'${rule.ip}' is not a valid IP or CIDR.`
@@ -48,7 +48,7 @@ const canSave = computed(() =>
   rules.value.every((r) => r.ip.trim() && IP_PATTERN.test(r.ip.trim())),
 )
 
-function validate() {
+const validate = () => {
   // Block-by-default with no Allow rule blocks everyone, including you.
   if (
     enabled.value &&
@@ -60,7 +60,7 @@ function validate() {
   return ''
 }
 
-async function save() {
+const save = async () => {
   error.value = validate()
   if (error.value) return
 

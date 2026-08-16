@@ -55,7 +55,7 @@ const statusOptions = [
   { label: 'Creating', value: 'provisioning' },
 ]
 
-function siteStatus(site) {
+const siteStatus = (site) => {
   // Provisioning wins over "offline": the site dir/site_config.json may not
   // exist yet in the earliest moments of a new-site/reinstall task.
   if (site.provisioning) return 'provisioning'
@@ -66,13 +66,13 @@ function siteStatus(site) {
 
 const statusBadge = (site) => SITE_STATUS[siteStatus(site)]
 
-function appsLabel(site) {
+const appsLabel = (site) => {
   const count = site.active_apps?.length || 0
   return count === 1 ? '1 app' : `${count} apps`
 }
 
 // Storage lands after the list, so a card shows its app count alone until then.
-function metaLabel(site) {
+const metaLabel = (site) => {
   const used = storageLabel(site.name)
   return used ? `${used} · ${appsLabel(site)}` : appsLabel(site)
 }
@@ -110,11 +110,11 @@ const listRows = computed(() =>
   })),
 )
 
-async function loginAsAdmin(site) {
+const loginAsAdmin = async (site) => {
   return openSiteLogin(() => sitesApi.loginLink(site.name))
 }
 
-function openSite(site) {
+const openSite = (site) => {
   toast.promise(loginAsAdmin(site), {
     loading: 'Logging in as admin',
     success: 'Logged in as admin',
@@ -122,7 +122,7 @@ function openSite(site) {
   })
 }
 
-async function backupNow(site) {
+const backupNow = async (site) => {
   try {
     const result = await sitesApi.backups.create(site.name)
     if (result.ok) openTaskDetailPage(router, result.task_id)
@@ -132,7 +132,7 @@ async function backupNow(site) {
   }
 }
 
-function siteMenuOptions(site) {
+const siteMenuOptions = (site) => {
   return [
     { label: 'Open site', icon: 'lucide-external-link', onClick: () => openSite(site) },
     { label: 'Back up now', icon: 'lucide-archive', onClick: () => backupNow(site) },

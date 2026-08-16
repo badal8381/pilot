@@ -57,7 +57,7 @@ const schedWeekday = ref(0)
 const schedMonthDay = ref(1)
 const schedHour = ref(2)
 
-function formatHour(h) {
+const formatHour = (h) => {
   if (h === 0) return '12:00 AM'
   if (h < 12) return `${h}:00 AM`
   if (h === 12) return '12:00 PM'
@@ -109,7 +109,7 @@ const schedCron = computed(() => {
   return `0 ${h} * * *`
 })
 
-function parseCronToState(cron) {
+const parseCronToState = (cron) => {
   const [, h, dom, , dow] = cron.split(' ')
   schedHour.value = isNaN(parseInt(h)) ? 0 : parseInt(h)
   if (dom !== '*') {
@@ -121,7 +121,7 @@ function parseCronToState(cron) {
   } else schedFrequency.value = 'daily'
 }
 
-async function load() {
+const load = async () => {
   try {
     const data = await props.fetchSchedule()
     if (!data.schedule) {
@@ -136,7 +136,7 @@ async function load() {
   }
 }
 
-async function setPreset(cron) {
+const setPreset = async (cron) => {
   error.value = ''
   try {
     await props.setSchedule(cron)
@@ -147,7 +147,7 @@ async function setPreset(cron) {
   }
 }
 
-async function saveCustomSchedule() {
+const saveCustomSchedule = async () => {
   error.value = ''
   scheduleSaving.value = true
   try {
@@ -162,7 +162,7 @@ async function saveCustomSchedule() {
   }
 }
 
-async function disable() {
+const disable = async () => {
   error.value = ''
   loading.value = true
   try {
@@ -176,7 +176,7 @@ async function disable() {
   }
 }
 
-async function enable() {
+const enable = async () => {
   error.value = ''
   loading.value = true
   try {

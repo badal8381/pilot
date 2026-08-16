@@ -64,7 +64,7 @@ watch(
   { immediate: true },
 )
 
-function onInstall(app) {
+const onInstall = (app) => {
   installTarget.value = app
   showInstallApp.value = true
 }

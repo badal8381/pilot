@@ -1,4 +1,4 @@
-export async function openSiteLogin(createLink) {
+export const openSiteLogin = async (createLink) => {
   const link = await createLink()
   if (typeof link?.url !== 'string') {
     throw new Error('The site login link is invalid.')

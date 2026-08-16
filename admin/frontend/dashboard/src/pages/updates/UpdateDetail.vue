@@ -85,18 +85,18 @@ const openTaskLog = (log) => router.push({ name: 'TaskDetail', params: { taskId:
 
 const expandedSites = ref(new Set())
 
-function toggleSiteJobs(siteName) {
+const toggleSiteJobs = (siteName) => {
   if (!siteJobs(siteName).length) return
   const expanded = new Set(expandedSites.value)
   if (!expanded.delete(siteName)) expanded.add(siteName)
   expandedSites.value = expanded
 }
 
-function siteJobs(siteName) {
+const siteJobs = (siteName) => {
   return (op.value?.task_logs || []).filter((log) => log.site === siteName)
 }
 
-async function load() {
+const load = async () => {
   try {
     op.value = await updatesApi.detail(props.operationId)
     error.value = ''
@@ -109,7 +109,7 @@ async function load() {
   }
 }
 
-async function refresh() {
+const refresh = async () => {
   refreshing.value = true
   try {
     await load()
@@ -118,14 +118,14 @@ async function refresh() {
   }
 }
 
-function schedule() {
+const schedule = () => {
   clearTimeout(timer)
   if (op.value && !isResolved(op.value) && (!isAttention.value || pending.value)) {
     timer = setTimeout(load, 3000)
   }
 }
 
-async function runAction(action) {
+const runAction = async (action) => {
   acting.value = true
   try {
     op.value = (await action()).operation || op.value
@@ -150,7 +150,7 @@ const doSkip = () => {
 const shortSha = (sha) => sha?.slice(0, 7) || '—'
 
 // Green sha = the checkout happened; gray = still just the plan.
-function revisionHint(app) {
+const revisionHint = (app) => {
   const target = shortSha(app.updated_sha || app.target_sha)
   return app.updated_sha ? `Updated to ${target}` : `Will update to ${target}`
 }
@@ -167,7 +167,7 @@ const appsOpen = ref(true)
 const serverOpen = ref(true)
 let openDefaultsSet = false
 
-function applyOpenDefaults() {
+const applyOpenDefaults = () => {
   if (openDefaultsSet || !op.value) return
   openDefaultsSet = true
   const settled = isResolved(op.value) && !anythingFailed.value
@@ -176,7 +176,7 @@ function applyOpenDefaults() {
   appsOpen.value = !settled
 }
 
-function siteCaption(site) {
+const siteCaption = (site) => {
   const status = siteStatus(site)
   if (status.value === 'pending') return ''
   if (status.value === 'success') return 'Migrated'

@@ -37,7 +37,7 @@ const rows = computed(() =>
 )
 const isLastKey = computed(() => rows.value.length <= 1)
 
-async function load() {
+const load = async () => {
   loading.value = true
   loadError.value = ''
   try {
@@ -49,13 +49,13 @@ async function load() {
   }
 }
 
-function openAdd() {
+const openAdd = () => {
   newKey.value = ''
   error.value = ''
   showAdd.value = true
 }
 
-async function add() {
+const add = async () => {
   adding.value = true
   error.value = ''
   try {
@@ -74,12 +74,12 @@ async function add() {
   }
 }
 
-function promptRemove(row) {
+const promptRemove = (row) => {
   removing.value = row
   showRemove.value = true
 }
 
-async function confirmRemove() {
+const confirmRemove = async () => {
   removingBusy.value = true
   try {
     const response = await sshKeysApi.remove(removing.value.fingerprint)

@@ -26,7 +26,7 @@ watch(show, (open) => {
   }
 })
 
-function preview(table) {
+const preview = (table) => {
   emit('preview', table.name)
   show.value = false
 }

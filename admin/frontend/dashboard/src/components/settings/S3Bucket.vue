@@ -47,7 +47,7 @@ const canSave = computed(
     (secretKeySet.value || Boolean(secretKey.value.trim())),
 )
 
-async function load() {
+const load = async () => {
   loading.value = true
   try {
     const data = await settingsApi.get()
@@ -65,7 +65,7 @@ async function load() {
   }
 }
 
-async function save() {
+const save = async () => {
   saving.value = true
   error.value = ''
   try {
@@ -92,7 +92,7 @@ async function save() {
   }
 }
 
-async function disconnect() {
+const disconnect = async () => {
   disconnecting.value = true
   try {
     const result = await settingsApi.update({ s3: { disconnect: true } })

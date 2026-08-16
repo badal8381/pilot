@@ -12,7 +12,7 @@ const openSection = defineModel('openSection')
 const showRevokePrompt = ref(false)
 const revoking = ref(false)
 
-async function revokeOtherSessions() {
+const revokeOtherSessions = async () => {
   revoking.value = true
   try {
     const result = await sessionApi.revokeAll()

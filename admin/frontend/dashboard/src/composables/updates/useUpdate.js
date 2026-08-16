@@ -9,10 +9,10 @@ const loaded = ref(false)
 const POLL_INTERVAL_MS = 3000
 let timer = null
 
-export function useUpdate() {
+export const useUpdate = () => {
   const { updatesAvailable, checked, check } = useAppUpdates()
 
-  async function load() {
+  const load = async () => {
     const wasActive = isActive(current.value)
     try {
       current.value = await updatesApi.current()
@@ -25,18 +25,18 @@ export function useUpdate() {
     }
   }
 
-  function schedule() {
+  const schedule = () => {
     clearTimeout(timer)
     if (isActive(current.value) || isPending(current.value)) {
       timer = setTimeout(load, POLL_INTERVAL_MS)
     }
   }
 
-  function stop() {
+  const stop = () => {
     clearTimeout(timer)
   }
 
-  function start() {
+  const start = () => {
     load()
     if (!checked.value) check()
   }

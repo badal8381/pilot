@@ -21,16 +21,16 @@ export const STATUS_CONFIG = {
   },
 }
 
-export function statusConfig(task) {
+export const statusConfig = (task) => {
   return STATUS_CONFIG[task.status] || STATUS_CONFIG.killed
 }
 
-export function isTaskActive(task) {
+export const isTaskActive = (task) => {
   return task?.status === 'queued' || task?.status === 'running'
 }
 
 // The backend decides this - some tasks leave partial state behind when killed.
-export function isTaskCancellable(task) {
+export const isTaskCancellable = (task) => {
   return Boolean(task?.is_cancellable)
 }
 
@@ -119,11 +119,11 @@ const COMMAND_TYPE = Object.fromEntries(
   TASK_TYPES.flatMap(({ value, commands }) => commands.map((command) => [command, value])),
 )
 
-export function taskType(task) {
+export const taskType = (task) => {
   return COMMAND_TYPE[task.command] || 'other'
 }
 
-export function commandLabel(command) {
+export const commandLabel = (command) => {
   return (
     COMMAND_LABELS[command] || command.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
   )
@@ -148,19 +148,19 @@ const SITE_ARG_KEY = {
 // site filter carries, so it has to read as a label.
 export const SERVER_SCOPE = 'Server'
 
-export function siteLabel(task) {
+export const siteLabel = (task) => {
   const key = SITE_ARG_KEY[task.command]
   return (key && task.args?.[key]) || SERVER_SCOPE
 }
 
-export function siteRoute(task) {
+export const siteRoute = (task) => {
   const site = siteLabel(task)
   if (site === SERVER_SCOPE) return null
   return { name: 'SiteDetail', params: { name: site } }
 }
 
 // What a task ran against, so a detail header reads the same either way.
-export function taskScope(task) {
+export const taskScope = (task) => {
   const label = siteLabel(task)
   if (label === SERVER_SCOPE) return { label, route: { name: 'Server' } }
   return { label, route: siteRoute(task) }
@@ -186,7 +186,7 @@ const APP_ACTION_FOR_COMMAND = {
   'get-and-install-app': 'install-app',
 }
 
-export function redirectRouteOnSuccess(task) {
+export const redirectRouteOnSuccess = (task) => {
   if (!REDIRECT_ON_SUCCESS_COMMANDS.includes(task.command)) return null
   if (task.command === 'drop-site') return { name: 'Sites' }
   const route = siteRoute(task)
@@ -197,7 +197,7 @@ export function redirectRouteOnSuccess(task) {
   return { ...route, query: { app, action: APP_ACTION_FOR_COMMAND[task.command] } }
 }
 
-export function relativeTime(iso) {
+export const relativeTime = (iso) => {
   if (!iso) return ''
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (seconds < 5) return 'just now'
@@ -215,7 +215,7 @@ export function relativeTime(iso) {
  * but anything over a minute still renders as "1m 30s", never "1.5m", so two
  * durations on the same screen never disagree about what a minute looks like.
  */
-export function fmtDuration(seconds, { precise = false } = {}) {
+export const fmtDuration = (seconds, { precise = false } = {}) => {
   if (seconds == null) return ''
   if (precise && seconds < 60) return `${seconds.toFixed(1)}s`
   const total = Math.round(seconds)
@@ -223,7 +223,7 @@ export function fmtDuration(seconds, { precise = false } = {}) {
   return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`
 }
 
-export function fmtDateTime(iso) {
+export const fmtDateTime = (iso) => {
   if (!iso) return '-'
   return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
@@ -233,7 +233,7 @@ export function fmtDateTime(iso) {
  * the queue takes that slot - it is the only thing worth knowing about a task
  * that has not started.
  */
-export function taskTiming(task) {
+export const taskTiming = (task) => {
   if (task.status === 'queued') {
     const position = task.queue_position ? `#${task.queue_position} in queue` : ''
     return [position, relativeTime(task.queued_at)].filter(Boolean).join(' · ')

@@ -20,7 +20,7 @@ export const OPERATOR_LABELS = {
 
 export const ACTION_LABELS = { block: 'Block', log: 'Log', skip: 'Skip' }
 
-export function ruleProblem(rule) {
+export const ruleProblem = (rule) => {
   // Shared by the editor (Incomplete badge, Add refusal) and the save gate.
   // An empty value matches every request for its field; a conditionless rule
   // is dropped by the nginx renderer without a word.
@@ -39,7 +39,7 @@ export function ruleProblem(rule) {
  * separately so it never clips. Spelling out every condition outgrows the row at
  * three of them, so past one the count is what a glance gets.
  */
-export function ruleSummary(rule) {
+export const ruleSummary = (rule) => {
   const count = rule.conditions?.length || 0
   if (count !== 1) return `When ${rule.match === 'any' ? 'any' : 'all'} of ${count} conditions match`
   const [condition] = rule.conditions
@@ -51,6 +51,6 @@ export function ruleSummary(rule) {
   return `When ${field} ${operator} "${condition.value || '…'}"`
 }
 
-export function actionLabel(rule) {
+export const actionLabel = (rule) => {
   return ACTION_LABELS[rule.action] || rule.action
 }

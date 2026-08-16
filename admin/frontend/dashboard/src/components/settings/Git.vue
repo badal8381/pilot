@@ -20,7 +20,7 @@ const tokenHelpUrl = computed(
     'https://github.com/settings/tokens/new?scopes=repo&description=Bench+CLI',
 )
 
-async function load() {
+const load = async () => {
   loading.value = true
   try {
     status.value = await gitApi.status()
@@ -30,7 +30,7 @@ async function load() {
   }
 }
 
-async function verifyAndConnect() {
+const verifyAndConnect = async () => {
   if (!token.value.trim()) {
     error.value = 'Paste a personal access token to connect.'
     return
@@ -53,7 +53,7 @@ async function verifyAndConnect() {
   }
 }
 
-async function verifyConnection() {
+const verifyConnection = async () => {
   verifying.value = true
   try {
     const result = await gitApi.repos()
@@ -67,7 +67,7 @@ async function verifyConnection() {
   }
 }
 
-async function disconnect() {
+const disconnect = async () => {
   await gitApi.disconnect()
   username.value = ''
   await load()

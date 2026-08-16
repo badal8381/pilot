@@ -10,12 +10,12 @@ const showBenches = ref(false)
 const showNewBench = ref(false)
 
 // shared by mobile settings page & desktop sidebar
-export function useAppMenu() {
+export const useAppMenu = () => {
   const router = useRouter()
   const { setColorScheme } = useColorScheme()
   const { session } = useSession()
 
-  async function logout() {
+  const logout = async () => {
     await authApi.logout()
     window.location.reload()
   }

@@ -2,6 +2,6 @@ import { ref } from 'vue'
 
 const awaitingTerminal = ref(false)
 
-export function useSetupHandoff() {
+export const useSetupHandoff = () => {
   return { awaitingTerminal }
 }

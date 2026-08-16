@@ -6,6 +6,6 @@ export const LIVE_POLL_MS = 10000
 export const LIVE_WARMUP_POLL_MS = 1000
 export const MIN_CHART_POINTS = 2
 
-export function livePollDelayMs({ isLive, pointCount }) {
+export const livePollDelayMs = ({ isLive, pointCount }) => {
   return isLive && pointCount < MIN_CHART_POINTS ? LIVE_WARMUP_POLL_MS : LIVE_POLL_MS
 }

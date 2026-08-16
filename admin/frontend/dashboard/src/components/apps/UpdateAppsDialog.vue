@@ -41,17 +41,17 @@ watch(
   { immediate: true },
 )
 
-function toggle(name) {
+const toggle = (name) => {
   const next = new Set(selected.value)
   next.has(name) ? next.delete(name) : next.add(name)
   selected.value = next
 }
 
-function toggleAll() {
+const toggleAll = () => {
   selected.value = selected.value.size === appNames.value.length ? new Set() : new Set(appNames.value)
 }
 
-async function runUpdate() {
+const runUpdate = async () => {
   if (!selected.value.size) return
   updating.value = true
   error.value = ''

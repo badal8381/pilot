@@ -1,12 +1,12 @@
 import { toSentenceCase } from './format.js'
 
-export function isFrappeApp(app) {
+export const isFrappeApp = (app) => {
   return Boolean(app.repo?.includes('github.com/frappe/'))
 }
 
 // The whole catalog is too much to scan while naming a site: Frappe's own apps
 // plus whatever is already cloned onto this bench, marketplace for the rest.
-export function buildSiteAppChoices(registry = [], benchApps = []) {
+export const buildSiteAppChoices = (registry = [], benchApps = []) => {
   const apps = new Map()
   registry
     .filter((app) => app.name !== 'frappe' && isFrappeApp(app))

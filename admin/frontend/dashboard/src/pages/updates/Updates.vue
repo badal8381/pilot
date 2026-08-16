@@ -47,14 +47,14 @@ const visibleOperations = computed(() =>
   operations.value.filter((op) => matchesUpdateFilter(op, statusFilter.value)),
 )
 
-function onFilterChange(value) {
+const onFilterChange = (value) => {
   const query = { ...route.query }
   if (value === 'all') delete query.status
   else query.status = value
   router.replace({ name: 'Updates', query })
 }
 
-function badge(op) {
+const badge = (op) => {
   if (op.pending_action) return { label: pendingActionLabel(op.pending_action), theme: 'amber' }
   if (op.state === 'completed') return null
   const tone = stateTone(op.state)
@@ -85,7 +85,7 @@ const rows = computed(() =>
 
 const getRowRoute = (row) => ({ name: 'UpdateDetail', params: { operationId: row.id } })
 
-function timing(op) {
+const timing = (op) => {
   const parts = []
   if (op.finished_at && op.started_at) {
     parts.push(`took ${fmtDuration((new Date(op.finished_at) - new Date(op.started_at)) / 1000)}`)
@@ -94,7 +94,7 @@ function timing(op) {
   return parts.filter(Boolean).join(' · ')
 }
 
-async function load() {
+const load = async () => {
   loading.value = true
   error.value = ''
   try {

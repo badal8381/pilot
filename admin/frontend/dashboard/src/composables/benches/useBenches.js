@@ -3,13 +3,13 @@ import { ref } from 'vue'
 import { apiErrorMessage } from '@/api/client'
 import { benchesApi } from '@/api/benches'
 
-export function useBenches() {
+export const useBenches = () => {
   const benches = ref([])
   const loading = ref(false)
   const controlLoading = ref('')
   const error = ref('')
 
-  async function load() {
+  const load = async () => {
     loading.value = true
     try {
       benches.value = await benchesApi.list()
@@ -19,7 +19,7 @@ export function useBenches() {
     }
   }
 
-  async function run(name, action) {
+  const run = async (name, action) => {
     error.value = ''
     try {
       const result = await action()
@@ -40,7 +40,7 @@ export function useBenches() {
     }
   }
 
-  async function control(name, action) {
+  const control = async (name, action) => {
     const operation = benchesApi[action]
     if (!operation) {
       error.value = 'Unsupported bench action.'
@@ -54,7 +54,7 @@ export function useBenches() {
     }
   }
 
-  function drop(name) {
+  const drop = (name) => {
     return run(name, () => benchesApi.drop(name))
   }
 

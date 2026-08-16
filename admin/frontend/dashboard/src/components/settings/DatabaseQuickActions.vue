@@ -66,7 +66,7 @@ const maxConnectionsDescription = computed(() => {
   return `Current: ${Number.isInteger(current) ? current : 'unavailable'}`
 })
 
-function action(name) {
+const action = (name) => {
   return (
     capabilities.value?.actions?.[name] || {
       available: false,
@@ -75,16 +75,16 @@ function action(name) {
   )
 }
 
-function formatSizingValue(value, unit = '') {
+const formatSizingValue = (value, unit = '') => {
   return `${value}${unit ? ` ${unit}` : ''}`
 }
 
-function idempotencyKey(actionName) {
+const idempotencyKey = (actionName) => {
   const random = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
   return `database-${actionName}-${Date.now()}-${random}`
 }
 
-function confirmRestart() {
+const confirmRestart = () => {
   actionError.value = ''
   confirmation.value = {
     action: 'restart',
@@ -96,7 +96,7 @@ function confirmRestart() {
   }
 }
 
-function confirmPerformanceSchema(enabled) {
+const confirmPerformanceSchema = (enabled) => {
   if (action('performance_schema').enabled === enabled) return
   actionError.value = ''
   confirmation.value = {
@@ -109,7 +109,7 @@ function confirmPerformanceSchema(enabled) {
   }
 }
 
-function openSizingAction(actionName) {
+const openSizingAction = (actionName) => {
   actionError.value = ''
   const capability = action(actionName)
   if (!capability.available) return
@@ -144,7 +144,7 @@ function openSizingAction(actionName) {
   }
 }
 
-async function runConfirmedAction() {
+const runConfirmedAction = async () => {
   if (!confirmation.value || activeAction.value) return
   const pending = confirmation.value
   activeAction.value = pending.action
@@ -166,7 +166,7 @@ async function runConfirmedAction() {
   }
 }
 
-async function runSizingAction() {
+const runSizingAction = async () => {
   if (
     !sizingAction.value ||
     sizingValidationError.value ||
@@ -197,11 +197,11 @@ async function runSizingAction() {
   }
 }
 
-function openBinlogs() {
+const openBinlogs = () => {
   router.push('/database/analyzer')
 }
 
-async function load() {
+const load = async () => {
   if (loading.value) return
   loading.value = true
   error.value = ''

@@ -14,7 +14,7 @@ const props = defineProps({
 
 const el = ref(null)
 
-function scrollToBottom() {
+const scrollToBottom = () => {
   nextTick(() => {
     if (el.value) el.value.scrollTop = el.value.scrollHeight
   })
@@ -24,7 +24,7 @@ function scrollToBottom() {
 // bottom resumes it.
 const follow = ref(true)
 
-function onScroll() {
+const onScroll = () => {
   const box = el.value
   if (!box) return
   follow.value = box.scrollHeight - box.scrollTop - box.clientHeight < 8

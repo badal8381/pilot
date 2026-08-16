@@ -39,7 +39,7 @@ watch(open, (isOpen) => {
   if (isOpen) load()
 })
 
-async function load() {
+const load = async () => {
   loading.value = true
   error.value = ''
   tables.value = []

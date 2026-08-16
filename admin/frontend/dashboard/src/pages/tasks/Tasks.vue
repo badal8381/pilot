@@ -101,7 +101,7 @@ const typeLabel = computed(
 const siteLabelText = computed(() => siteFilter.value || 'All sites')
 
 // Patch, not replace: changing one filter must not clear the other.
-function setFilterQuery(patch) {
+const setFilterQuery = (patch) => {
   const query = { ...route.query, ...patch }
   for (const key of Object.keys(query)) if (!query[key]) delete query[key]
   router.replace({ name: 'Tasks', query })
@@ -116,7 +116,7 @@ const isFiltered = computed(
   () => statusFilter.value !== 'all' || Boolean(siteFilter.value) || Boolean(typeFilter.value),
 )
 
-function onFilterChange(value) {
+const onFilterChange = (value) => {
   setFilterQuery({ status: value === 'all' ? '' : value })
   load(value)
 }

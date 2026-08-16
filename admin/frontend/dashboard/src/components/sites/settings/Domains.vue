@@ -32,7 +32,7 @@ const domainRows = computed(() => {
   return rows
 })
 
-function domainMenuOptions(row) {
+const domainMenuOptions = (row) => {
   const options = []
   if (!row.isPrimary) {
     options.push({
@@ -52,7 +52,7 @@ function domainMenuOptions(row) {
   return options
 }
 
-async function loadDomains() {
+const loadDomains = async () => {
   loading.value = true
   error.value = ''
   try {
@@ -66,7 +66,7 @@ async function loadDomains() {
   }
 }
 
-async function setPrimary(domain) {
+const setPrimary = async (domain) => {
   error.value = ''
   try {
     const data = await sitesApi.domains.setPrimary(props.siteName, domain)
@@ -84,7 +84,7 @@ const showAdd = ref(false)
 const showRemove = ref(false)
 const removeTarget = ref('')
 
-function openRemove(domain) {
+const openRemove = (domain) => {
   removeTarget.value = domain
   showRemove.value = true
 }

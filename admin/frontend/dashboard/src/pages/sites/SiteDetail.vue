@@ -95,12 +95,12 @@ watch(
 
 const isMobile = useIsMobile()
 
-function openSite() {
+const openSite = () => {
   window.open(`https://${site.value.name}/desk`, '_blank')
 }
 
 const settingUpSite = ref(false)
-async function setupSite() {
+const setupSite = async () => {
   settingUpSite.value = true
   try {
     await login()
@@ -111,15 +111,15 @@ async function setupSite() {
   }
 }
 
-function goToMarketplace() {
+const goToMarketplace = () => {
   router.push({ path: '/marketplace', query: { site: siteName } })
 }
 
-function goToAnalytics() {
+const goToAnalytics = () => {
   router.push({ name: 'Analytics', query: { view: 'site', window: '24h', site: siteName } })
 }
 
-function loginAsAdmin() {
+const loginAsAdmin = () => {
   toast.promise(login(), {
     loading: 'Logging in as admin',
     success: 'Logged in as admin',
@@ -127,7 +127,7 @@ function loginAsAdmin() {
   })
 }
 
-async function backupNow() {
+const backupNow = async () => {
   try {
     const result = await backup()
     if (result.ok) openTaskDetailPage(router, result.task_id)

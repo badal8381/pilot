@@ -14,7 +14,7 @@ const props = defineProps({
 })
 
 // Open while running or failed; anything else settles closed unless toggled.
-function shouldExpand(status) {
+const shouldExpand = (status) => {
   return status === 'running' || status === 'failed'
 }
 
@@ -28,7 +28,7 @@ watch(
   },
 )
 
-function toggle() {
+const toggle = () => {
   if (!props.hasOutput) return
   userOverridden = true
   expanded.value = !expanded.value

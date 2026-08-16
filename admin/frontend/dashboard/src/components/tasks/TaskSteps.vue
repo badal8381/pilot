@@ -21,14 +21,14 @@ const taskRef = computed(() => ({ status: props.taskStatus }))
 const { stepSections, hasSteps, stepDuration } = useTaskSteps(rawLinesRef, streamingRef, taskRef)
 const processedLines = computed(() => props.rawLines.map(processLine))
 
-function sectionLines(section) {
+const sectionLines = (section) => {
   return props.rawLines
     .slice(section.lineStart, section.lineEnd)
     .filter((line) => !STEP_MARKER_RE.test(line))
     .map(processLine)
 }
 
-function sectionHasOutput(section) {
+const sectionHasOutput = (section) => {
   return props.rawLines
     .slice(section.lineStart, section.lineEnd)
     .some((line) => line.trim() && !STEP_MARKER_RE.test(line))

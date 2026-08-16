@@ -109,7 +109,7 @@ const activityRows = computed(() =>
 const showDetail = ref(false)
 const viewingDetail = ref(null)
 
-function openDetail(row) {
+const openDetail = (row) => {
   viewingDetail.value = row.raw
   showDetail.value = true
 }
@@ -129,7 +129,7 @@ const detailEntries = computed(() => {
 
 const AUDIT_TYPE_LABELS = { ssh_key: 'SSH Key' }
 
-function auditTypeLabel(type) {
+const auditTypeLabel = (type) => {
   if (!type) return ''
   return AUDIT_TYPE_LABELS[type] || type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -153,39 +153,39 @@ const DETAIL_KEYS = [
 
 // Short enough to fit the column without forcing the row wider than its container -
 // full context (below) only shows up in the hover tooltip.
-function auditEntryHead(entry) {
+const auditEntryHead = (entry) => {
   const label = entry.type === 'task' ? commandLabel(entry.command) : auditTypeLabel(entry.type)
   return entry.event ? `${label} ${entry.event}` : label
 }
 
-function auditEntryDetail(entry) {
+const auditEntryDetail = (entry) => {
   const source = { ...entry, ...entry.args }
   const detail = [...new Set(DETAIL_KEYS.map((key) => source[key]).filter(Boolean))].join(' · ')
   const head = auditEntryHead(entry)
   return detail ? `${head} — ${detail}` : head
 }
 
-function relativeTimeOrDash(seconds) {
+const relativeTimeOrDash = (seconds) => {
   return seconds ? relativeTime(new Date(seconds * 1000).toISOString()) : '-'
 }
 
-function formatDate(seconds) {
+const formatDate = (seconds) => {
   return seconds ? fmtDateTime(new Date(seconds * 1000).toISOString()) : '-'
 }
 
-function menuOptions(row) {
+const menuOptions = (row) => {
   return [
     { label: 'View activity', icon: 'lucide-history', onClick: () => (jti.value = row.jti) },
     { label: 'Revoke session', icon: 'lucide-log-out', theme: 'red', onClick: () => promptRevoke(row) },
   ]
 }
 
-function promptRevoke(row) {
+const promptRevoke = (row) => {
   revoking.value = row
   showRevoke.value = true
 }
 
-async function confirmRevoke() {
+const confirmRevoke = async () => {
   revokeBusy.value = true
   try {
     const response = await sessionApi.revoke(revoking.value.jti)
@@ -203,7 +203,7 @@ async function confirmRevoke() {
   }
 }
 
-async function load() {
+const load = async () => {
   try {
     const data = await sessionApi.list()
     activeTokens.value = data.active_tokens || []

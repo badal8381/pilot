@@ -3,14 +3,14 @@ import { ref } from 'vue'
 // Standalone so api/client.js can report without importing useSession (which imports the client).
 const signedOut = ref(false)
 
-export function reportSignedOut() {
+export const reportSignedOut = () => {
   signedOut.value = true
 }
 
-export function isSignedOut() {
+export const isSignedOut = () => {
   return signedOut.value
 }
 
-export function useSignedOut() {
+export const useSignedOut = () => {
   return { signedOut }
 }

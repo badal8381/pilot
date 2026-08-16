@@ -16,7 +16,7 @@ const streaming = ref(false)
 const error = ref('')
 let source = null
 
-function close() {
+const close = () => {
   if (source) {
     source.close()
     source = null
@@ -26,7 +26,7 @@ function close() {
 
 // Answers are cached per task, so reopening replays the previous one instantly.
 // `refresh` asks the model again and replaces it.
-function start({ refresh = false } = {}) {
+const start = ({ refresh = false } = {}) => {
   close()
   text.value = ''
   error.value = ''

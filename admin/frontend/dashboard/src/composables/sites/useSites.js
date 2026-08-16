@@ -6,8 +6,8 @@ const sites = ref([])
 const loading = ref(false)
 const error = ref('')
 
-export function useSites() {
-  async function load() {
+export const useSites = () => {
+  const load = async () => {
     loading.value = true
     error.value = ''
     try {

@@ -7,19 +7,19 @@ import { parseBranchVersion, toSentenceCase } from '@/utils/format'
 import { matchesPill } from '@/utils/marketplaceCategories'
 import { isFrappeApp } from '@/utils/siteApps'
 
-function parseVersion(branch) {
+const parseVersion = (branch) => {
   const match = /^version-(\d+)/.exec(branch || '')
   return match ? Number(match[1]) : null
 }
 
-function parseBenchBranch(branch) {
+const parseBenchBranch = (branch) => {
   const version = parseVersion(branch)
   if (version !== null) return { version, label: `v${version}` }
   if (branch === 'develop') return { version: null, label: 'Nightly' }
   return { version: null, label: parseBranchVersion(branch) || null }
 }
 
-function sortApps(a, b) {
+const sortApps = (a, b) => {
   if (a.installed !== b.installed) return a.installed ? -1 : 1
   const as = a.stars ?? -1
   const bs = b.stars ?? -1
@@ -27,7 +27,7 @@ function sortApps(a, b) {
   return (a.title || a.name).localeCompare(b.title || b.name)
 }
 
-export function useMarketplace(initialSiteName = '') {
+export const useMarketplace = (initialSiteName = '') => {
   const registry = ref([])
   const benchName = ref('')
   const benchVersion = ref(null)
@@ -43,7 +43,7 @@ export function useMarketplace(initialSiteName = '') {
   const currentSiteName = ref('')
   const benchApps = ref([])
 
-  async function load() {
+  const load = async () => {
     loading.value = true
     error.value = ''
     try {
@@ -82,11 +82,11 @@ export function useMarketplace(initialSiteName = '') {
   )
   const installedOnCurrentSite = computed(() => new Set(currentSite.value?.active_apps || []))
 
-  function isInstalledOnAllSites(appName) {
+  const isInstalledOnAllSites = (appName) => {
     return Boolean(sites.value.length) && sites.value.every((site) => site.active_apps?.includes(appName))
   }
 
-  function isAppInstalled(appName) {
+  const isAppInstalled = (appName) => {
     return currentSiteName.value
       ? installedOnCurrentSite.value.has(appName)
       : isInstalledOnAllSites(appName)
@@ -102,11 +102,11 @@ export function useMarketplace(initialSiteName = '') {
       .sort((a, b) => a.title.localeCompare(b.title))
   })
 
-  function matchesWorksWith(app) {
+  const matchesWorksWith = (app) => {
     return !worksWith.value || Object.hasOwn(app.dependencies || {}, worksWith.value)
   }
 
-  function matchesSearch(app, query) {
+  const matchesSearch = (app, query) => {
     return (
       !query ||
       app.title?.toLowerCase().includes(query) ||

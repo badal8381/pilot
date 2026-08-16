@@ -62,7 +62,7 @@ const modelsHint = computed(() => {
   return `Enter the ${providerLabel.value} API key above to load models.`
 })
 
-async function fetchModels(providerValue) {
+const fetchModels = async (providerValue) => {
   models.value = []
   modelsError.value = ''
   if (!providerValue || freeTextModel.value) return
@@ -81,7 +81,7 @@ async function fetchModels(providerValue) {
   }
 }
 
-function onProviderSelect(value) {
+const onProviderSelect = (value) => {
   provider.value = value || ''
   model.value = ''
   fetchModels(provider.value)
@@ -95,7 +95,7 @@ watch([apiKey, apiBase], () => {
   apiKeyDebounce = setTimeout(() => fetchModels(provider.value), 600)
 })
 
-async function load() {
+const load = async () => {
   loading.value = true
   try {
     const data = await settingsApi.get()
@@ -113,7 +113,7 @@ async function load() {
   }
 }
 
-async function save() {
+const save = async () => {
   saving.value = true
   error.value = ''
   try {
@@ -141,7 +141,7 @@ async function save() {
   }
 }
 
-async function disconnect() {
+const disconnect = async () => {
   disconnecting.value = true
   try {
     const result = await settingsApi.update({ llm: { disconnect: true } })

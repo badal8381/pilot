@@ -27,13 +27,13 @@ const otp = ref('')
 const twoFactorRequired = ref(false)
 const isMobile = useIsMobile()
 
-function cancelTwoFactor() {
+const cancelTwoFactor = () => {
   twoFactorRequired.value = false
   otp.value = ''
   errorMessage.value = ''
 }
 
-async function login() {
+const login = async () => {
   if (twoFactorRequired.value ? !otp.value : !password.value) return
   isSubmitting.value = true
   errorMessage.value = ''

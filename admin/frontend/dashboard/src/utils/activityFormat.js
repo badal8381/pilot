@@ -12,11 +12,11 @@ const typeMetaMap = {
 
 const defaultTypeMeta = { icon: 'lucide-activity', iconBg: 'bg-surface-gray-2 text-ink-gray-7' }
 
-export function activityTypeMeta(entry) {
+export const activityTypeMeta = (entry) => {
   return typeMetaMap[entry.type] || defaultTypeMeta
 }
 
-export function activityTypeIcon(type) {
+export const activityTypeIcon = (type) => {
   return (typeMetaMap[type] || defaultTypeMeta).icon
 }
 
@@ -50,7 +50,7 @@ const sessionEventLabels = {
   recovery_codes_regenerated: 'Recovery codes regenerated',
 }
 
-export function activityLabel(entry) {
+export const activityLabel = (entry) => {
   const site = entry.site ? ` on ${entry.site}` : ''
   switch (entry.type) {
     case 'backup':
@@ -76,23 +76,23 @@ export function activityLabel(entry) {
   }
 }
 
-export function activityResourceRoute(entry) {
+export const activityResourceRoute = (entry) => {
   if (entry.site) return { name: 'SiteDetail', params: { name: entry.site } }
   if (entry.type === 'task' && entry.task_id)
     return { name: 'TaskDetail', params: { taskId: entry.task_id } }
   return null
 }
 
-export function activityResourceLabel(entry) {
+export const activityResourceLabel = (entry) => {
   if (entry.site) return entry.site
   if (entry.type === 'task' && entry.task_id) return entry.task_id
   return ''
 }
 
-export function activityActorLabel(entry) {
+export const activityActorLabel = (entry) => {
   return entry.actor || entry.ip || 'System'
 }
 
-export function activityTime(entry) {
+export const activityTime = (entry) => {
   return relativeTime(entry.logged_at)
 }

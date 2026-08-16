@@ -17,7 +17,7 @@ const router = useRouter()
 
 const { name: benchName, load: loadBench } = useBench()
 
-function shortRelativeTime(iso) {
+const shortRelativeTime = (iso) => {
   const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
   if (seconds < 60) return 'just now'
   const minutes = Math.floor(seconds / 60)
@@ -27,7 +27,7 @@ function shortRelativeTime(iso) {
   return `${Math.floor(hours / 24)}d ago`
 }
 
-function hasErrors(log) {
+const hasErrors = (log) => {
   return log.filename.endsWith('.error.log') && log.size_bytes > 0
 }
 
@@ -48,7 +48,7 @@ const totalLineCount = computed(
     rawLines.value.length,
 )
 
-async function loadLogs() {
+const loadLogs = async () => {
   logsLoading.value = true
   logsError.value = ''
   try {
@@ -102,7 +102,7 @@ const visibleLines = computed(() => {
 watch(visibleLines, () => nextTick(syncMatches))
 watch(linesCount, () => loadContent())
 
-function syncMatches() {
+const syncMatches = () => {
   // Skip the DOM scan entirely when there's nothing to highlight - matters
   // most during live tail, where visibleLines otherwise changes every line.
   if (!isSearching.value) {
@@ -123,18 +123,18 @@ function syncMatches() {
   }
 }
 
-function gotoMatch(delta) {
+const gotoMatch = (delta) => {
   const marks = matchEls()
   if (!marks.length) return
   activeMatch.value = (activeMatch.value + delta + marks.length) % marks.length
   paintMatches(true)
 }
 
-function matchEls() {
+const matchEls = () => {
   return viewer.value ? [...viewer.value.querySelectorAll('mark[data-mi]')] : []
 }
 
-function paintMatches(scroll) {
+const paintMatches = (scroll) => {
   matchEls().forEach((el, index) => {
     const active = index === activeMatch.value
     el.classList.toggle('log-match--active', active)
@@ -150,7 +150,7 @@ watch(selectedFile, (filename) => {
   if (filename) loadContent()
 })
 
-async function loadContent() {
+const loadContent = async () => {
   if (!selectedFile.value) return
   contentLoading.value = true
   contentError.value = ''
@@ -168,7 +168,7 @@ async function loadContent() {
   }
 }
 
-function startLive() {
+const startLive = () => {
   liveMode.value = true
   rawLines.value = []
   eventSource = new EventSource(logsApi.streamUrl(selectedFile.value))
@@ -180,7 +180,7 @@ function startLive() {
   eventSource.onerror = () => stopLive()
 }
 
-function stopLive() {
+const stopLive = () => {
   liveMode.value = false
   if (eventSource) {
     eventSource.close()
@@ -190,7 +190,7 @@ function stopLive() {
 
 // Wrap matches in rendered HTML, touching only text between tags so ANSI
 // <span>s stay intact; the pattern is built from an HTML-escaped term.
-function highlight(html, pattern) {
+const highlight = (html, pattern) => {
   return html.replace(
     /(<[^>]+>)|([^<]+)/g,
     (_, tag, text) =>
@@ -199,7 +199,7 @@ function highlight(html, pattern) {
   )
 }
 
-function escapeRegExp(text) {
+const escapeRegExp = (text) => {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 

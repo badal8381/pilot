@@ -20,7 +20,7 @@ const STEP_SUBTITLES = {
   database: 'Choose and configure your database',
 }
 
-export function useSetup() {
+export const useSetup = () => {
   const { awaitingTerminal } = useSetupHandoff()
 
   // Wizard state
@@ -104,7 +104,7 @@ export function useSetup() {
   const stepSubtitle = computed(() => STEP_SUBTITLES[currentStep.value] || null)
 
   // Loading
-  async function loadConfig() {
+  const loadConfig = async () => {
     try {
       const config = await setupApi.config()
       benchName.value = config.bench_name || ''
@@ -149,7 +149,7 @@ export function useSetup() {
     loadBranches()
   }
 
-  async function loadBranches() {
+  const loadBranches = async () => {
     try {
       availableBranches.value = (await setupApi.branches()).branches || []
     } catch {
@@ -158,19 +158,19 @@ export function useSetup() {
   }
 
   // Stream
-  function startStream(taskId) {
+  const startStream = (taskId) => {
     setupTaskId.value = taskId
     streamStatus.value = 'Starting…'
     streamUrl.value = setupApi.streamUrl(taskId)
     currentStep.value = 'running'
   }
 
-  function updateStreamStatus(line) {
+  const updateStreamStatus = (line) => {
     const match = line.match(/^\[\d+\/\d+\]\s*(.+?)\.*\s*$/)
     if (match) streamStatus.value = match[1]
   }
 
-  function onStreamDone(success) {
+  const onStreamDone = (success) => {
     if (!success) {
       failInstall('Setup failed. Open the details to see what went wrong, then try again.')
       return
@@ -180,18 +180,18 @@ export function useSetup() {
     shutdownWizardAndReload()
   }
 
-  function failInstall(message) {
+  const failInstall = (message) => {
     errorMessage.value = message
     showStreamDetails.value = true
   }
 
-  function toggleStreamDetails() {
+  const toggleStreamDetails = () => {
     showStreamDetails.value = !showStreamDetails.value
     if (showStreamDetails.value) terminal.value?.scrollToBottom()
   }
 
   // Validation
-  async function validateDatabaseStep() {
+  const validateDatabaseStep = async () => {
     if (dbMode.value !== 'external') return null
     const databaseName = dbType.value === 'postgres' ? 'PostgreSQL' : 'MariaDB'
     if (!dbHost.value) return 'Host is required for an external database'
@@ -224,7 +224,7 @@ export function useSetup() {
   }
 
   // Navigation
-  async function goToNextStep() {
+  const goToNextStep = async () => {
     const validators = { database: validateDatabaseStep }
     const message = await validators[currentStep.value]?.()
     if (message) {
@@ -235,18 +235,18 @@ export function useSetup() {
     currentStep.value = stepSequence.value[stepSequence.value.indexOf(currentStep.value) + 1]
   }
 
-  function goToPreviousStep() {
+  const goToPreviousStep = () => {
     errorMessage.value = ''
     currentStep.value = stepSequence.value[stepSequence.value.indexOf(currentStep.value) - 1]
   }
 
-  function backToConfiguration() {
+  const backToConfiguration = () => {
     errorMessage.value = ''
     showStreamDetails.value = false
     currentStep.value = stepSequence.value.at(-1)
   }
 
-  function buildPayload() {
+  const buildPayload = () => {
     const base = {
       db_type: dbType.value,
       app_repo: appRepo.value,
@@ -283,12 +283,12 @@ export function useSetup() {
     }
   }
 
-  async function saveConfig() {
+  const saveConfig = async () => {
     const result = await setupApi.save(buildPayload())
     if (result.error) throw new Error(apiErrorMessage(result, 'Failed to save configuration.'))
   }
 
-  async function startSetup() {
+  const startSetup = async () => {
     isSubmitting.value = true
     try {
       await saveConfig()
@@ -303,7 +303,7 @@ export function useSetup() {
     }
   }
 
-  async function shutdownWizardAndReload() {
+  const shutdownWizardAndReload = async () => {
     while (setupTaskId.value) {
       try {
         const response = await setupApi.finish(setupTaskId.value)

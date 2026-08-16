@@ -17,17 +17,17 @@ const error = ref('')
 
 const canSubmit = computed(() => meetsPasswordRequirements(newPassword.value))
 
-function validationError() {
+const validationError = () => {
   if (newPassword.value !== confirmPassword.value) return 'New passwords do not match.'
   return ''
 }
 
-function reset() {
+const reset = () => {
   newPassword.value = ''
   confirmPassword.value = ''
 }
 
-async function save() {
+const save = async () => {
   error.value = validationError()
   if (error.value) return
 

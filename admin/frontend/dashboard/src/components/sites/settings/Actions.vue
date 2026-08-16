@@ -20,7 +20,7 @@ const showSslEmail = ref(false)
 const sslEmail = ref('')
 const sslEmailError = ref('')
 
-async function enableSsl(email) {
+const enableSsl = async (email) => {
   error.value = ''
   sslEmailError.value = ''
   sslLoading.value = true
@@ -45,7 +45,7 @@ async function enableSsl(email) {
 
 const clearingCache = ref(false)
 
-async function clearCache() {
+const clearCache = async () => {
   error.value = ''
   clearingCache.value = true
   try {

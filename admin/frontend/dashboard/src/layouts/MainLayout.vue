@@ -67,7 +67,7 @@ const breadcrumbs = computed(() => {
 
 // The group is only a sidebar section heading - it has no route of its own, so
 // rendering it as a crumb gives a dead link that leads nowhere.
-function breadcrumbsFromRouteMeta({ title = '' }) {
+const breadcrumbsFromRouteMeta = ({ title = '' }) => {
   return title ? [{ label: title }] : []
 }
 </script>

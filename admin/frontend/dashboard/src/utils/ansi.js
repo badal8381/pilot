@@ -18,11 +18,11 @@ const ANSI_FG = {
   97: 'var(--ink-gray-9)',
 }
 
-export function escapeHtml(text) {
+export const escapeHtml = (text) => {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-export function ansiToHtml(text) {
+export const ansiToHtml = (text) => {
   let html = ''
   let openSpans = 0
   for (const part of text.split(/(\x1b\[[0-9;]*[A-Za-z])/)) {
@@ -47,7 +47,7 @@ export function ansiToHtml(text) {
 }
 
 // Resolve \r (progress-bar overwrites): keep the last non-whitespace segment
-function applyCarriageReturns(raw) {
+const applyCarriageReturns = (raw) => {
   const parts = raw.split('\r')
   for (let i = parts.length - 1; i >= 0; i--) {
     if (parts[i].trim()) return parts[i].trimEnd()
@@ -55,6 +55,6 @@ function applyCarriageReturns(raw) {
   return ''
 }
 
-export function processLine(raw) {
+export const processLine = (raw) => {
   return ansiToHtml(applyCarriageReturns(raw))
 }

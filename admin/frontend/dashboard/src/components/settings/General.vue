@@ -18,7 +18,7 @@ const saving = ref(false)
 const error = ref('')
 const allowDeveloperMode = ref(false)
 
-async function toggleAllowDeveloperMode(value) {
+const toggleAllowDeveloperMode = async (value) => {
   saving.value = true
   error.value = ''
   try {

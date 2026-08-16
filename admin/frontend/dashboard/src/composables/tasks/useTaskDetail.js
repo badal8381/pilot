@@ -3,13 +3,13 @@ import { ref } from 'vue'
 import { tasksApi } from '@/api/tasks'
 import { isTaskActive } from '@/utils/taskFormat'
 
-export function useTaskDetail(taskId) {
+export const useTaskDetail = (taskId) => {
   const task = ref(null)
   const rawLines = ref([])
   const loading = ref(false)
   const error = ref('')
 
-  async function load() {
+  const load = async () => {
     loading.value = true
     error.value = ''
     try {

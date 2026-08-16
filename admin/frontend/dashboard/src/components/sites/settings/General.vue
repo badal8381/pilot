@@ -55,7 +55,7 @@ onMounted(async () => {
 
 const getValue = (s) => s.get(site.value?.site_config)
 
-async function toggle(s, value) {
+const toggle = async (s, value) => {
   savingKey.value = s.key
   error.value = ''
   try {

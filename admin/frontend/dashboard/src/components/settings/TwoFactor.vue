@@ -38,7 +38,7 @@ const atDeviceLimit = computed(
   () => status.value.max_devices > 0 && status.value.credentials.length >= status.value.max_devices,
 )
 
-function fmtTimestamp(seconds) {
+const fmtTimestamp = (seconds) => {
   return seconds ? fmtDateTime(new Date(seconds * 1000).toISOString()) : 'Never'
 }
 
@@ -70,7 +70,7 @@ watch(showAdd, async (open) => {
   await load()
 })
 
-function openAdd() {
+const openAdd = () => {
   deviceName.value = ''
   otp.value = ''
   enrollment.value = null
@@ -78,7 +78,7 @@ function openAdd() {
   showAdd.value = true
 }
 
-async function startEnrollment() {
+const startEnrollment = async () => {
   // Fired on blur and Enter, so guard against re-enrolling an already-named device.
   if (enrollment.value || busy.value || !deviceName.value.trim()) return
   error.value = ''
@@ -92,7 +92,7 @@ async function startEnrollment() {
   }
 }
 
-async function confirmEnrollment() {
+const confirmEnrollment = async () => {
   error.value = ''
   busy.value = true
   try {
@@ -114,13 +114,13 @@ async function confirmEnrollment() {
   }
 }
 
-function promptRemove(row) {
+const promptRemove = (row) => {
   removing.value = row
   error.value = ''
   showRemove.value = true
 }
 
-async function confirmRemove() {
+const confirmRemove = async () => {
   error.value = ''
   busy.value = true
   try {
@@ -134,7 +134,7 @@ async function confirmRemove() {
   }
 }
 
-async function regenerate() {
+const regenerate = async () => {
   error.value = ''
   busy.value = true
   try {
@@ -150,7 +150,7 @@ async function regenerate() {
   }
 }
 
-function downloadCodes() {
+const downloadCodes = () => {
   const body = `Pilot recovery codes\n\nEach code signs you in once when no device is available.\n\n${codes.value.join('\n')}\n`
   const url = URL.createObjectURL(new Blob([body], { type: 'text/plain' }))
   const link = Object.assign(document.createElement('a'), {
@@ -162,7 +162,7 @@ function downloadCodes() {
   showCodes.value = false
 }
 
-async function copy(text) {
+const copy = async (text) => {
   try {
     await navigator.clipboard.writeText(text)
     toast.success('Copied')
@@ -171,7 +171,7 @@ async function copy(text) {
   }
 }
 
-async function load() {
+const load = async () => {
   try {
     status.value = await twoFactorApi.status()
   } catch (e) {

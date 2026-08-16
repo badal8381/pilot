@@ -12,8 +12,8 @@ const breakdown = ref(null)
 let fetchedAt = 0
 let pending = null
 
-export function useSiteStorage() {
-  function load(force = false) {
+export const useSiteStorage = () => {
+  const load = (force = false) => {
     if (!force) {
       if (pending) return pending
       if (breakdown.value && Date.now() - fetchedAt < REFRESH_AFTER_MS) return Promise.resolve()
@@ -34,7 +34,7 @@ export function useSiteStorage() {
     return pending
   }
 
-  function storageLabel(siteName) {
+  const storageLabel = (siteName) => {
     const bytes = breakdown.value ? siteStorageBytes(breakdown.value, siteName) : 0
     return bytes ? formatBytes(bytes) : ''
   }

@@ -29,12 +29,12 @@ const {
 
 // The list renders `installedApps`, which rides on the site payload - refreshing the
 // app metadata alone would leave a just-disabled app on screen.
-async function refresh() {
+const refresh = async () => {
   await Promise.all([reload(), loadApps()])
 }
 
 // Disabling needs a Frappe that supports it, and an app the catalog can reinstall.
-function canDisable(app) {
+const canDisable = (app) => {
   return canDisableApps.value && Boolean(app && registry.value.some((entry) => entry.name === app.name))
 }
 
@@ -55,11 +55,11 @@ const appObjects = computed(() =>
 const showUninstall = ref(false)
 const uninstallTarget = ref(null)
 
-function openLink(url) {
+const openLink = (url) => {
   window.open(url, '_blank', 'noopener,noreferrer')
 }
 
-function menuOptions(app) {
+const menuOptions = (app) => {
   return [
     ...(session.developerMode
       ? [{ label: 'Open in editor', icon: 'lucide-code', onClick: () => openLink(`/editor/${encodeURIComponent(app.name)}`) }]

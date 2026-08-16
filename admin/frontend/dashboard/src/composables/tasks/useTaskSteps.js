@@ -21,7 +21,7 @@ export const STEP_MARKER_RE = /^STEP(-FAILED)?\s/
  * @param {import('vue').Ref<boolean>}  streaming
  * @param {import('vue').Ref<object|null>} task
  */
-export function useTaskSteps(rawLines, streaming, task) {
+export const useTaskSteps = (rawLines, streaming, task) => {
   const stepSections = computed(() => {
     const markers = []
     const failedKeys = new Set()
@@ -70,7 +70,7 @@ export function useTaskSteps(rawLines, streaming, task) {
     return Math.round((done / stepSections.value.length) * 100)
   })
 
-  function stepDuration(section) {
+  const stepDuration = (section) => {
     if (!section.startedAt || !section.endedAt) return null
     return fmtDuration((section.endedAt - section.startedAt) / 1000, { precise: true })
   }

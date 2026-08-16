@@ -12,18 +12,18 @@ export const updatesApi = {
     request.post(`migrations/${id}/actions/bypass-patch`, { json: { patch } }).json(),
 }
 
-export function isResolved(operation) {
+export const isResolved = (operation) => {
   return !operation || operation.state === 'completed' || operation.state === 'reverted'
 }
 
-export function needsAttention(operation) {
+export const needsAttention = (operation) => {
   return !!operation && ATTENTION_STATES.includes(operation.state)
 }
 
-export function isActive(operation) {
+export const isActive = (operation) => {
   return !!operation && ACTIVE_STATES.includes(operation.state)
 }
 
-export function isPending(operation) {
+export const isPending = (operation) => {
   return !!operation?.pending_action
 }

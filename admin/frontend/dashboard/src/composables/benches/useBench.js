@@ -4,11 +4,11 @@ import { settingsApi } from '@/api/settings'
 
 let cached = null
 
-export function useBench() {
+export const useBench = () => {
   const name = ref(cached?.name ?? '')
   const defaultBranch = ref(cached?.defaultBranch ?? '')
 
-  async function load() {
+  const load = async () => {
     if (cached) return
     let settings
     try {

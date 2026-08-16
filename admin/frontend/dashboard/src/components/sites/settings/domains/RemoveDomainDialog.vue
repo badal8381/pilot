@@ -20,7 +20,7 @@ watch(show, (open) => {
   if (open) error.value = ''
 })
 
-async function confirmRemove() {
+const confirmRemove = async () => {
   error.value = ''
   removing.value = true
   try {

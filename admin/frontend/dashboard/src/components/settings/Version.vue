@@ -36,7 +36,7 @@ onMounted(async () => {
   }
 })
 
-async function check() {
+const check = async () => {
   if (checking.value) return
   dialogError.value = null
   log.value = ''
@@ -66,7 +66,7 @@ async function check() {
   }
 }
 
-async function update() {
+const update = async () => {
   if (updating.value) return
   updating.value = true
   dialogError.value = null
@@ -81,7 +81,7 @@ async function update() {
   }
 }
 
-async function pollTask(taskId) {
+const pollTask = async (taskId) => {
   // The admin service restarts mid-update, so detail requests fail transiently.
   // Give it a bounded window to come back before declaring the update lost.
   const MAX_CONSECUTIVE_FAILURES = 40 // ~60s at POLL_INTERVAL_MS

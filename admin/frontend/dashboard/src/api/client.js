@@ -3,19 +3,19 @@ import { isSignedOut, reportSignedOut } from '../composables/auth/useSignedOut.j
 
 export const API_V1_PREFIX = '/api/v1'
 
-export function apiUrl(path = '', origin = '') {
+export const apiUrl = (path = '', origin = '') => {
   const suffix = path ? `/${String(path).replace(/^\/+/, '')}` : ''
   return `${origin}${API_V1_PREFIX}${suffix}`
 }
 
-export function apiErrorMessage(payload, fallback = 'Request failed.') {
+export const apiErrorMessage = (payload, fallback = 'Request failed.') => {
   const error = payload?.error
   if (typeof error?.message === 'string' && error.message) return error.message
   if (typeof error === 'string' && error) return error
   return fallback
 }
 
-export async function unwrap(parsed) {
+export const unwrap = async (parsed) => {
   const data = await parsed
   if (data?.error) {
     // Once the signed-out modal owns the screen, every in-flight call fails for the same
@@ -27,7 +27,7 @@ export async function unwrap(parsed) {
   return data
 }
 
-export async function isSessionExpired(response) {
+export const isSessionExpired = async (response) => {
   // Only the auth guard sends this code. A wrong password on login or on a password
   // change also answers 401, but with `invalid_credentials` - that is a failed attempt,
   // not a session that stopped working underneath the user.

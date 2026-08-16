@@ -28,12 +28,12 @@ const router = useRouter()
 // on one record, so onBeforeRouteLeave never fires for it.
 const showDiscard = ref(false)
 let pendingNav = null
-function guarded(action) {
+const guarded = (action) => {
   if (!hasUnsavedChanges()) return action()
   pendingNav = action
   showDiscard.value = true
 }
-function discardAndGo() {
+const discardAndGo = () => {
   // Read before closing: closing trips the watcher below, which nulls it.
   const action = pendingNav
   pendingNav = null
@@ -106,7 +106,7 @@ const headerTitle = computed(() => {
   return subSection.value?.label ?? activeSectionLabel.value
 })
 
-function goBack() {
+const goBack = () => {
   guarded(() => {
     if (sessionJti.value) sessionJti.value = null
     else if (subSection.value) subSection.value = null

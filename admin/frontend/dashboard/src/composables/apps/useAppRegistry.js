@@ -9,19 +9,19 @@ export const FRAPPE_LOGO_URL =
 const registry = ref([])
 const loaded = ref(false)
 
-export function isFrappeFramework(name) {
+export const isFrappeFramework = (name) => {
   const lower = name?.toLowerCase()
   return lower === 'frappe' || lower === 'frappe framework'
 }
 
-export function hashTheme(name) {
+export const hashTheme = (name) => {
   let hash = 0
   for (const char of name ?? '') hash = (hash * 31 + char.charCodeAt(0)) | 0
   return THEMES[Math.abs(hash) % THEMES.length]
 }
 
-export function useAppRegistry() {
-  async function load() {
+export const useAppRegistry = () => {
+  const load = async () => {
     if (loaded.value) return
     try {
       registry.value = await appsApi.marketplace()

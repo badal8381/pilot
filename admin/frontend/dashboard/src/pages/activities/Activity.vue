@@ -27,11 +27,11 @@ const currentFilters = computed(() => ({
   site: siteFilter.value || undefined,
 }))
 
-function reload() {
+const reload = () => {
   load(currentFilters.value)
 }
 
-function clearSiteFilter() {
+const clearSiteFilter = () => {
   router.replace({ name: 'Activity' })
 }
 

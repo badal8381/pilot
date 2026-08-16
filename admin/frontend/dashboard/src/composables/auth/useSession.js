@@ -12,7 +12,7 @@ const session = reactive({
   developerMode: false,
 })
 
-async function loadSession() {
+const loadSession = async () => {
   try {
     const [bootstrap, currentSession] = await Promise.all([authApi.bootstrap(), authApi.session()])
     session.authenticated = currentSession.authenticated === true
@@ -32,10 +32,10 @@ async function loadSession() {
   session.loaded = true
 }
 
-async function ensureSession() {
+const ensureSession = async () => {
   if (!session.loaded) await loadSession()
 }
 
-export function useSession() {
+export const useSession = () => {
   return { session, loadSession, ensureSession }
 }

@@ -6,7 +6,7 @@ import { openSiteLogin } from '@/utils/siteLogin'
 const cache = new Map()
 const BACKUPS_PAGE_SIZE = 20
 
-function getStore(name) {
+const getStore = (name) => {
   if (!cache.has(name)) {
     cache.set(name, {
       site: ref(null),
@@ -27,10 +27,10 @@ function getStore(name) {
   return cache.get(name)
 }
 
-export function useSite(name) {
+export const useSite = (name) => {
   const store = getStore(name)
 
-  async function load() {
+  const load = async () => {
     store.loading.value = true
     store.error.value = ''
     try {
@@ -50,7 +50,7 @@ export function useSite(name) {
     }
   }
 
-  async function reload() {
+  const reload = async () => {
     try {
       const [data, configuration] = await Promise.all([
         sitesApi.detail(name),
@@ -65,7 +65,7 @@ export function useSite(name) {
     }
   }
 
-  async function loadApps() {
+  const loadApps = async () => {
     store.appsLoading.value = true
     try {
       const data = await sitesApi.apps.list(name)
@@ -79,7 +79,7 @@ export function useSite(name) {
     }
   }
 
-  async function _fetchBackups() {
+  const _fetchBackups = async () => {
     store.backupsLoading.value = true
     try {
       const data = await sitesApi.backups.list(name, store.backupsLimit.value)
@@ -94,40 +94,40 @@ export function useSite(name) {
     }
   }
 
-  async function loadBackups() {
+  const loadBackups = async () => {
     store.backupsLimit.value = BACKUPS_PAGE_SIZE
     await _fetchBackups()
   }
 
   /** Re-fetches with a larger `limit` - ListFooter's page-length control. */
-  async function setBackupsPageLength(pageLength) {
+  const setBackupsPageLength = async (pageLength) => {
     store.backupsLimit.value = pageLength
     await _fetchBackups()
   }
 
   /** ListFooter's "Load More" - grows the page by one more page-length step. */
-  async function loadMoreBackups() {
+  const loadMoreBackups = async () => {
     store.backupsLimit.value += BACKUPS_PAGE_SIZE
     await _fetchBackups()
   }
 
-  async function login() {
+  const login = async () => {
     return openSiteLogin(() => sitesApi.loginLink(name))
   }
 
-  async function backup() {
+  const backup = async () => {
     return sitesApi.backups.create(name)
   }
 
-  async function drop() {
+  const drop = async () => {
     return sitesApi.drop(name)
   }
 
-  async function reinstall() {
+  const reinstall = async () => {
     return sitesApi.reinstall(name)
   }
 
-  async function saveConfig(config) {
+  const saveConfig = async (config) => {
     return sitesApi.configuration.update(name, config)
   }
 

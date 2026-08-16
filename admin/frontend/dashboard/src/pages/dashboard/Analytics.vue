@@ -130,12 +130,12 @@ const historyWindow = computed(() => (activeWindow.value === 'live' ? '1h' : act
 // restores what the viewer actually picked.
 let preferredWindow = activeWindow.value
 
-function chooseWindow(key) {
+const chooseWindow = (key) => {
   preferredWindow = key
   selectWindow(key)
 }
 
-function setView(key) {
+const setView = (key) => {
   // Re-picking would refetch and, in live mode, discard collected history.
   if (view.value === key) return
   view.value = key
@@ -143,12 +143,12 @@ function setView(key) {
   else if (activeWindow.value === 'live') selectWindow('1h')
 }
 
-function selectSite(name) {
+const selectSite = (name) => {
   setView('site')
   activeSite.value = name
 }
 
-function selectWindow(key) {
+const selectWindow = (key) => {
   if (view.value === 'system') setWindow(key)
   else activeWindow.value = key
 }
@@ -194,7 +194,7 @@ const historyNow = ref(Date.now())
 
 // Time helpers
 
-function serverTime() {
+const serverTime = () => {
   return Date.now() + timeOffset.value
 }
 
@@ -203,11 +203,11 @@ const axisMin = computed(
 )
 const axisMax = computed(() => historyNow.value)
 
-function isPartial(earliest) {
+const isPartial = (earliest) => {
   return earliest != null && earliest > axisMin.value + 1000
 }
 
-function humanizeSince(earliest) {
+const humanizeSince = (earliest) => {
   if (earliest == null) return ''
   const seconds = Math.floor((historyNow.value - earliest) / 1000)
   if (seconds < 3600) return `${Math.max(1, Math.floor(seconds / 60))}m`
@@ -217,7 +217,7 @@ function humanizeSince(earliest) {
 
 // Data loading
 
-async function setWindow(key) {
+const setWindow = async (key) => {
   activeWindow.value = key
   if (key === 'live') {
     liveHistory.value = []
@@ -230,7 +230,7 @@ async function setWindow(key) {
   }
 }
 
-async function loadStats() {
+const loadStats = async () => {
   if (view.value !== 'system' || isHistorical.value) return
   try {
     const s = await monitorApi.stats()
@@ -242,7 +242,7 @@ async function loadStats() {
   } catch {}
 }
 
-function appendLivePoint(s) {
+const appendLivePoint = (s) => {
   const cpu = s.cpu_breakdown || {}
   const mem = s.memory_breakdown || {}
   const [load1, load5, load15] = s.load_avg || []
@@ -270,12 +270,12 @@ function appendLivePoint(s) {
   })
 }
 
-function trimLiveHistory() {
+const trimLiveHistory = () => {
   const cutoff = liveNow.value - LIVE_WINDOW_MS - 60000
   liveHistory.value = liveHistory.value.filter((p) => p.time >= cutoff)
 }
 
-async function refreshAppData() {
+const refreshAppData = async () => {
   try {
     const d = await monitorApi.history('30m')
     if (!d.error && d.application) {
@@ -284,7 +284,7 @@ async function refreshAppData() {
   } catch {}
 }
 
-async function seedLiveHistory() {
+const seedLiveHistory = async () => {
   if (isHistorical.value || liveHistory.value.length) return
   try {
     const d = await monitorApi.history('1h')
@@ -301,7 +301,7 @@ async function seedLiveHistory() {
   } catch {}
 }
 
-async function loadHistory(window) {
+const loadHistory = async (window) => {
   historyLoading.value = true
   historyError.value = ''
   try {
@@ -385,7 +385,7 @@ const liveXAxis = computed(() => ({
 const currentPoints = computed(() => (isHistorical.value ? system.value.points : liveHistory.value))
 const currentXAxis = computed(() => (isHistorical.value ? fixedXAxis.value : liveXAxis.value))
 
-function lineSeries(name, color, stacked) {
+const lineSeries = (name, color, stacked) => {
   return {
     name,
     type: 'line',
@@ -403,19 +403,19 @@ function lineSeries(name, color, stacked) {
   }
 }
 
-function transparent(hex, opacity) {
+const transparent = (hex, opacity) => {
   const v = parseInt(hex.slice(1), 16)
   return `rgba(${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}, ${opacity})`
 }
 
-function scaleFields(points, keys, divisor) {
+const scaleFields = (points, keys, divisor) => {
   return points.map((p) => ({
     ...p,
     ...Object.fromEntries(keys.map((k) => [k, p[k] != null ? p[k] / divisor : p[k]])),
   }))
 }
 
-function normalizeAppData(points, services) {
+const normalizeAppData = (points, services) => {
   return points.map((p) => ({
     time: p.time,
     ...Object.fromEntries(services.map((s) => [s, p[s] ?? 0])),
@@ -573,7 +573,7 @@ const charts = computed(() => [
 
 // Formatting
 
-function formatBytes(bytes) {
+const formatBytes = (bytes) => {
   if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(0) + ' KB'
   if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + ' MB'
   return (bytes / 1024 ** 3).toFixed(1) + ' GB'
@@ -582,7 +582,7 @@ function formatBytes(bytes) {
 // Lifecycle
 
 let statsTimer
-function scheduleStats() {
+const scheduleStats = () => {
   clearTimeout(statsTimer)
   const delay = livePollDelayMs({
     isLive: view.value === 'system' && !isHistorical.value,

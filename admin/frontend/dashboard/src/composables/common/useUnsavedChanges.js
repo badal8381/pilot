@@ -4,7 +4,7 @@ import { getCurrentScope, onScopeDispose } from 'vue'
 // Module-level: the asking shell is not an ancestor of every panel.
 const guards = new Set()
 
-export function useUnsavedChanges(isDirty) {
+export const useUnsavedChanges = (isDirty) => {
   // Without an active scope, onScopeDispose no-ops and the guard leaks
   // forever, permanently blocking navigation. Fail loudly instead.
   if (!getCurrentScope()) {
@@ -15,7 +15,7 @@ export function useUnsavedChanges(isDirty) {
   onScopeDispose(() => guards.delete(guard))
 }
 
-export function hasUnsavedChanges() {
+export const hasUnsavedChanges = () => {
   for (const guard of guards) {
     try {
       if (guard()) return true

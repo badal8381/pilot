@@ -39,17 +39,17 @@ const installableSites = computed(() => props.sites.filter((s) => !isInstalled(s
 // Hide "All sites" when there's only one site on the bench, or only one site left to install on.
 const showAllSitesOption = computed(() => props.sites.length > 1 && installableSites.value.length > 1)
 
-function isInstalled(site) {
+const isInstalled = (site) => {
   return Boolean(props.app && site.active_apps?.includes(props.app.name))
 }
 
-function siteMeta(site) {
+const siteMeta = (site) => {
   const n = site.active_apps?.length || 0
   return `${n} app${n === 1 ? '' : 's'}`
 }
 
 // An app the site only has disabled comes back enabled inline, with no task to follow.
-async function startInstall(site) {
+const startInstall = async (site) => {
   const result = await sitesApi.apps.install(site.name, {
     app: props.app.name,
   })
@@ -59,7 +59,7 @@ async function startInstall(site) {
 }
 
 // An install follows its task; an enable has no task, so it lands on the site itself.
-async function installOnSite(name) {
+const installOnSite = async (name) => {
   const site = props.sites.find((s) => s.name === name)
   if (!site) return
   const taskId = await startInstall(site)
@@ -68,7 +68,7 @@ async function installOnSite(name) {
   else openSitePage(router, site.name, props.app.name)
 }
 
-async function installOnAllSites() {
+const installOnAllSites = async () => {
   const targets = installableSites.value
   if (!targets.length) return
   const taskIds = await Promise.all(targets.map((site) => startInstall(site)))
@@ -78,7 +78,7 @@ async function installOnAllSites() {
   else router.push({ name: 'Sites' })
 }
 
-async function confirmInstall() {
+const confirmInstall = async () => {
   if (!selection.value || installing.value) return
   error.value = ''
   installing.value = true

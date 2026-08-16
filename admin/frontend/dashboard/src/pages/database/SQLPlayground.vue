@@ -88,7 +88,7 @@ const rowRange = computed(() => {
 const showConfirm = ref(false)
 const pendingQuery = ref('')
 
-function runQuery() {
+const runQuery = () => {
   const raw = editorRef.value?.getQueryToRun() ?? query.value
   if (!raw?.trim()) return
   if (!readOnly.value) {
@@ -99,7 +99,7 @@ function runQuery() {
   executeQuery(raw)
 }
 
-function confirmRunQuery() {
+const confirmRunQuery = () => {
   showConfirm.value = false
   executeQuery(pendingQuery.value)
 }
@@ -107,17 +107,17 @@ function confirmRunQuery() {
 // MariaDB quotes identifiers with backticks; Postgres and SQLite use the
 // standard double-quote (MariaDB treats double quotes as a string literal
 // unless ANSI_QUOTES is set, so backticks aren't a safe cross-engine default).
-function quoteIdentifier(name, dbType) {
+const quoteIdentifier = (name, dbType) => {
   return dbType === 'mariadb' ? `\`${name}\`` : `"${name}"`
 }
 
-function previewTable(tableName) {
+const previewTable = (tableName) => {
   modeStr.value = 'readonly'
   query.value = `SELECT * FROM ${quoteIdentifier(tableName, selectedSiteDbType.value)} LIMIT 100;`
   executeQuery(query.value)
 }
 
-async function executeQuery(raw) {
+const executeQuery = async (raw) => {
   if (!selectedSite.value || !raw?.trim()) return
   const statements = raw
     .split(';')
@@ -150,7 +150,7 @@ async function executeQuery(raw) {
 
 // ── CSV export ────────────────────────────────────────────────────────────────
 
-function exportCsv() {
+const exportCsv = () => {
   if (!currentResult.value) return
   const { columns, rows } = currentResult.value
   const escape = (v) => {
@@ -169,7 +169,7 @@ function exportCsv() {
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
-async function refreshSchema() {
+const refreshSchema = async () => {
   if (!selectedSite.value) return
   try {
     const data = await databaseApi.schema(selectedSite.value)

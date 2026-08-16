@@ -8,8 +8,8 @@ const loadingMore = ref(false)
 const error = ref('')
 const cursor = ref(null)
 
-export function useActivities() {
-  async function load(filters = {}) {
+export const useActivities = () => {
+  const load = async (filters = {}) => {
     loading.value = true
     error.value = ''
     cursor.value = null
@@ -25,7 +25,7 @@ export function useActivities() {
     }
   }
 
-  async function loadMore(filters = {}) {
+  const loadMore = async (filters = {}) => {
     if (!cursor.value || loadingMore.value) return
     loadingMore.value = true
     try {

@@ -21,16 +21,16 @@ const emit = defineEmits(['line', 'status', 'done', 'error'])
 const stream = useTaskStream({ guardHiddenTab: props.guardHiddenTab })
 const { terminal, lines, rawLines, streaming } = stream
 
-function setTerminal(el) {
+const setTerminal = (el) => {
   terminal.value = el
 }
 
-function seed(initial) {
+const seed = (initial) => {
   rawLines.value = [...initial]
   lines.value = initial.map(processLine)
 }
 
-function start(url = props.url) {
+const start = (url = props.url) => {
   if (!url) return
   if (props.reset) {
     rawLines.value = []

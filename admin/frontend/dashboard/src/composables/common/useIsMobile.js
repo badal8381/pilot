@@ -5,6 +5,6 @@ window.addEventListener('resize', () => {
   windowWidth.value = window.innerWidth
 })
 
-export function useIsMobile(breakpoint = 640) {
+export const useIsMobile = (breakpoint = 640) => {
   return computed(() => windowWidth.value < breakpoint)
 }

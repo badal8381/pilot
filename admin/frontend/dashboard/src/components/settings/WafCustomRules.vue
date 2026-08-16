@@ -42,7 +42,7 @@ const actionOptions = computed(() =>
   props.actions.map((a) => ({ label: ACTION_LABELS[a] || a, value: a })),
 )
 
-function placeholder(field) {
+const placeholder = (field) => {
   return PLACEHOLDERS[field] || 'value'
 }
 
@@ -50,7 +50,7 @@ function placeholder(field) {
 // inputs in place, jumping a focused caret to the wrong row.
 const keys = new WeakMap()
 let nextKey = 0
-function keyOf(object) {
+const keyOf = (object) => {
   if (!keys.has(object)) keys.set(object, `k${(nextKey += 1)}`)
   return keys.get(object)
 }
@@ -58,7 +58,7 @@ function keyOf(object) {
 // One key, not a set: opening a rule closes the one before it.
 const openKey = ref('')
 const isOpen = (rule) => openKey.value === keyOf(rule)
-function toggleOpen(rule) {
+const toggleOpen = (rule) => {
   const key = keyOf(rule)
   openKey.value = openKey.value === key ? '' : key
 }
@@ -68,7 +68,7 @@ const flaggedKey = ref('')
 const root = ref(null)
 let flagTimer = null
 
-function flagUnfinished() {
+const flagUnfinished = () => {
   const rule = rules.value.find((candidate) => ruleProblem(candidate))
   if (!rule) return false
   const key = keyOf(rule)
@@ -87,12 +87,12 @@ onUnmounted(() => clearTimeout(flagTimer))
 
 // Live reorder on dragover; identity keys keep row state through the splice.
 const dragKey = ref('')
-function onDragStart(rule, event) {
+const onDragStart = (rule, event) => {
   dragKey.value = keyOf(rule)
   openKey.value = ''
   event.dataTransfer.effectAllowed = 'move'
 }
-function onDragOver(rule) {
+const onDragOver = (rule) => {
   if (!dragKey.value || dragKey.value === keyOf(rule)) return
   const from = rules.value.findIndex((r) => keyOf(r) === dragKey.value)
   const to = rules.value.findIndex((r) => keyOf(r) === keyOf(rule))
@@ -100,14 +100,14 @@ function onDragOver(rule) {
   const [moved] = rules.value.splice(from, 1)
   rules.value.splice(to, 0, moved)
 }
-function onDragEnd() {
+const onDragEnd = () => {
   dragKey.value = ''
 }
 
-function newCondition() {
+const newCondition = () => {
   return { field: 'uri_path', operator: 'contains', value: '', header_name: '' }
 }
-function addRule() {
+const addRule = () => {
   if (flagUnfinished()) return
   const rule = {
     name: '',
@@ -120,21 +120,21 @@ function addRule() {
   // Key the reactive proxy the template iterates, not the raw local object.
   openKey.value = keyOf(rules.value[rules.value.length - 1])
 }
-function addCondition(rule) {
+const addCondition = (rule) => {
   rule.conditions.push(newCondition())
 }
-function removeCondition(rule, index) {
+const removeCondition = (rule, index) => {
   rule.conditions.splice(index, 1)
 }
 
 const showRemove = ref(false)
 const removingRule = ref(null)
 const removingLabel = computed(() => removingRule.value?.name || 'this rule')
-function promptRemove(rule) {
+const promptRemove = (rule) => {
   removingRule.value = rule
   showRemove.value = true
 }
-function confirmRemove() {
+const confirmRemove = () => {
   const index = rules.value.indexOf(removingRule.value)
   if (index !== -1) rules.value.splice(index, 1)
   showRemove.value = false

@@ -23,7 +23,7 @@ const showMigrate = ref(false)
 const migrating = ref(false)
 const migrateError = ref('')
 
-async function confirmMigrate() {
+const confirmMigrate = async () => {
   migrating.value = true
   migrateError.value = ''
   try {
@@ -78,7 +78,7 @@ const showReset = ref(false)
 const resetting = ref(false)
 const resetError = ref('')
 
-async function confirmReset() {
+const confirmReset = async () => {
   resetting.value = true
   resetError.value = ''
   try {
@@ -98,7 +98,7 @@ const showDrop = ref(false)
 const dropping = ref(false)
 const dropError = ref('')
 
-async function confirmDrop() {
+const confirmDrop = async () => {
   dropping.value = true
   dropError.value = ''
   try {

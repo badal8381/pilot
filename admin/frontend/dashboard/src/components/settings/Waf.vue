@@ -67,14 +67,14 @@ const setupNote = computed(() => {
   return ''
 })
 
-function linesToArray(text) {
+const linesToArray = (text) => {
   return text
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean)
 }
 
-function buildPayload() {
+const buildPayload = () => {
   return {
     enabled: enabled.value,
     mode: mode.value,
@@ -95,7 +95,7 @@ const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.val
 // route-level guard never fires for the shell's param-only navigation.
 useUnsavedChanges(dirty)
 
-function warnIfDirty(event) {
+const warnIfDirty = (event) => {
   if (!dirty.value) return
   event.preventDefault()
   event.returnValue = ''
@@ -115,7 +115,7 @@ const canSave = computed(
     !customRules.value.some((rule) => ruleProblem(rule)),
 )
 
-async function save() {
+const save = async () => {
   saving.value = true
   try {
     const payload = buildPayload()

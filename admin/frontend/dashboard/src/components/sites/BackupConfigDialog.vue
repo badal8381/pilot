@@ -59,7 +59,7 @@ const cron = computed(() => {
   return `0 ${hour.value} * * *`
 })
 
-function applySchedule(schedule) {
+const applySchedule = (schedule) => {
   if (!schedule) return
   const [, h, dom, , dow] = schedule.split(' ')
   hour.value = parseInt(h) || 0
@@ -72,7 +72,7 @@ function applySchedule(schedule) {
   } else frequency.value = 'daily'
 }
 
-function applyRetention(retention) {
+const applyRetention = (retention) => {
   if (!retention) return
   scheme.value = retention.scheme || 'gfs'
   keepLast.value = retention.keep_last ?? 7
@@ -82,7 +82,7 @@ function applyRetention(retention) {
   keepYearly.value = retention.keep_yearly ?? 5
 }
 
-async function open() {
+const open = async () => {
   error.value = ''
   show.value = true
   try {
@@ -96,7 +96,7 @@ async function open() {
 }
 
 // Save both enables/updates (checkbox on) and turns off (checkbox off).
-async function save() {
+const save = async () => {
   saving.value = true
   error.value = ''
   try {
@@ -125,7 +125,7 @@ async function save() {
   }
 }
 
-function retentionPayload() {
+const retentionPayload = () => {
   return {
     scheme: scheme.value,
     keep_last: keepLast.value,
