@@ -13,7 +13,7 @@ def run(benches_root: Path) -> None:
     """
     from pilot.internal.patch_state import is_applied, mark_applied
 
-    for bench_dir in sorted(benches_root.iterdir()):
+    for bench_dir in sorted(benches_root.glob("*")):
         if not bench_dir.is_dir() or not (bench_dir / "bench.toml").exists():
             continue
         if is_applied(bench_dir, PATCH_NAME):
