@@ -18,6 +18,7 @@ import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import BenchSwitcherDialog from '@/components/benches/BenchSwitcherDialog.vue'
 import NewBenchDialog from '@/components/benches/NewBenchDialog.vue'
 import SearchDialog from '@/components/search/SearchDialog.vue'
+import NotificationsPanel from '@/components/notifications/NotificationsPanel.vue'
 
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useIsMobile } from '@/composables/common/useIsMobile'
@@ -39,6 +40,7 @@ useSearchShortcut()
 // click, Escape, close button) exits to it directly instead of stepping back
 // through every section/subsection push made while the dialog was open.
 const lastNonSettingsRoute = ref(null)
+
 watch(
   () => route.fullPath,
   () => {
@@ -113,7 +115,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
       <MobileNav class="!bg-surface-base">
         <MobileNavItem label="Home" icon="lucide-house" to="/home" :active="route.name == 'Home'" />
         <MobileNavItem label="Search" icon="lucide-search" @click="openSearch" />
-        <MobileNavItem label="Notifications" icon="lucide-bell" />
+        <NotificationsPanel mobile />
         <MobileNavItem
           label="Settings"
           icon="lucide-settings"
