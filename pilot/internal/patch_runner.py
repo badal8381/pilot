@@ -34,6 +34,11 @@ def patch_names(phase: str) -> list[str]:
 
 def run_patches(phase: str, on_progress: Progress = lambda message: None) -> None:
     """Run every patch listed under `phase` ("pre_update", "post_update", or "all")."""
+    from pilot.utils import benches_dir
+
+    if not benches_dir().is_dir():
+        on_progress("No benches directory yet; nothing to patch.")
+        return
     phases = _PHASES if phase == "all" else (phase,)
     for one_phase in phases:
         for name in patch_names(one_phase):

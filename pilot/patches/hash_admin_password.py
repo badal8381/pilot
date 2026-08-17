@@ -37,4 +37,7 @@ def _hash_password(bench_dir: Path) -> None:
 if __name__ == "__main__":
     import sys
 
-    run(Path(sys.argv[1]))
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+    from pilot.utils import benches_dir
+
+    run(benches_dir())
