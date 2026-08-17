@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import tomllib
 from pathlib import Path
 
@@ -196,6 +197,32 @@ def test_setup_monitoring_runs_privileged_setup_at_provision_time(tmp_path: Path
     cmd._setup_monitoring()
 
     assert called == ["monitor", "uptime"]
+
+
+class _BlockPsutil:
+    def find_spec(self, name, path=None, target=None):
+        if name.split(".")[0] == "psutil":
+            raise ImportError("psutil is not installed on the system python")
+        return None
+
+
+def test_setup_monitoring_runs_without_psutil(tmp_path: Path, monkeypatch) -> None:
+    """The CLI runs on the system python, which has no third-party packages."""
+    from pilot.core.server.monitoring_config import MonitorConfigurator
+    from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
+
+    bench = _make_bench(tmp_path, process_manager="systemd")
+    cmd = ProductionSetup(bench)
+
+    for configurator in (MonitorConfigurator, UptimeMonitorConfigurator):
+        monkeypatch.setattr(configurator, "install", lambda self: None)
+        monkeypatch.setattr(configurator, "setup", lambda self: None)
+
+    for module in ("psutil", "pilot.core.server.monitoring", "pilot.core.server.monitoring_proc"):
+        monkeypatch.delitem(sys.modules, module, raising=False)
+    monkeypatch.setattr(sys, "meta_path", [_BlockPsutil(), *sys.meta_path])
+
+    cmd._setup_monitoring()
 
 
 def test_setup_letsencrypt_reraises_by_default(tmp_path: Path, monkeypatch) -> None:
