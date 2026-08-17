@@ -1,0 +1,29 @@
+import { ACTIVE_STATES, ATTENTION_STATES } from '@/utils/updateFormat.ts'
+import { request } from '@/api/client'
+
+export const updatesApi = {
+  list: (params = {}) => request.get('migrations', { searchParams: params }).json(),
+  current: () => request.get('migrations/current').json(),
+  detail: (id) => request.get(`migrations/${id}`).json(),
+  createUpdate: (json = {}) => request.post('updates', { json }).json(),
+  retry: (id) => request.post(`migrations/${id}/actions/retry`).json(),
+  restore: (id) => request.post(`migrations/${id}/actions/restore`).json(),
+  bypassPatch: (id, patch) =>
+    request.post(`migrations/${id}/actions/bypass-patch`, { json: { patch } }).json(),
+}
+
+export const isResolved = (operation) => {
+  return !operation || operation.state === 'completed' || operation.state === 'reverted'
+}
+
+export const needsAttention = (operation) => {
+  return !!operation && ATTENTION_STATES.includes(operation.state)
+}
+
+export const isActive = (operation) => {
+  return !!operation && ACTIVE_STATES.includes(operation.state)
+}
+
+export const isPending = (operation) => {
+  return !!operation?.pending_action
+}

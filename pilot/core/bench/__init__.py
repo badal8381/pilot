@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     from pilot.core.app import App, NewAppOptions, RevisionPin
     from pilot.core.bench.migration.store import MigrationStore
     from pilot.core.database import Database
+    from pilot.core.notification import NotificationStore
     from pilot.core.site import Site
     from pilot.tasks import TaskRunner
 
@@ -92,6 +93,12 @@ class Bench:
         from pilot.core.bench.migration.store import MigrationStore
 
         return MigrationStore(self)
+
+    @cached_property
+    def notifications(self) -> "NotificationStore":
+        from pilot.core.notification import NotificationStore
+
+        return NotificationStore(self.logs_path)
 
     @property
     def apps_path(self) -> Path:
@@ -269,6 +276,40 @@ class Bench:
 
         BenchRuntime(self).install_requirements(on_progress)
 
+    @property
+    def supports_lite_mode(self) -> bool:
+        """Whether this bench's frappe ships the one process lite mode runs."""
+        return (self.apps_path / "frappe" / "frappe" / "runner.py").is_file()
+
+    @property
+    def is_lite_mode(self) -> bool:
+        """The one owner of which process set applies. A frappe without the runner
+        keeps the ordinary set, however bench.toml reads."""
+        return self.config.lite_mode.enabled and self.supports_lite_mode
+
+    @property
+    def realtime_port(self) -> int:
+        """Where realtime answers. Lite serves it from the web process."""
+        return self.config.http_port if self.is_lite_mode else self.config.socketio_port
+
+    def enforce_lite_mode_rules(self) -> bool:
+        """Reconcile bench.toml with what lite mode can actually do here."""
+        if not self.config.lite_mode.enabled:
+            return False
+        if not self.supports_lite_mode:
+            self.audit_action("lite_mode_disabled", {"reason": "frappe has no runner"})
+            self.config.lite_mode.enabled = False
+            self.config.write(self.path)
+            return True
+        groups = len(self.config.workers.groups)
+        if groups == 1:
+            return False
+        # One pool cannot hold a count per set of queues.
+        self.audit_action("worker_groups_collapsed", {"reason": "lite mode", "groups": groups})
+        self.config.workers.collapse()
+        self.config.write(self.path)
+        return True
+
     def audit_action(self, category: str, fields: dict) -> None:
         """Record a bench-level audit entry, enriched with any registered context (e.g. the
         request IP and actor). Best-effort: a logging failure never fails the caller."""
@@ -299,6 +340,11 @@ class Bench:
         from pilot.core.bench.production import BenchProduction
 
         BenchProduction(self).restart_processes()
+
+    def rebuild_process_set(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
+        from pilot.core.bench.production import BenchProduction
+
+        BenchProduction(self).rebuild_process_set(on_progress)
 
     def remove_production(self, on_progress: Callable[[str], None] = lambda message: None) -> None:
         from pilot.core.bench.production import BenchProduction

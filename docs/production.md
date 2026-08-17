@@ -8,7 +8,6 @@ Production mode turns a bench into managed services behind nginx. It is meant fo
 [production]
 enabled = true
 process_manager = "systemd" # or "supervisor"
-use_companion_manager = false
 
 [admin]
 enabled = true
@@ -33,6 +32,10 @@ pilot setup letsencrypt
 ## Process Managers
 
 Supported managers are `systemd` and `supervisor`.
+
+The deployed process set is web, socketio, admin, workers, and the two redis
+servers. With `[lite_mode] enabled` it collapses to one bench process plus admin and
+redis - see [Lite Mode](configuration.md#lite-mode).
 
 Runtime commands:
 

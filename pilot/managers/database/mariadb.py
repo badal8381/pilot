@@ -3,12 +3,18 @@ import os
 import re
 import subprocess
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from contextlib import ExitStack, contextmanager
 from pathlib import Path
 from typing import NoReturn
 
 from pilot.config import MariaDBConfig
+from pilot.core.database.mariadb_variables import (
+    GENERIC_EDITABLE_MARIADB_VARIABLE_NAMES,
+    MARIADB_VARIABLE_NAMES,
+    MariaDBValue,
+    mariadb_variable_spec,
+)
 from pilot.core.mariadb_memory import (
     MariaDBMemorySizing,
     MariaDBVariableLimits,
@@ -428,6 +434,125 @@ class MariaDBManager(UserOwnedDBManager):
                     apply_error,
                 )
             return True
+
+    def global_variable_values(self, variable_names: Iterable[str]) -> dict[str, str]:
+        """Read known variables in one query without interpolating their names."""
+        names = tuple(dict.fromkeys(variable_names))
+        unsupported = set(names) - MARIADB_VARIABLE_NAMES
+        if unsupported:
+            name = sorted(unsupported)[0]
+            raise DatabaseError(f"Pilot cannot read MariaDB variable '{name}'.")
+        if not names:
+            return {}
+
+        placeholders = ", ".join(["%s"] * len(names))
+        connection = None
+        try:
+            connection = self.connect()
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT VARIABLE_NAME, VARIABLE_VALUE "
+                    "FROM information_schema.GLOBAL_VARIABLES "
+                    f"WHERE VARIABLE_NAME IN ({placeholders})",
+                    names,
+                )
+                rows = cursor.fetchall()
+        except Exception as exc:
+            raise DatabaseError("Could not read MariaDB configuration variables.") from exc
+        finally:
+            if connection is not None:
+                connection.close()
+        return {str(name).lower(): str(value) for name, value in rows}
+
+    def set_configuration_variable(self, name: str, value: MariaDBValue) -> bool:
+        """Persist, apply, verify, and roll back one safe dynamic variable."""
+        spec = self._configuration_variable_spec(name)
+        try:
+            requested = spec.validate_input(value)
+        except ValueError as exc:
+            raise DatabaseError(str(exc)) from exc
+        if not spec.dynamic:
+            raise DatabaseError(f"MariaDB variable '{name}' cannot be changed while running.")
+        self._require_linux_managed_server()
+
+        with self.database_action_lock():
+            self._require_healthy_server()
+            previous = self._read_configuration_variable(name)
+            if previous == requested:
+                return False
+
+            self.ensure_managed_config()
+            previous_content = self.managed_cnf_path.read_text(encoding="utf-8")
+            self._write_managed_option(spec.option_name, spec.option_value(requested))
+            try:
+                self._set_configuration_variable(name, requested)
+                self._verify_configuration_variable(name, requested)
+            except Exception as apply_error:
+                self._rollback_configuration_variable(
+                    previous_content,
+                    name,
+                    previous,
+                    apply_error,
+                )
+            return True
+
+    def _read_configuration_variable(self, name: str) -> MariaDBValue:
+        spec = self._configuration_variable_spec(name)
+        raw_value = self.global_variable_values((name,)).get(name)
+        if raw_value is None:
+            raise DatabaseError(f"MariaDB variable '{name}' is not exposed by the installed MariaDB version.")
+        try:
+            return spec.parse_server_value(raw_value)
+        except ValueError as exc:
+            raise DatabaseError(str(exc)) from exc
+
+    def _set_configuration_variable(self, name: str, value: MariaDBValue) -> None:
+        spec = self._configuration_variable_spec(name)
+        try:
+            validated = spec.validate_input(value)
+        except ValueError as exc:
+            raise DatabaseError(str(exc)) from exc
+        sql_value = int(validated) if type(validated) is bool else validated
+        connection = None
+        try:
+            connection = self.connect()
+            with connection.cursor() as cursor:
+                cursor.execute(f"SET GLOBAL {spec.name} = %s", (sql_value,))
+        except Exception as exc:
+            raise DatabaseError(f"Could not update MariaDB variable '{name}'.") from exc
+        finally:
+            if connection is not None:
+                connection.close()
+
+    def _verify_configuration_variable(self, name: str, expected: MariaDBValue) -> None:
+        if self._read_configuration_variable(name) != expected:
+            raise DatabaseError(f"MariaDB did not apply the requested value for '{name}'.")
+
+    def _rollback_configuration_variable(
+        self,
+        previous_content: str,
+        name: str,
+        previous_value: MariaDBValue,
+        apply_error: Exception,
+    ) -> NoReturn:
+        try:
+            atomic_write_private_text(self.managed_cnf_path, previous_content)
+            self._set_configuration_variable(name, previous_value)
+            self._verify_configuration_variable(name, previous_value)
+        except Exception as rollback_error:
+            raise DatabaseError(
+                f"Could not apply MariaDB variable '{name}', and restoring the previous "
+                f"configuration also failed: {rollback_error}"
+            ) from apply_error
+        raise DatabaseError(
+            f"Could not apply MariaDB variable '{name}'. The previous configuration was restored."
+        ) from apply_error
+
+    @staticmethod
+    def _configuration_variable_spec(name: str):
+        if name not in GENERIC_EDITABLE_MARIADB_VARIABLE_NAMES:
+            raise DatabaseError(f"Pilot cannot change MariaDB variable '{name}'.")
+        return mariadb_variable_spec(name)
 
     def _read_global_integer(self, variable: str) -> int:
         self._require_supported_integer_variable(variable)

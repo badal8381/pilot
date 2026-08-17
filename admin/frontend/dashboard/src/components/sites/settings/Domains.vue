@@ -1,74 +1,10 @@
-<template>
-  <div v-if="nginxEnabled">
-    <p class="font-semibold text-ink-gray-8 text-base">Domains</p>
-    <div v-if="loading" class="flex justify-center py-8">
-      <LoadingText />
-    </div>
-    <template v-else>
-      <div class="mt-1">
-        <div
-          v-for="row in domainRows"
-          :key="row.domain"
-          class="flex justify-between items-start gap-x-2.5 py-4 border-b border-outline-alpha-gray-1"
-        >
-          <div class="flex items-start gap-2.5 min-w-0">
-            <Tooltip :text="site?.ssl ? 'SSL active' : 'SSL inactive'">
-              <span
-                class="mt-0.5 size-4 text-ink-gray-5 shrink-0"
-                :class="site?.ssl ? 'lucide-lock text-ink-green-5' : 'lucide-lock-open'"
-              />
-            </Tooltip>
-            <div class="flex items-center gap-2 min-w-0">
-              <p class="font-medium text-ink-gray-8 text-base truncate">{{ row.domain }}</p>
-              <Badge
-                v-if="row.isPrimary"
-                label="Primary"
-                theme="green"
-                size="sm"
-                class="shrink-0"
-              />
-              <Badge v-else-if="row.isSite" label="Included" size="sm" class="shrink-0" />
-            </div>
-          </div>
-          <Dropdown
-            v-if="domainMenuOptions(row).length"
-            :options="domainMenuOptions(row)"
-          >
-            <template #default="{ open }">
-              <Button
-                variant="ghost"
-                size="sm"
-                :active="open"
-                icon="lucide-ellipsis"
-                label="Domain actions"
-                tooltip="Actions"
-              />
-            </template>
-          </Dropdown>
-        </div>
-      </div>
-      <ErrorMessage v-if="error" :message="error" class="mt-2" />
-      <Button variant="subtle" size="sm" class="mt-4" @click="showAdd = true">
-        <template #prefix><span class="size-4 lucide-plus" /></template>
-        Use your own domain
-      </Button>
-    </template>
-  </div>
-
-  <AddDomainDialog v-model="showAdd" :site-name="siteName" @added="loadDomains" />
-  <RemoveDomainDialog
-    v-model="showRemove"
-    :site-name="siteName"
-    :domain="removeTarget"
-    @removed="loadDomains"
-  />
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Badge, Button, Dropdown, ErrorMessage, LoadingText, Tooltip } from 'frappe-ui'
-import AddDomainDialog from './domains/AddDomainDialog.vue'
-import RemoveDomainDialog from './domains/RemoveDomainDialog.vue'
+
+import AddDomainDialog from '@/components/sites/settings/domains/AddDomainDialog.vue'
+import RemoveDomainDialog from '@/components/sites/settings/domains/RemoveDomainDialog.vue'
+
 import { useSite } from '@/composables/sites/useSite'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
@@ -96,7 +32,7 @@ const domainRows = computed(() => {
   return rows
 })
 
-function domainMenuOptions(row) {
+const domainMenuOptions = (row) => {
   const options = []
   if (!row.isPrimary) {
     options.push({
@@ -116,7 +52,7 @@ function domainMenuOptions(row) {
   return options
 }
 
-async function loadDomains() {
+const loadDomains = async () => {
   loading.value = true
   error.value = ''
   try {
@@ -130,7 +66,7 @@ async function loadDomains() {
   }
 }
 
-async function setPrimary(domain) {
+const setPrimary = async (domain) => {
   error.value = ''
   try {
     const data = await sitesApi.domains.setPrimary(props.siteName, domain)
@@ -148,7 +84,7 @@ const showAdd = ref(false)
 const showRemove = ref(false)
 const removeTarget = ref('')
 
-function openRemove(domain) {
+const openRemove = (domain) => {
   removeTarget.value = domain
   showRemove.value = true
 }
@@ -161,3 +97,73 @@ watch(nginxEnabled, (enabled) => {
   if (enabled) loadDomains()
 })
 </script>
+
+<template>
+  <div v-if="nginxEnabled">
+    <p class="font-semibold text-ink-gray-8 text-base">Domains</p>
+    <div v-if="loading" class="flex justify-center py-8">
+      <LoadingText />
+    </div>
+
+    <template v-else>
+      <div class="mt-1">
+        <div
+          v-for="row in domainRows"
+          :key="row.domain"
+          class="flex justify-between items-start gap-x-2.5 py-4 border-b border-outline-alpha-gray-1"
+        >
+          <div class="flex items-start gap-2.5 min-w-0">
+            <Tooltip :text="site?.ssl ? 'SSL active' : 'SSL inactive'">
+              <span
+                class="mt-0.5 size-4 text-ink-gray-5 shrink-0"
+                :class="site?.ssl ? 'lucide-lock text-ink-green-5' : 'lucide-lock-open'"
+              />
+            </Tooltip>
+
+            <div class="flex items-center gap-2 min-w-0">
+              <p class="font-medium text-ink-gray-8 text-base truncate">{{ row.domain }}</p>
+              <Badge
+                v-if="row.isPrimary"
+                label="Primary"
+                theme="green"
+                size="sm"
+                class="shrink-0"
+              />
+              <Badge v-else-if="row.isSite" label="Included" size="sm" class="shrink-0" />
+            </div>
+          </div>
+
+          <Dropdown
+            v-if="domainMenuOptions(row).length"
+            :options="domainMenuOptions(row)"
+          >
+            <template #default="{ open }">
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="Domain actions"
+                tooltip="Actions"
+              />
+            </template>
+          </Dropdown>
+        </div>
+      </div>
+
+      <ErrorMessage v-if="error" :message="error" class="mt-2" />
+      <Button variant="subtle" size="sm" class="mt-4" @click="showAdd = true">
+        <template #prefix><span class="size-4 lucide-plus" /></template>
+        Use your own domain
+      </Button>
+    </template>
+  </div>
+
+  <AddDomainDialog v-model="showAdd" :site-name="siteName" @added="loadDomains" />
+  <RemoveDomainDialog
+    v-model="showRemove"
+    :site-name="siteName"
+    :domain="removeTarget"
+    @removed="loadDomains"
+  />
+</template>

@@ -10,7 +10,7 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       frappeuiPlugin({
-        lucideIcons: true,
+        lucideIcons: { componentGlobs: [] },
         frappeProxy: false,
         jinjaBootData: false,
         buildConfig: false,

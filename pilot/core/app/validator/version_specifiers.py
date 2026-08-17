@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import typing
 
-from packaging.requirements import InvalidRequirement, Requirement
-from packaging.specifiers import InvalidSpecifier, SpecifierSet
-
+from pilot._vendor.packaging.requirements import InvalidRequirement, Requirement
+from pilot._vendor.packaging.specifiers import InvalidSpecifier, SpecifierSet
 from pilot.core.app.validator.base import read_pyproject
 from pilot.exceptions import AppValidationError
 

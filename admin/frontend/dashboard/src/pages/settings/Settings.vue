@@ -1,7 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { Button, TabButtons, useColorScheme } from 'frappe-ui'
+
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 
 const router = useRouter()
@@ -39,6 +40,7 @@ const themeOptions = [
           <span class="size-4 text-ink-gray-6 lucide-server-cog" />
           Server settings
         </span>
+
         <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
       </Button>
 
@@ -52,6 +54,7 @@ const themeOptions = [
           <span class="size-4 text-ink-gray-6 lucide-repeat" />
           Switch Bench
         </span>
+
         <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
       </Button>
 
@@ -64,6 +67,7 @@ const themeOptions = [
           <span class="size-4 text-ink-gray-6 lucide-history" />
           Activity
         </span>
+
         <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
       </Button>
 
@@ -72,6 +76,7 @@ const themeOptions = [
           <span class="size-4 text-ink-gray-6 lucide-sun-moon" />
           Theme
         </span>
+
         <TabButtons v-model="themeModel" :options="themeOptions" />
       </div>
 
@@ -80,6 +85,7 @@ const themeOptions = [
           <span class="size-4 text-ink-gray-6 lucide-log-out" />
           Logout
         </span>
+
         <template #suffix><span class="size-4 text-ink-gray-5 lucide-chevron-right" /></template>
       </Button>
     </div>

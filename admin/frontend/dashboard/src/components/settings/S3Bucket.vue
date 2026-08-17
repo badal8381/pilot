@@ -1,69 +1,7 @@
-<template>
-  <div v-if="loading" class="flex justify-center items-center h-40">
-    <Spinner size="lg" class="text-ink-gray-4" />
-  </div>
-  <div v-else class="space-y-6">
-    <Alert v-if="!connected" theme="blue" title="Why connect object storage?" :dismissible="false">
-      <template #description>
-        <p class="text-ink-gray-6 text-p-sm">
-          Connect S3-compatible object storage to send offsite backups and snapshots.
-        </p>
-      </template>
-    </Alert>
-
-    <div
-      v-if="connected"
-      class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3"
-    >
-      <div>
-        <p class="font-medium text-ink-gray-8 text-base">Connected to {{ bucket }}</p>
-        <p class="text-ink-gray-5 text-p-sm">{{ providerLabel }} · Access key {{ accessKey }}</p>
-      </div>
-      <Button
-        class="flex-1 sm:flex-none"
-        variant="subtle"
-        theme="red"
-        :loading="disconnecting"
-        @click="disconnect"
-        >Disconnect</Button
-      >
-    </div>
-
-    <div class="space-y-4">
-      <FormControl label="Bucket" type="text" v-model="bucket" placeholder="storage-bucket" />
-      <div class="flex sm:flex-row flex-col gap-4">
-        <Select label="Provider" v-model="provider" :options="providerOptions" class="w-full" />
-        <Select label="Region" v-model="region" :options="regionOptions" class="w-full" />
-      </div>
-      <div class="flex sm:flex-row flex-col gap-4">
-        <FormControl
-          label="Access Key"
-          type="text"
-          v-model="accessKey"
-          placeholder="AKIA…"
-          class="w-full"
-        />
-        <FormControl
-          label="Secret Key"
-          type="password"
-          v-model="secretKey"
-          :placeholder="secretKeySet ? '••••••••' : 'Secret key'"
-          class="w-full"
-        />
-      </div>
-      <ErrorMessage v-if="error" :message="error" />
-      <div class="flex justify-end">
-        <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
-          {{ connected ? 'Update' : 'Connect' }}
-        </Button>
-      </div>
-    </div>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Alert, Button, ErrorMessage, FormControl, Select, Spinner, toast } from 'frappe-ui'
+
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 
@@ -109,7 +47,7 @@ const canSave = computed(
     (secretKeySet.value || Boolean(secretKey.value.trim())),
 )
 
-async function load() {
+const load = async () => {
   loading.value = true
   try {
     const data = await settingsApi.get()
@@ -127,7 +65,7 @@ async function load() {
   }
 }
 
-async function save() {
+const save = async () => {
   saving.value = true
   error.value = ''
   try {
@@ -154,7 +92,7 @@ async function save() {
   }
 }
 
-async function disconnect() {
+const disconnect = async () => {
   disconnecting.value = true
   try {
     const result = await settingsApi.update({ s3: { disconnect: true } })
@@ -178,3 +116,70 @@ async function disconnect() {
 
 onMounted(load)
 </script>
+
+<template>
+  <div v-if="loading" class="flex justify-center items-center h-40">
+    <Spinner size="lg" class="text-ink-gray-4" />
+  </div>
+
+  <div v-else class="space-y-6">
+    <Alert v-if="!connected" theme="blue" title="Why connect object storage?" :dismissible="false">
+      <template #description>
+        <p class="text-ink-gray-6 text-p-sm">
+          Connect S3-compatible object storage to send offsite backups and snapshots.
+        </p>
+      </template>
+    </Alert>
+
+    <div
+      v-if="connected"
+      class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3"
+    >
+      <div>
+        <p class="font-medium text-ink-gray-8 text-base">Connected to {{ bucket }}</p>
+        <p class="text-ink-gray-5 text-p-sm">{{ providerLabel }} · Access key {{ accessKey }}</p>
+      </div>
+
+      <Button
+        class="flex-1 sm:flex-none"
+        variant="subtle"
+        theme="red"
+        :loading="disconnecting"
+        @click="disconnect"
+        >Disconnect</Button
+      >
+    </div>
+
+    <div class="space-y-4">
+      <FormControl label="Bucket" type="text" v-model="bucket" placeholder="storage-bucket" />
+      <div class="flex sm:flex-row flex-col gap-4">
+        <Select label="Provider" v-model="provider" :options="providerOptions" class="w-full" />
+        <Select label="Region" v-model="region" :options="regionOptions" class="w-full" />
+      </div>
+
+      <div class="flex sm:flex-row flex-col gap-4">
+        <FormControl
+          label="Access Key"
+          type="text"
+          v-model="accessKey"
+          placeholder="AKIA…"
+          class="w-full"
+        />
+        <FormControl
+          label="Secret Key"
+          type="password"
+          v-model="secretKey"
+          :placeholder="secretKeySet ? '••••••••' : 'Secret key'"
+          class="w-full"
+        />
+      </div>
+
+      <ErrorMessage v-if="error" :message="error" />
+      <div class="flex justify-end">
+        <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
+          {{ connected ? 'Update' : 'Connect' }}
+        </Button>
+      </div>
+    </div>
+  </div>
+</template>

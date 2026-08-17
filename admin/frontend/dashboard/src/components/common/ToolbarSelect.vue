@@ -1,3 +1,15 @@
+<script setup lang="ts">
+import { Button, Dropdown } from 'frappe-ui'
+
+import { useIsMobile } from '@/composables/common/useIsMobile'
+
+// inheritAttrs off so a caller's `class` styles the trigger, not the Dropdown.
+defineOptions({ inheritAttrs: false })
+defineProps({ options: { type: Array, required: true } })
+
+const isMobile = useIsMobile()
+</script>
+
 <template>
   <Dropdown :options="options">
     <template #default="{ open }">
@@ -9,14 +21,3 @@
     </template>
   </Dropdown>
 </template>
-
-<script setup>
-import { Button, Dropdown } from 'frappe-ui'
-import { useIsMobile } from '@/composables/common/useIsMobile'
-
-// inheritAttrs off so a caller's `class` styles the trigger, not the Dropdown.
-defineOptions({ inheritAttrs: false })
-defineProps({ options: { type: Array, required: true } })
-
-const isMobile = useIsMobile()
-</script>

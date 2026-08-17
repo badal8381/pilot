@@ -4,9 +4,8 @@ import ast
 import contextlib
 import typing
 
-from packaging.specifiers import InvalidSpecifier, SpecifierSet
-from packaging.version import InvalidVersion, Version
-
+from pilot._vendor.packaging.specifiers import InvalidSpecifier, SpecifierSet
+from pilot._vendor.packaging.version import InvalidVersion, Version
 from pilot.core.app.validator.base import module_path, read_pyproject
 from pilot.exceptions import AppValidationError, BenchError
 

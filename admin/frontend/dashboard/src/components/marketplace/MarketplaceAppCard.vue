@@ -1,3 +1,27 @@
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { Badge, Button, Dialog, Tooltip } from 'frappe-ui'
+import LucideDownload from '~icons/lucide/download'
+
+import AppIcon from '@/components/apps/AppIcon.vue'
+
+const props = defineProps({
+  app: { type: Object, required: true },
+})
+defineEmits(['install'])
+
+const showIncompatible = ref(false)
+
+const requirementLabel = computed(() =>
+  props.app.needs ? `Needs Frappe ${props.app.needs}` : 'Needs a newer Frappe version',
+)
+
+const incompatibleReason = computed(
+  () =>
+    `${props.app.title} requires ${props.app.needs ? `Frappe ${props.app.needs}` : 'a newer Frappe version'} to install.`,
+)
+</script>
+
 <template>
   <div class="flex items-center gap-3">
     <AppIcon :name="app.name" :label="app.title" :logo="app.logo_url || ''" size="xl" />
@@ -9,6 +33,7 @@
           <span v-if="app.label" class="text-ink-gray-5 text-xs shrink-0">{{ app.label }}</span>
           <Badge v-if="app.nightly" theme="gray" variant="subtle" label="Nightly" size="sm" />
         </div>
+
         <div class="mt-0.5 text-ink-gray-5 text-p-sm truncate">
           {{ app.description }}
         </div>
@@ -20,6 +45,7 @@
             <span class="size-4 text-ink-gray-9 lucide-check"></span>
           </span>
         </Tooltip>
+
         <Tooltip v-else-if="!app.compatible" :text="requirementLabel">
           <Button
             variant="ghost"
@@ -30,6 +56,7 @@
             <template #icon><LucideDownload class="size-4" /></template>
           </Button>
         </Tooltip>
+
         <Tooltip v-else :text="`Install ${app.title}`">
           <Button variant="ghost" label="Install" class="group" @click="$emit('install', app)">
             <template #icon>
@@ -49,6 +76,7 @@
           <span class="text-ink-gray-5">Current version</span>
           <span class="font-medium text-ink-gray-8">{{ app.frappe_version || 'Unknown' }}</span>
         </div>
+
         <div class="flex justify-between">
           <span class="text-ink-gray-5">Required version</span>
           <span class="font-medium text-ink-gray-8">{{ app.needs || 'Not specified' }}</span>
@@ -57,26 +85,3 @@
     </Dialog>
   </div>
 </template>
-
-<script setup>
-import { computed, ref } from 'vue'
-import { Badge, Button, Dialog, Tooltip } from 'frappe-ui'
-import LucideDownload from '~icons/lucide/download'
-import AppIcon from '@/components/apps/AppIcon.vue'
-
-const props = defineProps({
-  app: { type: Object, required: true },
-})
-defineEmits(['install'])
-
-const showIncompatible = ref(false)
-
-const requirementLabel = computed(() =>
-  props.app.needs ? `Needs Frappe ${props.app.needs}` : 'Needs a newer Frappe version',
-)
-
-const incompatibleReason = computed(
-  () =>
-    `${props.app.title} requires ${props.app.needs ? `Frappe ${props.app.needs}` : 'a newer Frappe version'} to install.`,
-)
-</script>
