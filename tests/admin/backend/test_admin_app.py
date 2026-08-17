@@ -282,8 +282,8 @@ def test_api_benches_create_routes_wizard_at_domain_when_production(tmp_path: Pa
     toml = (current / "bench.toml").read_text()
     (current / "bench.toml").write_text(
         toml.replace(
-            "enabled = false\nuse_companion_manager",
-            'enabled = true\nprocess_manager = "systemd"\nuse_companion_manager',
+            "[production]\nenabled = false",
+            '[production]\nenabled = true\nprocess_manager = "systemd"',
         )
     )
     from admin.backend.internal.session import Session

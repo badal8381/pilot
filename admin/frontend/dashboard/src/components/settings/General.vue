@@ -17,6 +17,8 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const allowDeveloperMode = ref(false)
+const liteMode = ref(false)
+const liteModeSupported = ref(false)
 
 const toggleAllowDeveloperMode = async (value) => {
   saving.value = true
@@ -33,10 +35,26 @@ const toggleAllowDeveloperMode = async (value) => {
   }
 }
 
+const toggleLiteMode = async (value) => {
+  saving.value = true
+  error.value = ''
+  try {
+    await settingsApi.update({ lite_mode: { enabled: value } })
+    liteMode.value = value
+    toast.success(`Lite mode ${value ? 'enabled' : 'disabled'}. Rebuilding the process set.`)
+  } catch (e) {
+    error.value = e.message || 'Could not update lite mode setting.'
+  } finally {
+    saving.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const data = await settingsApi.get()
     allowDeveloperMode.value = Boolean(data?.bench?.allow_developer_mode)
+    liteMode.value = Boolean(data?.lite_mode?.enabled)
+    liteModeSupported.value = Boolean(data?.lite_mode?.supported)
   } catch {
     error.value = 'Could not load settings.'
   } finally {
@@ -70,6 +88,21 @@ onMounted(async () => {
           :disabled="saving"
           @click.stop
           @update:model-value="toggleAllowDeveloperMode"
+        />
+      </SettingsRow>
+
+      <SettingsRow
+        v-if="liteModeSupported"
+        label="Lite mode"
+        description="One process for web, realtime and jobs. Less memory, best for small sites."
+        interactive
+        @click="!saving && toggleLiteMode(!liteMode)"
+      >
+        <Switch
+          :model-value="liteMode"
+          :disabled="saving"
+          @click.stop
+          @update:model-value="toggleLiteMode"
         />
       </SettingsRow>
 

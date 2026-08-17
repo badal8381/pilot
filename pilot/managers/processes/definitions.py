@@ -19,7 +19,7 @@ class ProcessDefinition:
     log_file: Path
     env: dict = field(default_factory=dict)
     working_dir: Path | None = None  # was `cd {dir} &&`
-    stop_timeout: int | None = None  # graceful-stop seconds (redis=300, web+companion=1600)
+    stop_timeout: int | None = None  # graceful-stop seconds (redis=300)
     critical: bool = True  # dev runner stops the whole bench when this process exits
 
 
@@ -30,7 +30,8 @@ class ProcessDefinitionBuilder:
         self.watch_admin_js = watch_admin_js
 
     def prod_process_definitions(self) -> list[ProcessDefinition]:
-        if self.bench.config.production.use_companion_manager:
+        if self.bench.is_lite_mode:
+            # web, realtime and jobs all live in the one lite process.
             defs = [self.web_definition(), self.admin_definition()]
         elif self.bench.config.production.process_manager == "systemd":
             all_queues = ",".join(q for group in self.bench.config.workers.groups for q in group.queues)
@@ -80,14 +81,12 @@ class ProcessDefinitionBuilder:
         """Shared env for Python processes. PYTHONUNBUFFERED keeps stdout unbuffered:
         every runner captures it into a pipe or log file, where Python would otherwise
         block-buffer app-code print() until ~8KB accumulates."""
-        env = {"PYTHONUNBUFFERED": "1"}
-        arenas = self.bench.config.gunicorn.malloc_arena_max
-        if arenas and arenas > 0:
-            env["MALLOC_ARENA_MAX"] = str(arenas)
-        return env
+        return {"PYTHONUNBUFFERED": "1"}
 
     def web_definition(self, dev: bool = False) -> ProcessDefinition:
         sites = self.bench.sites_path
+        if self.bench.is_lite_mode:
+            return self.lite_definition(dev=dev)
         if dev:
             port = self.bench.config.http_port
             argv = [
@@ -109,14 +108,43 @@ class ProcessDefinitionBuilder:
                 working_dir=sites,
             )
         gunicorn = self.bench.env_path / "bin" / "gunicorn"
-        companion = self.bench.config.production.use_companion_manager
         return ProcessDefinition(
             name="web",
             argv=[str(gunicorn), "-c", "../config/gunicorn.conf.py", "frappe.app:application"],
             log_file=self.bench.logs_path / "web.log",
             env=self.python_env(),
             working_dir=sites,
-            stop_timeout=1600 if companion else None,
+        )
+
+    def lite_definition(self, dev: bool = False) -> ProcessDefinition:
+        """Web, realtime and background jobs in one self-recycling process."""
+        lite_mode = self.bench.config.lite_mode
+        argv = [
+            str(self.python),
+            "-m",
+            "frappe.runner",
+            "--host=127.0.0.1",
+            f"--port={self.bench.config.http_port}",
+            f"--queue={','.join(self.bench.config.workers.queues)}",
+            f"--job-threads={self.bench.config.workers.count}",
+            f"--restart-after-requests={lite_mode.restart_after_requests}",
+            f"--restart-after-jobs={lite_mode.restart_after_jobs}",
+            f"--restart-idle-seconds={lite_mode.restart_idle_seconds}",
+            f"--request-drain-seconds={lite_mode.request_drain_seconds}",
+            f"--job-drain-seconds={lite_mode.job_drain_seconds}",
+        ]
+        if dev:
+            # No nginx in front, so the process serves /assets and /files itself.
+            argv.append("--serve-assets")
+        return ProcessDefinition(
+            name="web",
+            argv=argv,
+            log_file=self.bench.logs_path / "web.log",
+            # One threaded process: capping the glibc arenas keeps the heap from
+            # fragmenting across them, and preloading only pays off before a fork.
+            env={**self.python_env(), "MALLOC_ARENA_MAX": "2", "FRAPPE_PRELOAD_MODULES": "0"},
+            working_dir=self.bench.sites_path,
+            stop_timeout=lite_mode.stop_timeout,
         )
 
     def socketio_definition(self) -> ProcessDefinition:
