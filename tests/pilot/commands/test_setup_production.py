@@ -203,7 +203,6 @@ class _BlockPsutil:
     def find_spec(self, name, path=None, target=None):
         if name.split(".")[0] == "psutil":
             raise ImportError("psutil is not installed on the system python")
-        return None
 
 
 def test_setup_monitoring_runs_without_psutil(tmp_path: Path, monkeypatch) -> None:
