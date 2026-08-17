@@ -87,6 +87,36 @@ class SustainedAlerts:
                 state[name]["notified"] = True
         self._write(state)
 
+    def sustained(self) -> list[str]:
+        """Every condition that has held for the full window, read from the state
+        `due()` just wrote - so call it after `due()`, not instead of it.
+
+        Unlike `due()` this ignores delivery entirely. A condition an external sink
+        already accepted is still sustained, and still needs a local record if the
+        bench never managed to write one."""
+        now = time.time()
+        return sorted(
+            name for name, entry in self._read().items() if now - entry["since"] >= self.window_seconds
+        )
+
+    def unrecorded(self, names: list[str]) -> list[str]:
+        """Of `names`, the ones the bench has not written to its own feed yet.
+
+        Delivery and recording are different facts. A due condition stays due until
+        some sink accepts it, so the delivery attempt repeats every tick - the local
+        record must not, or a bench with no reachable sink writes one row per tick
+        for as long as the condition holds."""
+        state = self._read()
+        return [name for name in names if not state.get(name, {}).get("recorded")]
+
+    def mark_recorded(self, names: list[str]) -> None:
+        """Call once the bench's own feed holds a record for these conditions."""
+        state = self._read()
+        for name in names:
+            if name in state:
+                state[name]["recorded"] = True
+        self._write(state)
+
     def _read(self) -> dict[str, dict]:
         """A hand-edited or truncated file starts the window over rather than
         stopping the daemon."""

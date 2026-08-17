@@ -1,118 +1,8 @@
-<template>
-  <div class="mx-auto">
-    <StickyToolbar class="flex items-center gap-2">
-      <div class="flex-1 sm:flex-none min-w-0">
-        <ToolbarSelect
-          :options="targetOptions"
-          class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto sm:max-w-[250px] overflow-hidden"
-        >
-          <template #prefix>
-            <span class="size-4" :class="isServerScope ? 'lucide-server' : 'lucide-globe'" />
-          </template>
-          <span class="truncate">{{ targetLabel }}</span>
-        </ToolbarSelect>
-      </div>
-      <div v-if="isServerScope" class="shrink-0">
-        <ToolbarSelect :options="metricOptions" class="[&>.truncate]:text-left text-base">
-          {{ viewLabel }}
-        </ToolbarSelect>
-      </div>
-      <div class="shrink-0">
-        <ToolbarSelect :options="windowOptions" class="[&>.truncate]:text-left text-base">
-          <template #prefix>
-            <span
-              v-if="!isHistorical"
-              class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
-            />
-          </template>
-          {{ windowLabel }}
-        </ToolbarSelect>
-      </div>
-    </StickyToolbar>
-
-    <DatabaseInsights v-if="view === 'database'" :window="historyWindow" />
-
-    <template v-else-if="view === 'site'">
-      <SiteInsights v-if="activeSite" :site-name="activeSite" :window="historyWindow" />
-      <EmptyState
-        v-else-if="!sitesLoading"
-        icon="lucide-globe"
-        title="No sites on this bench yet"
-        description="Create a site to start collecting metrics for it."
-      />
-    </template>
-
-    <!-- Loading state -->
-    <template v-else-if="pageLoading">
-      <Skeleton v-if="!isHistorical" class="mb-6 rounded-6 h-[88px]" />
-      <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
-        <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
-      </div>
-    </template>
-
-    <template v-else>
-      <!-- Live stats bar: CPU / Memory / Storage -->
-      <div
-        v-if="liveStats"
-        class="bg-surface-white mb-6 border rounded-6 border-outline-gray-2 overflow-hidden"
-      >
-        <div class="flex sm:flex-row flex-col divide-outline-gray-2 sm:divide-x">
-          <div
-            v-for="meter in liveMeters"
-            :key="meter.label"
-            class="flex-1 px-4 sm:px-5 py-3 sm:py-4 border-t first:border-t-0 sm:border-t-0 border-outline-gray-2"
-          >
-            <div class="flex justify-between items-baseline gap-2 mb-2">
-              <span class="text-ink-gray-6 text-sm">{{ meter.label }}</span>
-              <span class="text-ink-gray-6 text-sm shrink-0">{{ meter.value }}</span>
-            </div>
-            <div class="bg-surface-gray-2 rounded-full h-1 overflow-hidden">
-              <div
-                class="bg-surface-gray-9 rounded-full h-full"
-                :style="{ width: Math.min(meter.percent, 100) + '%' }"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Historical empty states -->
-      <template v-if="isHistorical">
-        <LoadingText v-if="historyLoading" />
-        <ErrorMessage v-else-if="historyError" :message="historyError" />
-        <EmptyState
-          v-else-if="allEmpty"
-          icon="lucide-chart-line"
-          :title="`No data for the last ${windowLabel}`"
-          description="Monitoring hasn't collected metrics in this range yet."
-        />
-      </template>
-
-      <!-- Charts grid -->
-      <div v-if="showCharts" class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
-        <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
-          <AxisChart
-            :config="chart.config"
-            class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
-          />
-        </ChartCard>
-      </div>
-
-      <!-- Live mode collecting its first points, with the stat bar already up -->
-      <div v-else-if="!isHistorical" class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
-        <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
-      </div>
-
-      <!-- WAF analytics (only renders when the WAF has logged activity) -->
-      <WafAnalytics :window="activeWindow" />
-    </template>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { LoadingText, ErrorMessage, AxisChart, Skeleton } from 'frappe-ui'
+
 import ChartCard from '@/components/common/ChartCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
@@ -120,6 +10,7 @@ import ToolbarSelect from '@/components/common/ToolbarSelect.vue'
 import WafAnalytics from '@/components/common/WafAnalytics.vue'
 import DatabaseInsights from '@/components/dashboard/DatabaseInsights.vue'
 import SiteInsights from '@/components/dashboard/SiteInsights.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 import { livePollDelayMs } from '@/utils/livePolling'
@@ -239,12 +130,12 @@ const historyWindow = computed(() => (activeWindow.value === 'live' ? '1h' : act
 // restores what the viewer actually picked.
 let preferredWindow = activeWindow.value
 
-function chooseWindow(key) {
+const chooseWindow = (key) => {
   preferredWindow = key
   selectWindow(key)
 }
 
-function setView(key) {
+const setView = (key) => {
   // Re-picking would refetch and, in live mode, discard collected history.
   if (view.value === key) return
   view.value = key
@@ -252,12 +143,12 @@ function setView(key) {
   else if (activeWindow.value === 'live') selectWindow('1h')
 }
 
-function selectSite(name) {
+const selectSite = (name) => {
   setView('site')
   activeSite.value = name
 }
 
-function selectWindow(key) {
+const selectWindow = (key) => {
   if (view.value === 'system') setWindow(key)
   else activeWindow.value = key
 }
@@ -303,7 +194,7 @@ const historyNow = ref(Date.now())
 
 // Time helpers
 
-function serverTime() {
+const serverTime = () => {
   return Date.now() + timeOffset.value
 }
 
@@ -312,11 +203,11 @@ const axisMin = computed(
 )
 const axisMax = computed(() => historyNow.value)
 
-function isPartial(earliest) {
+const isPartial = (earliest) => {
   return earliest != null && earliest > axisMin.value + 1000
 }
 
-function humanizeSince(earliest) {
+const humanizeSince = (earliest) => {
   if (earliest == null) return ''
   const seconds = Math.floor((historyNow.value - earliest) / 1000)
   if (seconds < 3600) return `${Math.max(1, Math.floor(seconds / 60))}m`
@@ -326,7 +217,7 @@ function humanizeSince(earliest) {
 
 // Data loading
 
-async function setWindow(key) {
+const setWindow = async (key) => {
   activeWindow.value = key
   if (key === 'live') {
     liveHistory.value = []
@@ -339,7 +230,7 @@ async function setWindow(key) {
   }
 }
 
-async function loadStats() {
+const loadStats = async () => {
   if (view.value !== 'system' || isHistorical.value) return
   try {
     const s = await monitorApi.stats()
@@ -351,7 +242,7 @@ async function loadStats() {
   } catch {}
 }
 
-function appendLivePoint(s) {
+const appendLivePoint = (s) => {
   const cpu = s.cpu_breakdown || {}
   const mem = s.memory_breakdown || {}
   const [load1, load5, load15] = s.load_avg || []
@@ -379,12 +270,12 @@ function appendLivePoint(s) {
   })
 }
 
-function trimLiveHistory() {
+const trimLiveHistory = () => {
   const cutoff = liveNow.value - LIVE_WINDOW_MS - 60000
   liveHistory.value = liveHistory.value.filter((p) => p.time >= cutoff)
 }
 
-async function refreshAppData() {
+const refreshAppData = async () => {
   try {
     const d = await monitorApi.history('30m')
     if (!d.error && d.application) {
@@ -393,7 +284,7 @@ async function refreshAppData() {
   } catch {}
 }
 
-async function seedLiveHistory() {
+const seedLiveHistory = async () => {
   if (isHistorical.value || liveHistory.value.length) return
   try {
     const d = await monitorApi.history('1h')
@@ -410,7 +301,7 @@ async function seedLiveHistory() {
   } catch {}
 }
 
-async function loadHistory(window) {
+const loadHistory = async (window) => {
   historyLoading.value = true
   historyError.value = ''
   try {
@@ -494,7 +385,7 @@ const liveXAxis = computed(() => ({
 const currentPoints = computed(() => (isHistorical.value ? system.value.points : liveHistory.value))
 const currentXAxis = computed(() => (isHistorical.value ? fixedXAxis.value : liveXAxis.value))
 
-function lineSeries(name, color, stacked) {
+const lineSeries = (name, color, stacked) => {
   return {
     name,
     type: 'line',
@@ -512,19 +403,19 @@ function lineSeries(name, color, stacked) {
   }
 }
 
-function transparent(hex, opacity) {
+const transparent = (hex, opacity) => {
   const v = parseInt(hex.slice(1), 16)
   return `rgba(${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}, ${opacity})`
 }
 
-function scaleFields(points, keys, divisor) {
+const scaleFields = (points, keys, divisor) => {
   return points.map((p) => ({
     ...p,
     ...Object.fromEntries(keys.map((k) => [k, p[k] != null ? p[k] / divisor : p[k]])),
   }))
 }
 
-function normalizeAppData(points, services) {
+const normalizeAppData = (points, services) => {
   return points.map((p) => ({
     time: p.time,
     ...Object.fromEntries(services.map((s) => [s, p[s] ?? 0])),
@@ -682,7 +573,7 @@ const charts = computed(() => [
 
 // Formatting
 
-function formatBytes(bytes) {
+const formatBytes = (bytes) => {
   if (bytes < 1024 ** 2) return (bytes / 1024).toFixed(0) + ' KB'
   if (bytes < 1024 ** 3) return (bytes / 1024 ** 2).toFixed(1) + ' MB'
   return (bytes / 1024 ** 3).toFixed(1) + ' GB'
@@ -691,7 +582,7 @@ function formatBytes(bytes) {
 // Lifecycle
 
 let statsTimer
-function scheduleStats() {
+const scheduleStats = () => {
   clearTimeout(statsTimer)
   const delay = livePollDelayMs({
     isLive: view.value === 'system' && !isHistorical.value,
@@ -716,3 +607,118 @@ onMounted(async () => {
 })
 onUnmounted(() => clearTimeout(statsTimer))
 </script>
+
+<template>
+  <div class="mx-auto">
+    <StickyToolbar class="flex items-center gap-2">
+      <div class="flex-1 sm:flex-none min-w-0">
+        <ToolbarSelect
+          :options="targetOptions"
+          class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto sm:max-w-[250px] overflow-hidden"
+        >
+          <template #prefix>
+            <span class="size-4" :class="isServerScope ? 'lucide-server' : 'lucide-globe'" />
+          </template>
+
+          <span class="truncate">{{ targetLabel }}</span>
+        </ToolbarSelect>
+      </div>
+
+      <div v-if="isServerScope" class="shrink-0">
+        <ToolbarSelect :options="metricOptions" class="[&>.truncate]:text-left text-base">
+          {{ viewLabel }}
+        </ToolbarSelect>
+      </div>
+
+      <div class="shrink-0">
+        <ToolbarSelect :options="windowOptions" class="[&>.truncate]:text-left text-base">
+          <template #prefix>
+            <span
+              v-if="!isHistorical"
+              class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
+            />
+          </template>
+          {{ windowLabel }}
+        </ToolbarSelect>
+      </div>
+    </StickyToolbar>
+
+    <DatabaseInsights v-if="view === 'database'" :window="historyWindow" />
+
+    <template v-else-if="view === 'site'">
+      <SiteInsights v-if="activeSite" :site-name="activeSite" :window="historyWindow" />
+      <EmptyState
+        v-else-if="!sitesLoading"
+        icon="lucide-globe"
+        title="No sites on this bench yet"
+        description="Create a site to start collecting metrics for it."
+      />
+    </template>
+
+    <!-- Loading state -->
+    <template v-else-if="pageLoading">
+      <Skeleton v-if="!isHistorical" class="mb-6 rounded-6 h-[88px]" />
+      <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
+        <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
+      </div>
+    </template>
+
+    <template v-else>
+      <!-- Live stats bar: CPU / Memory / Storage -->
+      <div
+        v-if="liveStats"
+        class="bg-surface-white mb-6 border rounded-6 border-outline-gray-2 overflow-hidden"
+      >
+        <div class="flex sm:flex-row flex-col divide-outline-gray-2 sm:divide-x">
+          <div
+            v-for="meter in liveMeters"
+            :key="meter.label"
+            class="flex-1 px-4 sm:px-5 py-3 sm:py-4 border-t first:border-t-0 sm:border-t-0 border-outline-gray-2"
+          >
+            <div class="flex justify-between items-baseline gap-2 mb-2">
+              <span class="text-ink-gray-6 text-sm">{{ meter.label }}</span>
+              <span class="text-ink-gray-6 text-sm shrink-0">{{ meter.value }}</span>
+            </div>
+
+            <div class="bg-surface-gray-2 rounded-full h-1 overflow-hidden">
+              <div
+                class="bg-surface-gray-9 rounded-full h-full"
+                :style="{ width: Math.min(meter.percent, 100) + '%' }"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Historical empty states -->
+      <template v-if="isHistorical">
+        <LoadingText v-if="historyLoading" />
+        <ErrorMessage v-else-if="historyError" :message="historyError" />
+        <EmptyState
+          v-else-if="allEmpty"
+          icon="lucide-chart-line"
+          :title="`No data for the last ${windowLabel}`"
+          description="Monitoring hasn't collected metrics in this range yet."
+        />
+      </template>
+
+      <!-- Charts grid -->
+      <div v-if="showCharts" class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
+        <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
+          <AxisChart
+            :config="chart.config"
+            class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
+          />
+        </ChartCard>
+      </div>
+
+      <!-- Live mode collecting its first points, with the stat bar already up -->
+      <div v-else-if="!isHistorical" class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
+        <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
+      </div>
+
+      <!-- WAF analytics (only renders when the WAF has logged activity) -->
+      <WafAnalytics :window="activeWindow" />
+    </template>
+  </div>
+</template>

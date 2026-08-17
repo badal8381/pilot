@@ -1,109 +1,9 @@
-<template>
-  <div class="space-y-4 mt-5">
-    <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
-      <div>
-        <p class="font-medium text-ink-gray-8 text-base">Automated backups</p>
-        <p class="mt-0.5 text-ink-gray-5 text-p-sm">{{ scheduleSummary }}</p>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <Button variant="subtle" size="sm" @click="configRef.open()"
-          >{{ enabled ? 'Configure' : 'Enable' }}</Button
-        >
-        <Button size="sm" :loading="backingUp" @click="backupNow">
-          <template #prefix><span class="size-4 lucide-archive" /></template>
-          Back up now
-        </Button>
-      </div>
-    </div>
-
-    <BackupConfigDialog ref="configRef" :site-name="siteName" @saved="loadConfig" />
-
-    <ErrorMessage v-if="error" :message="error" />
-
-    <div :class="backups.length ? '' : 'rounded-7 border border-dashed border-outline-gray-2'">
-      <div v-if="backupsLoading" class="flex justify-center py-12">
-        <LoadingText />
-      </div>
-      <EmptyState
-        v-else-if="!backups.length"
-        :bordered="false"
-        icon="lucide-archive"
-        title="No backups yet"
-        :description="
-          enabled
-            ? 'Automatic backups run on schedule. You can also back up now.'
-            : 'Enable automatic backups to start protecting your site.'
-        "
-      >
-        <Button size="sm" :loading="backingUp" @click="backupNow">
-          <template #prefix><span class="size-4 lucide-archive" /></template>
-          Back up now
-        </Button>
-      </EmptyState>
-      <ListView
-        v-else
-        :columns="columns"
-        :rows="rows"
-        row-key="name"
-        :options="{ selectable: false, showTooltip: false }"
-      >
-        <template #cell="{ column, row, item }">
-          <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row.set)">
-              <template #default="{ open }">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  :active="open"
-                  icon="lucide-ellipsis"
-                  label="Backup actions"
-                  tooltip="Actions"
-                />
-              </template>
-            </Dropdown>
-          </div>
-          <div v-else-if="column.key === 'offsite'" class="flex justify-center">
-            <span
-              v-if="row.set.is_offsite"
-              class="size-4 text-ink-gray-6 lucide-check"
-              title="Backed up offsite"
-            />
-            <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
-          </div>
-          <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
-        </template>
-      </ListView>
-      <ListFooter
-        v-if="backupsHasMore || backups.length > 20"
-        class="mt-2 px-1"
-        :model-value="backupsLimit"
-        :options="footerOptions"
-        @update:model-value="setBackupsPageLength"
-        @load-more="loadMoreBackups"
-      />
-    </div>
-  </div>
-
-  <!-- Delete backup dialog -->
-  <Dialog v-model="showDelete" title="Delete Backup" size="sm">
-    <p class="text-ink-gray-7 text-sm">
-      Delete the backup from
-      <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
-      be undone.
-    </p>
-    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-        >Delete</Button
-      >
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
-import { computed, onMounted, ref } from 'vue'
+<script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { computed, onMounted, ref } from 'vue'
+
+import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
+
 import {
   Button,
   Dialog,
@@ -111,16 +11,17 @@ import {
   ErrorMessage,
   LoadingText,
 } from 'frappe-ui'
-import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
-import { apiErrorMessage } from '@/api/client'
+
 import { sitesApi } from '@/api/sites'
 import { tasksApi } from '@/api/tasks'
+import { cronToLabel } from '@/utils/backup'
+import { apiErrorMessage } from '@/api/client'
+import { fmtDateTime } from '@/utils/taskFormat'
 import { useSite } from '@/composables/sites/useSite'
 import { openTaskDetailPage } from '@/utils/taskRoute'
-import { fmtDateTime } from '@/utils/taskFormat'
-import { cronToLabel } from '@/utils/backup'
 
 const props = defineProps({ siteName: { type: String, required: true } })
 const router = useRouter()
@@ -157,7 +58,7 @@ const scheduleSummary = computed(() =>
     : 'Manual backups are kept until you delete them.',
 )
 
-async function loadConfig() {
+const loadConfig = async () => {
   try {
     config.value = await sitesApi.backups.schedule.get(props.siteName)
   } catch {
@@ -165,7 +66,7 @@ async function loadConfig() {
   }
 }
 
-async function backupNow() {
+const backupNow = async () => {
   backingUp.value = true
   error.value = ''
   try {
@@ -212,7 +113,7 @@ const OFFSITE_KIND_KEYS = {
   site_config: 'site_config',
 }
 
-function menuOptions(set) {
+const menuOptions = (set) => {
   const kinds = [
     ['database', 'Download Database'],
     ['public-file', 'Download Public'],
@@ -239,7 +140,7 @@ function menuOptions(set) {
   ]
 }
 
-async function downloadFile(set, kind) {
+const downloadFile = async (set, kind) => {
   const file = fileOf(set, kind)
   if (file?.path) {
     window.location.href = sitesApi.backups.download(props.siteName, set.timestamp, file.filename)
@@ -270,7 +171,7 @@ const deleteTarget = ref(null)
 const deleting = ref(false)
 const deleteError = ref('')
 
-async function confirmDelete() {
+const confirmDelete = async () => {
   deleting.value = true
   deleteError.value = ''
   try {
@@ -292,3 +193,113 @@ onMounted(() => {
   loadConfig()
 })
 </script>
+
+<template>
+  <div class="space-y-4 mt-5">
+    <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
+      <div>
+        <p class="font-medium text-ink-gray-8 text-base">Automated backups</p>
+        <p class="mt-0.5 text-ink-gray-5 text-p-sm">{{ scheduleSummary }}</p>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <Button variant="subtle" size="sm" @click="configRef.open()"
+          >{{ enabled ? 'Configure' : 'Enable' }}</Button
+        >
+        <Button size="sm" :loading="backingUp" @click="backupNow">
+          <template #prefix><span class="size-4 lucide-archive" /></template>
+          Back up now
+        </Button>
+      </div>
+    </div>
+
+    <BackupConfigDialog ref="configRef" :site-name="siteName" @saved="loadConfig" />
+
+    <ErrorMessage v-if="error" :message="error" />
+
+    <div :class="backups.length ? '' : 'rounded-7 border border-dashed border-outline-gray-2'">
+      <div v-if="backupsLoading" class="flex justify-center py-12">
+        <LoadingText />
+      </div>
+
+      <EmptyState
+        v-else-if="!backups.length"
+        :bordered="false"
+        icon="lucide-archive"
+        title="No backups yet"
+        :description="
+          enabled
+            ? 'Automatic backups run on schedule. You can also back up now.'
+            : 'Enable automatic backups to start protecting your site.'
+        "
+      >
+        <Button size="sm" :loading="backingUp" @click="backupNow">
+          <template #prefix><span class="size-4 lucide-archive" /></template>
+          Back up now
+        </Button>
+      </EmptyState>
+
+      <ListView
+        v-else
+        :columns="columns"
+        :rows="rows"
+        row-key="name"
+        :options="{ selectable: false, showTooltip: false }"
+      >
+        <template #cell="{ column, row, item }">
+          <div v-if="column.key === 'actions'" class="flex justify-end">
+            <Dropdown :options="menuOptions(row.set)">
+              <template #default="{ open }">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  :active="open"
+                  icon="lucide-ellipsis"
+                  label="Backup actions"
+                  tooltip="Actions"
+                />
+              </template>
+            </Dropdown>
+          </div>
+
+          <div v-else-if="column.key === 'offsite'" class="flex justify-center">
+            <span
+              v-if="row.set.is_offsite"
+              class="size-4 text-ink-gray-6 lucide-check"
+              title="Backed up offsite"
+            />
+            <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
+          </div>
+
+          <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+        </template>
+      </ListView>
+
+      <ListFooter
+        v-if="backupsHasMore || backups.length > 20"
+        class="mt-2 px-1"
+        :model-value="backupsLimit"
+        :options="footerOptions"
+        @update:model-value="setBackupsPageLength"
+        @load-more="loadMoreBackups"
+      />
+    </div>
+  </div>
+
+  <!-- Delete backup dialog -->
+  <Dialog v-model="showDelete" title="Delete Backup" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Delete the backup from
+      <strong>{{ deleteTarget ? fmtDateTime(deleteTarget.created_at) : '' }}</strong>? This cannot
+      be undone.
+    </p>
+
+    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+        >Delete</Button
+      >
+    </div>
+  </Dialog>
+</template>

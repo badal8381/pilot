@@ -1,64 +1,7 @@
-<template>
-  <Dialog v-model="show" title="Configure automated backups" size="lg">
-    <div class="space-y-5">
-      <Checkbox v-model="isEnabled" label="Enable automated backups" />
-
-      <template v-if="isEnabled">
-        <div
-          class="gap-4 grid grid-cols-1"
-          :class="frequency === 'daily' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'"
-        >
-          <Select label="Frequency" v-model="frequency" :options="FREQ_OPTIONS" />
-          <Select
-            v-if="frequency === 'weekly'"
-            label="Day of week"
-            v-model.number="weekday"
-            :options="weekdayOptions"
-          />
-          <Select
-            v-if="frequency === 'monthly'"
-            label="Day of month"
-            v-model.number="monthDay"
-            :options="monthDayOptions"
-          />
-          <Select label="Time" v-model.number="hour" :options="hourOptions" />
-        </div>
-
-        <div class="space-y-4 pt-5 border-t border-outline-gray-1">
-          <div class="space-y-1.5">
-            <Select label="Retention" v-model="scheme" :options="SCHEME_OPTIONS" />
-            <p class="text-ink-gray-5 text-p-sm">{{ schemeHint }}</p>
-          </div>
-
-          <FormControl
-            v-if="scheme === 'fifo'"
-            label="Backups to keep"
-            type="number"
-            min="0"
-            v-model.number="keepLast"
-          />
-          <div v-else class="gap-4 grid grid-cols-2 sm:grid-cols-4">
-            <FormControl label="Daily" type="number" min="0" v-model.number="keepDaily" />
-            <FormControl label="Weekly" type="number" min="0" v-model.number="keepWeekly" />
-            <FormControl label="Monthly" type="number" min="0" v-model.number="keepMonthly" />
-            <FormControl label="Yearly" type="number" min="0" v-model.number="keepYearly" />
-          </div>
-        </div>
-      </template>
-
-      <ErrorMessage v-if="error" :message="error" />
-    </div>
-
-    <div class="flex justify-end gap-2 mt-6">
-      <Button variant="ghost" @click="show = false">Cancel</Button>
-      <Button variant="solid" :loading="saving" @click="save">Save</Button>
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Button, Checkbox, Dialog, ErrorMessage, FormControl, Select } from 'frappe-ui'
+
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 import { formatHour } from '@/utils/backup'
@@ -116,7 +59,7 @@ const cron = computed(() => {
   return `0 ${hour.value} * * *`
 })
 
-function applySchedule(schedule) {
+const applySchedule = (schedule) => {
   if (!schedule) return
   const [, h, dom, , dow] = schedule.split(' ')
   hour.value = parseInt(h) || 0
@@ -129,7 +72,7 @@ function applySchedule(schedule) {
   } else frequency.value = 'daily'
 }
 
-function applyRetention(retention) {
+const applyRetention = (retention) => {
   if (!retention) return
   scheme.value = retention.scheme || 'gfs'
   keepLast.value = retention.keep_last ?? 7
@@ -139,7 +82,7 @@ function applyRetention(retention) {
   keepYearly.value = retention.keep_yearly ?? 5
 }
 
-async function open() {
+const open = async () => {
   error.value = ''
   show.value = true
   try {
@@ -153,7 +96,7 @@ async function open() {
 }
 
 // Save both enables/updates (checkbox on) and turns off (checkbox off).
-async function save() {
+const save = async () => {
   saving.value = true
   error.value = ''
   try {
@@ -182,7 +125,7 @@ async function save() {
   }
 }
 
-function retentionPayload() {
+const retentionPayload = () => {
   return {
     scheme: scheme.value,
     keep_last: keepLast.value,
@@ -195,3 +138,61 @@ function retentionPayload() {
 
 defineExpose({ open })
 </script>
+
+<template>
+  <Dialog v-model="show" title="Configure automated backups" size="lg">
+    <div class="space-y-5">
+      <Checkbox v-model="isEnabled" label="Enable automated backups" />
+
+      <template v-if="isEnabled">
+        <div
+          class="gap-4 grid grid-cols-1"
+          :class="frequency === 'daily' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'"
+        >
+          <Select label="Frequency" v-model="frequency" :options="FREQ_OPTIONS" />
+          <Select
+            v-if="frequency === 'weekly'"
+            label="Day of week"
+            v-model.number="weekday"
+            :options="weekdayOptions"
+          />
+          <Select
+            v-if="frequency === 'monthly'"
+            label="Day of month"
+            v-model.number="monthDay"
+            :options="monthDayOptions"
+          />
+          <Select label="Time" v-model.number="hour" :options="hourOptions" />
+        </div>
+
+        <div class="space-y-4 pt-5 border-t border-outline-gray-1">
+          <div class="space-y-1.5">
+            <Select label="Retention" v-model="scheme" :options="SCHEME_OPTIONS" />
+            <p class="text-ink-gray-5 text-p-sm">{{ schemeHint }}</p>
+          </div>
+
+          <FormControl
+            v-if="scheme === 'fifo'"
+            label="Backups to keep"
+            type="number"
+            min="0"
+            v-model.number="keepLast"
+          />
+          <div v-else class="gap-4 grid grid-cols-2 sm:grid-cols-4">
+            <FormControl label="Daily" type="number" min="0" v-model.number="keepDaily" />
+            <FormControl label="Weekly" type="number" min="0" v-model.number="keepWeekly" />
+            <FormControl label="Monthly" type="number" min="0" v-model.number="keepMonthly" />
+            <FormControl label="Yearly" type="number" min="0" v-model.number="keepYearly" />
+          </div>
+        </div>
+      </template>
+
+      <ErrorMessage v-if="error" :message="error" />
+    </div>
+
+    <div class="flex justify-end gap-2 mt-6">
+      <Button variant="ghost" @click="show = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
+  </Dialog>
+</template>

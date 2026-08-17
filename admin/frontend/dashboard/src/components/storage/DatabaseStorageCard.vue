@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { Badge } from 'frappe-ui'
 import { computed, ref } from 'vue'
+
 import BinlogPurgeAlert from '@/components/storage/BinlogPurgeAlert.vue'
 import UsageMeter from '@/components/common/UsageMeter.vue'
+
 import type { DatabaseBreakdown } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
 
@@ -116,6 +118,7 @@ const isDatabaseListExpandable = computed(
               >
                 {{ row.site || row.schema }}
               </span>
+
               <Badge v-if="row.system" label="system" theme="gray" size="sm" />
               <lucide-chevron-right v-if="row.site" class="size-3.5 text-ink-gray-5" />
             </div>

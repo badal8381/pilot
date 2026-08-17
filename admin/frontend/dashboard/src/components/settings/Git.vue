@@ -1,7 +1,86 @@
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { Alert, Button, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
+
+import { apiErrorMessage } from '@/api/client'
+import { gitApi } from '@/api/git'
+
+const loading = ref(true)
+const connecting = ref(false)
+const verifying = ref(false)
+const error = ref('')
+const status = ref(null)
+const username = ref('')
+const token = ref('')
+
+const connected = computed(() => Boolean(status.value?.connected && status.value?.is_token_valid))
+const tokenHelpUrl = computed(
+  () =>
+    status.value?.providers?.github ||
+    'https://github.com/settings/tokens/new?scopes=repo&description=Bench+CLI',
+)
+
+const load = async () => {
+  loading.value = true
+  try {
+    status.value = await gitApi.status()
+    if (status.value?.username) username.value = status.value.username
+  } finally {
+    loading.value = false
+  }
+}
+
+const verifyAndConnect = async () => {
+  if (!token.value.trim()) {
+    error.value = 'Paste a personal access token to connect.'
+    return
+  }
+  connecting.value = true
+  error.value = ''
+  try {
+    const result = await gitApi.connect('github', token.value.trim(), username.value.trim())
+    if (result.error) {
+      error.value = apiErrorMessage(result, 'Could not verify token.')
+    } else {
+      token.value = ''
+      status.value = result
+      toast.success(`Connected as ${result.username}`)
+    }
+  } catch (e) {
+    error.value = e.message || 'Could not verify token.'
+  } finally {
+    connecting.value = false
+  }
+}
+
+const verifyConnection = async () => {
+  verifying.value = true
+  try {
+    const result = await gitApi.repos()
+    if (Array.isArray(result)) toast.success('GitHub connection is working')
+    else toast.error(apiErrorMessage(result, 'GitHub connection failed'))
+  } catch (e) {
+    toast.error(e.message || 'GitHub connection failed')
+  } finally {
+    await load()
+    verifying.value = false
+  }
+}
+
+const disconnect = async () => {
+  await gitApi.disconnect()
+  username.value = ''
+  await load()
+}
+
+onMounted(load)
+</script>
+
 <template>
   <div v-if="loading" class="flex justify-center items-center h-40">
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
+
   <div v-else class="space-y-6">
     <Alert v-if="!connected" theme="blue" title="Connect GitHub" :dismissible="false">
       <template #description>
@@ -27,6 +106,7 @@
         <p class="font-medium text-ink-gray-8 text-base">Connected as {{ username }}</p>
         <p class="text-ink-gray-5 text-p-sm">GitHub · Personal access token</p>
       </div>
+
       <div class="flex items-center gap-2">
         <Button
           class="flex-1 sm:flex-none"
@@ -60,80 +140,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import { computed, onMounted, ref } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
-import { apiErrorMessage } from '@/api/client'
-import { gitApi } from '@/api/git'
-
-const loading = ref(true)
-const connecting = ref(false)
-const verifying = ref(false)
-const error = ref('')
-const status = ref(null)
-const username = ref('')
-const token = ref('')
-
-const connected = computed(() => Boolean(status.value?.connected && status.value?.is_token_valid))
-const tokenHelpUrl = computed(
-  () =>
-    status.value?.providers?.github ||
-    'https://github.com/settings/tokens/new?scopes=repo&description=Bench+CLI',
-)
-
-async function load() {
-  loading.value = true
-  try {
-    status.value = await gitApi.status()
-    if (status.value?.username) username.value = status.value.username
-  } finally {
-    loading.value = false
-  }
-}
-
-async function verifyAndConnect() {
-  if (!token.value.trim()) {
-    error.value = 'Paste a personal access token to connect.'
-    return
-  }
-  connecting.value = true
-  error.value = ''
-  try {
-    const result = await gitApi.connect('github', token.value.trim(), username.value.trim())
-    if (result.error) {
-      error.value = apiErrorMessage(result, 'Could not verify token.')
-    } else {
-      token.value = ''
-      status.value = result
-      toast.success(`Connected as ${result.username}`)
-    }
-  } catch (e) {
-    error.value = e.message || 'Could not verify token.'
-  } finally {
-    connecting.value = false
-  }
-}
-
-async function verifyConnection() {
-  verifying.value = true
-  try {
-    const result = await gitApi.repos()
-    if (Array.isArray(result)) toast.success('GitHub connection is working')
-    else toast.error(apiErrorMessage(result, 'GitHub connection failed'))
-  } catch (e) {
-    toast.error(e.message || 'GitHub connection failed')
-  } finally {
-    await load()
-    verifying.value = false
-  }
-}
-
-async function disconnect() {
-  await gitApi.disconnect()
-  username.value = ''
-  await load()
-}
-
-onMounted(load)
-</script>

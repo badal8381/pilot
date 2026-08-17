@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Tree } from 'frappe-ui'
 import { computed, onMounted, reactive, ref } from 'vue'
-import { appsApi } from '@/api/apps'
+
 import AppIcon from '@/components/apps/AppIcon.vue'
 import UsageMeter from '@/components/common/UsageMeter.vue'
+
+import { appsApi } from '@/api/apps'
 import type { BenchBreakdown, SiteStorage } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
 

@@ -492,3 +492,86 @@ def test_an_alert_no_sink_accepted_is_not_delivered(tmp_path: Path) -> None:
         delivered = notify(bench, {"event": "x", "message": "m", "context": {}})
 
     assert delivered is False
+
+
+def test_an_undelivered_alert_is_recorded_locally_once(tmp_path: Path) -> None:
+    """A due condition stays due until a sink accepts it, so the delivery attempt
+    repeats every tick. The bench's own feed must not grow a row per tick with it."""
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+
+    def refuse(endpoint, token, payload):
+        raise urllib.error.URLError("connection refused")
+
+    with patch("pilot.core.alerts.send_alert", refuse):
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        _age_alerts(monitor)
+        for _ in range(5):
+            monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    recorded = monitor.bench.notifications.list(10)
+    assert [item.title for item in recorded] == ["Resource limit breached"]
+
+
+def test_a_breach_that_recovers_and_returns_is_recorded_again(tmp_path: Path) -> None:
+    """`recorded` lives with the condition, so a cleared limit that breaks a
+    second time is a new incident and earns a new row."""
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+
+    with _captured_alerts():
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        _age_alerts(monitor)
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+        monitor.send_alert_if_required(_system_record(cpu=10.0))
+
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        _age_alerts(monitor)
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert len(monitor.bench.notifications.list(10)) == 2
+
+
+def test_a_local_record_that_failed_is_retried_on_the_next_tick(tmp_path: Path) -> None:
+    """Recording once per breach must not mean losing the breach when the write
+    itself fails - the condition stays unrecorded so the next tick tries again."""
+    from pilot.core.notification import NotificationStore
+
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+
+    def refuse(endpoint, token, payload):
+        raise urllib.error.URLError("connection refused")
+
+    with patch("pilot.core.alerts.send_alert", refuse):
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        _age_alerts(monitor)
+
+        with patch.object(NotificationStore, "create", side_effect=OSError("no space left on device")):
+            monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+        assert monitor.bench.notifications.list(10) == [], "the failed write left nothing behind"
+
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert [item.title for item in monitor.bench.notifications.list(10)] == ["Resource limit breached"]
+
+
+def test_a_delivered_alert_whose_local_write_failed_is_still_recorded(tmp_path: Path) -> None:
+    """Delivery retires the condition from `due` for good. The bench's own record
+    is tracked apart from that, so a failed write is still retried afterwards."""
+    from pilot.core.notification import NotificationStore
+
+    monitor = _alerting_monitor(tmp_path, cpu_usage_limit=80)
+
+    with _captured_alerts():
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+        _age_alerts(monitor)
+
+        with patch.object(NotificationStore, "create", side_effect=OSError("no space left on device")):
+            monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+        assert monitor.bench.notifications.list(10) == []
+        assert json.loads(monitor.alerts_path.read_text())["cpu_usage_limit"]["notified"] is True
+
+        monitor.send_alert_if_required(_system_record(cpu=95.0))
+
+    assert [item.title for item in monitor.bench.notifications.list(10)] == ["Resource limit breached"]

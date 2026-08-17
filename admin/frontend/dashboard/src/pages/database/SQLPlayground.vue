@@ -1,221 +1,12 @@
-<template>
-  <Teleport v-if="selectedSite" defer to="#header-actions">
-    <FormControl
-      type="select"
-      v-model="selectedSite"
-      :options="siteOptions"
-      class="w-28 sm:w-44 max-w-[140px] sm:max-w-[180px]"
-    />
-  </Teleport>
-
-  <div
-    v-if="!selectedSite"
-    class="flex flex-col justify-center items-center gap-4 text-center"
-    style="height: 75vh;"
-  >
-    <span
-      class="place-items-center grid bg-surface-gray-2 rounded-6 size-10 text-ink-gray-5 shrink-0"
-    >
-      <span class="size-5 lucide-database" />
-    </span>
-    <div>
-      <p class="font-medium text-ink-gray-7 text-base">Select a site to get started</p>
-      <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
-        Queries run against that site's database.
-      </p>
-    </div>
-    <!-- Wrapped: FormControl's own w-full beats a width utility passed to it. -->
-    <div class="w-56">
-      <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
-    </div>
-  </div>
-
-  <div v-else class="flex flex-col gap-3">
-    <!-- Editor card -->
-    <div class="border rounded-6 border-outline-gray-2 overflow-hidden transition-colors">
-      <div class="h-44 sm:h-[220px]">
-        <SQLCodeEditor
-          ref="editorRef"
-          v-model="query"
-          :schema="schema"
-          :db-type="selectedSiteDbType"
-          @run="runQuery"
-        />
-      </div>
-      <div
-        class="flex flex-wrap justify-between items-center gap-2 bg-surface-base px-2 py-2 border-t border-outline-gray-2"
-      >
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="sm:hidden">
-            <FormControl type="select" v-model="modeStr" :options="modeOptions" />
-          </div>
-          <div class="hidden sm:block">
-            <TabButtons v-model="modeStr" :options="modeOptions" />
-          </div>
-          <div class="hidden sm:block">
-            <Button
-              variant="outline"
-              size="sm"
-              iconLeft="lucide-table"
-              :disabled="!schema.length"
-              @click="showSchema = true"
-            >
-              Tables
-              <template v-if="schema.length" #suffix>
-                <span class="text-ink-gray-4 text-xs">{{ schema.length }}</span>
-              </template>
-            </Button>
-          </div>
-        </div>
-        <div class="flex items-center gap-3 ml-auto">
-          <Button
-            variant="solid"
-            size="sm"
-            iconLeft="lucide-play"
-            :loading="running"
-            :disabled="!selectedSite || !query.trim()"
-            @click="runQuery"
-          >
-            Execute
-          </Button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Error -->
-    <Alert v-if="error" theme="red" title="Query failed" :dismissible="false">
-      <template #description>
-        <p class="font-mono text-xs break-words whitespace-pre-wrap">{{ error }}</p>
-      </template>
-    </Alert>
-
-    <!-- Results -->
-    <template v-if="results.length && !error">
-      <!-- Query tabs (only when multiple statements) -->
-      <div v-if="results.length > 1" class="overflow-x-auto hover-scrollbar">
-        <TabButtons v-model="activeTab" type="underline" :options="tabOptions" />
-      </div>
-
-      <div v-if="currentResult" class="border rounded-6 border-outline-gray-2 overflow-hidden">
-        <!-- Write query success (no result set) -->
-        <div
-          v-if="!currentResult.columns.length"
-          class="flex justify-center items-center gap-2 py-8 text-ink-gray-6 text-sm"
-        >
-          <span class="size-4 text-ink-green-3 lucide-check-circle" />
-          Query executed successfully
-          <span v-if="currentResult.affected_rows != null"
-            >· {{ currentResult.affected_rows }} row(s) affected</span
-          >
-        </div>
-
-        <template v-else>
-          <SimpleTable
-            :columns="resultColumns"
-            :rows="paginatedRowObjects"
-            :show-index="true"
-            :index-offset="(page - 1) * perPage"
-            min-height="320px"
-            :mono="false"
-            truncate
-            show-null
-            empty-text="No rows returned."
-            :bordered="false"
-          />
-
-          <!-- Table footer -->
-          <div
-            v-if="currentResult.row_count"
-            class="flex flex-wrap justify-between items-center gap-2 bg-surface-base px-1 py-1 border-t border-outline-gray-2"
-          >
-            <Button variant="ghost" size="xs" iconLeft="lucide-download" @click="exportCsv">
-              Download as CSV
-            </Button>
-            <div class="flex items-center gap-3">
-              <div
-                class="hidden sm:flex items-center gap-1.5 pr-3 border-r-2 border-outline-gray-2"
-              >
-                <span class="text-ink-gray-5 text-xs shrink-0">Per Page</span>
-                <FormControl
-                  type="select"
-                  v-model="perPage"
-                  class="max-w-16"
-                  :options="pageOptions"
-                />
-              </div>
-              <span class="hidden sm:inline tabular-nums text-ink-gray-5 text-xs whitespace-nowrap">
-                {{ rowRange }}
-                of {{ currentResult.row_count }} rows
-                <span v-if="currentResult.truncated">(truncated)</span>
-              </span>
-              <div class="flex items-center ">
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  iconLeft="lucide-arrow-left"
-                  :disabled="page <= 1"
-                  @click="page--"
-                  >Prev</Button
-                >
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  iconRight="lucide-arrow-right"
-                  :disabled="page >= totalPages"
-                  @click="page++"
-                  >Next</Button
-                >
-              </div>
-            </div>
-          </div>
-        </template>
-      </div>
-
-      <!-- View SQL Query -->
-      <div v-if="currentResult">
-        <button
-          class="flex items-center gap-1.5 text-ink-gray-5 hover:text-ink-gray-8 text-xs transition-colors"
-          @click="showSql = !showSql"
-        >
-          <span class="size-3" :class="showSql ? 'lucide-chevron-down' : 'lucide-chevron-right'" />
-          View SQL Query
-        </button>
-        <pre
-          v-if="showSql"
-          class="bg-surface-gray-1 mt-1.5 px-3 py-2 border rounded-6 border-outline-gray-2 overflow-x-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
-          style="font-family: ui-monospace, SFMono-Regular, monospace;"
-        >{{ currentResult.query }}</pre>
-      </div>
-    </template>
-  </div>
-
-  <!-- Tables schema browser -->
-  <SQLSchemaDialog v-model="showSchema" :schema="schema" @preview="previewTable" />
-
-  <!-- Confirm read/write execution -->
-  <Dialog v-model="showConfirm" title="Run in Read/Write mode" size="lg">
-    <p class="text-ink-gray-7 text-sm">
-      This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
-      the database. Are you sure you want to continue?
-    </p>
-    <pre
-      class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-6 border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
-      style="font-family: ui-monospace, SFMono-Regular, monospace;"
-    >{{ pendingQuery }}</pre>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="outline" @click="showConfirm = false">Cancel</Button>
-      <Button variant="solid" @click="confirmRunQuery">Execute</Button>
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Alert, Button, Dialog, FormControl, TabButtons } from 'frappe-ui'
+
 import SQLCodeEditor from '@/components/database/SQLCodeEditor.vue'
 import SQLSchemaDialog from '@/components/database/SQLSchemaDialog.vue'
 import SimpleTable from '@/components/common/SimpleTable.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { databaseApi } from '@/api/database'
 
@@ -297,7 +88,7 @@ const rowRange = computed(() => {
 const showConfirm = ref(false)
 const pendingQuery = ref('')
 
-function runQuery() {
+const runQuery = () => {
   const raw = editorRef.value?.getQueryToRun() ?? query.value
   if (!raw?.trim()) return
   if (!readOnly.value) {
@@ -308,7 +99,7 @@ function runQuery() {
   executeQuery(raw)
 }
 
-function confirmRunQuery() {
+const confirmRunQuery = () => {
   showConfirm.value = false
   executeQuery(pendingQuery.value)
 }
@@ -316,17 +107,17 @@ function confirmRunQuery() {
 // MariaDB quotes identifiers with backticks; Postgres and SQLite use the
 // standard double-quote (MariaDB treats double quotes as a string literal
 // unless ANSI_QUOTES is set, so backticks aren't a safe cross-engine default).
-function quoteIdentifier(name, dbType) {
+const quoteIdentifier = (name, dbType) => {
   return dbType === 'mariadb' ? `\`${name}\`` : `"${name}"`
 }
 
-function previewTable(tableName) {
+const previewTable = (tableName) => {
   modeStr.value = 'readonly'
   query.value = `SELECT * FROM ${quoteIdentifier(tableName, selectedSiteDbType.value)} LIMIT 100;`
   executeQuery(query.value)
 }
 
-async function executeQuery(raw) {
+const executeQuery = async (raw) => {
   if (!selectedSite.value || !raw?.trim()) return
   const statements = raw
     .split(';')
@@ -359,7 +150,7 @@ async function executeQuery(raw) {
 
 // ── CSV export ────────────────────────────────────────────────────────────────
 
-function exportCsv() {
+const exportCsv = () => {
   if (!currentResult.value) return
   const { columns, rows } = currentResult.value
   const escape = (v) => {
@@ -378,7 +169,7 @@ function exportCsv() {
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
-async function refreshSchema() {
+const refreshSchema = async () => {
   if (!selectedSite.value) return
   try {
     const data = await databaseApi.schema(selectedSite.value)
@@ -426,3 +217,225 @@ onMounted(async () => {
   } catch {}
 })
 </script>
+
+<template>
+  <Teleport v-if="selectedSite" defer to="#header-actions">
+    <FormControl
+      type="select"
+      v-model="selectedSite"
+      :options="siteOptions"
+      class="w-28 sm:w-44 max-w-[140px] sm:max-w-[180px]"
+    />
+  </Teleport>
+
+  <div
+    v-if="!selectedSite"
+    class="flex flex-col justify-center items-center gap-4 text-center"
+    style="height: 75vh;"
+  >
+    <span
+      class="place-items-center grid bg-surface-gray-2 rounded-6 size-10 text-ink-gray-5 shrink-0"
+    >
+      <span class="size-5 lucide-database" />
+    </span>
+
+    <div>
+      <p class="font-medium text-ink-gray-7 text-base">Select a site to get started</p>
+      <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
+        Queries run against that site's database.
+      </p>
+    </div>
+
+    <!-- Wrapped: FormControl's own w-full beats a width utility passed to it. -->
+    <div class="w-56">
+      <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
+    </div>
+  </div>
+
+  <div v-else class="flex flex-col gap-3">
+    <!-- Editor card -->
+    <div class="border rounded-6 border-outline-gray-2 overflow-hidden transition-colors">
+      <div class="h-44 sm:h-[220px]">
+        <SQLCodeEditor
+          ref="editorRef"
+          v-model="query"
+          :schema="schema"
+          :db-type="selectedSiteDbType"
+          @run="runQuery"
+        />
+      </div>
+
+      <div
+        class="flex flex-wrap justify-between items-center gap-2 bg-surface-base px-2 py-2 border-t border-outline-gray-2"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="sm:hidden">
+            <FormControl type="select" v-model="modeStr" :options="modeOptions" />
+          </div>
+
+          <div class="hidden sm:block">
+            <TabButtons v-model="modeStr" :options="modeOptions" />
+          </div>
+
+          <div class="hidden sm:block">
+            <Button
+              variant="outline"
+              size="sm"
+              iconLeft="lucide-table"
+              :disabled="!schema.length"
+              @click="showSchema = true"
+            >
+              Tables
+              <template v-if="schema.length" #suffix>
+                <span class="text-ink-gray-4 text-xs">{{ schema.length }}</span>
+              </template>
+            </Button>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-3 ml-auto">
+          <Button
+            variant="solid"
+            size="sm"
+            iconLeft="lucide-play"
+            :loading="running"
+            :disabled="!selectedSite || !query.trim()"
+            @click="runQuery"
+          >
+            Execute
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <Alert v-if="error" theme="red" title="Query failed" :dismissible="false">
+      <template #description>
+        <p class="font-mono text-xs break-words whitespace-pre-wrap">{{ error }}</p>
+      </template>
+    </Alert>
+
+    <!-- Results -->
+    <template v-if="results.length && !error">
+      <!-- Query tabs (only when multiple statements) -->
+      <div v-if="results.length > 1" class="overflow-x-auto hover-scrollbar">
+        <TabButtons v-model="activeTab" type="underline" :options="tabOptions" />
+      </div>
+
+      <div v-if="currentResult" class="border rounded-6 border-outline-gray-2 overflow-hidden">
+        <!-- Write query success (no result set) -->
+        <div
+          v-if="!currentResult.columns.length"
+          class="flex justify-center items-center gap-2 py-8 text-ink-gray-6 text-sm"
+        >
+          <span class="size-4 text-ink-green-3 lucide-check-circle" />
+          Query executed successfully
+          <span v-if="currentResult.affected_rows != null"
+            >· {{ currentResult.affected_rows }} row(s) affected</span
+          >
+        </div>
+
+        <template v-else>
+          <SimpleTable
+            :columns="resultColumns"
+            :rows="paginatedRowObjects"
+            :show-index="true"
+            :index-offset="(page - 1) * perPage"
+            min-height="320px"
+            :mono="false"
+            truncate
+            show-null
+            empty-text="No rows returned."
+            :bordered="false"
+          />
+
+          <!-- Table footer -->
+          <div
+            v-if="currentResult.row_count"
+            class="flex flex-wrap justify-between items-center gap-2 bg-surface-base px-1 py-1 border-t border-outline-gray-2"
+          >
+            <Button variant="ghost" size="xs" iconLeft="lucide-download" @click="exportCsv">
+              Download as CSV
+            </Button>
+
+            <div class="flex items-center gap-3">
+              <div
+                class="hidden sm:flex items-center gap-1.5 pr-3 border-r-2 border-outline-gray-2"
+              >
+                <span class="text-ink-gray-5 text-xs shrink-0">Per Page</span>
+                <FormControl
+                  type="select"
+                  v-model="perPage"
+                  class="max-w-16"
+                  :options="pageOptions"
+                />
+              </div>
+
+              <span class="hidden sm:inline tabular-nums text-ink-gray-5 text-xs whitespace-nowrap">
+                {{ rowRange }}
+                of {{ currentResult.row_count }} rows
+                <span v-if="currentResult.truncated">(truncated)</span>
+              </span>
+
+              <div class="flex items-center ">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  iconLeft="lucide-arrow-left"
+                  :disabled="page <= 1"
+                  @click="page--"
+                  >Prev</Button
+                >
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  iconRight="lucide-arrow-right"
+                  :disabled="page >= totalPages"
+                  @click="page++"
+                  >Next</Button
+                >
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+
+      <!-- View SQL Query -->
+      <div v-if="currentResult">
+        <button
+          class="flex items-center gap-1.5 text-ink-gray-5 hover:text-ink-gray-8 text-xs transition-colors"
+          @click="showSql = !showSql"
+        >
+          <span class="size-3" :class="showSql ? 'lucide-chevron-down' : 'lucide-chevron-right'" />
+          View SQL Query
+        </button>
+
+        <pre
+          v-if="showSql"
+          class="bg-surface-gray-1 mt-1.5 px-3 py-2 border rounded-6 border-outline-gray-2 overflow-x-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
+          style="font-family: ui-monospace, SFMono-Regular, monospace;"
+        >{{ currentResult.query }}</pre>
+      </div>
+    </template>
+  </div>
+
+  <!-- Tables schema browser -->
+  <SQLSchemaDialog v-model="showSchema" :schema="schema" @preview="previewTable" />
+
+  <!-- Confirm read/write execution -->
+  <Dialog v-model="showConfirm" title="Run in Read/Write mode" size="lg">
+    <p class="text-ink-gray-7 text-sm">
+      This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
+      the database. Are you sure you want to continue?
+    </p>
+
+    <pre
+      class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-6 border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
+      style="font-family: ui-monospace, SFMono-Regular, monospace;"
+    >{{ pendingQuery }}</pre>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="outline" @click="showConfirm = false">Cancel</Button>
+      <Button variant="solid" @click="confirmRunQuery">Execute</Button>
+    </div>
+  </Dialog>
+</template>

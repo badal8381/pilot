@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+
 import {
   Breadcrumbs,
   BottomSheet,
@@ -9,6 +10,7 @@ import {
   MobileNav,
   MobileNavItem,
 } from 'frappe-ui'
+
 import Sidebar from '@/components/navigation/Sidebar.vue'
 import PilotLogo from '@/components/icons/Pilot.vue'
 import UpdateStatusButton from '@/components/common/UpdateStatusButton.vue'
@@ -16,6 +18,8 @@ import SettingsDialog from '@/components/settings/SettingsDialog.vue'
 import BenchSwitcherDialog from '@/components/benches/BenchSwitcherDialog.vue'
 import NewBenchDialog from '@/components/benches/NewBenchDialog.vue'
 import SearchDialog from '@/components/search/SearchDialog.vue'
+import NotificationsPanel from '@/components/notifications/NotificationsPanel.vue'
+
 import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSession } from '@/composables/auth/useSession'
@@ -24,16 +28,19 @@ import { openSearch, searchOpen, useSearchShortcut } from '@/composables/common/
 
 const route = useRoute()
 const router = useRouter()
-const { items, resetBreadcrumbs } = useBreadcrumbs()
 const isMobile = useIsMobile()
+
 const { session } = useSession()
 const { showBenches, showNewBench } = useAppMenu()
+const { items, resetBreadcrumbs } = useBreadcrumbs()
+
 useSearchShortcut()
 
 // Remembers the last non-Settings route so dismissing the dialog (backdrop
 // click, Escape, close button) exits to it directly instead of stepping back
 // through every section/subsection push made while the dialog was open.
 const lastNonSettingsRoute = ref(null)
+
 watch(
   () => route.fullPath,
   () => {
@@ -66,7 +73,7 @@ const breadcrumbs = computed(() => {
 
 // The group is only a sidebar section heading - it has no route of its own, so
 // rendering it as a crumb gives a dead link that leads nowhere.
-function breadcrumbsFromRouteMeta({ title = '' }) {
+const breadcrumbsFromRouteMeta = ({ title = '' }) => {
   return title ? [{ label: title }] : []
 }
 </script>
@@ -108,7 +115,7 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
       <MobileNav class="!bg-surface-base">
         <MobileNavItem label="Home" icon="lucide-house" to="/home" :active="route.name == 'Home'" />
         <MobileNavItem label="Search" icon="lucide-search" @click="openSearch" />
-        <MobileNavItem label="Notifications" icon="lucide-bell" />
+        <NotificationsPanel mobile />
         <MobileNavItem
           label="Settings"
           icon="lucide-settings"
@@ -148,9 +155,11 @@ function breadcrumbsFromRouteMeta({ title = '' }) {
   </DesktopShell>
 
   <SettingsDialog v-model="showSettings" />
+
   <template v-if="session.allowBenchManagement">
     <BenchSwitcherDialog v-model="showBenches" @new-bench="showNewBench = true" />
     <NewBenchDialog v-model="showNewBench" />
   </template>
+
   <SearchDialog v-model:open="searchOpen" />
 </template>

@@ -14,7 +14,7 @@ def run(benches_root: Path) -> None:
 
     bench_dirs = [
         entry
-        for entry in sorted(benches_root.iterdir())
+        for entry in sorted(benches_root.glob("*"))
         if entry.is_dir() and (entry / "bench.toml").exists() and not is_applied(entry, PATCH_NAME)
     ]
     if not bench_dirs:
