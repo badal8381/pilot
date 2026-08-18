@@ -18,7 +18,7 @@ defineProps({
   <!-- ListRow's own hover paints surface-sidebar, transparent in the dark
        theme. Rows are links, hence the descendant selector. -->
   <ListView
-    class="[&_a:hover]:bg-surface-gray-1"
+    class="max-w-full [&_a:hover]:bg-surface-gray-1"
     :columns="columns"
     :rows="rows"
     row-key="id"
