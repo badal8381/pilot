@@ -135,8 +135,6 @@ onMounted(load)
       <ErrorMessage :message="error" />
     </div>
 
-    <!-- Marketplace Apps -->
-
     <template v-else-if="isFiltered">
       <section v-if="filteredApps.length" class="mt-12">
         <h2 class="font-medium text-ink-gray-9 text-base">

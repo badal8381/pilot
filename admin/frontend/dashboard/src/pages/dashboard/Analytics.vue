@@ -655,7 +655,6 @@ onUnmounted(() => clearTimeout(statsTimer))
       />
     </template>
 
-    <!-- Loading state -->
     <template v-else-if="pageLoading">
       <Skeleton v-if="!isHistorical" class="mb-6 rounded-6 h-[88px]" />
       <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
@@ -702,7 +701,6 @@ onUnmounted(() => clearTimeout(statsTimer))
         />
       </template>
 
-      <!-- Charts grid -->
       <div v-if="showCharts" class="gap-4 grid grid-cols-1 sm:grid-cols-2 mb-6">
         <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
           <AxisChart

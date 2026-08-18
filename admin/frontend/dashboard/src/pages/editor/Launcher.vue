@@ -46,17 +46,14 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Disabled -->
     <p v-if="!session.developerMode" class="mt-16 text-ink-gray-5 text-sm text-center">
       Enable Developer mode in Settings to use the code editor.
     </p>
 
-    <!-- Loading -->
     <div v-else-if="loading" class="flex justify-center mt-16">
       <LoadingText />
     </div>
 
-    <!-- Apps -->
     <section v-else-if="appObjects.length" class="mt-6">
       <p class="font-medium text-ink-gray-9 text-base">
         Installed apps · {{ appObjects.length }}

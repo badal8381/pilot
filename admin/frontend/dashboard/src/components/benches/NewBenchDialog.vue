@@ -257,7 +257,6 @@ const createBench = async () => {
         <Button variant="subtle" @click="openWizardInNewTab">Open setup now</Button>
       </div>
 
-      <!-- Loading -->
       <div
         v-else-if="isProduction === null"
         class="flex flex-col justify-center items-center gap-3 py-16"

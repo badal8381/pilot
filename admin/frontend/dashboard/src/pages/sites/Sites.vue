@@ -26,12 +26,10 @@ import { openTaskDetailPage } from '@/utils/taskRoute'
 import { useSites } from '@/composables/sites/useSites'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 import { useSiteStorage } from '@/composables/sites/useSiteStorage'
-import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 
 const route = useRoute()
 const router = useRouter()
 const isMobile = useIsMobile()
-const { setBreadcrumbs } = useBreadcrumbs()
 const { sites, loading, error, load } = useSites()
 const { load: loadStorage, storageLabel } = useSiteStorage()
 
@@ -173,9 +171,7 @@ onMounted(() => {
 
 <template>
   <div class="mx-auto max-w-3xl">
-    <!-- Bar -->
     <StickyToolbar v-if="showToolbar" class="flex items-center gap-2">
-      <!-- Search text bar -->
       <FormControl
         v-model="search"
         type="text"
@@ -188,7 +184,6 @@ onMounted(() => {
         </template>
       </FormControl>
 
-      <!-- Status filter -->
       <FormControl
         v-model="statusFilter"
         type="select"
@@ -196,7 +191,6 @@ onMounted(() => {
         :size="isMobile ? 'md' : 'sm'"
         class="max-w-24 sm:max-w-32"
       />
-      <!-- List view type -->
       <TabButtons
         v-model="view"
         :options="viewOptions"
@@ -232,7 +226,6 @@ onMounted(() => {
             :to="{ name: 'SiteDetail', params: { name: site.name } }"
             class="flex flex-1 items-center gap-3 min-w-0 no-underline"
           >
-            <!-- Icon -->
             <div
               class="place-items-center grid bg-surface-gray-2 rounded-4 size-8 text-ink-gray-6 shrink-0"
             >
@@ -240,15 +233,12 @@ onMounted(() => {
             </div>
 
             <div class="flex-1 min-w-0">
-              <!-- First Line -->
               <div class="gap-2 grid grid-cols-[3fr_1fr]">
                 <div class="flex items-center gap-1.5 min-w-0">
-                  <!-- Site Name -->
                   <span class="font-medium text-ink-gray-9 text-base truncate">
                     {{ site.name }}
                   </span>
 
-                  <!-- Status -->
                   <Badge
                     v-if="statusBadge(site)"
                     v-bind="statusBadge(site)"
@@ -259,7 +249,6 @@ onMounted(() => {
                 </div>
 
                 <div class="flex justify-end">
-                  <!-- Actions Dropdown -->
                   <Dropdown :options="siteMenuOptions(site)">
                     <Button
                       variant="ghost"
@@ -272,7 +261,6 @@ onMounted(() => {
                 </div>
               </div>
 
-              <!-- Second Line -->
               <p class="text-ink-gray-5 text-p-sm">
                 {{ metaLabel(site) }}
               </p>
@@ -281,7 +269,6 @@ onMounted(() => {
         </div>
       </div>
 
-      <!-- List view -->
       <ListView
         v-else
         :columns="listColumns"
@@ -350,7 +337,6 @@ onMounted(() => {
     <Badge :label="filteredSites.length" theme="gray" variant="subtle" size="md" />
   </Teleport>
 
-  <!-- New Site Button -->
   <Teleport defer to="#header-actions">
     <Button variant="solid" @click="showCreate = true">
       <template #prefix>

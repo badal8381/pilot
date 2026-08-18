@@ -196,7 +196,6 @@ const refresh = async () => {
     </ListView>
   </div>
 
-  <!-- Add dialog -->
   <Dialog v-model="showAddDialog" title="Add config" size="sm">
     <div class="space-y-3">
       <div class="space-y-1.5">
@@ -218,7 +217,6 @@ const refresh = async () => {
     </div>
   </Dialog>
 
-  <!-- Edit dialog -->
   <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
     <div class="space-y-1.5">
       <p class="font-medium text-ink-gray-7 text-sm">Value</p>
@@ -232,7 +230,6 @@ const refresh = async () => {
     </div>
   </Dialog>
 
-  <!-- Delete dialog -->
   <Dialog v-model="showDelete" title="Remove config" size="sm">
     <p class="text-ink-gray-7 text-sm">
       Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from

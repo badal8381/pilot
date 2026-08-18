@@ -286,7 +286,6 @@ onMounted(() => {
     </div>
   </div>
 
-  <!-- Delete backup dialog -->
   <Dialog v-model="showDelete" title="Delete Backup" size="sm">
     <p class="text-ink-gray-7 text-sm">
       Delete the backup from

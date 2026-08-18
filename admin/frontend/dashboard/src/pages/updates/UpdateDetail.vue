@@ -416,7 +416,6 @@ onUnmounted(() => clearTimeout(timer))
           />
         </UpdateSection>
 
-        <!-- Sites -->
         <UpdateSection
           v-if="op.sites?.length"
           v-model:open="sitesOpen"
@@ -469,7 +468,6 @@ onUnmounted(() => clearTimeout(timer))
         </UpdateSection>
       </div>
 
-      <!-- User decisions -->
       <UpdateSection
         v-if="op.decisions?.length"
         class="mt-2"
@@ -488,7 +486,6 @@ onUnmounted(() => clearTimeout(timer))
         </div>
       </UpdateSection>
 
-      <!-- Skip patch confirmation -->
       <Dialog v-model="confirmSkip" title="Skip this patch permanently?">
         <p class="text-p-sm text-ink-gray-6">
           Skipping marks
@@ -507,7 +504,6 @@ onUnmounted(() => clearTimeout(timer))
         </template>
       </Dialog>
 
-      <!-- Restore confirmation -->
       <Dialog v-model="confirmRestore" title="Restore this update?">
         <p class="text-p-sm text-ink-gray-6">
           Apps return to their previous revisions, and migrated sites get their pre-update data

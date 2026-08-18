@@ -73,12 +73,10 @@ const {
       </div>
 
       <div class="flex-1 p-5 overflow-y-auto">
-        <!-- Loading -->
         <div v-show="currentStep === 'loading'" class="flex justify-center items-center py-10">
           <LoadingText />
         </div>
 
-        <!-- Database -->
         <div v-show="currentStep === 'database'" class="flex flex-col gap-4">
           <Select label="Database engine" v-model="dbType" :options="dbTypeOptions" />
           <Select label="Database setup" v-model="dbMode" :options="dbModeOptions" />
@@ -114,14 +112,12 @@ const {
           <ErrorMessage v-show="errorMessage" :message="errorMessage" />
         </div>
 
-        <!-- Customize -->
         <div v-show="currentStep === 'customize'" class="flex flex-col gap-4">
           <Select label="Frappe branch" v-model="appBranch" :options="branchOptions" />
           <TextInput label="Frappe repository" v-model="appRepo" />
           <ErrorMessage v-show="errorMessage" :message="errorMessage" />
         </div>
 
-        <!-- Installing -->
         <div v-show="isInstalling" class="flex flex-col gap-4">
           <p class="text-ink-gray-7 text-sm">{{ streamStatus }}</p>
           <button

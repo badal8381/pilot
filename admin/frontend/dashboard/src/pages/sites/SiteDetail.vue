@@ -262,12 +262,10 @@ onMounted(() => {
     </PageHero>
 
     <div class="mx-auto w-full max-w-3xl">
-      <!-- Tabs -->
       <StickyToolbar>
         <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
       </StickyToolbar>
 
-      <!-- Sections -->
       <SiteApps v-if="activeTab === 'apps'" :site-name="siteName" />
       <SiteBackups v-else-if="activeTab === 'backups'" :site-name="siteName" />
       <SiteConfig v-else-if="activeTab === 'config'" :site-name="siteName" />

@@ -226,7 +226,6 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
   </div>
 
-  <!-- Custom schedule dialog -->
   <Dialog v-model="showCustomDialog" :title="`Custom ${noun} schedule`" size="sm">
     <div class="space-y-4">
       <div class="space-y-1.5">
@@ -261,7 +260,6 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
     </div>
   </Dialog>
 
-  <!-- Disable confirmation -->
   <Dialog v-model="showDisableConfirm" :title="`Disable ${noun}`" size="sm">
     <p class="text-ink-gray-7 text-sm">{{ disableBody }}</p>
     <div class="flex justify-end gap-2 mt-4">

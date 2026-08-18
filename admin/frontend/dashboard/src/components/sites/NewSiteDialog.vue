@@ -184,7 +184,6 @@ const submit = async () => {
             />
           </div>
 
-          <!-- Example site name -->
           <p class="mt-1.5 text-ink-gray-5 text-p-sm">
             Web address:
             <span class="font-medium text-ink-gray-7"
@@ -229,13 +228,11 @@ const submit = async () => {
         </div>
       </div>
 
-      <!-- Just a note -->
       <p class="flex items-start gap-1.5 text-ink-gray-5 text-p-sm">
         <span class="mt-0.5 size-3.5 lucide-info shrink-0"></span>
         Runs on this server - no extra cost; sites share its compute and storage.
       </p>
 
-      <!-- Error message -->
       <ErrorMessage v-if="error" class="mt-1" :message="error" />
 
       <div class="flex justify-end gap-2">

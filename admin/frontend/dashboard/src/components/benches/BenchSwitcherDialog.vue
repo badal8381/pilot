@@ -241,12 +241,10 @@ watch(show, (open) => {
             <Badge v-if="isCurrentBench(row.bench)" theme="green" size="sm" label="Current" />
           </div>
 
-          <!-- Status badge -->
           <div v-else-if="column.key === 'status'" class="flex justify-center w-full">
             <Badge :theme="statusTheme(row.bench)" :label="row.status" />
           </div>
 
-          <!-- Per-bench actions -->
           <div v-else-if="column.key === 'actions'" class="flex justify-end w-full">
             <span
               v-if="controlLoading === row.name"

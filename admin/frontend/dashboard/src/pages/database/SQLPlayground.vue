@@ -314,16 +314,13 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Error -->
     <Alert v-if="error" theme="red" title="Query failed" :dismissible="false">
       <template #description>
         <p class="font-mono text-xs break-words whitespace-pre-wrap">{{ error }}</p>
       </template>
     </Alert>
 
-    <!-- Results -->
     <template v-if="results.length && !error">
-      <!-- Query tabs (only when multiple statements) -->
       <div v-if="results.length > 1" class="overflow-x-auto hover-scrollbar">
         <TabButtons v-model="activeTab" type="underline" :options="tabOptions" />
       </div>
@@ -407,7 +404,6 @@ onMounted(async () => {
         </template>
       </div>
 
-      <!-- View SQL Query -->
       <div v-if="currentResult">
         <button
           class="flex items-center gap-1.5 text-ink-gray-5 hover:text-ink-gray-8 text-xs transition-colors"
@@ -426,10 +422,8 @@ onMounted(async () => {
     </template>
   </div>
 
-  <!-- Tables schema browser -->
   <SQLSchemaDialog v-model="showSchema" :schema="schema" @preview="previewTable" />
 
-  <!-- Confirm read/write execution -->
   <Dialog v-model="showConfirm" title="Run in Read/Write mode" size="lg">
     <p class="text-ink-gray-7 text-sm">
       This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
