@@ -63,7 +63,7 @@ const pageOptions = [
 const resultColumns = computed(() => {
   if (!currentResult.value) return []
   return [
-    { key: '__index', label: '#', class: 'w-8 tabular-nums text-ink-gray-4 text-xs' },
+    { key: 'sqlTableIndex', label: '#', class: 'w-8 tabular-nums text-ink-gray-4 text-xs' },
     ...currentResult.value.columns.map((c) => ({ key: c, label: c })),
   ]
 })
@@ -71,9 +71,11 @@ const resultColumns = computed(() => {
 const paginatedRowObjects = computed(() => {
   if (!currentResult.value) return []
   const { columns, rows } = currentResult.value
-  return rows
-    .slice((page.value - 1) * perPage.value, page.value * perPage.value)
-    .map((row) => Object.fromEntries(columns.map((col, i) => [col, row[i]])))
+  const offset = (page.value - 1) * perPage.value
+  return rows.slice(offset, offset + perPage.value).map((row, i) => ({
+    sqlTableIndex: offset + i + 1,
+    ...Object.fromEntries(columns.map((col, j) => [col, row[j]])),
+  }))
 })
 
 const totalPages = computed(() =>
@@ -341,10 +343,6 @@ onMounted(async () => {
 
         <template v-else>
           <Table height="h-auto" :columns="resultColumns" :rows="paginatedRowObjects">
-            <template #__index="{ index }">
-              {{ (page - 1) * perPage + index + 1 }}
-            </template>
-
             <template v-for="name in currentResult.columns" :key="name" #[name]="{ row }">
               <span v-if="row[name] === null" class="text-ink-gray-3 italic">null</span>
               <span v-else class="block max-w-xs truncate">{{ row[name] }}</span>
