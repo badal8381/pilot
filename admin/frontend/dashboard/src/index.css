@@ -114,8 +114,9 @@ body {
   animation: fade-in 0.35s var(--ease-out);
 }
 
-#app {
-  isolation: isolate;
+.dialog-overlay,
+.dialog-scroll-container {
+  z-index: 50;
 }
 
 /* Dropdown/Menu content teleports to <body> without a z-index; lift it above both
