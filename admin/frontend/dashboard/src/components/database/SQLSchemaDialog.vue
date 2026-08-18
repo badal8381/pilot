@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { Button, Dialog, FormControl } from 'frappe-ui'
 
-import SimpleTable from '@/components/common/SimpleTable.vue'
+import Table from '@/components/common/Table.vue'
 
 const props = defineProps({
   schema: { type: Array, default: () => [] },
@@ -10,6 +10,11 @@ const props = defineProps({
 const emit = defineEmits(['preview'])
 
 const show = defineModel({ default: false })
+
+const schemaColumns = [
+  { key: 'name', label: 'Column', class: 'font-mono' },
+  { key: 'type', label: 'Type', class: 'font-mono' },
+]
 
 const search = ref('')
 const selected = ref(null)
@@ -82,8 +87,10 @@ const preview = (table) => {
             </Button>
           </div>
 
-          <SimpleTable
-            :columns="[{ key: 'name', label: 'Column' }, { key: 'type', label: 'Type' }]"
+          <Table
+            class="border rounded-6 border-outline-gray-2"
+            height="h-auto"
+            :columns="schemaColumns"
             :rows="selected.columns"
           />
         </template>

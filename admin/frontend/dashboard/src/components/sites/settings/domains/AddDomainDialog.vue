@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, TextInput } from 'frappe-ui'
 
-import SimpleTable from '@/components/common/SimpleTable.vue'
+import Table from '@/components/common/Table.vue'
 
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
@@ -129,7 +129,12 @@ const confirmAdd = async () => {
             {{ dnsRecordGroups.length > 1 ? `Option ${i + 1}: ${group.type} record` : `${group.type} record` }}
           </p>
 
-          <SimpleTable class="mt-2" :columns="DNS_RECORD_COLUMNS" :rows="group.records" />
+          <Table
+            class="mt-2 border rounded-6 border-outline-gray-2"
+            height="h-auto"
+            :columns="DNS_RECORD_COLUMNS"
+            :rows="group.records"
+          />
         </div>
 
         <p class="mt-3 text-ink-gray-5 text-xs">
