@@ -80,9 +80,6 @@ const metaLabel = (site) => {
 
 const isFiltered = computed(() => Boolean(search.value.trim()) || statusFilter.value !== 'all')
 
-// The total, not the filtered list: filtering down to ten must not hide the controls.
-const showToolbar = computed(() => sites.value.length > 10)
-
 const filteredSites = computed(() => {
   const query = search.value.toLowerCase().trim()
   return sites.value.filter((site) => {
@@ -171,7 +168,7 @@ onMounted(() => {
 
 <template>
   <div class="mx-auto max-w-3xl">
-    <StickyToolbar v-if="showToolbar" class="flex items-center gap-2">
+    <StickyToolbar v-if="sites.length > 10" class="flex items-center gap-2">
       <FormControl
         v-model="search"
         type="text"
