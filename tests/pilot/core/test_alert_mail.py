@@ -23,6 +23,7 @@ class FakeSMTP:
     """Stands in for both smtplib transports and records what a send did."""
 
     sends: ClassVar[list["FakeSMTP"]] = []
+    refuse: ClassVar[dict] = {}  # recipients smtplib reports back as refused
 
     def __init__(self, host: str, port: int, timeout: float | None = None, context=None) -> None:
         self.host = host
@@ -47,8 +48,9 @@ class FakeSMTP:
     def login(self, username: str, password: str) -> None:
         self.logged_in_as = (username, password)
 
-    def send_message(self, message) -> None:
+    def send_message(self, message) -> dict:
         self.messages.append(message)
+        return dict(FakeSMTP.refuse)
 
 
 @pytest.fixture(autouse=True)
@@ -134,7 +136,32 @@ def test_a_relay_without_a_login_name_sends_anonymously() -> None:
     with patch("smtplib.SMTP", FakeSMTP):
         send_mail(_limits(smtp_url="smtp://smtp.test"), PAYLOAD)
 
-    assert FakeSMTP.sends[0].logged_in_as is None
+    sent = FakeSMTP.sends[0]
+    assert sent.logged_in_as is None
+    # An empty From becomes MAIL FROM:<>, which most relays refuse.
+    assert sent.messages[0]["From"] == "pilot@smtp.test"
+
+
+def test_a_refused_recipient_is_not_a_delivery(tmp_path: Path) -> None:
+    """send_message reports per-recipient refusals by returning them; a partial
+    send must not retire the alert for the mailbox that never got it."""
+    refused = {"oncall@test": (550, b"No such user")}
+
+    with patch("smtplib.SMTP", FakeSMTP), patch.object(FakeSMTP, "refuse", refused):
+        delivered = notify(_bench(tmp_path, _limits()), PAYLOAD)
+
+    assert not delivered
+
+
+def test_a_broken_url_disables_mail_instead_of_raising(tmp_path: Path) -> None:
+    """common_config.toml can be hand-edited, and most config reads skip validation,
+    so a bad URL has to read as "no mail sink" rather than kill the monitor tick."""
+    for url in ("http://smtp.test", "smtp://", "not-a-url"):
+        limits = _limits(smtp_url=url)
+        assert not limits.is_mail_configured
+        with patch("smtplib.SMTP", FakeSMTP):
+            assert notify(_bench(tmp_path, limits), PAYLOAD) is False
+    assert FakeSMTP.sends == []
 
 
 def test_mail_counts_as_delivery_when_every_webhook_fails(tmp_path: Path) -> None:

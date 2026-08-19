@@ -91,9 +91,12 @@ class ConfigPatcher:
 
     @staticmethod
     def _apply_alert_mail(limits: ResourceLimitConfig, resource_limits: dict) -> None:
-        """A blank password keeps the stored one, the same way webhook tokens work."""
+        """A blank password keeps the stored one, the same way webhook tokens work.
+        Clearing the server URL drops it, so a rotated credential has a way out."""
         if "smtp_url" in resource_limits:
             limits.smtp_url = str(resource_limits["smtp_url"]).strip()
+            if not limits.smtp_url:
+                limits.smtp_password = ""
         if resource_limits.get("smtp_password"):
             limits.smtp_password = str(resource_limits["smtp_password"])
         if "email_recipients" in resource_limits:

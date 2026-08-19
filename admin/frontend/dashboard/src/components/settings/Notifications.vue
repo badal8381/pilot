@@ -110,10 +110,20 @@ const limitError = (key) => {
   return ''
 }
 
+// Mirrors the server: scheme, a host, a readable port, and no inline password.
+const mailUrlIsValid = (url) => {
+  if (!/^smtps?:\/\//.test(url) || !URL.canParse(url)) return false
+  const parsed = new URL(url)
+  return Boolean(parsed.hostname) && !/\s/.test(url)
+}
+
+const mailUrlHasPassword = (url) => URL.canParse(url) && Boolean(new URL(url).password)
+
 const mailError = computed(() => {
   const url = mail.value.smtp_url.trim()
-  if (url && !/^smtps?:\/\/[^\s]+$/.test(url))
+  if (url && !mailUrlIsValid(url))
     return 'Server URL must look like smtp://user@mail.example.com:587 or smtps://...'
+  if (url && mailUrlHasPassword(url)) return 'Put the password in the field below, not in the URL.'
   const addresses = recipients()
   if (addresses.length && !url) return 'A server URL is required to send alert emails.'
   if (addresses.some((address) => !/^[^@\s]+@[^@\s]+$/.test(address)))

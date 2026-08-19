@@ -38,11 +38,17 @@ def send_alert(endpoint: str, token: str, payload: dict[str, typing.Any]) -> Non
 
 
 def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> None:
-    """Email one alert to the configured recipients."""
+    """Email one alert to every configured recipient.
+
+    Raises if any recipient is refused: a partial send still leaves someone
+    uninformed, and the caller retires the alert once this returns.
+    """
     endpoint = limits.get_mail_endpoint()
     message = EmailMessage()
     message["Subject"] = f"[Pilot] {payload['message']}"
-    message["From"] = endpoint.username
+    # An anonymous relay has no login name to send as, and an empty From would
+    # become MAIL FROM:<>, the null bounce sender most relays reject.
+    message["From"] = endpoint.username or f"pilot@{endpoint.host}"
     message["To"] = ", ".join(limits.email_recipients)
     message.set_content(f"{payload['message']}\n\n{json.dumps(payload['context'], indent=2)}")
 
@@ -60,7 +66,9 @@ def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> 
             server.starttls(context=context)
         if endpoint.username:
             server.login(endpoint.username, limits.smtp_password)
-        server.send_message(message)
+        refused = server.send_message(message)
+        if refused:
+            raise smtplib.SMTPRecipientsRefused(refused)
 
 
 def notify(bench: "Bench", payload: dict[str, typing.Any]) -> bool:

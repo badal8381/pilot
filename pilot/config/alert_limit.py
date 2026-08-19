@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass, field
 from typing import NamedTuple
 from urllib.parse import unquote, urlsplit
@@ -5,6 +6,7 @@ from urllib.parse import unquote, urlsplit
 RESOURCE_LIMIT_FIELDS = ("cpu_usage_limit", "memory_usage_limit", "disk_space_limit")
 # scheme -> (default port, connect over SSL instead of STARTTLS)
 SMTP_SCHEMES = {"smtp": (587, False), "smtps": (465, True)}
+_ADDRESS_RE = re.compile(r"^[^@\s]+@[^@\s]+$")
 
 
 class MailEndpoint(NamedTuple):
@@ -34,15 +36,31 @@ class ResourceLimitConfig:
 
     @property
     def is_mail_configured(self) -> bool:
-        return bool(self.smtp_url and self.email_recipients)
+        """A hand-edited common_config.toml is never validated, so a broken URL has
+        to read as "no mail sink" rather than raise into the monitoring tick."""
+        if not (self.smtp_url and self.email_recipients):
+            return False
+        try:
+            self.get_mail_endpoint()
+        except ValueError:
+            return False
+        return True
 
     def get_mail_endpoint(self) -> MailEndpoint:
         """Server, port, TLS mode and login name out of `smtp_url`."""
         parts = urlsplit(self.smtp_url)
+        if parts.scheme not in SMTP_SCHEMES:
+            raise ValueError("resource_limits.smtp_url must start with smtp:// or smtps://.")
         default_port, is_ssl = SMTP_SCHEMES[parts.scheme]
+        if not parts.hostname:
+            raise ValueError("resource_limits.smtp_url needs a mail server.")
+        try:
+            port = parts.port or default_port
+        except ValueError:
+            raise ValueError("resource_limits.smtp_url has an invalid port.") from None
         return MailEndpoint(
-            host=parts.hostname or "",
-            port=parts.port or default_port,
+            host=parts.hostname,
+            port=port,
             is_ssl=is_ssl,
             username=unquote(parts.username or ""),
         )
@@ -68,18 +86,15 @@ class ResourceLimitConfig:
             raise ValueError("resource_limits.smtp_url is required to send alert emails.")
 
         for recipient in self.email_recipients:
-            if "@" not in recipient:
+            # A stricter check than "has an @": a space or newline here would end up
+            # in a To: header, where it splits the header rather than failing cleanly.
+            if not _ADDRESS_RE.match(recipient):
                 raise ValueError(f"resource_limits.email_recipients has a bad address: {recipient!r}.")
 
     def _validate_smtp_url(self) -> None:
-        parts = urlsplit(self.smtp_url)
-        if parts.scheme not in SMTP_SCHEMES:
-            raise ValueError("resource_limits.smtp_url must start with smtp:// or smtps://.")
-        if not parts.hostname:
-            raise ValueError("resource_limits.smtp_url needs a mail server.")
-        if parts.password:
+        if urlsplit(self.smtp_url).password:
             raise ValueError("Keep the mail password in resource_limits.smtp_password, not in smtp_url.")
         try:
-            self.get_mail_endpoint()  # urlsplit rejects an out-of-range port
-        except ValueError:
-            raise ValueError("resource_limits.smtp_url has an invalid port.") from None
+            self.get_mail_endpoint()  # also rejects a port urlsplit cannot read
+        except ValueError as error:
+            raise ValueError(str(error) or "resource_limits.smtp_url is invalid.") from None
