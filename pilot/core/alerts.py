@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import smtplib
+import ssl
 import time
 import typing
 import urllib.request
@@ -45,10 +46,18 @@ def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> 
     message["To"] = ", ".join(limits.email_recipients)
     message.set_content(f"{payload['message']}\n\n{json.dumps(payload['context'], indent=2)}")
 
-    transport = smtplib.SMTP_SSL if endpoint.is_ssl else smtplib.SMTP
-    with transport(endpoint.host, endpoint.port, timeout=ALERT_TIMEOUT_SECONDS) as server:
+    # smtplib's own default context does not verify the peer, so pass one that does:
+    # an unverified hop would hand the password to whoever answers.
+    context = ssl.create_default_context()
+    if endpoint.is_ssl:
+        server = smtplib.SMTP_SSL(
+            endpoint.host, endpoint.port, timeout=ALERT_TIMEOUT_SECONDS, context=context
+        )
+    else:
+        server = smtplib.SMTP(endpoint.host, endpoint.port, timeout=ALERT_TIMEOUT_SECONDS)
+    with server:
         if not endpoint.is_ssl:
-            server.starttls()  # credentials must never cross a plaintext hop
+            server.starttls(context=context)
         if endpoint.username:
             server.login(endpoint.username, limits.smtp_password)
         server.send_message(message)

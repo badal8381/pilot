@@ -1,5 +1,6 @@
 """Tests for the email sink on the alert fan-out."""
 
+import ssl
 from pathlib import Path
 from typing import ClassVar
 from unittest.mock import patch
@@ -23,10 +24,11 @@ class FakeSMTP:
 
     sends: ClassVar[list["FakeSMTP"]] = []
 
-    def __init__(self, host: str, port: int, timeout: float | None = None) -> None:
+    def __init__(self, host: str, port: int, timeout: float | None = None, context=None) -> None:
         self.host = host
         self.port = port
         self.timeout = timeout
+        self.context = context
         self.started_tls = False
         self.logged_in_as: tuple[str, str] | None = None
         self.messages: list = []
@@ -38,8 +40,9 @@ class FakeSMTP:
     def __exit__(self, *exception) -> bool:
         return False
 
-    def starttls(self) -> None:
+    def starttls(self, context=None) -> None:
         self.started_tls = True
+        self.context = context
 
     def login(self, username: str, password: str) -> None:
         self.logged_in_as = (username, password)
@@ -88,6 +91,20 @@ def test_the_alert_is_mailed_over_starttls() -> None:
     assert message["To"] == "ops@test, oncall@test"
     assert message["Subject"] == "[Pilot] my-bench: a.test unreachable"
     assert "a.test" in message.get_content()
+
+
+def test_both_transports_verify_the_server_certificate() -> None:
+    """smtplib's own default context skips verification, which would hand the
+    password to whoever answers on an intercepted connection."""
+    with patch("smtplib.SMTP", FakeSMTP):
+        send_mail(_limits(), PAYLOAD)
+    with patch("smtplib.SMTP_SSL", FakeSMTP):
+        send_mail(_limits(smtp_url="smtps://alerts@test@smtp.test"), PAYLOAD)
+
+    for send in FakeSMTP.sends:
+        assert send.context is not None
+        assert send.context.verify_mode == ssl.CERT_REQUIRED
+        assert send.context.check_hostname
 
 
 def test_the_login_name_is_also_the_sender() -> None:

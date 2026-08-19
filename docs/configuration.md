@@ -214,7 +214,36 @@ token = ""
 [admin]
 jwks_url = "https://issuer.example.com/jwks.json"
 jwks_audience = "bench-fleet"
+
+[resource_limits]
+cpu_usage_limit = 85
+memory_usage_limit = 90
+disk_space_limit = 0
+site_uptime = true
+webhook_endpoints = { "https://alerts.example.com/pilot" = "bearer-token" }
+smtp_url = "smtp://alerts@example.com@smtp.example.com:587"
+smtp_password = ""
+email_recipients = ["ops@example.com"]
 ```
+
+### Alert Delivery
+
+`[resource_limits]` sets when an alert is raised and where it goes. A usage percentage of `0` disables that alert; `site_uptime` covers sites that stop answering their ping. A condition must hold for five minutes before anything is sent.
+
+Alerts always go to Central. Each entry in `webhook_endpoints` receives them too, as a POST with an `Authorization: Bearer` header. Mail is a third sink, off until `smtp_url` and `email_recipients` are both set.
+
+`smtp_url` carries the server, port, and login name together:
+
+- `smtp://` upgrades the connection with STARTTLS and defaults to port 587
+- `smtps://` connects over SSL and defaults to port 465
+- a port in the URL overrides that default, as in `smtp://smtp.example.com:2525`
+- the login name goes before the host - `smtp://alerts@example.com@smtp.example.com` is a full email address as the user, and needs no escaping
+- omit the login name for a relay that takes no credentials
+- the login name is also the sender address
+
+The certificate is verified in both modes, so a server with a self-signed certificate is refused rather than trusted silently.
+
+The password belongs in `smtp_password`, never in the URL - a URL carrying one is rejected. Like the other secrets in this file, it is stored as written; `common_config.toml` is written owner-only (`0600`). The Admin API never returns it, reporting only whether one is stored.
 
 `BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, `config.central`, `config.datum`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
 
