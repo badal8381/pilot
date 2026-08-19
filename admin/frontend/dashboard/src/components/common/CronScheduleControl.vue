@@ -1,73 +1,4 @@
-<template>
-  <div>
-    <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
-      <div v-if="!titleless">
-        <p class="font-medium text-ink-gray-8 text-sm">{{ title }}</p>
-        <p class="mt-0.5 text-ink-gray-5 text-sm">
-          <template v-if="disabled">{{ disabledHint }}</template>
-          <template v-else>{{ enabledHint }}</template>
-        </p>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <Button v-if="disabled" size="sm" :loading="loading" @click="enable"
-          >Enable {{ noun }}</Button
-        >
-        <Dropdown v-else :options="scheduleOptions">
-          <template #default="{ open }">
-            <Button variant="subtle" size="sm" :loading="loading" :active="open">
-              <template #suffix><span class="size-4 lucide-chevron-down" /></template>
-              {{ currentScheduleLabel }}
-            </Button>
-          </template>
-        </Dropdown>
-        <slot name="actions" />
-      </div>
-    </div>
-
-    <ErrorMessage v-if="error" :message="error" class="mt-2" />
-  </div>
-
-  <!-- Custom schedule dialog -->
-  <Dialog v-model="showCustomDialog" :title="`Custom ${noun} schedule`" size="sm">
-    <div class="space-y-4">
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Frequency</p>
-        <Select v-model="schedFrequency" :options="FREQ_OPTIONS" class="w-full" />
-      </div>
-      <div v-if="schedFrequency === 'weekly'" class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Day of week</p>
-        <Select v-model="schedWeekday" :options="WEEKDAY_OPTIONS" class="w-full" />
-      </div>
-      <div v-if="schedFrequency === 'monthly'" class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Day of month</p>
-        <Select v-model="schedMonthDay" :options="monthDayOptions" class="w-full" />
-      </div>
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Time</p>
-        <Select v-model="schedHour" :options="hourOptions" class="w-full" />
-      </div>
-      <p v-if="retentionHint" class="text-ink-gray-4 text-p-sm">{{ retentionHint }}</p>
-      <ErrorMessage v-if="error" :message="error" />
-    </div>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showCustomDialog = false">Cancel</Button>
-      <Button variant="solid" :loading="scheduleSaving" @click="saveCustomSchedule"
-        >Save schedule</Button
-      >
-    </div>
-  </Dialog>
-
-  <!-- Disable confirmation -->
-  <Dialog v-model="showDisableConfirm" :title="`Disable ${noun}`" size="sm">
-    <p class="text-ink-gray-7 text-sm">{{ disableBody }}</p>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showDisableConfirm = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="loading" @click="disable">Disable</Button>
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { Button, Dialog, Dropdown, ErrorMessage, Select } from 'frappe-ui'
 
@@ -126,7 +57,7 @@ const schedWeekday = ref(0)
 const schedMonthDay = ref(1)
 const schedHour = ref(2)
 
-function formatHour(h) {
+const formatHour = (h) => {
   if (h === 0) return '12:00 AM'
   if (h < 12) return `${h}:00 AM`
   if (h === 12) return '12:00 PM'
@@ -178,7 +109,7 @@ const schedCron = computed(() => {
   return `0 ${h} * * *`
 })
 
-function parseCronToState(cron) {
+const parseCronToState = (cron) => {
   const [, h, dom, , dow] = cron.split(' ')
   schedHour.value = isNaN(parseInt(h)) ? 0 : parseInt(h)
   if (dom !== '*') {
@@ -190,7 +121,7 @@ function parseCronToState(cron) {
   } else schedFrequency.value = 'daily'
 }
 
-async function load() {
+const load = async () => {
   try {
     const data = await props.fetchSchedule()
     if (!data.schedule) {
@@ -205,7 +136,7 @@ async function load() {
   }
 }
 
-async function setPreset(cron) {
+const setPreset = async (cron) => {
   error.value = ''
   try {
     await props.setSchedule(cron)
@@ -216,7 +147,7 @@ async function setPreset(cron) {
   }
 }
 
-async function saveCustomSchedule() {
+const saveCustomSchedule = async () => {
   error.value = ''
   scheduleSaving.value = true
   try {
@@ -231,7 +162,7 @@ async function saveCustomSchedule() {
   }
 }
 
-async function disable() {
+const disable = async () => {
   error.value = ''
   loading.value = true
   try {
@@ -245,7 +176,7 @@ async function disable() {
   }
 }
 
-async function enable() {
+const enable = async () => {
   error.value = ''
   loading.value = true
   try {
@@ -263,3 +194,79 @@ onMounted(load)
 
 defineExpose({ disabled, currentScheduleLabel, loading, enable })
 </script>
+
+<template>
+  <div>
+    <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
+      <div v-if="!titleless">
+        <p class="font-medium text-ink-gray-8 text-sm">{{ title }}</p>
+        <p class="mt-0.5 text-ink-gray-5 text-sm">
+          <template v-if="disabled">{{ disabledHint }}</template>
+          <template v-else>{{ enabledHint }}</template>
+        </p>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <Button v-if="disabled" size="sm" :loading="loading" @click="enable"
+          >Enable {{ noun }}</Button
+        >
+        <Dropdown v-else :options="scheduleOptions">
+          <template #default="{ open }">
+            <Button variant="subtle" size="sm" :loading="loading" :active="open">
+              <template #suffix><span class="size-4 lucide-chevron-down" /></template>
+              {{ currentScheduleLabel }}
+            </Button>
+          </template>
+        </Dropdown>
+
+        <slot name="actions" />
+      </div>
+    </div>
+
+    <ErrorMessage v-if="error" :message="error" class="mt-2" />
+  </div>
+
+  <!-- Custom schedule dialog -->
+  <Dialog v-model="showCustomDialog" :title="`Custom ${noun} schedule`" size="sm">
+    <div class="space-y-4">
+      <div class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Frequency</p>
+        <Select v-model="schedFrequency" :options="FREQ_OPTIONS" class="w-full" />
+      </div>
+
+      <div v-if="schedFrequency === 'weekly'" class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Day of week</p>
+        <Select v-model="schedWeekday" :options="WEEKDAY_OPTIONS" class="w-full" />
+      </div>
+
+      <div v-if="schedFrequency === 'monthly'" class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Day of month</p>
+        <Select v-model="schedMonthDay" :options="monthDayOptions" class="w-full" />
+      </div>
+
+      <div class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Time</p>
+        <Select v-model="schedHour" :options="hourOptions" class="w-full" />
+      </div>
+
+      <p v-if="retentionHint" class="text-ink-gray-4 text-p-sm">{{ retentionHint }}</p>
+      <ErrorMessage v-if="error" :message="error" />
+    </div>
+
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showCustomDialog = false">Cancel</Button>
+      <Button variant="solid" :loading="scheduleSaving" @click="saveCustomSchedule"
+        >Save schedule</Button
+      >
+    </div>
+  </Dialog>
+
+  <!-- Disable confirmation -->
+  <Dialog v-model="showDisableConfirm" :title="`Disable ${noun}`" size="sm">
+    <p class="text-ink-gray-7 text-sm">{{ disableBody }}</p>
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDisableConfirm = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="loading" @click="disable">Disable</Button>
+    </div>
+  </Dialog>
+</template>

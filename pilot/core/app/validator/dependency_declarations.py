@@ -3,8 +3,7 @@ from __future__ import annotations
 import ast
 import typing
 
-from packaging.specifiers import InvalidSpecifier, SpecifierSet
-
+from pilot._vendor.packaging.specifiers import InvalidSpecifier, SpecifierSet
 from pilot.core.app.validator.base import module_path, read_pyproject
 from pilot.exceptions import AppValidationError
 

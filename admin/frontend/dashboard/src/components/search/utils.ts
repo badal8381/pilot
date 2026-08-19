@@ -1,4 +1,4 @@
-import type { SearchGroups } from './index'
+import type { SearchGroups } from '@/components/search/index'
 
 export const highlightMatch = (text: string, query: string): string => {
   if (!query) return text

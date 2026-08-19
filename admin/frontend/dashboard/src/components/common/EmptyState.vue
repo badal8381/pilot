@@ -1,3 +1,15 @@
+<script setup lang="ts">
+defineProps({
+  icon: { type: String, default: '' },
+  title: { type: String, required: true },
+  description: { type: String, default: '' },
+  // Off when the state already sits inside a bordered panel.
+  bordered: { type: Boolean, default: true },
+  // For empty states that sit among other content rather than filling a page.
+  compact: { type: Boolean, default: false },
+})
+</script>
+
 <template>
   <div
     class="flex flex-col items-center px-6 text-center"
@@ -13,22 +25,12 @@
     >
       <span :class="[compact ? 'size-4' : 'size-5', icon]" />
     </span>
+
     <div>
       <p class="font-medium text-ink-gray-7 text-base">{{ title }}</p>
       <p v-if="description" class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">{{ description }}</p>
     </div>
+
     <slot />
   </div>
 </template>
-
-<script setup>
-defineProps({
-  icon: { type: String, default: '' },
-  title: { type: String, required: true },
-  description: { type: String, default: '' },
-  // Off when the state already sits inside a bordered panel.
-  bordered: { type: Boolean, default: true },
-  // For empty states that sit among other content rather than filling a page.
-  compact: { type: Boolean, default: false },
-})
-</script>

@@ -1,3 +1,42 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import { Button, Dialog, FormControl } from 'frappe-ui'
+
+import Table from '@/components/common/Table.vue'
+
+const props = defineProps({
+  schema: { type: Array, default: () => [] },
+})
+const emit = defineEmits(['preview'])
+
+const show = defineModel({ default: false })
+
+const schemaColumns = [
+  { key: 'name', label: 'Column', class: 'font-mono' },
+  { key: 'type', label: 'Type', class: 'font-mono' },
+]
+
+const search = ref('')
+const selected = ref(null)
+
+const filteredTables = computed(() => {
+  const query = search.value.toLowerCase().trim()
+  return props.schema.filter((t) => !query || t.name.toLowerCase().includes(query))
+})
+
+watch(show, (open) => {
+  if (open) {
+    search.value = ''
+    selected.value = null
+  }
+})
+
+const preview = (table) => {
+  emit('preview', table.name)
+  show.value = false
+}
+</script>
+
 <template>
   <Dialog v-model="show" title="Tables" size="3xl">
     <FormControl v-model="search" type="text" placeholder="Search tables" autocomplete="off">
@@ -22,6 +61,7 @@
         >
           {{ table.name }}
         </button>
+
         <p v-if="!filteredTables.length" class="px-2 py-1.5 text-ink-gray-4 text-sm">
           No tables found.
         </p>
@@ -38,6 +78,7 @@
                 columns)</span
               >
             </h3>
+
             <Button variant="outline" size="sm" @click="preview(selected)">
               <template #prefix>
                 <span class="size-3.5 lucide-eye" />
@@ -45,11 +86,15 @@
               Preview data
             </Button>
           </div>
-          <SimpleTable
-            :columns="[{ key: 'name', label: 'Column' }, { key: 'type', label: 'Type' }]"
+
+          <Table
+            class="border rounded-6 border-outline-gray-2"
+            height="h-auto"
+            :columns="schemaColumns"
             :rows="selected.columns"
           />
         </template>
+
         <p
           v-else
           class="flex justify-center items-center min-h-[120px] sm:h-full text-ink-gray-4 text-sm"
@@ -60,36 +105,3 @@
     </div>
   </Dialog>
 </template>
-
-<script setup>
-import { computed, ref, watch } from 'vue'
-import { Button, Dialog, FormControl } from 'frappe-ui'
-import SimpleTable from '@/components/common/SimpleTable.vue'
-
-const props = defineProps({
-  schema: { type: Array, default: () => [] },
-})
-const emit = defineEmits(['preview'])
-
-const show = defineModel({ default: false })
-
-const search = ref('')
-const selected = ref(null)
-
-const filteredTables = computed(() => {
-  const query = search.value.toLowerCase().trim()
-  return props.schema.filter((t) => !query || t.name.toLowerCase().includes(query))
-})
-
-watch(show, (open) => {
-  if (open) {
-    search.value = ''
-    selected.value = null
-  }
-})
-
-function preview(table) {
-  emit('preview', table.name)
-  show.value = false
-}
-</script>

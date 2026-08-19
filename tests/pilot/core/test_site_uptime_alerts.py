@@ -152,3 +152,38 @@ def test_an_undelivered_alert_is_retried_on_the_next_tick(tmp_path: Path) -> Non
 
     assert delivered == ["https://alerts.example.com"]
     assert json.loads(monitor.alerts_path.read_text())["a.test"]["notified"] is True
+
+
+def test_a_site_that_stays_down_is_recorded_locally_once(tmp_path: Path) -> None:
+    """The retry above repeats every five seconds. Only the delivery repeats -
+    the bench's own feed keeps one row for the incident."""
+    monitor = _monitor(tmp_path)
+    monitor.send_alert_if_required([_ping("a.test", up=False)])
+    _age_alerts(monitor)
+
+    def refuse(endpoint, token, payload):
+        raise OSError("connection refused")
+
+    with patch("pilot.core.alerts.send_alert", refuse):
+        for _ in range(5):
+            monitor.send_alert_if_required([_ping("a.test", up=False)])
+
+    recorded = monitor.bench.notifications.list(10)
+    assert [item.title for item in recorded] == ["a.test is unreachable"]
+
+
+def test_a_second_site_going_down_gets_its_own_record(tmp_path: Path) -> None:
+    """Recording is per condition, so a new site joining an existing incident is
+    not swallowed by the first site's record."""
+    monitor = _monitor(tmp_path)
+    monitor.send_alert_if_required([_ping("a.test", up=False)])
+    _age_alerts(monitor)
+
+    with patch("pilot.core.alerts.send_alert", lambda endpoint, token, payload: None):
+        monitor.send_alert_if_required([_ping("a.test", up=False)])
+        monitor.send_alert_if_required([_ping("a.test", up=False), _ping("b.test", up=False)])
+        _age_alerts(monitor)
+        monitor.send_alert_if_required([_ping("a.test", up=False), _ping("b.test", up=False)])
+
+    titles = sorted(item.title for item in monitor.bench.notifications.list(10))
+    assert titles == ["a.test is unreachable", "b.test is unreachable"]

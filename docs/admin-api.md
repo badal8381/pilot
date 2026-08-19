@@ -13,6 +13,7 @@ admin/backend/api/v1/
   apps.py    bench app inventory and actions
   tasks.py   task list, logs, events, control
   logs.py    log access
+  notifications.py  bench notification feed and read state
   processes.py
   stats.py
   updates.py

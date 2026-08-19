@@ -2,12 +2,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
 import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Skeleton } from 'frappe-ui'
+
+import Table from '@/components/common/Table.vue'
+
 import { useActivities } from '@/composables/activities/useActivities'
 import { useSites } from '@/composables/sites/useSites'
 import { commandLabel, relativeTime } from '@/utils/taskFormat'
 import type { AuditEntry } from '@/types/audit'
-
-import Table from '@/components/common/Table.vue'
 
 const props = defineProps<{ siteName?: string }>()
 
@@ -243,6 +244,7 @@ onMounted(() => {
           >
             <span class="size-3.5" :class="activityTypeMeta(row.entry).icon" />
           </span>
+
           <span class="font-medium text-ink-gray-9 text-sm">{{ row.activity }}</span>
         </template>
 

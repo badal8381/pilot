@@ -1,14 +1,13 @@
 <script setup lang="ts">
 import { Button, ErrorMessage, Skeleton } from 'frappe-ui'
-
 import { h, onMounted, ref } from 'vue'
-import { apiErrorMessage } from '@/api/client'
-import { monitorApi } from '@/api/monitor'
 
 import FCLogo from '@/components/icons/FC.vue'
 import AppStorageCard from '@/components/storage/AppStorageCard.vue'
 import DBStorageCard from '@/components/storage/DatabaseStorageCard.vue'
 
+import { apiErrorMessage } from '@/api/client'
+import { monitorApi } from '@/api/monitor'
 import type { StorageBreakdown } from '@/types/storage'
 import { formatBytes } from '@/utils/format'
 

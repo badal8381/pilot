@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import stat
 import subprocess
-from unittest.mock import Mock, PropertyMock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, call, patch
 
 import pytest
 
@@ -552,6 +552,158 @@ def test_global_integer_helpers_allow_only_known_variables() -> None:
     ):
         manager._set_global_integer("max_connections; DROP DATABASE mysql", 10)
     connect.assert_not_called()
+
+
+def test_global_variable_catalog_read_uses_parameterized_names() -> None:
+    manager = _manager()
+    connection = MagicMock()
+    cursor = connection.cursor.return_value.__enter__.return_value
+    cursor.fetchall.return_value = [
+        ("CONNECT_TIMEOUT", "10"),
+        ("INNODB_PRINT_ALL_DEADLOCKS", "ON"),
+    ]
+    with patch.object(manager, "connect", return_value=connection):
+        result = manager.global_variable_values(("connect_timeout", "innodb_print_all_deadlocks"))
+
+    assert result == {
+        "connect_timeout": "10",
+        "innodb_print_all_deadlocks": "ON",
+    }
+    sql, parameters = cursor.execute.call_args.args
+    assert "IN (%s, %s)" in sql
+    assert parameters == ("connect_timeout", "innodb_print_all_deadlocks")
+    assert "connect_timeout" not in sql
+    connection.close.assert_called_once()
+
+
+def test_global_variable_catalog_rejects_unknown_name_before_connecting() -> None:
+    manager = _manager()
+    with (
+        patch.object(manager, "connect") as connect,
+        pytest.raises(DatabaseError, match="cannot read"),
+    ):
+        manager.global_variable_values(("connect_timeout; DROP DATABASE mysql",))
+    connect.assert_not_called()
+
+
+def test_safe_configuration_change_applies_live_and_persists(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    managed_file.write_text(
+        "# Managed by Pilot's database variable editor.\n" "[mysqld]\n" "performance-schema = OFF\n"
+    )
+    state = {"connect_timeout": 10}
+
+    def set_value(name, value) -> None:
+        state[name] = value
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(
+            manager,
+            "_read_configuration_variable",
+            side_effect=lambda name: state[name],
+        ),
+        patch.object(manager, "_set_configuration_variable", side_effect=set_value) as update,
+    ):
+        assert manager.set_configuration_variable("connect_timeout", 20) is True
+
+    update.assert_called_once_with("connect_timeout", 20)
+    assert "connect-timeout = 20" in managed_file.read_text()
+    assert "performance-schema = OFF" in managed_file.read_text()
+
+
+def test_safe_boolean_configuration_is_written_as_on_or_off(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    managed_file.write_text("# Managed by Pilot's database variable editor.\n[mysqld]\n")
+    state = {"innodb_print_all_deadlocks": True}
+
+    def set_value(name, value) -> None:
+        state[name] = value
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(
+            manager,
+            "_read_configuration_variable",
+            side_effect=lambda name: state[name],
+        ),
+        patch.object(manager, "_set_configuration_variable", side_effect=set_value),
+    ):
+        assert manager.set_configuration_variable("innodb_print_all_deadlocks", False) is True
+
+    assert "innodb-print-all-deadlocks = OFF" in managed_file.read_text()
+
+
+def test_failed_catalog_change_restores_exact_config_and_runtime(tmp_path) -> None:
+    manager = _manager()
+    config_dir = tmp_path / "config"
+    config_dir.mkdir()
+    (config_dir / "my.cnf").write_text("# Managed by Pilot.\n[mysqld]\n")
+    managed_file = config_dir / "managed.cnf"
+    previous = "# Managed by Pilot's database variable editor.\n" "[mysqld]\n" "performance-schema = OFF\n"
+    managed_file.write_text(previous)
+
+    with (
+        patch.object(type(manager), "state_dir", new_callable=PropertyMock, return_value=tmp_path),
+        patch(f"{MODULE}.is_macos", return_value=False),
+        patch.object(manager, "is_installed", return_value=True),
+        patch.object(manager, "is_provisioned", return_value=True),
+        patch.object(manager, "is_healthy", return_value=True),
+        patch.object(manager, "_read_configuration_variable", return_value=10),
+        patch.object(manager, "_set_configuration_variable") as update,
+        patch.object(
+            manager,
+            "_verify_configuration_variable",
+            side_effect=[DatabaseError("verification failed"), None],
+        ),
+        pytest.raises(DatabaseError, match="previous configuration was restored"),
+    ):
+        manager.set_configuration_variable("connect_timeout", 20)
+
+    assert managed_file.read_text() == previous
+    assert update.call_args_list == [
+        call("connect_timeout", 20),
+        call("connect_timeout", 10),
+    ]
+
+
+@pytest.mark.parametrize(
+    ("name", "value", "message"),
+    [
+        ("connect_timeout", True, "whole number"),
+        ("connect_timeout", 1, "at least 2"),
+        ("max_connections", 50, "cannot change"),
+        ("connect_timeout; DROP DATABASE mysql", 10, "cannot change"),
+    ],
+)
+def test_catalog_change_rejects_invalid_input_before_touching_server(
+    name: str,
+    value,
+    message: str,
+) -> None:
+    manager = _manager()
+    with (
+        patch.object(manager, "is_installed") as installed,
+        pytest.raises(DatabaseError, match=message),
+    ):
+        manager.set_configuration_variable(name, value)
+    installed.assert_not_called()
 
 
 def test_database_action_lock_is_released_after_action_failure(tmp_path) -> None:

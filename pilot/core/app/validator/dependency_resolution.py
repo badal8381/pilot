@@ -6,8 +6,7 @@ import tempfile
 import typing
 from pathlib import Path
 
-from packaging.requirements import InvalidRequirement, Requirement
-
+from pilot._vendor.packaging.requirements import InvalidRequirement, Requirement
 from pilot.core.app.validator.base import read_pyproject
 from pilot.exceptions import AppValidationError, CommandError
 from pilot.managers.environment import ensure_uv

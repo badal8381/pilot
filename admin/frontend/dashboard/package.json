@@ -7,7 +7,7 @@
     "preinstall": "cd \"$(git rev-parse --show-toplevel)\" && uv run python scripts/generate_ts_types.py",
     "dev": "vite",
     "build": "vite build",
-    "test": "node --test src/utils/*.test.js",
+    "test": "node --test src/utils/*.test.ts",
     "preview": "vite preview"
   },
   "dependencies": {

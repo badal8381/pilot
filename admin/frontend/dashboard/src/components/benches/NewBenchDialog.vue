@@ -1,6 +1,7 @@
-<script setup>
+<script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { Button, Dialog, ErrorMessage, FormControl, LoadingIndicator, Select } from 'frappe-ui'
+
 import { apiErrorMessage } from '@/api/client'
 import { authApi } from '@/api/auth'
 import { benchesApi } from '@/api/benches'
@@ -38,17 +39,17 @@ const elapsedLabel = computed(() => {
   return `${m}:${s}`
 })
 
-function openWizard() {
+const openWizard = () => {
   if (wizardUrl.value) window.location.href = wizardUrl.value
 }
 
 // Manual button: open in a new tab so this admin page stays put (the automatic
 // redirect on ready navigates the current tab instead).
-function openWizardInNewTab() {
+const openWizardInNewTab = () => {
   if (wizardUrl.value) window.open(wizardUrl.value, '_blank', 'noopener')
 }
 
-function stopElapsed() {
+const stopElapsed = () => {
   if (elapsedTimer) {
     clearInterval(elapsedTimer)
     elapsedTimer = null
@@ -71,7 +72,7 @@ const processManagerOptions = computed(() => [
   { value: 'supervisor', label: 'Supervisor', hint: 'Alternative' },
 ])
 
-async function loadMode() {
+const loadMode = async () => {
   isProduction.value = null
   try {
     const data = await authApi.bootstrap()
@@ -83,7 +84,7 @@ async function loadMode() {
   }
 }
 
-async function loadWildcardDomains() {
+const loadWildcardDomains = async () => {
   try {
     const data = await benchesApi.wildcardDomains()
     wildcardDomains.value = data.domains || []
@@ -121,7 +122,7 @@ watch(show, (open) => {
   loadWildcardDomains()
 })
 
-function startProvisioning(url) {
+const startProvisioning = (url) => {
   provisioning.value = true
   wizardUrl.value = url
   elapsed.value = 0
@@ -143,7 +144,7 @@ const MAX_WAIT_SECONDS = 120
 // cache: 'no-store' (plus a nonce) keeps the browser from reusing a stale answer.
 // Returns true if the A record is published (and points here when we know our IP),
 // false if it resolves but not yet, null if the lookup itself couldn't run.
-async function dnsResolved(domain, expectedIp) {
+const dnsResolved = async (domain, expectedIp) => {
   try {
     const url = `https://dns.google/resolve?name=${domain}&type=A&_=${elapsed.value}`
     const response = await fetch(url, {
@@ -163,7 +164,7 @@ async function dnsResolved(domain, expectedIp) {
 // domain has propagated, and a minimum wait elapses. The dev/port flow has no
 // domain, so it skips DoH and the wait. DoH being unreachable (null) doesn't
 // block, and a cached negative stops blocking after MAX_WAIT_SECONDS.
-async function pollReady(params, domain = '', serverIp = '') {
+const pollReady = async (params, domain = '', serverIp = '') => {
   if (!provisioning.value) return
   let serverReady = false
   try {
@@ -184,7 +185,7 @@ async function pollReady(params, domain = '', serverIp = '') {
   setTimeout(() => pollReady(params, domain, serverIp), 5000)
 }
 
-async function createBench() {
+const createBench = async () => {
   const benchName = name.value.trim()
   if (!benchName) return
   if (!/^[a-zA-Z0-9_-]+$/.test(benchName)) {
@@ -246,11 +247,13 @@ async function createBench() {
           <p class="font-semibold text-ink-gray-9 text-lg">This may take a few minutes</p>
           <p class="max-w-xs text-ink-gray-6 text-sm">Opens automatically when ready.</p>
         </div>
+
         <span
           class="bg-surface-gray-2 px-2.5 py-1 rounded-full font-medium text-ink-gray-6 text-xs"
         >
           Elapsed {{ elapsedLabel }}
         </span>
+
         <Button variant="subtle" @click="openWizardInNewTab">Open setup now</Button>
       </div>
 
@@ -269,6 +272,7 @@ async function createBench() {
           This bench is running in development mode, so new benches can be created from the
           command line :
         </p>
+
         <pre
           class="bg-surface-gray-2 px-3 py-2.5 rounded-6 text-ink-gray-8 text-sm select-all"
         >pilot new my-bench</pre>
@@ -303,6 +307,7 @@ async function createBench() {
             </button>
           </div>
         </div>
+
         <div>
           <template v-if="wildcardDomains.length === 0">
             <FormControl
@@ -318,6 +323,7 @@ async function createBench() {
               isn't provisioned automatically, so setup can't be reached until it resolves here.
             </p>
           </template>
+
           <div v-else>
             <span class="block mb-1.5 text-ink-gray-5 text-xs">Admin domain</span>
             <div class="flex items-stretch gap-2">
@@ -342,19 +348,23 @@ async function createBench() {
               >
             </div>
           </div>
+
           <p class="mt-1.5 text-ink-gray-5 text-xs">
             The web address you'll use to open this bench.
           </p>
         </div>
+
         <ErrorMessage v-if="error" :message="error" />
         <p v-if="status" class="text-ink-gray-6 text-sm">{{ status }}</p>
       </template>
     </div>
+
     <template #actions v-if="!provisioning">
       <div class="flex justify-end gap-2">
         <Button variant="ghost" @click="show = false">
           {{ isProduction === false ? 'Close' : 'Cancel' }}
         </Button>
+
         <Button
           v-if="isProduction === true"
           variant="solid"
