@@ -142,7 +142,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="gap-4 grid grid-cols-1 sm:grid-cols-2">
+  <div class="gap-4 grid sm:grid-cols-2">
     <SiteUptime :site-name="siteName" :window="window" />
 
     <template v-if="loading">

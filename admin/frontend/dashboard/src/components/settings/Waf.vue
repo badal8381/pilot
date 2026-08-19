@@ -182,7 +182,7 @@ onMounted(async () => {
         <span>{{ setupNote }}</span>
       </p>
 
-      <div class="items-start gap-4 grid grid-cols-1 sm:grid-cols-2">
+      <div class="items-start gap-4 grid sm:grid-cols-2">
         <div class="space-y-1.5">
           <FormControl type="select" label="Action" :options="ACTION_OPTIONS" v-model="mode" />
           <p v-if="mode === 'DetectionOnly'" class="text-ink-gray-5 text-p-sm">
@@ -228,7 +228,7 @@ onMounted(async () => {
       </summary>
 
       <div class="space-y-4 mt-4">
-        <div class="gap-4 grid grid-cols-1 sm:grid-cols-2 items-start">
+        <div class="gap-4 grid sm:grid-cols-2 items-start">
           <div class="space-y-1.5">
             <FormControl
               type="number"
