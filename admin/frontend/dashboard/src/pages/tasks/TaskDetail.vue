@@ -119,8 +119,6 @@ onMounted(() => {
       <Badge
         :label="statusConfig(task).label"
         :theme="statusConfig(task).theme"
-        variant="subtle"
-        size="md"
       />
     </Teleport>
 
@@ -128,8 +126,6 @@ onMounted(() => {
     <Teleport defer to="#header-actions" :disabled="isMobile">
       <div class="flex items-center gap-2" :class="isMobile ? 'mb-4' : ''">
         <Button
-          variant="subtle"
-          size="sm"
           :loading="loading"
           icon="lucide-refresh-cw"
           label="Refresh"
@@ -138,8 +134,6 @@ onMounted(() => {
         />
         <Button
           v-if="task.status === 'failed' && aiConnected"
-          variant="subtle"
-          size="sm"
           icon-left="lucide-sparkles"
           @click="showDebug = true"
         >
@@ -148,8 +142,6 @@ onMounted(() => {
 
         <Button
           v-if="isTaskCancellable(task)"
-          variant="subtle"
-          size="sm"
           theme="red"
           icon-left="lucide-x"
           @click="cancelTask"

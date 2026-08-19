@@ -93,7 +93,6 @@ onMounted(async () => {
       </div>
 
       <Button
-        variant="subtle"
         icon="lucide-x"
         label="Remove worker group"
         tooltip="Remove worker group"
@@ -105,7 +104,7 @@ onMounted(async () => {
     <ErrorMessage v-if="error" :message="error" />
 
     <div class="flex justify-end gap-2">
-      <Button variant="subtle" icon-left="lucide-plus" @click="addGroup">Add</Button>
+      <Button icon-left="lucide-plus" @click="addGroup">Add</Button>
       <Button variant="solid" :loading="saving" @click="save">Save Changes</Button>
     </div>
   </div>

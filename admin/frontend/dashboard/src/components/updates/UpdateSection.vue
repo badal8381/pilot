@@ -24,7 +24,7 @@ defineEmits(['update:open'])
       <div class="flex items-center gap-2">
         <span class="size-4 text-ink-gray-5 shrink-0" :class="icon" />
         <h2 class="text-base font-medium text-ink-gray-8">{{ title }}</h2>
-        <Badge :label="count" theme="gray" variant="subtle" size="sm" />
+        <Badge :label="count" size="sm" />
       </div>
 
       <span

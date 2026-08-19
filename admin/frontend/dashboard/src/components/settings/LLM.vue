@@ -213,7 +213,6 @@ onMounted(load)
       <div v-if="needsApiBase" class="space-y-1.5">
         <FormControl
           label="API Base URL"
-          type="text"
           v-model="apiBase"
           placeholder="http://your-host:8000/v1"
         />
@@ -230,7 +229,6 @@ onMounted(load)
       <FormControl
         v-if="freeTextModel"
         label="Model"
-        type="text"
         v-model="model"
         placeholder="Your served model name"
       />
@@ -269,7 +267,6 @@ onMounted(load)
           <FormControl
             v-if="!needsApiBase"
             label="API Base URL"
-            type="text"
             v-model="apiBase"
             placeholder="Leave blank to use the provider default"
           />

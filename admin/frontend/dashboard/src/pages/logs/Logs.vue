@@ -229,7 +229,6 @@ onUnmounted(() => stopLive())
       >
         <div class="sm:px-2 pt-2 shrink-0">
           <FormControl
-            type="text"
             v-model="fileSearch"
             placeholder="Search log files"
             :size="isSinglePane ? 'md' : 'sm'"
@@ -296,7 +295,6 @@ onUnmounted(() => stopLive())
             <!-- Mobile-only: back + filename, replacing the standalone filename bar -->
             <div class="md:hidden flex items-center gap-2">
               <Button
-                variant="subtle"
                 icon="lucide-arrow-left"
                 :size="isSinglePane ? 'md' : 'sm'"
                 label="Back to logs"
@@ -309,7 +307,6 @@ onUnmounted(() => stopLive())
             </div>
 
             <FormControl
-              type="text"
               v-model="search"
               placeholder="Search this log"
               :size="isSinglePane ? 'md' : 'sm'"
@@ -325,7 +322,6 @@ onUnmounted(() => stopLive())
                 >{{ matchTotal ? activeMatch + 1 : 0 }}/{{ matchTotal }}</span
               >
               <Button
-                variant="subtle"
                 icon="lucide-chevron-up"
                 :size="isSinglePane ? 'md' : 'sm'"
                 label="Previous match"
@@ -334,7 +330,6 @@ onUnmounted(() => stopLive())
                 @click="gotoMatch(-1)"
               />
               <Button
-                variant="subtle"
                 icon="lucide-chevron-down"
                 :size="isSinglePane ? 'md' : 'sm'"
                 label="Next match"
@@ -362,7 +357,6 @@ onUnmounted(() => stopLive())
 
               <Button
                 class="ml-auto sm:ml-0"
-                variant="subtle"
                 icon="lucide-refresh-cw"
                 :size="isSinglePane ? 'md' : 'sm'"
                 label="Refresh"
@@ -372,7 +366,6 @@ onUnmounted(() => stopLive())
               />
               <Button
                 v-if="!liveMode"
-                variant="subtle"
                 icon="lucide-radio"
                 :size="isSinglePane ? 'md' : 'sm'"
                 label="Live tail"
@@ -381,7 +374,6 @@ onUnmounted(() => stopLive())
               />
               <Button
                 v-else
-                variant="subtle"
                 theme="red"
                 icon="lucide-radio"
                 :size="isSinglePane ? 'md' : 'sm'"
@@ -391,7 +383,6 @@ onUnmounted(() => stopLive())
               />
               <a :href="logsApi.downloadUrl(selectedFile)" class="contents">
                 <Button
-                  variant="subtle"
                   icon="lucide-download"
                   :size="isSinglePane ? 'md' : 'sm'"
                   label="Download"

@@ -39,7 +39,7 @@ const preview = (table) => {
 
 <template>
   <Dialog v-model="show" title="Tables" size="3xl">
-    <FormControl v-model="search" type="text" placeholder="Search tables" autocomplete="off">
+    <FormControl v-model="search" placeholder="Search tables" autocomplete="off">
       <template #prefix>
         <span class="size-4 text-ink-gray-5 lucide-search" />
       </template>
@@ -79,7 +79,7 @@ const preview = (table) => {
               >
             </h3>
 
-            <Button variant="outline" size="sm" @click="preview(selected)">
+            <Button variant="outline" @click="preview(selected)">
               <template #prefix>
                 <span class="size-3.5 lucide-eye" />
               </template>

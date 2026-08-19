@@ -213,7 +213,7 @@ const goBack = () => {
     </p>
 
     <div class="flex justify-end gap-2 mt-4">
-      <Button variant="subtle" @click="showDiscard = false">Keep editing</Button>
+      <Button @click="showDiscard = false">Keep editing</Button>
       <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>
     </div>
   </Dialog>

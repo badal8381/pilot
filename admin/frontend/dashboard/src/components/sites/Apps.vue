@@ -118,7 +118,6 @@ onMounted(() => {
             <template #default="{ open }">
               <Button
                 variant="ghost"
-                size="sm"
                 :active="open"
                 icon="lucide-ellipsis"
                 label="App actions"

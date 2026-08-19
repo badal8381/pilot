@@ -145,7 +145,6 @@ const refresh = async () => {
 
       <div class="flex items-center gap-2 shrink-0">
         <Button
-          size="sm"
           variant="ghost"
           :loading="refreshing"
           icon="lucide-refresh-cw"
@@ -153,7 +152,7 @@ const refresh = async () => {
           tooltip="Refresh"
           @click="refresh"
         />
-        <Button size="sm" @click="openDialog()">
+        <Button @click="openDialog()">
           <template #prefix><span class="size-4 lucide-plus" /></template>
           Add config
         </Button>
@@ -181,7 +180,6 @@ const refresh = async () => {
             <template #default="{ open }">
               <Button
                 variant="ghost"
-                size="sm"
                 :active="open"
                 icon="lucide-ellipsis"
                 label="Config actions"

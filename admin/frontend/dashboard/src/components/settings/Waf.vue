@@ -243,7 +243,7 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-1.5">
-            <FormControl type="text" label="Max inspected body size" v-model="bodyLimit" />
+            <FormControl label="Max inspected body size" v-model="bodyLimit" />
             <p class="text-ink-gray-5 text-p-sm">Number with a k, m or g suffix, e.g. 50m.</p>
           </div>
         </div>

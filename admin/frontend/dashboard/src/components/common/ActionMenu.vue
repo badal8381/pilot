@@ -46,7 +46,7 @@ onBeforeUnmount(close)
 
 <template>
   <div ref="root" class="inline-flex relative">
-    <Button variant="ghost" size="sm" :active="open" @click="toggle">
+    <Button variant="ghost" :active="open" @click="toggle">
       <template #icon>
         <span class="size-4 lucide-ellipsis-vertical" />
       </template>

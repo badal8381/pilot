@@ -205,7 +205,6 @@ onMounted(load)
 
       <Button
         v-if="!atDeviceLimit"
-        variant="subtle"
         icon-left="lucide-plus"
         @click="openAdd"
         >Add device</Button
@@ -255,7 +254,6 @@ onMounted(load)
         <div v-else-if="column.key === 'actions'" class="flex justify-end">
           <Button
             variant="ghost"
-            size="sm"
             theme="red"
             icon="lucide-trash-2"
             label="Remove device"
@@ -276,7 +274,7 @@ onMounted(load)
           label="Recovery codes"
           :description="`${status.recovery_codes_remaining} unused. Use one when no device is available.`"
         >
-          <Button size="sm" variant="subtle" @click="showRegenerate = true">Regenerate</Button>
+          <Button @click="showRegenerate = true">Regenerate</Button>
         </SettingsRow>
       </div>
     </div>
@@ -358,7 +356,7 @@ onMounted(load)
     </div>
 
     <div class="flex justify-end gap-2 mt-4">
-      <Button variant="subtle" @click="copy(codes.join('\n'))">Copy all</Button>
+      <Button @click="copy(codes.join('\n'))">Copy all</Button>
       <Button variant="solid" icon-left="lucide-download" @click="downloadCodes">
         Download
       </Button>

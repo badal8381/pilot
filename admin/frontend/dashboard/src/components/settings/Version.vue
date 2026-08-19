@@ -118,7 +118,7 @@ const pollTask = async (taskId) => {
 
 <template>
   <SettingsRow label="Pilot Version" :description="loading ? '' : versionLabel">
-    <Button size="sm" variant="subtle" :loading="checking" @click="check">Update</Button>
+    <Button :loading="checking" @click="check">Update</Button>
   </SettingsRow>
 
   <ErrorMessage v-if="versionError" :message="versionError" />

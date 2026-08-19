@@ -225,14 +225,12 @@ onUnmounted(() => clearTimeout(timer))
 
     <template v-else-if="op">
       <Teleport defer to="#header-badge">
-        <Badge v-if="pending" theme="amber" variant="subtle" size="md" :label="pendingLabel" />
+        <Badge v-if="pending" theme="amber" :label="pendingLabel" />
         <UpdateStateBadge v-else :state="op.state" />
       </Teleport>
 
       <Teleport defer to="#header-actions">
         <Button
-          variant="subtle"
-          size="sm"
           icon="lucide-refresh-cw"
           label="Refresh"
           tooltip="Refresh"
@@ -303,7 +301,6 @@ onUnmounted(() => clearTimeout(timer))
           <div v-else class="mt-4 flex flex-wrap gap-2">
             <Button
               v-if="op.state === 'needs_attention' && op.diagnosis?.patch && !patchAlreadySkipped"
-              variant="subtle"
               theme="red"
               :loading="acting"
               @click="confirmSkip = true"
@@ -313,7 +310,6 @@ onUnmounted(() => clearTimeout(timer))
 
             <Button
               v-if="op.state === 'needs_attention'"
-              variant="subtle"
               :loading="acting"
               @click="doRetry"
             >
@@ -322,7 +318,6 @@ onUnmounted(() => clearTimeout(timer))
 
             <Button
               v-if="op.can_restore"
-              variant="subtle"
               :loading="acting"
               @click="confirmRestore = true"
             >

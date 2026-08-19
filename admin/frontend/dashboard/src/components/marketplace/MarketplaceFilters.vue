@@ -49,7 +49,6 @@ const worksWithLabel = computed(() => {
       <FormControl
         v-model="searchModel"
         class="flex-1"
-        type="text"
         placeholder="Search for any app"
         :size="isMobile ? 'md' : 'sm'"
       >
@@ -76,7 +75,6 @@ const worksWithLabel = computed(() => {
         </div>
 
         <Button
-          variant="subtle"
           class="text-base"
           :size="isMobile ? 'md' : 'sm'"
           @click="$emit('add-from-github')"

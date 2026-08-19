@@ -107,7 +107,6 @@ const login = async () => {
           v-else
           v-model="otp"
           label="Authentication code"
-          type="text"
           placeholder="123456"
           autofocus
           @keydown.enter="login"

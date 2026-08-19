@@ -81,7 +81,7 @@ const confirmAdd = async () => {
 </script>
 
 <template>
-  <Dialog v-model="show" title="Use your own domain" size="lg">
+  <Dialog v-model="show" title="Use your own domain">
     <template v-if="step === 'input'">
       <p class="text-ink-gray-7 text-sm">
         To add a custom domain, you must already own it. If you don't have one, buy it and come
@@ -101,7 +101,7 @@ const confirmAdd = async () => {
 
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
       <div class="flex justify-end gap-2 mt-4">
-        <Button variant="subtle" @click="show = false">Cancel</Button>
+        <Button @click="show = false">Cancel</Button>
         <Button
           variant="solid"
           :loading="continuing"
@@ -152,7 +152,7 @@ const confirmAdd = async () => {
 
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
       <div class="flex justify-end gap-2 mt-4">
-        <Button variant="subtle" @click="show = false">Cancel</Button>
+        <Button @click="show = false">Cancel</Button>
         <Button variant="solid" :loading="adding" @click="confirmAdd">
           {{ dnsRecordGroups.length ? 'Verify DNS' : 'Register' }}
         </Button>

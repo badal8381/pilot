@@ -171,7 +171,6 @@ onMounted(() => {
     <StickyToolbar v-if="sites.length > 10" class="flex items-center gap-2">
       <FormControl
         v-model="search"
-        type="text"
         placeholder="Search"
         :size="isMobile ? 'md' : 'sm'"
         class="flex-1"
@@ -239,7 +238,6 @@ onMounted(() => {
                   <Badge
                     v-if="statusBadge(site)"
                     v-bind="statusBadge(site)"
-                    variant="subtle"
                     size="sm"
                     class="shrink-0"
                   />
@@ -287,7 +285,6 @@ onMounted(() => {
             <Badge
               v-if="statusBadge(row.site)"
               v-bind="statusBadge(row.site)"
-              variant="subtle"
               size="sm"
             />
           </div>
@@ -304,7 +301,6 @@ onMounted(() => {
               <template #default="{ open }">
                 <Button
                   variant="ghost"
-                  size="sm"
                   :active="open"
                   icon="lucide-ellipsis"
                   label="Site actions"
@@ -331,7 +327,7 @@ onMounted(() => {
   </div>
 
   <Teleport v-if="hasCount" defer to="#header-badge">
-    <Badge :label="filteredSites.length" theme="gray" variant="subtle" size="md" />
+    <Badge :label="filteredSites.length" />
   </Teleport>
 
   <Teleport defer to="#header-actions">

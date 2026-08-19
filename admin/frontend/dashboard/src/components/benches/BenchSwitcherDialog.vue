@@ -201,13 +201,13 @@ watch(show, (open) => {
   <Dialog v-model="show" title="Manage Benches" size="3xl" :showCloseButton="true">
     <div class="flex flex-col" @pointerdown.stop>
       <div class="flex justify-end items-center gap-1 mb-4">
-        <Button variant="ghost" size="sm" :loading="loading" @click="loadBenches" title="Refresh">
+        <Button variant="ghost" :loading="loading" @click="loadBenches" title="Refresh">
           <template #icon>
             <LucideRefreshCw class="w-4 h-4" />
           </template>
         </Button>
 
-        <Button variant="subtle" size="sm" @click="newBench">
+        <Button @click="newBench">
           <template #prefix>
             <LucidePlus class="w-4 h-4" />
           </template>

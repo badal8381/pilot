@@ -203,10 +203,10 @@ onMounted(() => {
       </div>
 
       <div class="flex items-center gap-2 shrink-0">
-        <Button variant="subtle" size="sm" @click="configRef.open()"
+        <Button @click="configRef.open()"
           >{{ enabled ? 'Configure' : 'Enable' }}</Button
         >
-        <Button size="sm" :loading="backingUp" @click="backupNow">
+        <Button :loading="backingUp" @click="backupNow">
           <template #prefix><span class="size-4 lucide-archive" /></template>
           Back up now
         </Button>
@@ -233,7 +233,7 @@ onMounted(() => {
             : 'Enable automatic backups to start protecting your site.'
         "
       >
-        <Button size="sm" :loading="backingUp" @click="backupNow">
+        <Button :loading="backingUp" @click="backupNow">
           <template #prefix><span class="size-4 lucide-archive" /></template>
           Back up now
         </Button>
@@ -252,7 +252,6 @@ onMounted(() => {
               <template #default="{ open }">
                 <Button
                   variant="ghost"
-                  size="sm"
                   :active="open"
                   icon="lucide-ellipsis"
                   label="Backup actions"

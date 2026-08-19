@@ -111,7 +111,7 @@ onMounted(load)
 
   <div v-else class="space-y-6">
     <div class="flex justify-end">
-      <Button variant="subtle" icon-left="lucide-plus" @click="openAdd">Add</Button>
+      <Button icon-left="lucide-plus" @click="openAdd">Add</Button>
     </div>
 
     <div
@@ -139,7 +139,6 @@ onMounted(load)
         <div v-if="column.key === 'actions'" class="flex justify-end">
           <Button
             variant="ghost"
-            size="sm"
             theme="red"
             icon="lucide-trash-2"
             label="Remove SSH key"

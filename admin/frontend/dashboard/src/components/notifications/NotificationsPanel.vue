@@ -105,7 +105,6 @@ onUnmounted(() => clearInterval(badgeTimer))
   <Popover
     v-model:open="isOpen"
     bare
-    align="start"
     :side="mobile ? 'top' : 'right'"
     :offset="mobile ? 0 : 9"
     :collision-padding="0"

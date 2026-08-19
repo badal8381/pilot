@@ -48,7 +48,6 @@ onMounted(load)
       <Button
         class="ml-auto"
         variant="ghost"
-        size="sm"
         icon="lucide-refresh-cw"
         label="Refresh"
         tooltip="Refresh"

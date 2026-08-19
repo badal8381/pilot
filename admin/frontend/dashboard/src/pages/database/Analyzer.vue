@@ -461,7 +461,7 @@ onMounted(load)
         @refresh="loadSize"
       >
         <template v-if="selectedSite" #actions>
-          <Button variant="subtle" size="sm" @click="showTableSizes = true">View Details</Button>
+          <Button @click="showTableSizes = true">View Details</Button>
         </template>
 
         <ErrorMessage v-if="sizeError" :message="sizeError" class="m-4" />
@@ -493,7 +493,6 @@ onMounted(load)
               <Button
                 variant="ghost"
                 theme="red"
-                size="sm"
                 iconLeft="lucide-x"
                 @click="confirmKill(row.process)"
               >
@@ -568,7 +567,6 @@ onMounted(load)
                   <Button
                     variant="ghost"
                     theme="red"
-                    size="sm"
                     icon="lucide-trash-2"
                     label="Delete binary logs"
                     @click="confirmPurge(row.index)"

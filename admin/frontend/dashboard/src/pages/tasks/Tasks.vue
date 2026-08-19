@@ -138,7 +138,6 @@ onMounted(() => load(statusFilter.value))
         <Dropdown :options="typeMenu">
           <template #default="{ open }">
             <Button
-              variant="subtle"
               :size="isMobile ? 'md' : 'sm'"
               :active="open"
               class="[&>.truncate]:text-left text-base"
@@ -153,7 +152,6 @@ onMounted(() => load(statusFilter.value))
           <Dropdown :options="siteMenu">
             <template #default="{ open }">
               <Button
-                variant="subtle"
                 :size="isMobile ? 'md' : 'sm'"
                 :active="open"
                 class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto min-w-0"
@@ -167,7 +165,6 @@ onMounted(() => load(statusFilter.value))
 
         <Button
           class="ml-auto sm:ml-auto"
-          variant="subtle"
           :size="isMobile ? 'md' : 'sm'"
           icon="lucide-refresh-cw"
           label="Refresh"

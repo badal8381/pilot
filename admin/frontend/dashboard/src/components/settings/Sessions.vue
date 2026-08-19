@@ -250,7 +250,6 @@ onMounted(load)
         <div v-if="column.key === 'actions'" class="flex justify-end">
           <Button
             variant="ghost"
-            size="sm"
             icon="lucide-info"
             label="Activity details"
             tooltip="Details"
@@ -293,7 +292,6 @@ onMounted(load)
               <template #default="{ open }">
                 <Button
                   variant="ghost"
-                  size="sm"
                   :active="open"
                   icon="lucide-ellipsis"
                   label="Session actions"

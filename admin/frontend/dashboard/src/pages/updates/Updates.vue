@@ -121,8 +121,6 @@ onMounted(load)
          once there is room to spare. -->
     <Teleport v-if="isMobile" defer to="#header-actions">
       <Button
-        variant="subtle"
-        size="sm"
         :loading="loading"
         icon="lucide-refresh-cw"
         label="Refresh"
@@ -143,8 +141,6 @@ onMounted(load)
       <Button
         v-if="!isMobile"
         class="ml-auto"
-        variant="subtle"
-        size="sm"
         :loading="loading"
         icon="lucide-refresh-cw"
         label="Refresh"

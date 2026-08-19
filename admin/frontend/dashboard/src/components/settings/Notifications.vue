@@ -189,7 +189,7 @@ onMounted(async () => {
     <div class="space-y-2">
       <div class="flex justify-between items-center">
         <p class="font-medium text-ink-gray-8 text-base leading-normal">Webhook endpoints</p>
-        <Button variant="subtle" icon-left="lucide-plus" @click="addWebhook">Add endpoint</Button>
+        <Button icon-left="lucide-plus" @click="addWebhook">Add endpoint</Button>
       </div>
 
       <p class="text-ink-gray-5 text-p-sm">
@@ -228,7 +228,6 @@ onMounted(async () => {
             </div>
 
             <Button
-              variant="subtle"
               icon="lucide-x"
               label="Remove endpoint"
               tooltip="Remove endpoint"

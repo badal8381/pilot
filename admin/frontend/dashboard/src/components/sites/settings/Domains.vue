@@ -140,7 +140,6 @@ watch(nginxEnabled, (enabled) => {
             <template #default="{ open }">
               <Button
                 variant="ghost"
-                size="sm"
                 :active="open"
                 icon="lucide-ellipsis"
                 label="Domain actions"
@@ -152,7 +151,7 @@ watch(nginxEnabled, (enabled) => {
       </div>
 
       <ErrorMessage v-if="error" :message="error" class="mt-2" />
-      <Button variant="subtle" size="sm" class="mt-4" @click="showAdd = true">
+      <Button class="mt-4" @click="showAdd = true">
         <template #prefix><span class="size-4 lucide-plus" /></template>
         Use your own domain
       </Button>

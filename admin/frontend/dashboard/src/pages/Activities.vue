@@ -251,7 +251,7 @@ onMounted(() => {
         <template #actions="{ row }">
           <div class="flex justify-end">
             <Dropdown :options="activityActions(row.entry)">
-              <Button variant="ghost" size="sm" icon="lucide-more-horizontal" />
+              <Button variant="ghost" icon="lucide-more-horizontal" />
             </Dropdown>
           </div>
         </template>

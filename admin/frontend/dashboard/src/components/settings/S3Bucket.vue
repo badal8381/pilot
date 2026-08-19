@@ -142,7 +142,6 @@ onMounted(load)
 
       <Button
         class="flex-1 sm:flex-none"
-        variant="subtle"
         theme="red"
         :loading="disconnecting"
         @click="disconnect"
@@ -151,7 +150,7 @@ onMounted(load)
     </div>
 
     <div class="space-y-4">
-      <FormControl label="Bucket" type="text" v-model="bucket" placeholder="storage-bucket" />
+      <FormControl label="Bucket" v-model="bucket" placeholder="storage-bucket" />
       <div class="flex sm:flex-row flex-col gap-4">
         <Select label="Provider" v-model="provider" :options="providerOptions" class="w-full" />
         <Select label="Region" v-model="region" :options="regionOptions" class="w-full" />
@@ -160,7 +159,6 @@ onMounted(load)
       <div class="flex sm:flex-row flex-col gap-4">
         <FormControl
           label="Access Key"
-          type="text"
           v-model="accessKey"
           placeholder="AKIA…"
           class="w-full"

@@ -119,7 +119,7 @@ const isDatabaseListExpandable = computed(
                 {{ row.site || row.schema }}
               </span>
 
-              <Badge v-if="row.system" label="system" theme="gray" size="sm" />
+              <Badge v-if="row.system" label="system" size="sm" />
               <lucide-chevron-right v-if="row.site" class="size-3.5 text-ink-gray-5" />
             </div>
 

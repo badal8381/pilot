@@ -269,7 +269,6 @@ onMounted(load)
         :description="bufferPoolDescription"
       >
         <Button
-          size="sm"
           variant="ghost"
           icon="lucide-pencil"
           :disabled="!action('innodb_buffer_pool_size').available || Boolean(activeAction)"
@@ -283,7 +282,6 @@ onMounted(load)
         :description="maxConnectionsDescription"
       >
         <Button
-          size="sm"
           variant="ghost"
           icon="lucide-pencil"
           :disabled="!action('max_connections').available || Boolean(activeAction)"
@@ -297,8 +295,6 @@ onMounted(load)
         description="Inspect binary logs and safely purge complete log ranges."
       >
         <Button
-          size="sm"
-          variant="subtle"
           :disabled="!action('manage_binlogs').available"
           @click="openBinlogs"
         >
@@ -312,8 +308,6 @@ onMounted(load)
         description="Restart the database service and verify that it accepts connections."
       >
         <Button
-          size="sm"
-          variant="subtle"
           :disabled="!action('restart').available || Boolean(activeAction)"
           :loading="activeAction === 'restart'"
           @click="confirmRestart"

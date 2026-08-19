@@ -87,7 +87,7 @@ onMounted(load)
   <PageHero v-else icon="lucide-store">
     <template #title>
       <h1 class="font-medium text-ink-gray-9 text-lg truncate">Frappe Marketplace</h1>
-      <Badge v-if="benchVersionLabel" :label="benchVersionLabel" size="md" class="shrink-0">
+      <Badge v-if="benchVersionLabel" :label="benchVersionLabel" class="shrink-0">
         <template #prefix><span class="size-2.5 lucide-box" /></template>
       </Badge>
     </template>

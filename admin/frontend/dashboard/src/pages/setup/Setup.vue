@@ -193,7 +193,6 @@ const {
       <div v-show="isConfiguring || (isInstalling && errorMessage)" class="flex gap-2 px-5 py-4">
         <Button
           v-show="isInstalling && errorMessage"
-          variant="subtle"
           class="w-full"
           @click="backToConfiguration"
         >

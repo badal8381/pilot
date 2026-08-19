@@ -88,7 +88,7 @@ const runUpdate = async () => {
               {{ selected.size }} of {{ appNames.length }} selected
             </span>
 
-            <Button variant="ghost" size="sm" @click="toggleAll">
+            <Button variant="ghost" @click="toggleAll">
               {{ selected.size === appNames.length ? 'Unselect all' : 'Select all' }}
             </Button>
           </div>

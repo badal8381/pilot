@@ -183,7 +183,6 @@ onMounted(load)
 
       <FormControl
         v-model="search"
-        type="text"
         placeholder="Search variables"
         autocomplete="off"
         class="mb-5"
@@ -217,7 +216,6 @@ onMounted(load)
 
                 <Button
                   v-if="variable.editable"
-                  size="sm"
                   variant="ghost"
                   icon="lucide-pencil"
                   :disabled="saving"

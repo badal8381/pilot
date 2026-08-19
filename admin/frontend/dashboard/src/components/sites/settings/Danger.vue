@@ -133,7 +133,7 @@ const confirmDrop = async () => {
           </p>
         </div>
 
-        <Button size="sm" theme="red" class="ml-4 shrink-0" @click="d.action"
+        <Button theme="red" class="ml-4 shrink-0" @click="d.action"
           >{{ d.buttonLabel || d.label }}</Button
         >
       </div>

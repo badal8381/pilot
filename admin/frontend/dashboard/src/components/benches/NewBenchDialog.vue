@@ -236,7 +236,6 @@ const createBench = async () => {
   <Dialog
     v-model="show"
     :title="provisioning ? 'Setting Up Bench' : 'New Bench'"
-    size="lg"
     :showCloseButton="true"
   >
     <div class="flex flex-col gap-5">
@@ -254,7 +253,7 @@ const createBench = async () => {
           Elapsed {{ elapsedLabel }}
         </span>
 
-        <Button variant="subtle" @click="openWizardInNewTab">Open setup now</Button>
+        <Button @click="openWizardInNewTab">Open setup now</Button>
       </div>
 
       <div
@@ -282,7 +281,6 @@ const createBench = async () => {
       <template v-else-if="isProduction === true">
         <FormControl
           label="Bench name"
-          type="text"
           v-model="name"
           placeholder="my-bench"
           @input="error = ''"
@@ -311,7 +309,6 @@ const createBench = async () => {
           <template v-if="wildcardDomains.length === 0">
             <FormControl
               label="Admin domain"
-              type="text"
               v-model="adminDomain"
               placeholder="my-admin.example.com"
               @input="error = ''"
@@ -328,7 +325,6 @@ const createBench = async () => {
             <div class="flex items-stretch gap-2">
               <FormControl
                 class="flex-1 min-w-0"
-                type="text"
                 v-model="adminPrefix"
                 placeholder="my-admin"
                 @input="error = ''"

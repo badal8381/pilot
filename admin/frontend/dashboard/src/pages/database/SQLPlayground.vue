@@ -286,7 +286,6 @@ onMounted(async () => {
           <div class="hidden sm:block">
             <Button
               variant="outline"
-              size="sm"
               iconLeft="lucide-table"
               :disabled="!schema.length"
               @click="showSchema = true"
@@ -302,7 +301,6 @@ onMounted(async () => {
         <div class="flex items-center gap-3 ml-auto">
           <Button
             variant="solid"
-            size="sm"
             iconLeft="lucide-play"
             :loading="running"
             :disabled="!selectedSite || !query.trim()"
@@ -424,7 +422,7 @@ onMounted(async () => {
 
   <SQLSchemaDialog v-model="showSchema" :schema="schema" @preview="previewTable" />
 
-  <Dialog v-model="showConfirm" title="Run in Read/Write mode" size="lg">
+  <Dialog v-model="showConfirm" title="Run in Read/Write mode">
     <p class="text-ink-gray-7 text-sm">
       This query will run in <strong>Read/Write</strong> mode and any changes will be committed to
       the database. Are you sure you want to continue?

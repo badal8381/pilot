@@ -152,7 +152,7 @@ const confirmRemove = () => {
         </p>
       </div>
 
-      <Button class="shrink-0" variant="subtle" icon-left="lucide-plus" @click="addRule">
+      <Button class="shrink-0" icon-left="lucide-plus" @click="addRule">
         Add rule
       </Button>
     </div>
@@ -227,7 +227,6 @@ const confirmRemove = () => {
           <!-- A bare Switch has no accessible name (attrs land on the wrapper);
                `label` gives the <label for> association, sr-only hides it. -->
           <Switch
-            size="sm"
             class="shrink-0 [&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
             label="Rule enabled"
             :model-value="rule.enabled"
@@ -240,7 +239,6 @@ const confirmRemove = () => {
              pl clears the drag handle so the fields line up under the rule name. -->
         <div v-if="isOpen(rule)" class="space-y-4 pt-1 pr-2.5 pb-5 pl-[2.375rem]">
         <FormControl
-          type="text"
           label="Rule name"
           v-model="rule.name"
           placeholder="Block /admin from outside the office"

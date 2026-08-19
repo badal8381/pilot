@@ -33,7 +33,6 @@ defineProps({
         v-show="row.badge"
         :label="row.badge?.label"
         :theme="row.badge?.theme"
-        variant="subtle"
       />
       <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
     </template>

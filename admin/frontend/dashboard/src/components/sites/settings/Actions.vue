@@ -98,8 +98,6 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
         </div>
 
         <Button
-          size="sm"
-          variant="subtle"
           class="ml-4 shrink-0"
           :loading="row.loading()"
           @click="row.onClick"

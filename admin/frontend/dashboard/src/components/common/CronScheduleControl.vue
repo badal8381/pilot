@@ -207,12 +207,12 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
       </div>
 
       <div class="flex items-center gap-2 shrink-0">
-        <Button v-if="disabled" size="sm" :loading="loading" @click="enable"
+        <Button v-if="disabled" :loading="loading" @click="enable"
           >Enable {{ noun }}</Button
         >
         <Dropdown v-else :options="scheduleOptions">
           <template #default="{ open }">
-            <Button variant="subtle" size="sm" :loading="loading" :active="open">
+            <Button :loading="loading" :active="open">
               <template #suffix><span class="size-4 lucide-chevron-down" /></template>
               {{ currentScheduleLabel }}
             </Button>

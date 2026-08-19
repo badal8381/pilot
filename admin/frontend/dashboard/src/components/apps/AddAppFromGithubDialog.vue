@@ -209,7 +209,6 @@ const submit = async () => {
           <div class="flex items-end gap-2">
             <FormControl
               label="Repository URL"
-              type="text"
               v-model="repo"
               class="flex-1"
               placeholder="https://github.com/frappe/crm"
@@ -288,7 +287,7 @@ const submit = async () => {
       </div>
 
       <div class="flex justify-end gap-2">
-        <Button variant="subtle" @click="open = false">Cancel</Button>
+        <Button @click="open = false">Cancel</Button>
         <Button v-if="needsGithubConnection" variant="solid" @click="goToGithubSettings"
           >Connect GitHub</Button
         >

@@ -83,8 +83,6 @@ onBeforeUnmount(close)
 
       <div v-if="text || error" class="flex justify-end">
         <Button
-          variant="subtle"
-          size="sm"
           icon-left="lucide-refresh-cw"
           :loading="streaming"
           @click="start({ refresh: true })"

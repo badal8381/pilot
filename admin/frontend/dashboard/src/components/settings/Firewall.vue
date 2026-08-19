@@ -158,7 +158,7 @@ onMounted(async () => {
     <div class="space-y-2">
       <div class="flex justify-between items-center">
         <p class="font-medium text-ink-gray-8 text-base leading-normal">Rules</p>
-        <Button variant="subtle" icon-left="lucide-plus" @click="addRule">Add rule</Button>
+        <Button icon-left="lucide-plus" @click="addRule">Add rule</Button>
       </div>
 
       <EmptyState
@@ -192,7 +192,6 @@ onMounted(async () => {
             </div>
 
             <Button
-              variant="subtle"
               icon="lucide-x"
               label="Remove rule"
               tooltip="Remove rule"

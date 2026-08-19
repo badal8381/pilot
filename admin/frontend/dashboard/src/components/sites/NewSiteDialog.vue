@@ -150,7 +150,6 @@ const submit = async () => {
           v-if="!wildcardDomains.length"
           v-model="newSiteName"
           label="Site name"
-          type="text"
           placeholder="mysite.localhost"
           @keyup.enter="submit"
         />
@@ -163,7 +162,6 @@ const submit = async () => {
               v-model="sitePrefix"
               class="flex-1 min-w-0"
               :class="hasSingleDomain ? '[&_[data-slot=control]]:pe-28' : ''"
-              type="text"
               placeholder="mysite"
               @keyup.enter="submit"
             >
@@ -236,7 +234,7 @@ const submit = async () => {
       <ErrorMessage v-if="error" class="mt-1" :message="error" />
 
       <div class="flex justify-end gap-2">
-        <Button variant="subtle" @click="open = false">Cancel</Button>
+        <Button @click="open = false">Cancel</Button>
         <Button variant="solid" :loading="creating" @click="submit" :disabled="!newSiteName"
           >Create Site</Button
         >

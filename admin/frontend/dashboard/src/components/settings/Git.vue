@@ -110,19 +110,18 @@ onMounted(load)
       <div class="flex items-center gap-2">
         <Button
           class="flex-1 sm:flex-none"
-          variant="subtle"
           :loading="verifying"
           @click="verifyConnection"
           >Verify</Button
         >
-        <Button class="flex-1 sm:flex-none" variant="subtle" theme="red" @click="disconnect"
+        <Button class="flex-1 sm:flex-none" theme="red" @click="disconnect"
           >Disconnect</Button
         >
       </div>
     </div>
 
     <div class="space-y-4">
-      <FormControl label="GitHub Username" type="text" v-model="username" placeholder="octocat" />
+      <FormControl label="GitHub Username" v-model="username" placeholder="octocat" />
       <FormControl
         label="Personal Access Token"
         type="password"
