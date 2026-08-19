@@ -1,12 +1,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { LoadingText, ErrorMessage, AxisChart, Skeleton } from 'frappe-ui'
+import { LoadingText, ErrorMessage, AxisChart, Select, Skeleton } from 'frappe-ui'
 
 import ChartCard from '@/components/common/ChartCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
-import ToolbarSelect from '@/components/common/ToolbarSelect.vue'
 import WafAnalytics from '@/components/common/WafAnalytics.vue'
 import DatabaseInsights from '@/components/dashboard/DatabaseInsights.vue'
 import SiteInsights from '@/components/dashboard/SiteInsights.vue'
@@ -15,6 +14,7 @@ import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 import { livePollDelayMs } from '@/utils/livePolling'
 import { useSites } from '@/composables/sites/useSites'
+import { useIsMobile } from '@/composables/common/useIsMobile'
 
 const WINDOWS = [
   { key: 'live', label: 'Live' },
@@ -89,48 +89,39 @@ const WINDOW_KEYS = WINDOWS.map((w) => w.key)
 
 const view = ref(VIEW_KEYS.includes(route.query.view) ? route.query.view : 'system')
 const initialWindow = WINDOW_KEYS.includes(route.query.window) ? route.query.window : 'live'
-const activeWindow = ref(
-  view.value !== 'system' && initialWindow === 'live' ? '1h' : initialWindow,
-)
+const activeWindow = ref(view.value !== 'system' && initialWindow === 'live' ? '1h' : initialWindow)
 const isHistorical = computed(() => activeWindow.value !== 'live')
 
-const viewLabel = computed(() => VIEWS.find((v) => v.key === view.value)?.label ?? '')
 const isServerScope = computed(() => view.value !== 'site')
 
-const targetLabel = computed(() =>
-  view.value === 'site' ? activeSite.value || 'Select site' : 'Server',
-)
+// Target, not metric: returning to the server keeps the metric on show. A
+// site has none of its own, so it has to land on System.
 const targetOptions = computed(() => [
-  // Target, not metric: returning to the server keeps the metric on show. A
-  // site has none of its own, so it has to land on System.
-  {
-    label: 'Server',
-    icon: 'lucide-server',
-    onClick: () => setView(isServerScope.value ? view.value : 'system'),
-  },
-  ...sites.value.map((site) => ({
-    label: site.name,
-    icon: 'lucide-globe',
-    onClick: () => selectSite(site.name),
-  })),
+  { label: 'Server', value: 'server', icon: 'lucide-server' },
+  ...sites.value.map((site) => ({ label: site.name, value: site.name, icon: 'lucide-globe' })),
 ])
+const target = computed({
+  get: () => (view.value === 'site' ? activeSite.value : 'server'),
+  set: (value) =>
+    value === 'server' ? setView(isServerScope.value ? view.value : 'system') : selectSite(value),
+})
 
 // Server-level metrics only; a site has one chart set and needs no picker.
-const metricOptions = computed(() =>
-  VIEWS.filter((v) => v.key !== 'site').map((v) => ({
-    label: v.label,
-    onClick: () => setView(v.key),
-  })),
-)
+const metricOptions = VIEWS.filter((v) => v.key !== 'site').map((v) => ({
+  label: v.label,
+  value: v.key,
+}))
+const metric = computed({ get: () => view.value, set: (value) => setView(value) })
 
 // Only the system view has a live mode, so hide it elsewhere.
 const windowLabel = computed(() => WINDOWS.find((w) => w.key === activeWindow.value)?.label ?? '')
 const windowOptions = computed(() =>
   WINDOWS.filter((w) => view.value === 'system' || w.key !== 'live').map((w) => ({
     label: w.label,
-    onClick: () => chooseWindow(w.key),
+    value: w.key,
   })),
 )
+const windowModel = computed({ get: () => activeWindow.value, set: (value) => chooseWindow(value) })
 // Database and site charts never receive 'live'.
 const historyWindow = computed(() => (activeWindow.value === 'live' ? '1h' : activeWindow.value))
 
@@ -163,6 +154,7 @@ const selectWindow = (key) => {
 
 // Site view
 const { sites, loading: sitesLoading, load: loadSites } = useSites()
+const isMobile = useIsMobile()
 const activeSite = ref(typeof route.query.site === 'string' ? route.query.site : '')
 
 // Persist view + window + site so a reload restores the same chart.
@@ -622,36 +614,44 @@ onUnmounted(() => clearTimeout(statsTimer))
 <template>
   <div class="mx-auto">
     <StickyToolbar class="flex items-center gap-2">
-      <div class="flex-1 sm:flex-none min-w-0">
-        <ToolbarSelect
-          :options="targetOptions"
-          class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto sm:max-w-[250px] overflow-hidden"
-        >
-          <template #prefix>
-            <span class="size-4" :class="isServerScope ? 'lucide-server' : 'lucide-globe'" />
-          </template>
+      <Select
+        v-model="target"
+        :options="targetOptions"
+        :size="isMobile ? 'md' : 'sm'"
+        variant="outline"
+        side="bottom"
+        align="start"
+        placeholder="Select site"
+        class="flex-1 sm:flex-none min-w-0 sm:max-w-[250px]"
+      />
 
-          <span class="truncate">{{ targetLabel }}</span>
-        </ToolbarSelect>
-      </div>
+      <Select
+        v-if="isServerScope"
+        v-model="metric"
+        :options="metricOptions"
+        :size="isMobile ? 'md' : 'sm'"
+        variant="outline"
+        side="bottom"
+        align="start"
+        class="shrink-0"
+      />
 
-      <div v-if="isServerScope" class="shrink-0">
-        <ToolbarSelect :options="metricOptions" class="[&>.truncate]:text-left text-base">
-          {{ viewLabel }}
-        </ToolbarSelect>
-      </div>
-
-      <div class="shrink-0">
-        <ToolbarSelect :options="windowOptions" class="[&>.truncate]:text-left text-base">
-          <template #prefix>
-            <span
-              v-if="!isHistorical"
-              class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
-            />
-          </template>
-          {{ windowLabel }}
-        </ToolbarSelect>
-      </div>
+      <Select
+        v-model="windowModel"
+        :options="windowOptions"
+        :size="isMobile ? 'md' : 'sm'"
+        variant="outline"
+        side="bottom"
+        align="start"
+        class="shrink-0"
+      >
+        <template #prefix>
+          <span
+            v-if="!isHistorical"
+            class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
+          />
+        </template>
+      </Select>
     </StickyToolbar>
 
     <DatabaseInsights v-if="view === 'database'" :window="historyWindow" />
