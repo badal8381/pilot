@@ -1,3 +1,17 @@
+<script setup lang="ts">
+import { Badge } from 'frappe-ui'
+
+defineProps({
+  icon: { type: String, required: true },
+  title: { type: String, required: true },
+  // A string too: an unresolved multi-site update counts as "2/5".
+  count: { type: [Number, String], required: true },
+  open: { type: Boolean, default: true },
+})
+
+defineEmits(['update:open'])
+</script>
+
 <template>
   <details
     :open="open"
@@ -12,6 +26,7 @@
         <h2 class="text-base font-medium text-ink-gray-8">{{ title }}</h2>
         <Badge :label="count" theme="gray" variant="subtle" size="sm" />
       </div>
+
       <span
         class="size-4 text-ink-gray-5 transition-transform group-open/section:rotate-180 lucide-chevron-down"
       />
@@ -20,17 +35,3 @@
     <div><slot /></div>
   </details>
 </template>
-
-<script setup>
-import { Badge } from 'frappe-ui'
-
-defineProps({
-  icon: { type: String, required: true },
-  title: { type: String, required: true },
-  // A string too: an unresolved multi-site update counts as "2/5".
-  count: { type: [Number, String], required: true },
-  open: { type: Boolean, default: true },
-})
-
-defineEmits(['update:open'])
-</script>

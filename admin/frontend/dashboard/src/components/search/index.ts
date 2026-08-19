@@ -1,8 +1,10 @@
 import { computed } from 'vue'
+import { useColorScheme } from 'frappe-ui'
+
 import { sidebarSections } from '@/components/navigation/list'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
-import { useColorScheme } from 'frappe-ui'
 import { useSession } from '@/composables/auth/useSession'
+
 import {
   DATABASE_SECTIONS,
   GENERAL_SECTIONS,

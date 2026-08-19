@@ -1,11 +1,13 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { Sidebar, SidebarHeader, SidebarLabel, SidebarItem, SidebarCollapseToggle } from 'frappe-ui'
-import { sidebarSections } from './list'
-import { useAppMenu } from './useAppMenu'
+
 import PilotLogo from '@/components/icons/Pilot.vue'
 import NotificationsPanel from '@/components/notifications/NotificationsPanel.vue'
+
+import { sidebarSections } from '@/components/navigation/list'
+import { useAppMenu } from '@/components/navigation/useAppMenu'
 import { openSearch } from '@/composables/common/useSearch'
 
 const props = defineProps({
@@ -15,8 +17,6 @@ const props = defineProps({
 const route = useRoute()
 const { menuItems, session } = useAppMenu()
 
-// Items can gate themselves behind a session flag (e.g. `developerMode`);
-// sections left with no visible items are dropped entirely.
 const visibleSections = computed(() =>
   sidebarSections
     .map((section) => ({
@@ -26,8 +26,6 @@ const visibleSections = computed(() =>
     .filter((section) => section.items.length),
 )
 
-// Prefix match, not just exact: a site's detail page (/sites/foo/general)
-// should still light up the "Sites" item, not just the bare list page.
 const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
 </script>
 
@@ -46,19 +44,23 @@ const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
     />
 
     <nav class="flex-1 overflow-y-auto px-2 pt-2">
-      <SidebarItem icon="lucide-search" suffix="⌘ K" class="mb-0.5 text-sm" @click="openSearch">
+      <SidebarItem
+        v-if="!isMobile"
+        icon="lucide-search"
+        suffix="⌘ K"
+        class="mb-0.5 text-sm"
+        @click="openSearch"
+      >
         Search
       </SidebarItem>
 
-      <NotificationsPanel />
+      <NotificationsPanel v-if="!isMobile" />
 
       <template v-for="section in visibleSections" :key="section.label || 'main'">
-        <!-- `divider`: collapsed, the section name has no room, so the label
-             becomes a rule and the groups stay separated instead of running
-             into one column of icons. -->
         <SidebarLabel v-if="section.label" divider class="mt-2">
           {{ section.label }}
         </SidebarLabel>
+
         <SidebarItem
           v-for="item in section.items"
           :key="item.to"
@@ -77,25 +79,3 @@ const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
     <SidebarCollapseToggle class="mt-auto mx-2 mb-2" />
   </Sidebar>
 </template>
-
-<style scoped>
-/* Holds the rail's icons still and on centre while it collapses; frappe-ui
-   1.0.0-beta.25 re-aligns them mid-animation instead. Drop once
-   frappe/frappe-ui#907 lands. */
-[data-slot='sidebar'] :deep([data-slot='sidebar-item'] > :where(a, button)) {
-  justify-content: flex-start;
-  padding-left: 0.5rem;
-}
-
-[data-slot='sidebar']
-  :deep([data-slot='sidebar-item'] > :where(a, button) > span:first-child) {
-  /* Undo the collapsed `size-7` box - the row is already the hit target. */
-  width: auto;
-  height: auto;
-}
-
-[data-slot='sidebar'] :deep(> div:first-child) {
-  justify-content: flex-start;
-  padding-left: 0.25rem;
-}
-</style>

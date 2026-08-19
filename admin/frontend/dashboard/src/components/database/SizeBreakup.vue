@@ -1,11 +1,6 @@
-<template>
-  <div class="p-4">
-    <UsageMeter :parts="parts" />
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
+
 import UsageMeter from '@/components/common/UsageMeter.vue'
 
 const props = defineProps({
@@ -35,3 +30,9 @@ const parts = computed(() => {
   ]
 })
 </script>
+
+<template>
+  <div class="p-4">
+    <UsageMeter :parts="parts" />
+  </div>
+</template>

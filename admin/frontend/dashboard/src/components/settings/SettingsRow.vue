@@ -1,3 +1,12 @@
+<script setup lang="ts">
+defineProps({
+  label: { type: String, required: true },
+  description: { type: String, default: '' },
+  as: { type: String, default: 'div', validator: (as) => ['div', 'button'].includes(as) },
+  interactive: { type: Boolean, default: false },
+})
+</script>
+
 <template>
   <!-- `as="button"` when the row itself is the control. A row whose slot already
        holds one stays a div and forwards the click: a control nested in a button
@@ -13,17 +22,9 @@
       <p class="font-medium text-ink-gray-8 text-base">{{ label }}</p>
       <p v-if="description" class="text-ink-gray-6 text-p-sm">{{ description }}</p>
     </div>
+
     <div class="ml-4 shrink-0">
       <slot />
     </div>
   </component>
 </template>
-
-<script setup>
-defineProps({
-  label: { type: String, required: true },
-  description: { type: String, default: '' },
-  as: { type: String, default: 'div', validator: (as) => ['div', 'button'].includes(as) },
-  interactive: { type: Boolean, default: false },
-})
-</script>

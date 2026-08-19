@@ -1,3 +1,13 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+
+const props = defineProps({ job: { type: Object, required: true } })
+
+// A retried step leaves several jobs behind, so only the one that broke the chain
+// earns colour. Killing a migrate mid-run stops the update just as a crash does.
+const failed = computed(() => ['failed', 'killed'].includes(props.job.status))
+</script>
+
 <template>
   <button
     type="button"
@@ -11,13 +21,3 @@
     {{ job.label }}
   </button>
 </template>
-
-<script setup>
-import { computed } from 'vue'
-
-const props = defineProps({ job: { type: Object, required: true } })
-
-// A retried step leaves several jobs behind, so only the one that broke the chain
-// earns colour. Killing a migrate mid-run stops the update just as a crash does.
-const failed = computed(() => ['failed', 'killed'].includes(props.job.status))
-</script>

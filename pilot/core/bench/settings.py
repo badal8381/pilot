@@ -23,6 +23,7 @@ _RESTART_KEYS = {
     ("redis", "queue_port"),
     ("workers", "groups"),
     ("production", "process_manager"),
+    ("lite_mode", "enabled"),
 }
 
 
@@ -44,14 +45,22 @@ class BenchSettings:
         old_waf: dict,
         old_s3_config: dict,
     ) -> tuple[bool, str | None]:
+        self.bench.enforce_lite_mode_rules()
         restarted = self._regenerate_and_restart_if_needed(old_restart)
         waf_warning = self._apply_nginx_if_needed(old_firewall, old_waf)
         self._sync_s3_if_needed(old_s3_config)
         return restarted, waf_warning
 
     def _regenerate_and_restart_if_needed(self, old_restart: dict) -> bool:
-        if not is_restart_needed(old_restart, restart_trigger_values(self.bench.config)):
+        new_restart = restart_trigger_values(self.bench.config)
+        if not is_restart_needed(old_restart, new_restart):
             return False
+        if old_restart.get("lite_mode") != new_restart.get("lite_mode"):
+            # The process set itself changed, so the units have to be reinstalled.
+            from pilot.tasks.switch_lite_mode import SwitchLiteModeTask
+
+            SwitchLiteModeTask.queue(self.bench)
+            return True
         try:
             regenerate_configs(self.bench)
         except Exception as error:
@@ -219,6 +228,7 @@ def restart_trigger_values(config: BenchConfig) -> dict:
         "redis": {"cache_port": config.redis.cache_port, "queue_port": config.redis.queue_port},
         "workers": {"groups": worker_groups_payload(config)},
         "production": {"process_manager": config.production.process_manager or "none"},
+        "lite_mode": {"enabled": config.lite_mode.enabled},
     }
 
 

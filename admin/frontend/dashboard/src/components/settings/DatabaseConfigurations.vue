@@ -1,155 +1,8 @@
-<template>
-  <Teleport defer to="#settings-header-actions">
-    <Tooltip text="Refresh database configurations">
-      <Button
-        variant="ghost"
-        icon="lucide-refresh-cw"
-        :loading="loading"
-        aria-label="Refresh database configurations"
-        @click="load"
-      />
-    </Tooltip>
-  </Teleport>
-
-  <div v-if="loading && !snapshot" class="flex justify-center items-center h-40">
-    <Spinner size="lg" class="text-ink-gray-4" />
-  </div>
-  <div v-else>
-    <ErrorMessage v-if="error" :message="error" class="mb-4" />
-
-    <div
-      v-if="snapshot && !snapshot.readable"
-      class="border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-ink-gray-7 text-sm"
-    >
-      {{ snapshot.reason }}
-    </div>
-
-    <template v-else-if="snapshot">
-      <div
-        v-if="snapshot.edit_reason"
-        class="mb-4 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-ink-gray-7 text-sm"
-      >
-        {{ snapshot.edit_reason }}
-      </div>
-
-      <FormControl
-        v-model="search"
-        type="text"
-        placeholder="Search variables"
-        autocomplete="off"
-        class="mb-5"
-      />
-
-      <div v-if="groups.length" class="space-y-7">
-        <section v-for="group in groups" :key="group.name">
-          <h4 class="mb-1 font-medium text-ink-gray-6 text-sm">
-            {{ group.name }}
-          </h4>
-          <div class="divide-y divide-outline-alpha-gray-1">
-            <div
-              v-for="variable in group.variables"
-              :key="variable.name"
-              class="flex sm:flex-row sm:items-center sm:justify-between flex-col gap-3 py-3"
-            >
-              <div class="min-w-0">
-                <code class="font-medium text-ink-gray-8 text-base break-all">
-                  {{ variable.name }}
-                </code>
-              </div>
-              <div class="flex items-center justify-between sm:justify-end gap-3 sm:ml-6 shrink-0">
-                <span
-                  class="max-w-48 text-right text-ink-gray-8 text-sm font-mono break-all"
-                  :class="{ 'text-ink-gray-5': !variable.supported }"
-                >
-                  {{ formatValue(variable) }}
-                </span>
-                <Button
-                  v-if="variable.editable"
-                  size="sm"
-                  variant="ghost"
-                  icon="lucide-pencil"
-                  :disabled="saving"
-                  aria-label="Edit"
-                  @click="openEditor(variable)"
-                />
-                <Tooltip v-else :text="variable.reason || 'Read-only in Pilot'">
-                  <span
-                    class="block size-4 text-ink-gray-4 lucide-lock"
-                    role="img"
-                    :aria-label="variable.reason || 'Read-only in Pilot'"
-                  />
-                </Tooltip>
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-      <p v-else class="py-10 text-center text-ink-gray-5 text-sm">
-        No database variables match this search.
-      </p>
-    </template>
-  </div>
-
-  <Dialog
-    v-model="editorOpen"
-    :title="editing ? `Update ${editing.name}` : 'Update database configuration'"
-    size="sm"
-  >
-    <div v-if="editing && editor" class="space-y-4">
-      <div v-if="editor.value_type === 'boolean'" class="flex items-center justify-between gap-4">
-        <p class="font-medium text-ink-gray-8 text-base">Enabled</p>
-        <Switch
-          class="[&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
-          :label="editing.name"
-          :model-value="Boolean(draftValue)"
-          @update:model-value="(value) => (draftValue = value)"
-        />
-      </div>
-      <FormControl
-        v-else
-        v-model.number="draftValue"
-        type="number"
-        :label="inputLabel"
-        :min="editor.min"
-        :max="editor.max"
-        :step="editor.step || 1"
-        autocomplete="off"
-      />
-
-      <div v-if="editor.value_type === 'integer'" class="text-ink-gray-6 text-sm">
-        <p v-if="Number.isInteger(editor.recommended)">
-          Recommended: {{ formatConstraint(editor.recommended, editor.unit) }}
-        </p>
-        <p v-if="Number.isInteger(editor.min) && Number.isInteger(editor.max)">
-          Allowed: {{ formatConstraint(editor.min, editor.unit) }} to
-          {{ formatConstraint(editor.max, editor.unit) }}
-        </p>
-      </div>
-      <p v-if="restartWarning" class="text-ink-orange-6 text-sm">
-        {{ restartWarning }}
-      </p>
-      <ErrorMessage v-if="validationError" :message="validationError" />
-      <ErrorMessage v-if="saveError" :message="saveError" />
-
-      <div class="flex justify-end gap-2">
-        <Button variant="ghost" :disabled="saving" @click="editorOpen = false"> Cancel </Button>
-        <Button
-          variant="solid"
-          :loading="saving"
-          :disabled="Boolean(validationError) || unchanged"
-          @click="save"
-        >
-          {{ restartWarning ? 'Update and restart' : 'Update' }}
-        </Button>
-      </div>
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { Button, Dialog, ErrorMessage, FormControl, Spinner, Switch, Tooltip } from 'frappe-ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+
 import { databaseApi } from '@/api/database'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
@@ -217,7 +70,7 @@ const restartWarning = computed(() => {
   return editor.value.requires_restart ? 'MariaDB will restart to apply this change.' : ''
 })
 
-function formatValue(variable) {
+const formatValue = (variable) => {
   if (!variable.supported || variable.value === null) return 'Unavailable'
   if (variable.value_type === 'boolean') return variable.value ? 'Enabled' : 'Disabled'
   if (variable.unit === 'bytes' && Number.isFinite(variable.value)) {
@@ -226,7 +79,7 @@ function formatValue(variable) {
   return formatConstraint(variable.value, variable.unit)
 }
 
-function formatBytes(value) {
+const formatBytes = (value) => {
   const units = ['bytes', 'KB', 'MB', 'GB', 'TB']
   let amount = value
   let index = 0
@@ -238,25 +91,25 @@ function formatBytes(value) {
   return `${rounded} ${units[index]}`
 }
 
-function formatConstraint(value, unit) {
+const formatConstraint = (value, unit) => {
   if (!unit) return String(value)
   if (unit === 'percent') return `${value}%`
   return `${value} ${unit}`
 }
 
-function openEditor(variable) {
+const openEditor = (variable) => {
   if (!variable.editable || !variable.edit) return
   saveError.value = ''
   draftValue.value = variable.edit.value
   editing.value = variable
 }
 
-function idempotencyKey(variable) {
+const idempotencyKey = (variable) => {
   const random = globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)
   return `database-config-${variable}-${Date.now()}-${random}`
 }
 
-async function save() {
+const save = async () => {
   if (!editing.value || validationError.value || unchanged.value || saving.value) return
   const variable = editing.value.name
   saving.value = true
@@ -276,7 +129,7 @@ async function save() {
   }
 }
 
-async function load() {
+const load = async () => {
   if (loading.value) return
   loading.value = true
   error.value = ''
@@ -292,3 +145,160 @@ async function load() {
 
 onMounted(load)
 </script>
+
+<template>
+  <Teleport defer to="#settings-header-actions">
+    <Tooltip text="Refresh database configurations">
+      <Button
+        variant="ghost"
+        icon="lucide-refresh-cw"
+        :loading="loading"
+        aria-label="Refresh database configurations"
+        @click="load"
+      />
+    </Tooltip>
+  </Teleport>
+
+  <div v-if="loading && !snapshot" class="flex justify-center items-center h-40">
+    <Spinner size="lg" class="text-ink-gray-4" />
+  </div>
+
+  <div v-else>
+    <ErrorMessage v-if="error" :message="error" class="mb-4" />
+
+    <div
+      v-if="snapshot && !snapshot.readable"
+      class="border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-ink-gray-7 text-sm"
+    >
+      {{ snapshot.reason }}
+    </div>
+
+    <template v-else-if="snapshot">
+      <div
+        v-if="snapshot.edit_reason"
+        class="mb-4 border border-outline-gray-2 bg-surface-gray-1 px-3 py-2 text-ink-gray-7 text-sm"
+      >
+        {{ snapshot.edit_reason }}
+      </div>
+
+      <FormControl
+        v-model="search"
+        type="text"
+        placeholder="Search variables"
+        autocomplete="off"
+        class="mb-5"
+      />
+
+      <div v-if="groups.length" class="space-y-7">
+        <section v-for="group in groups" :key="group.name">
+          <h4 class="mb-1 font-medium text-ink-gray-6 text-sm">
+            {{ group.name }}
+          </h4>
+
+          <div class="divide-y divide-outline-alpha-gray-1">
+            <div
+              v-for="variable in group.variables"
+              :key="variable.name"
+              class="flex sm:flex-row sm:items-center sm:justify-between flex-col gap-3 py-3"
+            >
+              <div class="min-w-0">
+                <code class="font-medium text-ink-gray-8 text-base break-all">
+                  {{ variable.name }}
+                </code>
+              </div>
+
+              <div class="flex items-center justify-between sm:justify-end gap-3 sm:ml-6 shrink-0">
+                <span
+                  class="max-w-48 text-right text-ink-gray-8 text-sm font-mono break-all"
+                  :class="{ 'text-ink-gray-5': !variable.supported }"
+                >
+                  {{ formatValue(variable) }}
+                </span>
+
+                <Button
+                  v-if="variable.editable"
+                  size="sm"
+                  variant="ghost"
+                  icon="lucide-pencil"
+                  :disabled="saving"
+                  aria-label="Edit"
+                  @click="openEditor(variable)"
+                />
+                <Tooltip v-else :text="variable.reason || 'Read-only in Pilot'">
+                  <span
+                    class="block size-4 text-ink-gray-4 lucide-lock"
+                    role="img"
+                    :aria-label="variable.reason || 'Read-only in Pilot'"
+                  />
+                </Tooltip>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <p v-else class="py-10 text-center text-ink-gray-5 text-sm">
+        No database variables match this search.
+      </p>
+    </template>
+  </div>
+
+  <Dialog
+    v-model="editorOpen"
+    :title="editing ? `Update ${editing.name}` : 'Update database configuration'"
+    size="sm"
+  >
+    <div v-if="editing && editor" class="space-y-4">
+      <div v-if="editor.value_type === 'boolean'" class="flex items-center justify-between gap-4">
+        <p class="font-medium text-ink-gray-8 text-base">Enabled</p>
+        <Switch
+          class="[&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
+          :label="editing.name"
+          :model-value="Boolean(draftValue)"
+          @update:model-value="(value) => (draftValue = value)"
+        />
+      </div>
+
+      <FormControl
+        v-else
+        v-model.number="draftValue"
+        type="number"
+        :label="inputLabel"
+        :min="editor.min"
+        :max="editor.max"
+        :step="editor.step || 1"
+        autocomplete="off"
+      />
+
+      <div v-if="editor.value_type === 'integer'" class="text-ink-gray-6 text-sm">
+        <p v-if="Number.isInteger(editor.recommended)">
+          Recommended: {{ formatConstraint(editor.recommended, editor.unit) }}
+        </p>
+
+        <p v-if="Number.isInteger(editor.min) && Number.isInteger(editor.max)">
+          Allowed: {{ formatConstraint(editor.min, editor.unit) }} to
+          {{ formatConstraint(editor.max, editor.unit) }}
+        </p>
+      </div>
+
+      <p v-if="restartWarning" class="text-ink-orange-6 text-sm">
+        {{ restartWarning }}
+      </p>
+
+      <ErrorMessage v-if="validationError" :message="validationError" />
+      <ErrorMessage v-if="saveError" :message="saveError" />
+
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" :disabled="saving" @click="editorOpen = false"> Cancel </Button>
+        <Button
+          variant="solid"
+          :loading="saving"
+          :disabled="Boolean(validationError) || unchanged"
+          @click="save"
+        >
+          {{ restartWarning ? 'Update and restart' : 'Update' }}
+        </Button>
+      </div>
+    </div>
+  </Dialog>
+</template>

@@ -1,137 +1,10 @@
-<template>
-  <div v-if="loading" class="flex justify-center items-center h-40">
-    <Spinner size="lg" class="text-ink-gray-4" />
-  </div>
-  <div v-else class="space-y-6">
-    <SettingsSwitch
-      label="Site uptime"
-      description="Alert when a site stops responding to its uptime check."
-      :model-value="siteUptime"
-      @update:model-value="(on) => (siteUptime = on)"
-    />
-
-    <div v-for="alert in RESOURCE_ALERTS" :key="alert.key" class="space-y-3">
-      <SettingsSwitch
-        :label="alert.label"
-        :description="alert.description"
-        :model-value="enabled[alert.key]"
-        @update:model-value="(on) => setEnabled(alert.key, on)"
-      />
-      <div v-if="enabled[alert.key]" class="flex items-center gap-2 pl-0.5">
-        <TextInput
-          v-model="limits[alert.key]"
-          type="number"
-          min="1"
-          max="100"
-          class="w-24"
-          :aria-label="`${alert.label} limit`"
-        />
-        <span class="text-ink-gray-6 text-base">% and above</span>
-      </div>
-    </div>
-
-    <div class="space-y-2">
-      <div class="flex justify-between items-center">
-        <p class="font-medium text-ink-gray-8 text-base leading-normal">Webhook endpoints</p>
-        <Button variant="subtle" icon-left="lucide-plus" @click="addWebhook">Add endpoint</Button>
-      </div>
-      <p class="text-ink-gray-5 text-p-sm">
-        Alerts go to Central. Endpoints listed here receive them too, as a POST carrying an
-        <code>Authorization: Bearer</code> header, so the token stays out of the URL.
-      </p>
-
-      <EmptyState
-        compact
-        v-if="!webhooks.length"
-        icon="lucide-webhook"
-        title="No webhook endpoints"
-        description="Alerts are only reported to Central. Add an endpoint to receive them yourself."
-      />
-
-      <div v-else class="space-y-3">
-        <div v-for="(webhook, index) in webhooks" :key="index">
-          <div class="flex items-end gap-2">
-            <div class="flex-1 space-y-1.5">
-              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Endpoint URL</p>
-              <TextInput
-                v-model="webhook.url"
-                placeholder="https://alerts.example.com/pilot"
-                class="w-full"
-              />
-            </div>
-            <div class="flex-1 space-y-1.5">
-              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Token</p>
-              <TextInput
-                v-model="webhook.token"
-                type="password"
-                :placeholder="webhook.token_set ? 'Unchanged' : 'Bearer token'"
-                class="w-full"
-              />
-            </div>
-            <Button
-              variant="subtle"
-              icon="lucide-x"
-              label="Remove endpoint"
-              tooltip="Remove endpoint"
-              @click="removeWebhook(index)"
-            />
-          </div>
-          <p v-if="webhookError(webhook)" class="mt-1.5 text-ink-red-5 text-p-sm">
-            {{ webhookError(webhook) }}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <div class="space-y-2">
-      <p class="font-medium text-ink-gray-8 text-base leading-normal">Email</p>
-      <p class="text-ink-gray-5 text-p-sm">Send the same alerts to a mailbox.</p>
-
-      <div class="gap-3 grid grid-cols-2">
-        <div class="space-y-1.5 col-span-2">
-          <p class="font-medium text-ink-gray-7 text-base">Server URL</p>
-          <TextInput
-            v-model="mail.smtp_url"
-            placeholder="smtp://alerts@example.com@smtp.example.com:587"
-            class="w-full"
-          />
-        </div>
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-base">Password</p>
-          <TextInput
-            v-model="mail.smtp_password"
-            type="password"
-            :placeholder="mail.smtp_password_set ? 'Unchanged' : 'SMTP password'"
-            class="w-full"
-          />
-        </div>
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-base">Recipients</p>
-          <TextInput
-            v-model="mail.email_recipients"
-            placeholder="ops@example.com, oncall@example.com"
-            class="w-full"
-          />
-        </div>
-      </div>
-      <p v-if="mailError" class="text-ink-red-5 text-p-sm">{{ mailError }}</p>
-    </div>
-
-    <ErrorMessage v-if="error" :message="error" />
-
-    <div v-if="dirty" class="flex justify-end">
-      <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
-        Save changes
-      </Button>
-    </div>
-  </div>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { Button, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
+
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 
@@ -175,7 +48,7 @@ const mail = ref({
 const savedPayload = ref('')
 const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
 
-function buildPayload() {
+const buildPayload = () => {
   return {
     ...Object.fromEntries(
       RESOURCE_ALERTS.map((alert) => [
@@ -196,41 +69,40 @@ function buildPayload() {
   }
 }
 
-function recipients() {
-  return mail.value.email_recipients
+const recipients = () =>
+  mail.value.email_recipients
     .split(',')
     .map((address) => address.trim())
     .filter(Boolean)
-}
 
-function setEnabled(key, on) {
+const setEnabled = (key, on) => {
   enabled.value[key] = on
   if (on && !Number(limits.value[key])) {
     limits.value[key] = String(RESOURCE_ALERTS.find((alert) => alert.key === key).initial)
   }
 }
 
-function addWebhook() {
+const addWebhook = () => {
   webhooks.value.push({ url: '', token: '', token_set: false, original_url: '' })
 }
 
-function removeWebhook(index) {
+const removeWebhook = (index) => {
   webhooks.value.splice(index, 1)
 }
 
 // A row still being filled in says nothing and just holds the Save button.
-function webhookError(webhook) {
+const webhookError = (webhook) => {
   const url = webhook.url.trim()
   if (url && (!URL.canParse(url) || !/^https?:\/\//.test(url)))
     return 'Endpoint must be an http:// or https:// URL.'
   return ''
 }
 
-function webhookIsComplete(webhook) {
+const webhookIsComplete = (webhook) => {
   return Boolean(webhook.url.trim()) && Boolean(webhook.token || webhook.token_set)
 }
 
-function limitError(key) {
+const limitError = (key) => {
   if (!enabled.value[key]) return ''
   const limit = Number(limits.value[key])
   if (!Number.isInteger(limit) || limit < 1 || limit > 100)
@@ -256,7 +128,7 @@ const canSave = computed(
     !mailError.value,
 )
 
-async function save() {
+const save = async () => {
   if (!canSave.value) return
 
   error.value = ''
@@ -315,3 +187,141 @@ onMounted(async () => {
   }
 })
 </script>
+
+<template>
+  <div v-if="loading" class="flex justify-center items-center h-40">
+    <Spinner size="lg" class="text-ink-gray-4" />
+  </div>
+
+  <div v-else class="space-y-6">
+    <SettingsSwitch
+      label="Site uptime"
+      description="Alert when a site stops responding to its uptime check."
+      :model-value="siteUptime"
+      @update:model-value="(on) => (siteUptime = on)"
+    />
+
+    <div v-for="alert in RESOURCE_ALERTS" :key="alert.key" class="space-y-3">
+      <SettingsSwitch
+        :label="alert.label"
+        :description="alert.description"
+        :model-value="enabled[alert.key]"
+        @update:model-value="(on) => setEnabled(alert.key, on)"
+      />
+      <div v-if="enabled[alert.key]" class="flex items-center gap-2 pl-0.5">
+        <TextInput
+          v-model="limits[alert.key]"
+          type="number"
+          min="1"
+          max="100"
+          class="w-24"
+          :aria-label="`${alert.label} limit`"
+        />
+        <span class="text-ink-gray-6 text-base">% and above</span>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <div class="flex justify-between items-center">
+        <p class="font-medium text-ink-gray-8 text-base leading-normal">Webhook endpoints</p>
+        <Button variant="subtle" icon-left="lucide-plus" @click="addWebhook">Add endpoint</Button>
+      </div>
+
+      <p class="text-ink-gray-5 text-p-sm">
+        Alerts go to Central. Endpoints listed here receive them too, as a POST carrying an
+        <code>Authorization: Bearer</code> header, so the token stays out of the URL.
+      </p>
+
+      <EmptyState
+        compact
+        v-if="!webhooks.length"
+        icon="lucide-webhook"
+        title="No webhook endpoints"
+        description="Alerts are only reported to Central. Add an endpoint to receive them yourself."
+      />
+
+      <div v-else class="space-y-3">
+        <div v-for="(webhook, index) in webhooks" :key="index">
+          <div class="flex items-end gap-2">
+            <div class="flex-1 space-y-1.5">
+              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Endpoint URL</p>
+              <TextInput
+                v-model="webhook.url"
+                placeholder="https://alerts.example.com/pilot"
+                class="w-full"
+              />
+            </div>
+
+            <div class="flex-1 space-y-1.5">
+              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Token</p>
+              <TextInput
+                v-model="webhook.token"
+                type="password"
+                :placeholder="webhook.token_set ? 'Unchanged' : 'Bearer token'"
+                class="w-full"
+              />
+            </div>
+
+            <Button
+              variant="subtle"
+              icon="lucide-x"
+              label="Remove endpoint"
+              tooltip="Remove endpoint"
+              @click="removeWebhook(index)"
+            />
+          </div>
+
+          <p v-if="webhookError(webhook)" class="mt-1.5 text-ink-red-5 text-p-sm">
+            {{ webhookError(webhook) }}
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="space-y-2">
+      <p class="font-medium text-ink-gray-8 text-base leading-normal">Email</p>
+
+      <p class="text-ink-gray-5 text-p-sm">Send the same alerts to a mailbox.</p>
+
+      <div class="gap-3 grid grid-cols-2">
+        <div class="space-y-1.5 col-span-2">
+          <p class="font-medium text-ink-gray-7 text-base">Server URL</p>
+          <TextInput
+            v-model="mail.smtp_url"
+            placeholder="smtp://alerts@example.com@smtp.example.com:587"
+            class="w-full"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <p class="font-medium text-ink-gray-7 text-base">Password</p>
+          <TextInput
+            v-model="mail.smtp_password"
+            type="password"
+            :placeholder="mail.smtp_password_set ? 'Unchanged' : 'SMTP password'"
+            class="w-full"
+          />
+        </div>
+
+        <div class="space-y-1.5">
+          <p class="font-medium text-ink-gray-7 text-base">Recipients</p>
+          <TextInput
+            v-model="mail.email_recipients"
+            placeholder="ops@example.com, oncall@example.com"
+            class="w-full"
+          />
+        </div>
+      </div>
+
+      <p v-if="mailError" class="text-ink-red-5 text-p-sm">{{ mailError }}</p>
+    </div>
+
+    <ErrorMessage v-if="error" :message="error" />
+
+    <div v-if="dirty" class="flex justify-end">
+      <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
+        Save changes
+      </Button>
+    </div>
+  </div>
+</template>

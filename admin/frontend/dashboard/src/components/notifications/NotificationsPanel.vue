@@ -1,9 +1,20 @@
 <script setup lang="ts">
-import { Alert, Button, Popover, Select, SidebarItem, Spinner, TabButtons } from 'frappe-ui'
+import {
+  Alert,
+  Button,
+  MobileNavItem,
+  Popover,
+  Select,
+  SidebarItem,
+  Spinner,
+  TabButtons,
+} from 'frappe-ui'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+
 import EmptyState from '@/components/common/EmptyState.vue'
 import Scrollbar from '@/components/common/Scrollbar.vue'
+
 import { useNotifications } from '@/composables/notifications/useNotifications'
 import type { Notification } from '@/types/notification'
 import { relativeTime } from '@/utils/taskFormat'
@@ -13,6 +24,10 @@ interface SeverityLook {
   text: string
   bg: string
 }
+
+defineProps({
+  mobile: { type: Boolean, default: false },
+})
 
 const badgePollMs = 60000
 
@@ -87,9 +102,26 @@ onUnmounted(() => clearInterval(badgeTimer))
 </script>
 
 <template>
-  <Popover v-model:open="isOpen" bare side="right" align="start" :offset="9" :collision-padding="0">
+  <Popover
+    v-model:open="isOpen"
+    bare
+    align="start"
+    :side="mobile ? 'top' : 'right'"
+    :offset="mobile ? 0 : 9"
+    :collision-padding="0"
+  >
     <template #trigger>
-      <SidebarItem label="Notifications" :suffix="badge" class="mb-3 text-sm">
+      <MobileNavItem v-if="mobile" label="Notifications">
+        <span class="relative block size-6">
+          <span class="lucide-bell block size-6 text-ink-gray-5" />
+          <span
+            v-if="unread > 0"
+            class="top-0 right-0 absolute bg-surface-blue-6 rounded-full size-1.5 shrink-0"
+          />
+        </span>
+      </MobileNavItem>
+
+      <SidebarItem v-else label="Notifications" :suffix="badge" class="mb-3 text-sm">
         <template #prefix>
           <span class="relative block size-4">
             <span class="lucide-bell block size-4" />
@@ -103,7 +135,7 @@ onUnmounted(() => clearInterval(badgeTimer))
     </template>
 
     <aside
-      class="flex flex-col bg-surface-base md:border-r border-outline-gray-1 w-screen md:w-[430px] h-screen"
+      class="flex flex-col bg-surface-base md:border-r border-outline-gray-1 w-screen md:w-[430px] h-[calc(100dvh-3.5rem)] md:h-screen"
     >
       <header class="flex items-center gap-1 py-2 pr-2 pl-4 border-outline-gray-1 border-b">
         <span class="mr-auto font-medium text-base">Notifications</span>
@@ -156,10 +188,12 @@ onUnmounted(() => clearInterval(badgeTimer))
               <span class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base">
                 {{ item.title }}
               </span>
+
               <span class="text-ink-gray-5 text-xs whitespace-nowrap shrink-0">
                 {{ relativeTime(item.created_at) }}
               </span>
             </span>
+
             <span v-if="item.message" class="block mt-0.5 text-ink-gray-6 text-p-sm">
               {{ item.message }}
             </span>

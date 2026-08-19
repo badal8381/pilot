@@ -14,29 +14,6 @@ body {
   background-color: var(--surface-alpha-gray-4);
 }
 
-/* frappe-ui's Button paints its subtle/outline/ghost red variants with raw
-   text-red-700 - a palette class that never flips for dark mode, unlike the
-   ink tokens its gray and blue variants use - so every red button turned
-   dark-red-on-dark-red. ink-red-8 is what the library's own Badge pairs with
-   surface-red-2, so this is Button catching up to its sibling. Scoped to dark
-   mode and to that exact utility (used nowhere else, checked) so light keeps
-   the library's spec. Delete once Button moves to ink-red upstream. */
-[data-theme='dark'] .text-red-700 {
-  color: var(--ink-red-8);
-}
-
-/* .text-base, */
-/* .text-base-medium { */
-/*   @apply !text-[16px]; */
-/* } */
-
-/* @screen sm { */
-/*   .text-base, */
-/*   .text-base-medium { */
-/*     @apply !text-[14px]; */
-/*   } */
-/* } */
-
 .mobile-sidebar [data-slot="sidebar-item"] .text-sm {
   @apply !text-[16px];
 }
@@ -114,8 +91,9 @@ body {
   animation: fade-in 0.35s var(--ease-out);
 }
 
-#app {
-  isolation: isolate;
+.dialog-overlay,
+.dialog-scroll-container {
+  z-index: 50;
 }
 
 /* Dropdown/Menu content teleports to <body> without a z-index; lift it above both

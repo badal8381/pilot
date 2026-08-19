@@ -1,110 +1,8 @@
-<template>
-  <div class="space-y-4 mt-5">
-    <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
-      <p class="text-ink-gray-5 text-sm">
-        Keys passed to this site's <code class="font-mono text-ink-gray-7">site_config.json</code>.
-      </p>
-      <div class="flex items-center gap-2 shrink-0">
-        <Button
-          size="sm"
-          variant="ghost"
-          :loading="refreshing"
-          icon="lucide-refresh-cw"
-          label="Refresh"
-          tooltip="Refresh"
-          @click="refresh"
-        />
-        <Button size="sm" @click="openDialog()">
-          <template #prefix><span class="size-4 lucide-plus" /></template>
-          Add config
-        </Button>
-      </div>
-    </div>
-
-    <!-- Config table -->
-    <div
-      v-if="!rows.length"
-      class="py-12 border border-dashed rounded-7 border-outline-gray-2 text-ink-gray-5 text-sm text-center"
-    >
-      No config keys.
-    </div>
-    <ListView
-      v-else
-      :columns="columns"
-      :rows="rows"
-      row-key="name"
-      :options="{ selectable: false, showTooltip: false }"
-    >
-      <template #cell="{ column, row, item }">
-        <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Dropdown v-if="!row.readonly" :options="menuOptions(row)">
-            <template #default="{ open }">
-              <Button
-                variant="ghost"
-                size="sm"
-                :active="open"
-                icon="lucide-ellipsis"
-                label="Config actions"
-                tooltip="Actions"
-              />
-            </template>
-          </Dropdown>
-        </div>
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
-      </template>
-    </ListView>
-  </div>
-
-  <!-- Add dialog -->
-  <Dialog v-model="showAddDialog" title="Add config" size="sm">
-    <div class="space-y-3">
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Key</p>
-        <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
-      </div>
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Value</p>
-        <TextInput v-model="entryValue" placeholder="value" class="w-full" />
-      </div>
-      <ErrorMessage v-if="dialogError" :message="dialogError" />
-    </div>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
-      <Button variant="solid" :loading="saving" @click="save">Save</Button>
-    </div>
-  </Dialog>
-
-  <!-- Edit dialog -->
-  <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
-    <div class="space-y-1.5">
-      <p class="font-medium text-ink-gray-7 text-sm">Value</p>
-      <TextInput v-model="entryValue" placeholder="value" class="w-full" />
-    </div>
-    <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
-      <Button variant="solid" :loading="saving" @click="save">Save</Button>
-    </div>
-  </Dialog>
-
-  <!-- Delete dialog -->
-  <Dialog v-model="showDelete" title="Remove config" size="sm">
-    <p class="text-ink-gray-7 text-sm">
-      Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
-      <code class="text-ink-gray-9">site_config.json</code>?
-    </p>
-    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-        >Remove</Button
-      >
-    </div>
-  </Dialog>
-</template>
-
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
+
+import { ListView, ListRowItem } from 'frappe-ui/experimental'
+
 import {
   Button,
   Dialog,
@@ -112,7 +10,7 @@ import {
   ErrorMessage,
   TextInput,
 } from 'frappe-ui'
-import { ListView, ListRowItem } from 'frappe-ui/experimental'
+
 import { sitesApi } from '@/api/sites'
 import { useSite } from '@/composables/sites/useSite'
 
@@ -139,7 +37,7 @@ const rows = computed(() => {
   return entries
 })
 
-function menuOptions(row) {
+const menuOptions = (row) => {
   return [
     { label: 'Edit', icon: 'lucide-pencil', onClick: () => openDialog(row.key) },
     {
@@ -164,7 +62,7 @@ const dialogError = ref('')
 const refreshing = ref(false)
 const isNew = computed(() => showAddDialog.value)
 
-function openDialog(key = null) {
+const openDialog = (key = null) => {
   dialogError.value = ''
   entryKey.value = key || ''
   if (key !== null) {
@@ -177,7 +75,7 @@ function openDialog(key = null) {
   }
 }
 
-function parseValue(raw) {
+const parseValue = (raw) => {
   try {
     return JSON.parse(raw)
   } catch {
@@ -185,7 +83,7 @@ function parseValue(raw) {
   }
 }
 
-async function save() {
+const save = async () => {
   const key = entryKey.value.trim()
   if (!key) {
     dialogError.value = 'Key is required.'
@@ -214,7 +112,7 @@ const deleteKey = ref('')
 const deleting = ref(false)
 const deleteError = ref('')
 
-async function confirmDelete() {
+const confirmDelete = async () => {
   deleting.value = true
   deleteError.value = ''
   try {
@@ -228,7 +126,7 @@ async function confirmDelete() {
   }
 }
 
-async function refresh() {
+const refresh = async () => {
   refreshing.value = true
   try {
     await reload()
@@ -237,3 +135,116 @@ async function refresh() {
   }
 }
 </script>
+
+<template>
+  <div class="space-y-4 mt-5">
+    <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
+      <p class="text-ink-gray-5 text-sm">
+        Keys passed to this site's <code class="font-mono text-ink-gray-7">site_config.json</code>.
+      </p>
+
+      <div class="flex items-center gap-2 shrink-0">
+        <Button
+          size="sm"
+          variant="ghost"
+          :loading="refreshing"
+          icon="lucide-refresh-cw"
+          label="Refresh"
+          tooltip="Refresh"
+          @click="refresh"
+        />
+        <Button size="sm" @click="openDialog()">
+          <template #prefix><span class="size-4 lucide-plus" /></template>
+          Add config
+        </Button>
+      </div>
+    </div>
+
+    <!-- Config table -->
+    <div
+      v-if="!rows.length"
+      class="py-12 border border-dashed rounded-7 border-outline-gray-2 text-ink-gray-5 text-sm text-center"
+    >
+      No config keys.
+    </div>
+
+    <ListView
+      v-else
+      :columns="columns"
+      :rows="rows"
+      row-key="name"
+      :options="{ selectable: false, showTooltip: false }"
+    >
+      <template #cell="{ column, row, item }">
+        <div v-if="column.key === 'actions'" class="flex justify-end">
+          <Dropdown v-if="!row.readonly" :options="menuOptions(row)">
+            <template #default="{ open }">
+              <Button
+                variant="ghost"
+                size="sm"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="Config actions"
+                tooltip="Actions"
+              />
+            </template>
+          </Dropdown>
+        </div>
+
+        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      </template>
+    </ListView>
+  </div>
+
+  <!-- Add dialog -->
+  <Dialog v-model="showAddDialog" title="Add config" size="sm">
+    <div class="space-y-3">
+      <div class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Key</p>
+        <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
+      </div>
+
+      <div class="space-y-1.5">
+        <p class="font-medium text-ink-gray-7 text-sm">Value</p>
+        <TextInput v-model="entryValue" placeholder="value" class="w-full" />
+      </div>
+
+      <ErrorMessage v-if="dialogError" :message="dialogError" />
+    </div>
+
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
+  </Dialog>
+
+  <!-- Edit dialog -->
+  <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
+    <div class="space-y-1.5">
+      <p class="font-medium text-ink-gray-7 text-sm">Value</p>
+      <TextInput v-model="entryValue" placeholder="value" class="w-full" />
+    </div>
+
+    <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
+      <Button variant="solid" :loading="saving" @click="save">Save</Button>
+    </div>
+  </Dialog>
+
+  <!-- Delete dialog -->
+  <Dialog v-model="showDelete" title="Remove config" size="sm">
+    <p class="text-ink-gray-7 text-sm">
+      Remove <code class="text-ink-gray-9">{{ deleteKey }}</code> from
+      <code class="text-ink-gray-9">site_config.json</code>?
+    </p>
+
+    <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
+    <div class="flex justify-end gap-2 mt-4">
+      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+        >Remove</Button
+      >
+    </div>
+  </Dialog>
+</template>
