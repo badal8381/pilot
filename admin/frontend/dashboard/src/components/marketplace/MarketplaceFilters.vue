@@ -48,7 +48,7 @@ const worksWithLabel = computed(() => {
 </script>
 
 <template>
-  <StickyToolbar>
+  <StickyToolbar class="py-2 md:py-3">
     <div class="flex sm:flex-row flex-col gap-2">
       <FormControl
         v-model="searchModel"

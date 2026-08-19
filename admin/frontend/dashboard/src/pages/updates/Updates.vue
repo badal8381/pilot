@@ -131,7 +131,7 @@ onMounted(load)
 
     <!-- A flex item sizes to the strip's natural width and overflows the screen;
          a block child is held to the content width and fits. -->
-    <StickyToolbar :class="isMobile ? '' : 'flex items-center gap-2'">
+    <StickyToolbar class="py-2 md:py-3" :class="isMobile ? '' : 'flex items-center gap-2'">
       <TabButtons
         :size="isMobile ? 'md' : 'sm'"
         :options="UPDATE_FILTERS"
