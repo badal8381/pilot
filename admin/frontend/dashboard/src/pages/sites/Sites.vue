@@ -34,9 +34,10 @@ const viewOptions = [
 ]
 
 const SITE_STATUS = {
-  broken: { label: 'Broken', theme: 'red' },
-  offline: { label: 'Paused', theme: 'orange' },
-  provisioning: { label: 'Creating', theme: 'blue' },
+  online: { label: 'Active', dot: 'bg-surface-green-8' },
+  broken: { label: 'Broken', dot: 'bg-surface-red-8' },
+  offline: { label: 'Paused', dot: 'bg-surface-orange-8' },
+  provisioning: { label: 'Creating', dot: 'bg-surface-blue-8' },
 }
 
 const statusOptions = [
@@ -56,7 +57,7 @@ const siteStatus = (site) => {
   return 'online'
 }
 
-const statusBadge = (site) => SITE_STATUS[siteStatus(site)]
+const statusInfo = (site) => SITE_STATUS[siteStatus(site)]
 
 const appsLabel = (site) => {
   const count = site.active_apps?.length || 0
@@ -83,7 +84,7 @@ const filteredSites = computed(() => {
 const hasCount = computed(() => !loading.value || sites.value.length > 0)
 
 const listColumns = [
-  { label: 'Site', key: 'site', class: 'w-full' },
+  { label: 'Site', key: 'site', class: 'w-1/2' },
   { label: 'Status', key: 'status' },
   { label: 'Storage', key: 'storage', class: 'text-ink-gray-6 text-sm' },
   { label: 'Apps', key: 'apps', class: 'text-ink-gray-6 text-sm' },
@@ -211,11 +212,17 @@ onMounted(() => {
           </div>
 
           <div class="flex flex-1 flex-wrap items-center gap-x-1.5 min-w-0">
-            <span class="font-medium text-ink-gray-9 text-base truncate">
+            <span class="flex-1 max-w-fit font-medium text-ink-gray-9 text-base truncate">
               {{ site.name }}
             </span>
 
-            <Badge v-if="statusBadge(site)" v-bind="statusBadge(site)" size="sm" class="shrink-0" />
+            <span
+              v-if="siteStatus(site) !== 'online'"
+              class="flex items-center gap-1.5 mx-1 text-ink-gray-6 text-p-sm"
+            >
+              <span class="rounded-full size-1.5" :class="statusInfo(site).dot" />
+              {{ statusInfo(site).label }}
+            </span>
 
             <Dropdown :options="siteMenuOptions(site)">
               <Button
@@ -224,11 +231,11 @@ onMounted(() => {
                 icon="lucide-ellipsis"
                 label="Site actions"
                 tooltip="Actions"
-                class="ml-auto shrink-0"
+                class="ml-auto"
               />
             </Dropdown>
 
-            <p class="text-ink-gray-5 text-p-sm w-full">
+            <p class="w-full text-ink-gray-5 text-p-sm">
               {{ metaLabel(site) }}
             </p>
           </div>
@@ -246,7 +253,13 @@ onMounted(() => {
         </template>
 
         <template #status="{ row }">
-          <Badge v-if="statusBadge(row.site)" v-bind="statusBadge(row.site)" size="sm" />
+          <span
+            v-if="statusInfo(row.site)"
+            class="flex items-center gap-1.5 text-ink-gray-6 text-p-sm"
+          >
+            <span class="rounded-full size-1.5" :class="statusInfo(row.site).dot" />
+            {{ statusInfo(row.site).label }}
+          </span>
         </template>
 
         <template #actions="{ row }">
