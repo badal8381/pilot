@@ -66,13 +66,7 @@ const login = async () => {
         <PilotLogo class="size-8" />
         <div class="flex flex-col gap-1">
           <h1 class="font-semibold text-ink-gray-9 text-lg">Sign In</h1>
-          <p v-if="session.wizard" class="text-ink-gray-5 text-p-base">
-            This bench is not set up yet. Open the setup link printed by
-            <code class="bg-surface-gray-2 px-1 py-0.5 rounded-4 font-mono text-ink-gray-8">pilot start</code>,
-            or sign in with the admin password from when the bench was created.
-          </p>
-
-          <p v-else class="text-ink-gray-5 text-p-base">Welcome! Please sign in to continue.</p>
+          <p class="text-ink-gray-5 text-p-base">Welcome! Please sign in to continue.</p>
         </div>
       </div>
 

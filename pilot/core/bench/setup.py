@@ -141,7 +141,7 @@ class ProductionSetup:
             SystemdProcessManager(self.bench).remove_units()
 
     def _setup_monitoring(self):
-        from pilot.core.server.monitoring import MonitorConfigurator
+        from pilot.core.server.monitoring_config import MonitorConfigurator
         from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
         monitor = MonitorConfigurator(self.bench)

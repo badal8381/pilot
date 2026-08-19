@@ -47,7 +47,6 @@ count = 3
 [production]
 enabled = true
 process_manager = "systemd"
-use_companion_manager = false
 
 [gunicorn]
 workers = 4

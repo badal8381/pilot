@@ -80,6 +80,7 @@ def test_known_and_legacy_keys_not_flagged() -> None:
         "process_manager": "supervisor",
         "nginx": True,
         "lightweight": False,
+        "use_companion_manager": False,
     }
     data["workers"] = [{"queue": "default", "count": 1}]
     assert BenchConfig._unknown_config_paths(data) == []

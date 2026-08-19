@@ -26,8 +26,10 @@ from pilot.managers.platform import NONINTERACTIVE_PRIVILEGES_ENV
 
 _READY_FD_ENV = "BENCH_TASK_READY_FD"
 _LAUNCH_ID_ENV = "BENCH_TASK_LAUNCH_ID"
+WRAPPER_MODULE = "pilot.internal.tasks.wrapper"
 CANCEL_GRACE_SECONDS = 3.0
 _PROCESS_EXIT_POLL_SECONDS = 0.05
+_UNKNOWN_GRACE_SECONDS = 60.0
 
 
 class TaskProcessStartError(BenchError):
@@ -38,10 +40,11 @@ class TaskProcess:
     def __init__(self, bench_root: Path) -> None:
         self._store = TaskStore(bench_root)
         self._inspector = ProcessInspector()
+        self._unknown_since: dict[str, float] = {}
 
     def start(self, task_id: str) -> subprocess.Popen:
         task_dir = self._store.task_dir(task_id)
-        argv = [sys.executable, "-m", "pilot.internal.tasks.wrapper", str(task_dir)]
+        argv = [sys.executable, "-m", WRAPPER_MODULE, str(task_dir)]
         launch_id = secrets.token_hex(16)
         read_fd, write_fd = os.pipe()
         process = None
@@ -86,6 +89,8 @@ class TaskProcess:
     def reconcile(self) -> str | None:
         for task_id in self._store.task_ids_with_process():
             ownership = self.ownership(task_id)
+            if ownership == ProcessOwnership.UNKNOWN:
+                ownership = self._resolve_unknown(task_id)
             if ownership in {ProcessOwnership.OWNED, ProcessOwnership.UNKNOWN}:
                 return task_id
             try:
@@ -93,7 +98,7 @@ class TaskProcess:
             except (OSError, ValueError, TaskNotFoundError):
                 return task_id
             if status == TaskStatus.RUNNING:
-                self._interrupt(task_id)
+                self.interrupt(task_id)
             elif status != TaskStatus.QUEUED:
                 self._run_stored_callback_for_status(task_id)
                 self._store.remove_private_files(
@@ -106,6 +111,30 @@ class TaskProcess:
                 return task_id
         self._recover_terminal_callbacks()
         return None
+
+    def _resolve_unknown(self, task_id: str) -> ProcessOwnership:
+        """Look for the wrapper when the stored record is unreadable."""
+        markers = [WRAPPER_MODULE, str(self._store.task_dir(task_id))]
+        try:
+            pid = self._inspector.get_pid_matching(markers, self._pid_hint(task_id))
+        except OSError:
+            return self._unknown_within_grace(task_id)
+        self._unknown_since.pop(task_id, None)
+        return ProcessOwnership.OWNED if pid is not None else ProcessOwnership.DEAD
+
+    def _unknown_within_grace(self, task_id: str) -> ProcessOwnership:
+        # ponytail: in-memory clock, a worker restart extends the wait
+        first_seen = self._unknown_since.setdefault(task_id, time.monotonic())
+        if time.monotonic() - first_seen < _UNKNOWN_GRACE_SECONDS:
+            return ProcessOwnership.UNKNOWN
+        self._unknown_since.pop(task_id, None)
+        return ProcessOwnership.DEAD
+
+    def _pid_hint(self, task_id: str) -> int | None:
+        try:
+            return self._store.read_pid(task_id)
+        except (OSError, ValueError, TaskNotFoundError):
+            return None
 
     def cancel(self, task_id: str, grace_seconds: float | None = None) -> None:
         if self._store.read_status(task_id) != TaskStatus.RUNNING:
@@ -141,7 +170,7 @@ class TaskProcess:
         changed: bool = False,
     ) -> bool:
         if ownership in {ProcessOwnership.DEAD, ProcessOwnership.STALE}:
-            self._interrupt(task_id)
+            self.interrupt(task_id)
             return True
         if ownership == ProcessOwnership.UNKNOWN:
             detail = "changed" if changed else "is uncertain"
@@ -179,9 +208,10 @@ class TaskProcess:
                 process.kill()
             process.wait()
         self._store.remove_private_files(task_id, "process.json", "pid")
-        self._interrupt(task_id)
+        self.interrupt(task_id)
 
-    def _interrupt(self, task_id: str) -> None:
+    def interrupt(self, task_id: str) -> None:
+        """Fail a task whose process died without finalizing."""
         self._store.transition(
             task_id,
             TaskStatus.RUNNING,

@@ -46,7 +46,6 @@ count = 1
 
 [production]
 enabled = false
-use_companion_manager = false
 
 [admin]
 port = 7010

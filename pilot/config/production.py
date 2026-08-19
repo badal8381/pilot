@@ -11,7 +11,6 @@ VALID_PROCESS_MANAGERS = ("systemd", "supervisor")
 class ProductionConfig:
     enabled: bool = False
     process_manager: str = ""  # systemd | supervisor - required when enabled
-    use_companion_manager: bool = False
 
     @classmethod
     def from_dict(cls, data: dict | None) -> "ProductionConfig":
@@ -26,11 +25,7 @@ class ProductionConfig:
         # Oldest format derived the manager from a `lightweight` flag.
         if enabled and not pm and "lightweight" in data:
             pm = "systemd" if data.get("lightweight", False) else "supervisor"
-        return cls(
-            enabled=enabled,
-            process_manager=pm,
-            use_companion_manager=data.get("use_companion_manager", False),
-        )
+        return cls(enabled=enabled, process_manager=pm)
 
     @staticmethod
     def _normalize_process_manager(value: str) -> str:
