@@ -147,7 +147,7 @@ defineExpose({ open })
       <template v-if="isEnabled">
         <div
           class="gap-4 grid"
-          :class="frequency === 'daily' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'"
+          :class="frequency === 'daily' ? 'md:grid-cols-2' : 'md:grid-cols-3'"
         >
           <Select label="Frequency" v-model="frequency" :options="FREQ_OPTIONS" />
           <Select

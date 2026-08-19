@@ -657,7 +657,7 @@ onUnmounted(() => clearTimeout(statsTimer))
 
     <template v-else-if="pageLoading">
       <Skeleton v-if="!isHistorical" class="mb-6 rounded-6 h-[88px]" />
-      <div class="gap-4 grid sm:grid-cols-2 mb-6">
+      <div class="gap-4 grid md:grid-cols-2 mb-6">
         <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
       </div>
     </template>
@@ -701,7 +701,7 @@ onUnmounted(() => clearTimeout(statsTimer))
         />
       </template>
 
-      <div v-if="showCharts" class="gap-4 grid sm:grid-cols-2 mb-6">
+      <div v-if="showCharts" class="gap-4 grid md:grid-cols-2 mb-6">
         <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
           <AxisChart
             :config="chart.config"
@@ -711,7 +711,7 @@ onUnmounted(() => clearTimeout(statsTimer))
       </div>
 
       <!-- Live mode collecting its first points, with the stat bar already up -->
-      <div v-else-if="!isHistorical" class="gap-4 grid sm:grid-cols-2 mb-6">
+      <div v-else-if="!isHistorical" class="gap-4 grid md:grid-cols-2 mb-6">
         <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
       </div>
 

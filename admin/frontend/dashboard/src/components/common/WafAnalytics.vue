@@ -59,7 +59,7 @@ watch(() => props.window, load, { immediate: true })
       </div>
     </div>
 
-    <div class="gap-4 grid sm:grid-cols-2">
+    <div class="gap-4 grid md:grid-cols-2">
       <div class="bg-surface-white p-4 border rounded-6 border-outline-gray-2">
         <div class="mb-2 text-ink-gray-6 text-sm">Top rules</div>
         <div v-if="!data.top_rules.length" class="text-ink-gray-5 text-xs">

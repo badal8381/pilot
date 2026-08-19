@@ -203,7 +203,7 @@ const submit = async () => {
         <div
           ref="appList"
           :data-fade="fadeEdges"
-          class="gap-x-4 grid grid-cols-1 sm:grid-cols-2 -mx-4 sm:-mx-6 px-4 sm:px-6 max-h-72 overflow-y-auto app-list"
+          class="gap-x-4 grid grid-cols-1 md:grid-cols-2 -mx-4 sm:-mx-6 px-4 sm:px-6 max-h-72 overflow-y-auto app-list"
           @scroll.passive="updateFadeEdges"
         >
           <button

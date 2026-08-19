@@ -221,7 +221,7 @@ onUnmounted(() => clearInterval(refreshTimer))
 
 <template>
   <div>
-    <div v-if="loading" class="gap-4 grid sm:grid-cols-2">
+    <div v-if="loading" class="gap-4 grid md:grid-cols-2">
       <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
     </div>
 
@@ -238,7 +238,7 @@ onUnmounted(() => clearInterval(refreshTimer))
       description="The monitor hasn't sampled the database in this range yet."
     />
 
-    <div v-else class="gap-4 grid sm:grid-cols-2">
+    <div v-else class="gap-4 grid md:grid-cols-2">
       <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
         <AxisChart
           :config="chart.config"
