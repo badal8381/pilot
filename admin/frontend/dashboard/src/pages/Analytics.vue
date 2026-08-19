@@ -42,7 +42,15 @@ const TIME_GRAIN = {
   '24h': 'hour',
   '1w': 'day',
 }
-const PALETTE = ['#2490ef', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899']
+const PALETTE = [
+  'var(--ink-blue-5)',
+  'var(--ink-amber-5)',
+  'var(--ink-green-5)',
+  'var(--ink-purple-5)',
+  'var(--ink-red-5)',
+  'var(--ink-cyan-5)',
+  'var(--ink-pink-5)',
+]
 const LIVE_WINDOW_MS = 1800 * 1000
 
 // Series names and colors
@@ -53,17 +61,17 @@ const DISK_IO_SERIES = ['Read', 'Write']
 const DISK_SERIES = 'Root Disk'
 
 const CPU_COLORS = {
-  'Busy User': '#2490ef',
-  'Busy System': '#f59e0b',
-  'Busy IOWait': '#ef4444',
-  'Busy IRQ': '#8b5cf6',
-  'Busy Other': '#ec4899',
+  'Busy User': 'var(--ink-blue-5)',
+  'Busy System': 'var(--ink-amber-5)',
+  'Busy IOWait': 'var(--ink-red-5)',
+  'Busy IRQ': 'var(--ink-purple-5)',
+  'Busy Other': 'var(--ink-pink-5)',
 }
 const MEMORY_COLORS = {
-  Used: '#f59e0b',
-  'Cached + Buffers': '#2490ef',
-  Free: '#10b981',
-  'Swap Used': '#ef4444',
+  Used: 'var(--ink-amber-5)',
+  'Cached + Buffers': 'var(--ink-blue-5)',
+  Free: 'var(--ink-green-5)',
+  'Swap Used': 'var(--ink-red-5)',
 }
 
 // State
@@ -367,6 +375,7 @@ const showCharts = computed(() =>
 // Chart helpers
 
 const GRID = { show: true, lineStyle: { type: 'dashed', color: 'var(--outline-gray-2)' } }
+const LEGEND = { itemWidth: 12, itemHeight: 12, textStyle: { padding: [0, 0, 0, 1] } }
 
 const fixedXAxis = computed(() => ({
   key: 'time',
@@ -397,15 +406,10 @@ const lineSeries = (name, color, stacked) => {
       showSymbol: false,
       stack: stacked ? 'total' : undefined,
       lineStyle: { width: 1.5 },
-      areaStyle: { color: transparent(color, 0.25) },
+      areaStyle: { color, opacity: 0.25 },
       emphasis: { focus: 'series' },
     },
   }
-}
-
-const transparent = (hex, opacity) => {
-  const v = parseInt(hex.slice(1), 16)
-  return `rgba(${(v >> 16) & 255}, ${(v >> 8) & 255}, ${v & 255}, ${opacity})`
 }
 
 const scaleFields = (points, keys, divisor) => {
@@ -437,6 +441,7 @@ const cpuChartConfig = computed(() => ({
     })),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, yMax: 100, echartOptions: { name: '%', splitLine: GRID } },
+    echartOptions: { legend: LEGEND },
     series: CPU_SERIES.map((name) => lineSeries(name, CPU_COLORS[name], true)),
   },
 }))
@@ -452,10 +457,11 @@ const loadChartConfig = computed(() => ({
     })),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, echartOptions: { name: '', splitLine: GRID } },
+    echartOptions: { legend: LEGEND },
     series: [
-      lineSeries('Load Average 1', '#46B37E'),
-      lineSeries('Load Average 5', '#F2D14B'),
-      lineSeries('Load Average 15', '#E03636'),
+      lineSeries('Load Average 1', 'var(--ink-green-5)'),
+      lineSeries('Load Average 5', 'var(--ink-yellow-5)'),
+      lineSeries('Load Average 15', 'var(--ink-red-5)'),
     ],
   },
 }))
@@ -499,6 +505,7 @@ const diskChartConfig = computed(() => ({
     data: currentPoints.value,
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, yMax: 100, echartOptions: { name: '%', splitLine: GRID } },
+    echartOptions: { legend: LEGEND },
     series: [lineSeries(DISK_SERIES, PALETTE[0])],
   },
 }))
@@ -509,6 +516,7 @@ const networkChartConfig = computed(() => ({
     data: scaleFields(currentPoints.value, NETWORK_SERIES, 1024 ** 2),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, echartOptions: { name: 'MB/s', splitLine: GRID } },
+    echartOptions: { legend: LEGEND },
     series: NETWORK_SERIES.map((name, i) => lineSeries(name, PALETTE[i])),
   },
 }))
@@ -519,6 +527,7 @@ const diskIoChartConfig = computed(() => ({
     data: scaleFields(currentPoints.value, DISK_IO_SERIES, 1024 ** 2),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, echartOptions: { name: 'MB/s', splitLine: GRID } },
+    echartOptions: { legend: LEGEND },
     series: DISK_IO_SERIES.map((name, i) => lineSeries(name, PALETTE[i])),
   },
 }))
@@ -542,6 +551,7 @@ const appCpuConfig = computed(() => ({
     data: normalizeAppData(appWindowData.value.cpu, appWindowData.value.services),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, yMax: 100, echartOptions: { name: '%', splitLine: GRID } },
+    echartOptions: { legend: LEGEND },
     series: appWindowData.value.services.map((name, i) => lineSeries(name, PALETTE[i])),
   },
 }))
@@ -556,6 +566,7 @@ const appMemConfig = computed(() => ({
     ),
     xAxis: currentXAxis.value,
     yAxis: { yMin: 0, echartOptions: { name: 'MB', splitLine: GRID } },
+    echartOptions: { legend: LEGEND },
     series: appWindowData.value.services.map((name, i) => lineSeries(name, PALETTE[i])),
   },
 }))
