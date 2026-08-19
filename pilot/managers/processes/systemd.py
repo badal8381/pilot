@@ -41,9 +41,8 @@ class SystemdProcessManager(SystemdUserMixin, ManagedProcessManager):
         GunicornManager(self.bench).generate_admin_config()
         self.systemd_conf_dir.mkdir(parents=True, exist_ok=True)
 
-        # Build the definitions before unlinking anything: an app with a broken
-        # declaration raises here, and a half-cleared directory would leave
-        # dangling symlinks that drop services on the next daemon-reload.
+        # Built before unlinking anything: a broken declaration raises here, and a
+        # half-cleared directory would drop services on the next daemon-reload.
         defs = self._prod_process_definitions()
 
         target_file = self._target_name()

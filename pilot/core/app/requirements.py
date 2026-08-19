@@ -21,37 +21,20 @@ class AppRequirementsError(BenchError):
 
 
 class AppRequirements:
-    """Reads and validates an app's process declarations from the
-    [tool.pilot.background_processes] table of its pyproject.toml.
+    """An app's [tool.pilot.background_processes] declarations, from its pyproject.toml.
 
-    Each process is a sub-table keyed by its name:
-
-        [tool.pilot.background_processes.flow_server]
-        cmd = ["flow", "serve"]
-        restart_on_failure = true
-        pre_run = ["bash", "-c", "./scripts/install_flow.sh"]
-        post_run = ["bash", "-c", "rm -f flow.sock"]
-
-    Every declared value is attacker-controlled (any installed app), so each
-    field is validated on read - reject, never sanitize - before it can reach a
-    unit file or a shell.
+    Every value comes from a third-party app, so each field is rejected - never
+    sanitized - before it can reach a unit file or a shell. See docs/app-processes.md.
     """
 
     def __init__(self, app: "App") -> None:
         self.app = app
 
     def process_definitions(self) -> list[ProcessDefinition]:
-        return [self._build_definition(name, entry) for name, entry in self._process_entries.items()]
+        return [self._build_definition(name, entry) for name, entry in self._declarations.items()]
 
     @property
-    def _process_entries(self) -> dict:
-        entries = self._tool_pilot.get("background_processes", {})
-        if not isinstance(entries, dict):
-            raise self._error("[tool.pilot.background_processes] must be a table of tables.")
-        return entries
-
-    @property
-    def _tool_pilot(self) -> dict:
+    def _declarations(self) -> dict:
         pyproject = self.app.path / "pyproject.toml"
         if not pyproject.exists():
             return {}
@@ -59,8 +42,11 @@ class AppRequirements:
             data = tomllib.loads(pyproject.read_text())
         except (tomllib.TOMLDecodeError, OSError) as exc:
             raise self._error(f"unreadable pyproject.toml: {exc}") from exc
-        section = data.get("tool", {}).get("pilot", {})
-        return section if isinstance(section, dict) else {}
+        tool_pilot = data.get("tool", {}).get("pilot", {})
+        entries = tool_pilot.get("background_processes", {}) if isinstance(tool_pilot, dict) else {}
+        if not isinstance(entries, dict):
+            raise self._error("[tool.pilot.background_processes] must be a table of tables.")
+        return entries
 
     def _build_definition(self, name: str, entry: object) -> ProcessDefinition:
         if not isinstance(name, str) or not _NAME_RE.match(name):
@@ -98,11 +84,8 @@ class AppRequirements:
         )
 
     def _working_dir(self, name: str, value: object) -> Path:
-        """Defaults to the app directory; a relative path is read from there.
-
-        Each process manager has its own default directory, so a declaration
-        that never names one would otherwise start somewhere unpredictable.
-        """
+        """Defaults to the app directory; a relative path is read from there. Each
+        manager has its own default, so an unnamed one would start unpredictably."""
         if value is None:
             return self.app.path
         self._reject_control(name, "working_dir", value)
@@ -138,12 +121,8 @@ class AppRequirements:
 
     @staticmethod
     def _resolve_executable(executable: str, working_dir: Path) -> str:
-        """Anchor a path-like executable to the working directory.
-
-        Resolved lexically, not on disk: a `pre_run` hook may be what puts the
-        binary there in the first place. A bare name (`flow`) is left alone for
-        a PATH lookup.
-        """
+        """Anchor a path-like executable to the working directory, lexically - a
+        `pre_run` hook may be what downloads it. A bare name is left for PATH."""
         if "/" not in executable:
             return executable
         return executable if executable.startswith("/") else str(working_dir / executable)

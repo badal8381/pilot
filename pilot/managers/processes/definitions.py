@@ -12,6 +12,8 @@ from pilot.utils import cli_root
 if TYPE_CHECKING:
     from pilot.core.bench import Bench
 
+CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
+
 
 @dataclass
 class ProcessDefinition:
@@ -28,21 +30,24 @@ class ProcessDefinition:
 
 
 def hook_wrapped_argv(pd: ProcessDefinition) -> list[str]:
-    """argv for managers with no native pre/post hooks (supervisor, dev runner).
-
-    Every part is shlex-quoted and control chars are already rejected at read
-    time, so an app cannot break out of the shell line it declared.
-    """
+    """argv for managers with no native pre/post hooks (supervisor, dev runner)."""
     if not pd.pre_run and not pd.post_run:
         return pd.argv
     script = shlex.join(pd.argv)
     if pd.pre_run:
         script = f"{shlex.join(pd.pre_run)} && {script}"
     if pd.post_run:
-        # ponytail: keeps the wrapping `sh` alive as the parent; both managers
-        # stop the whole process group, so nothing is left behind.
         script = f"{script}; rc=$?; {shlex.join(pd.post_run)}; exit $rc"
     return ["sh", "-c", script]
+
+
+def reject_control_chars(pd: ProcessDefinition) -> None:
+    """A control character in a declared field would inject directives into a unit file."""
+    fields = [pd.name, str(pd.working_dir or ""), *pd.argv, *pd.pre_run, *pd.post_run]
+    for key, value in pd.env.items():
+        fields += [key, value]
+    if any(CONTROL_RE.search(field) for field in fields):
+        raise ValueError(f"process '{pd.name}' has a control character in a unit field")
 
 
 class ProcessDefinitionBuilder:
@@ -82,13 +87,8 @@ class ProcessDefinitionBuilder:
         return defs
 
     def app_process_definitions(self) -> list[ProcessDefinition]:
-        """A malformed declaration raises instead of being skipped.
-
-        Skipping would drop that app's processes from the desired set, and
-        reconciliation reads a smaller set as "removed" - it would stop and
-        disable services that are running fine. Failing here leaves the bench
-        untouched until the app is fixed.
-        """
+        """A malformed declaration raises rather than being skipped - a skipped app
+        reads as "removed" to reconciliation, which would stop its live services."""
         defs: list[ProcessDefinition] = []
         for app in self.bench.apps():
             defs.extend(app.requirements.process_definitions())

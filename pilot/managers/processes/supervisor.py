@@ -13,10 +13,14 @@ from pilot.managers.processes.base import (
     UnitGroup,
     override,
 )
-from pilot.managers.processes.definitions import hook_wrapped_argv
+from pilot.managers.processes.definitions import hook_wrapped_argv, reject_control_chars
 from pilot.managers.processes.local import ProcessDefinition
-from pilot.managers.processes.systemd_render import reject_control_chars, supervisor_escape
 from pilot.utils import cli_root, run_command
+
+
+def _escape(value: str) -> str:
+    # supervisord expands %(...)s, and quoted values need their quotes escaped.
+    return value.replace("%", "%%").replace('"', '\\"')
 
 
 class SupervisorRenderer(ServiceRenderer):
@@ -32,12 +36,12 @@ class SupervisorRenderer(ServiceRenderer):
         directory = f"directory={pd.working_dir}\n" if pd.working_dir else ""
         env = ""
         if pd.env:
-            pairs = ",".join(f'{k}="{supervisor_escape(v)}"' for k, v in pd.env.items())
+            pairs = ",".join(f'{k}="{_escape(v)}"' for k, v in pd.env.items())
             env = f"environment={pairs}\n"
         stop = f"stopwaitsecs={pd.stop_timeout}\n" if pd.stop_timeout is not None else ""
         return (
             f"[program:{self.get_program_name(pd)}]\n"
-            f"command={supervisor_escape(shlex.join(hook_wrapped_argv(pd)))}\n"
+            f"command={_escape(shlex.join(hook_wrapped_argv(pd)))}\n"
             f"{env}{directory}"
             f"autostart=true\n"
             f"autorestart={'true' if pd.restart_on_failure else 'false'}\n"
