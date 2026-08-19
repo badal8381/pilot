@@ -5,7 +5,11 @@ import { useIsMobile } from '@/composables/common/useIsMobile'
 
 // inheritAttrs off so a caller's `class` styles the trigger, not the Dropdown.
 defineOptions({ inheritAttrs: false })
-defineProps({ options: { type: Array, required: true } })
+interface Props {
+  options: any[]
+}
+
+defineProps<Props>()
 
 const isMobile = useIsMobile()
 </script>

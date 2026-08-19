@@ -8,7 +8,11 @@ import { benchesApi } from '@/api/benches'
 
 const PM_LABELS = { systemd: 'Systemd', supervisor: 'Supervisor' }
 
-const props = defineProps({ modelValue: Boolean })
+interface Props {
+  modelValue?: boolean
+}
+
+const props = defineProps<Props>()
 const emit = defineEmits(['update:modelValue'])
 
 const show = computed({

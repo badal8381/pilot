@@ -17,9 +17,13 @@ import { appsApi } from '@/api/apps'
 import { gitApi } from '@/api/git'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
-const props = defineProps({
+interface Props {
   // When set, the fetched app is also installed on this site.
-  siteName: { type: String, default: '' },
+  siteName?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  siteName: '',
 })
 const open = defineModel('open')
 const router = useRouter()

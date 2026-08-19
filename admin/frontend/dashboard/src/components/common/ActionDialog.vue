@@ -3,20 +3,31 @@ import { Avatar, Button, Dialog, ErrorMessage } from 'frappe-ui'
 
 import AppIcon from '@/components/apps/AppIcon.vue'
 
-defineProps({
-  title: { type: String, required: true },
-  size: { type: String, default: 'md' },
+interface Props {
+  title: string
+  size?: string
   // { label, description, badge, icon } - `icon` picks a lucide tile, otherwise
   // the app logo is used via { name, logo }.
-  subject: { type: Object, default: null },
+  subject?: Record<string, any> | null
   // { title, message } rendered as the destructive-action callout.
-  warning: { type: Object, default: null },
-  error: { type: String, default: '' },
-  confirmLabel: { type: String, required: true },
-  confirmTheme: { type: String, default: 'gray' },
-  cancelLabel: { type: String, default: 'Cancel' },
-  loading: { type: Boolean, default: false },
-  disabled: { type: Boolean, default: false },
+  warning?: Record<string, any> | null
+  error?: string
+  confirmLabel: string
+  confirmTheme?: string
+  cancelLabel?: string
+  loading?: boolean
+  disabled?: boolean
+}
+
+withDefaults(defineProps<Props>(), {
+  size: 'md',
+  subject: null,
+  warning: null,
+  error: '',
+  confirmTheme: 'gray',
+  cancelLabel: 'Cancel',
+  loading: false,
+  disabled: false,
 })
 
 const open = defineModel('open')

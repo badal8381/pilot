@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { Badge } from 'frappe-ui'
 
-defineProps({
-  icon: { type: String, required: true },
-  title: { type: String, required: true },
+interface Props {
+  icon: string
+  title: string
   // A string too: an unresolved multi-site update counts as "2/5".
-  count: { type: [Number, String], required: true },
-  open: { type: Boolean, default: true },
+  count: number | string
+  open?: boolean
+}
+
+withDefaults(defineProps<Props>(), {
+  open: true,
 })
 
 defineEmits(['update:open'])

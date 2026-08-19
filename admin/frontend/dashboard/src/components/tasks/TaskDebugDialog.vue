@@ -6,7 +6,11 @@ import DOMPurify from 'dompurify'
 
 import { tasksApi } from '@/api/tasks'
 
-const props = defineProps({ taskId: { type: String, required: true } })
+interface Props {
+  taskId: string
+}
+
+const props = defineProps<Props>()
 const show = defineModel({ type: Boolean, default: false })
 
 const text = ref('')

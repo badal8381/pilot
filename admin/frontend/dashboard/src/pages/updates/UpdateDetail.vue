@@ -23,7 +23,11 @@ import { useBreadcrumbs } from '@/composables/common/useBreadcrumbs'
 import { fmtDateTime, fmtDuration } from '@/utils/taskFormat'
 import { opTitle, patchSkipped, pendingActionLabel, siteStatus } from '@/utils/updateFormat'
 
-const props = defineProps({ operationId: { type: String, required: true } })
+interface Props {
+  operationId: string
+}
+
+const props = defineProps<Props>()
 const router = useRouter()
 const { setBreadcrumbs } = useBreadcrumbs()
 

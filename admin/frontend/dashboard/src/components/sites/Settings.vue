@@ -4,7 +4,11 @@ import SettingsDomains from '@/components/sites/settings/Domains.vue'
 import SettingsActions from '@/components/sites/settings/Actions.vue'
 import SettingsDanger from '@/components/sites/settings/Danger.vue'
 
-defineProps({ siteName: { type: String, required: true } })
+interface Props {
+  siteName: string
+}
+
+defineProps<Props>()
 </script>
 
 <template>

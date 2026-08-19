@@ -5,9 +5,13 @@ import { ErrorMessage, Skeleton } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 
-const props = defineProps({
-  siteName: { type: String, required: true },
-  window: { type: String, default: '1h' },
+interface Props {
+  siteName: string
+  window?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  window: '1h',
 })
 
 const loading = ref(true)

@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 
-defineProps({ sections: { type: Array, required: true } })
+interface Props {
+  sections: any[]
+}
+
+defineProps<Props>()
 const emit = defineEmits(['passwordChanged'])
 const openSection = defineModel('openSection')
 

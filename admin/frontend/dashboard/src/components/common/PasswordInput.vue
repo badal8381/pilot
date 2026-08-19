@@ -4,10 +4,16 @@ import { TextInput } from 'frappe-ui'
 import LucideEye from '~icons/lucide/eye'
 import LucideEyeOff from '~icons/lucide/eye-off'
 
-defineProps({
-  label: { type: String, default: '' },
-  placeholder: { type: String, default: '' },
-  autocomplete: { type: String, default: 'off' },
+interface Props {
+  label?: string
+  placeholder?: string
+  autocomplete?: string
+}
+
+withDefaults(defineProps<Props>(), {
+  label: '',
+  placeholder: '',
+  autocomplete: 'off',
 })
 
 const password = defineModel({ type: String, default: '' })

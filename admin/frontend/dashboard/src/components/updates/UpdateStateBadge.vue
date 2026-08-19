@@ -3,7 +3,11 @@ import { Badge } from 'frappe-ui'
 
 import { stateLabel, stateTone } from '@/utils/updateFormat'
 
-defineProps({ state: { type: String, required: true } })
+interface Props {
+  state: string
+}
+
+defineProps<Props>()
 </script>
 
 <template>

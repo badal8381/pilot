@@ -9,10 +9,16 @@ import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 import { openSitePage, openTaskDetailPage } from '@/utils/taskRoute'
 
-const props = defineProps({
-  app: { type: Object, default: null },
-  sites: { type: Array, default: () => [] },
-  siteName: { type: String, default: '' },
+interface Props {
+  app?: Record<string, any> | null
+  sites?: any[]
+  siteName?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  app: null,
+  sites: () => [],
+  siteName: '',
 })
 const open = defineModel('open')
 const router = useRouter()

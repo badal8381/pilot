@@ -3,7 +3,13 @@ import { ref, watch } from 'vue'
 
 import { monitorApi } from '@/api/monitor'
 
-const props = defineProps({ window: { type: String, default: '24h' } })
+interface Props {
+  window?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  window: '24h',
+})
 
 const data = ref(null)
 

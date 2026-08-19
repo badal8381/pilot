@@ -1,15 +1,26 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 
-const props = defineProps({
-  lines: { type: Array, default: () => [] },
-  streaming: { type: Boolean, default: false },
-  lineNumbers: { type: Boolean, default: false },
-  wrap: { type: Boolean, default: false },
-  rounded: { type: Boolean, default: true },
-  fill: { type: Boolean, default: false },
-  rows: { type: Boolean, default: false },
-  emptyText: { type: String, default: 'No output.' },
+interface Props {
+  lines?: any[]
+  streaming?: boolean
+  lineNumbers?: boolean
+  wrap?: boolean
+  rounded?: boolean
+  fill?: boolean
+  rows?: boolean
+  emptyText?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  lines: () => [],
+  streaming: false,
+  lineNumbers: false,
+  wrap: false,
+  rounded: true,
+  fill: false,
+  rows: false,
+  emptyText: 'No output.',
 })
 
 const el = ref(null)

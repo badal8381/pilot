@@ -23,7 +23,11 @@ import ActionMenu from '@/components/common/ActionMenu.vue'
 
 import { useBenches } from '@/composables/benches/useBenches'
 
-const props = defineProps({ modelValue: Boolean })
+interface Props {
+  modelValue?: boolean
+}
+
+const props = defineProps<Props>()
 const emit = defineEmits(['update:modelValue', 'new-bench'])
 
 const show = computed({

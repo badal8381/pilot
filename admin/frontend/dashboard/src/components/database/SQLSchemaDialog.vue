@@ -4,8 +4,12 @@ import { Button, Dialog, FormControl } from 'frappe-ui'
 
 import Table from '@/components/common/Table.vue'
 
-const props = defineProps({
-  schema: { type: Array, default: () => [] },
+interface Props {
+  schema?: any[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  schema: () => [],
 })
 const emit = defineEmits(['preview'])
 

@@ -5,9 +5,11 @@ import LucideDownload from '~icons/lucide/download'
 
 import AppIcon from '@/components/apps/AppIcon.vue'
 
-const props = defineProps({
-  app: { type: Object, required: true },
-})
+interface Props {
+  app: Record<string, any>
+}
+
+const props = defineProps<Props>()
 defineEmits(['install'])
 
 const showIncompatible = ref(false)

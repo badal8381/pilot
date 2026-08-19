@@ -12,8 +12,12 @@ import { PILLS } from '@/utils/marketplaceCategories'
 
 const isMobile = useIsMobile()
 
-const props = defineProps({
-  worksWithOptions: { type: Array, default: () => [] },
+interface Props {
+  worksWithOptions?: any[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  worksWithOptions: () => [],
 })
 defineEmits(['add-from-github'])
 

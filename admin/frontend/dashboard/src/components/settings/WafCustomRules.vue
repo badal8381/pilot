@@ -15,10 +15,16 @@ import {
 
 // Two-way bound so the child owns list edits without mutating a prop.
 const rules = defineModel({ type: Array, default: () => [] })
-const props = defineProps({
-  fields: { type: Array, default: () => [] },
-  operators: { type: Array, default: () => [] },
-  actions: { type: Array, default: () => [] },
+interface Props {
+  fields?: any[]
+  operators?: any[]
+  actions?: any[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  fields: () => [],
+  operators: () => [],
+  actions: () => [],
 })
 
 const PLACEHOLDERS = {

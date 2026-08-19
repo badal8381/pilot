@@ -6,7 +6,11 @@ import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 import { formatHour } from '@/utils/backup'
 
-const props = defineProps({ siteName: { type: String, required: true } })
+interface Props {
+  siteName: string
+}
+
+const props = defineProps<Props>()
 const emit = defineEmits(['saved'])
 
 const FREQ_OPTIONS = [

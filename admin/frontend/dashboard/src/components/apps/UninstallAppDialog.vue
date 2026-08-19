@@ -8,12 +8,17 @@ import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 import { openTaskDetailPage } from '@/utils/taskRoute'
 
-const props = defineProps({
-  app: { type: Object, default: null },
-  siteName: { type: String, required: true },
+interface Props {
+  app?: Record<string, any> | null
+  siteName: string
   // Only marketplace apps can be disabled - a disabled app is re-enabled by
   // installing it again, which needs the app to still be in the catalog.
-  canDisable: { type: Boolean, default: false },
+  canDisable?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  app: null,
+  canDisable: false,
 })
 const open = defineModel('open')
 const emit = defineEmits(['disabled'])

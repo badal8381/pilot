@@ -10,8 +10,12 @@ import { sidebarSections } from '@/components/navigation/list'
 import { useAppMenu } from '@/components/navigation/useAppMenu'
 import { openSearch } from '@/composables/common/useSearch'
 
-const props = defineProps({
-  isMobile: { type: Boolean, default: false },
+interface Props {
+  isMobile?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  isMobile: false,
 })
 
 const route = useRoute()

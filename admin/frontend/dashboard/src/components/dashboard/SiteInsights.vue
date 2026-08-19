@@ -8,9 +8,13 @@ import SiteUptime from '@/components/dashboard/SiteUptime.vue'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 
-const props = defineProps({
-  siteName: { type: String, required: true },
-  window: { type: String, default: '24h' },
+interface Props {
+  siteName: string
+  window?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  window: '24h',
 })
 
 const TIME_GRAIN = {

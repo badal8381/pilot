@@ -14,7 +14,11 @@ import {
 import { sitesApi } from '@/api/sites'
 import { useSite } from '@/composables/sites/useSite'
 
-const props = defineProps({ siteName: { type: String, required: true } })
+interface Props {
+  siteName: string
+}
+
+const props = defineProps<Props>()
 
 const { site, reload } = useSite(props.siteName)
 

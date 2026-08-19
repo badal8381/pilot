@@ -11,9 +11,11 @@ import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { useSession } from '@/composables/auth/useSession'
 import { toSentenceCase } from '@/utils/format'
 
-const props = defineProps({
-  siteName: { type: String, required: true },
-})
+interface Props {
+  siteName: string
+}
+
+const props = defineProps<Props>()
 const { session } = useSession()
 
 const { apps, canDisableApps, installedApps, appsLoading, loadApps, reload } = useSite(props.siteName)

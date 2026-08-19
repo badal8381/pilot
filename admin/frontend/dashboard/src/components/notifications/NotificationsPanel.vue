@@ -25,8 +25,12 @@ interface SeverityLook {
   bg: string
 }
 
-defineProps({
-  mobile: { type: Boolean, default: false },
+interface Props {
+  mobile?: boolean
+}
+
+withDefaults(defineProps<Props>(), {
+  mobile: false,
 })
 
 const badgePollMs = 60000

@@ -4,8 +4,12 @@ import LucideCheck from '~icons/lucide/check'
 
 import { PASSWORD_REQUIREMENTS } from '@/utils/passwordStrength'
 
-const props = defineProps({
-  password: { type: String, default: '' },
+interface Props {
+  password?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  password: '',
 })
 
 const requirements = computed(() =>

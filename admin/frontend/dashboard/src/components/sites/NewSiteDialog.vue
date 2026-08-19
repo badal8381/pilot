@@ -10,8 +10,12 @@ import { sitesApi } from '@/api/sites'
 import { useAppRegistry } from '@/composables/apps/useAppRegistry'
 import { buildSiteAppChoices } from '@/utils/siteApps'
 
-defineProps({
-  sites: { type: Array, default: () => [] },
+interface Props {
+  sites?: any[]
+}
+
+withDefaults(defineProps<Props>(), {
+  sites: () => [],
 })
 
 const emit = defineEmits(['started'])

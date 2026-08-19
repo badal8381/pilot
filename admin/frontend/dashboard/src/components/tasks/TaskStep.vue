@@ -4,13 +4,21 @@ import { Spinner } from 'frappe-ui'
 
 import LogView from '@/components/logs/LogView.vue'
 
-const props = defineProps({
-  label: { type: String, required: true },
-  status: { type: String, default: 'pending' },
-  duration: { type: String, default: null },
-  lines: { type: Array, default: () => [] },
-  hasOutput: { type: Boolean, default: false },
-  streaming: { type: Boolean, default: false },
+interface Props {
+  label: string
+  status?: string
+  duration?: string | null
+  lines?: any[]
+  hasOutput?: boolean
+  streaming?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  status: 'pending',
+  duration: null,
+  lines: () => [],
+  hasOutput: false,
+  streaming: false,
 })
 
 // Open while running or failed; anything else settles closed unless toggled.

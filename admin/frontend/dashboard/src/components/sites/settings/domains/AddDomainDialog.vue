@@ -13,7 +13,11 @@ const DNS_RECORD_COLUMNS = [
   { key: 'value', label: 'Points to' },
 ]
 
-const props = defineProps({ siteName: { type: String, required: true } })
+interface Props {
+  siteName: string
+}
+
+const props = defineProps<Props>()
 const emit = defineEmits(['added'])
 
 const show = defineModel({ default: false })

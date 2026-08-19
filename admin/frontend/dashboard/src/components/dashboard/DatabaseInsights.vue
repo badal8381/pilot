@@ -10,7 +10,13 @@ import { apiErrorMessage } from '@/api/client'
 import { monitorApi } from '@/api/monitor'
 import { formatBytes } from '@/utils/format'
 
-const props = defineProps({ window: { type: String, default: '1h' } })
+interface Props {
+  window?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  window: '1h',
+})
 
 const TIME_GRAIN = {
   '30m': 'minute',

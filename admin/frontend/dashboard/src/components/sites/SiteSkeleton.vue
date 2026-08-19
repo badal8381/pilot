@@ -2,9 +2,13 @@
 import { computed } from 'vue'
 import { Skeleton } from 'frappe-ui'
 
-const props = defineProps({
+interface Props {
   // Index-based width cycle: varied bars, stable across re-renders.
-  index: { type: Number, default: 0 },
+  index?: number
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  index: 0,
 })
 
 const NAME_WIDTHS = ['w-32', 'w-24', 'w-40', 'w-28']

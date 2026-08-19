@@ -3,8 +3,12 @@ import { Dialog } from 'frappe-ui'
 
 import SiteRow from '@/components/sites/SiteRow.vue'
 
-defineProps({
-  sites: { type: Array, default: () => [] },
+interface Props {
+  sites?: any[]
+}
+
+withDefaults(defineProps<Props>(), {
+  sites: () => [],
 })
 const open = defineModel('open')
 const site = defineModel('site')

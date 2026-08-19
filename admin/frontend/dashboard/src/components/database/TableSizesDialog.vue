@@ -7,8 +7,12 @@ import { apiErrorMessage } from '@/api/client'
 import { databaseApi } from '@/api/database'
 import { formatBytes } from '@/utils/format'
 
-const props = defineProps({
-  site: { type: String, default: '' },
+interface Props {
+  site?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  site: '',
 })
 
 const open = defineModel('open', { type: Boolean, default: false })

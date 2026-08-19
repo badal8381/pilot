@@ -5,9 +5,13 @@ import { Button, Dialog, ErrorMessage } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
 
-const props = defineProps({
-  siteName: { type: String, required: true },
-  domain: { type: String, default: '' },
+interface Props {
+  siteName: string
+  domain?: string
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  domain: '',
 })
 const emit = defineEmits(['removed'])
 

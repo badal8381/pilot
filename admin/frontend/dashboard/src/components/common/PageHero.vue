@@ -1,5 +1,11 @@
 <script setup lang="ts">
-defineProps({ icon: { type: String, default: '' } })
+interface Props {
+  icon?: string
+}
+
+withDefaults(defineProps<Props>(), {
+  icon: '',
+})
 </script>
 
 <template>

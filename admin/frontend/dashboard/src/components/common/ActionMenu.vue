@@ -2,7 +2,13 @@
 import { ref, onBeforeUnmount } from 'vue'
 import { Button } from 'frappe-ui'
 
-const props = defineProps({ options: { type: Array, default: () => [] } })
+interface Props {
+  options?: any[]
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  options: () => [],
+})
 
 const root = ref(null)
 const panel = ref(null)

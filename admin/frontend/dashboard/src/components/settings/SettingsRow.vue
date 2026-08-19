@@ -1,9 +1,15 @@
 <script setup lang="ts">
-defineProps({
-  label: { type: String, required: true },
-  description: { type: String, default: '' },
-  as: { type: String, default: 'div', validator: (as) => ['div', 'button'].includes(as) },
-  interactive: { type: Boolean, default: false },
+interface Props {
+  label: string
+  description?: string
+  as?: 'div' | 'button'
+  interactive?: boolean
+}
+
+withDefaults(defineProps<Props>(), {
+  description: '',
+  as: 'div',
+  interactive: false,
 })
 </script>
 

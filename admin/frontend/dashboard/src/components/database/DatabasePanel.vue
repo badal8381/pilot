@@ -2,13 +2,21 @@
 import { computed } from 'vue'
 import { Badge, Button, Switch } from 'frappe-ui'
 
-const props = defineProps({
-  title: { type: String, required: true },
-  subtitle: { type: String, default: '' },
-  badge: { type: [String, Array], default: '' },
-  loading: { type: Boolean, default: false },
-  showAutoRefresh: { type: Boolean, default: false },
-  autoRefresh: { type: Boolean, default: false },
+interface Props {
+  title: string
+  subtitle?: string
+  badge?: string | any[]
+  loading?: boolean
+  showAutoRefresh?: boolean
+  autoRefresh?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  subtitle: '',
+  badge: '',
+  loading: false,
+  showAutoRefresh: false,
+  autoRefresh: false,
 })
 
 defineEmits(['refresh', 'update:autoRefresh'])

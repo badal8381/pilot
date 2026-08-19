@@ -1,12 +1,19 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-const props = defineProps({
-  label: { type: String, required: true },
-  icon: { type: String, default: 'lucide-globe' },
-  selected: { type: Boolean, default: false },
-  disabled: { type: Boolean, default: false },
-  interactive: { type: Boolean, default: true },
+interface Props {
+  label: string
+  icon?: string
+  selected?: boolean
+  disabled?: boolean
+  interactive?: boolean
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  icon: 'lucide-globe',
+  selected: false,
+  disabled: false,
+  interactive: true,
 })
 
 const stateClass = computed(() => {

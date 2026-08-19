@@ -4,7 +4,13 @@ import { AxisChart } from 'frappe-ui'
 
 import ChartCard from '@/components/common/ChartCard.vue'
 
-const props = defineProps({ overview: { type: Object, default: null } })
+interface Props {
+  overview?: Record<string, any> | null
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  overview: null,
+})
 
 const GRID = { show: true, lineStyle: { type: 'dashed', color: 'var(--outline-gray-2)' } }
 const PALETTE = ['#10b981', '#ef4444', '#f59e0b', '#2490ef', '#8b5cf6', '#06b6d4', '#ec4899']

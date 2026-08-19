@@ -2,19 +2,27 @@
 import { computed, onMounted, ref } from 'vue'
 import { Button, Dialog, Dropdown, ErrorMessage, Select } from 'frappe-ui'
 
-const props = defineProps({
-  title: { type: String, default: '' },
+interface Props {
+  title?: string
   // Lowercase plural noun used in button/dialog copy, e.g. "backups", "snapshots".
-  noun: { type: String, required: true },
-  enabledHint: { type: String, default: '' },
-  disabledHint: { type: String, default: '' },
-  disableBody: { type: String, required: true },
-  retentionHint: { type: String, default: '' },
+  noun: string
+  enabledHint?: string
+  disabledHint?: string
+  disableBody: string
+  retentionHint?: string
   // Hide the title/hint text, rendering only the enable button or schedule dropdown.
-  titleless: { type: Boolean, default: false },
-  fetchSchedule: { type: Function, required: true }, // () => Promise<{ schedule: string|null }>
-  setSchedule: { type: Function, required: true }, // (cron: string) => Promise<void>, throws on failure
-  removeSchedule: { type: Function, required: true }, // () => Promise<void>, throws on failure
+  titleless?: boolean
+  fetchSchedule: () => Promise<{ schedule: string | null }>
+  setSchedule: (cron: string) => Promise<void>
+  removeSchedule: () => Promise<void>
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  title: '',
+  enabledHint: '',
+  disabledHint: '',
+  retentionHint: '',
+  titleless: false,
 })
 
 const FREQ_OPTIONS = [

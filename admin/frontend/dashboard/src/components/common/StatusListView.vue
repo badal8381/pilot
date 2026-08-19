@@ -7,11 +7,13 @@ import { ListRowItem, ListView } from 'frappe-ui/experimental'
  * render as text. Rows need an `id` and, where the badge shows, a `badge` of
  * `{ label, theme }` or null.
  */
-defineProps({
-  columns: { type: Array, required: true },
-  rows: { type: Array, required: true },
-  getRowRoute: { type: Function, required: true },
-})
+interface Props {
+  columns: any[]
+  rows: any[]
+  getRowRoute: (row: Record<string, any>) => Record<string, any>
+}
+
+defineProps<Props>()
 </script>
 
 <template>
