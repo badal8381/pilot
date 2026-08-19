@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import smtplib
 import time
 import typing
 import urllib.request
+from email.message import EmailMessage
 from pathlib import Path
 
 from pilot.integrations.central import CentralClient, CentralClientError
 
 if typing.TYPE_CHECKING:
+    from pilot.config.alert_limit import ResourceLimitConfig
     from pilot.core.bench import Bench
 
 # How long a condition must hold before it is worth telling anyone about.
@@ -33,16 +36,43 @@ def send_alert(endpoint: str, token: str, payload: dict[str, typing.Any]) -> Non
         pass
 
 
-def notify(bench: "Bench", payload: dict[str, typing.Any]) -> bool:
-    """If we made it to any of the webhooks we will mark this as a successful delivery."""
-    delivered = False
+def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> None:
+    """Email one alert to the configured recipients."""
+    endpoint = limits.get_mail_endpoint()
+    message = EmailMessage()
+    message["Subject"] = f"[Pilot] {payload['message']}"
+    message["From"] = endpoint.username
+    message["To"] = ", ".join(limits.email_recipients)
+    message.set_content(f"{payload['message']}\n\n{json.dumps(payload['context'], indent=2)}")
 
-    for endpoint, token in bench.config.resource_limits.webhook_endpoints.items():
+    transport = smtplib.SMTP_SSL if endpoint.is_ssl else smtplib.SMTP
+    with transport(endpoint.host, endpoint.port, timeout=ALERT_TIMEOUT_SECONDS) as server:
+        if not endpoint.is_ssl:
+            server.starttls()  # credentials must never cross a plaintext hop
+        if endpoint.username:
+            server.login(endpoint.username, limits.smtp_password)
+        server.send_message(message)
+
+
+def notify(bench: "Bench", payload: dict[str, typing.Any]) -> bool:
+    """If we made it to any of the webhooks or mailboxes we will mark this as a successful delivery."""
+    delivered = False
+    limits = bench.config.resource_limits
+
+    for endpoint, token in limits.webhook_endpoints.items():
         try:
             send_alert(endpoint, token, payload)
         except OSError:
             continue
         delivered = True
+
+    if limits.is_mail_configured:
+        try:
+            send_mail(limits, payload)
+        except OSError:
+            pass
+        else:
+            delivered = True
 
     try:
         CentralClient(bench).notify_central(**payload)

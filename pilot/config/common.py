@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 from pilot.config.alert_limit import ResourceLimitConfig
@@ -92,19 +92,10 @@ class CommonConfig:
         if self.datum != DatumConfig():
             data["datum"] = {"endpoint": self.datum.endpoint, "token": self.datum.token}
         if self.resource_limits != ResourceLimitConfig():
-            data["resource_limits"] = self._resource_limits_section()
+            data["resource_limits"] = asdict(self.resource_limits)
         if self.jwks_url:
             data["admin"] = {"jwks_url": self.jwks_url, "jwks_audience": self.jwks_audience}
         return data
-
-    def _resource_limits_section(self) -> ConfigDict:
-        return {
-            "cpu_usage_limit": self.resource_limits.cpu_usage_limit,
-            "memory_usage_limit": self.resource_limits.memory_usage_limit,
-            "disk_space_limit": self.resource_limits.disk_space_limit,
-            "site_uptime": self.resource_limits.site_uptime,
-            "webhook_endpoints": self.resource_limits.webhook_endpoints,
-        }
 
     def _central_section(self) -> ConfigDict:
         data: ConfigDict = {"endpoint": self.central.endpoint, "auth_token": self.central.auth_token}

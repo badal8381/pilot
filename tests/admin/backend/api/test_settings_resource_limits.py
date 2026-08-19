@@ -71,6 +71,9 @@ def test_settings_response_exposes_limits() -> None:
         "disk_space_limit": 0,
         "site_uptime": True,
         "webhook_endpoints": [],
+        "smtp_url": "",
+        "smtp_password_set": False,
+        "email_recipients": [],
     }
 
 
@@ -137,6 +140,53 @@ def test_patch_keeps_stored_token_when_blank(tmp_path: Path) -> None:
 
     stored = CommonConfig.read(benches_root).resource_limits.webhook_endpoints
     assert stored == {"https://alerts.example.com/pilot": "tok-123"}
+
+
+def test_patch_persists_mail_settings(tmp_path: Path) -> None:
+    benches_root = tmp_path / "benches"
+    client = _client(benches_root / "current")
+    mail = {
+        "smtp_url": "smtps://alerts@example.com@smtp.example.com",
+        "smtp_password": "secret",
+        "email_recipients": ["ops@example.com", " oncall@example.com "],
+    }
+
+    response = client.patch("/api/v1/settings", json={"resource_limits": mail})
+
+    assert response.status_code == 200
+    limits = CommonConfig.read(benches_root).resource_limits
+    assert limits.get_mail_endpoint() == ("smtp.example.com", 465, True, "alerts@example.com")
+    assert limits.email_recipients == ["ops@example.com", "oncall@example.com"]
+    read_back = client.get("/api/v1/settings").get_json()["resource_limits"]
+    assert read_back["smtp_password_set"] is True
+    assert "secret" not in str(read_back)
+
+
+def test_patch_keeps_stored_mail_password_when_blank(tmp_path: Path) -> None:
+    benches_root = tmp_path / "benches"
+    client = _client(benches_root / "current")
+    mail = {"smtp_url": "smtp://smtp.example.com", "smtp_password": "secret"}
+    client.patch("/api/v1/settings", json={"resource_limits": mail})
+
+    client.patch(
+        "/api/v1/settings",
+        json={"resource_limits": {"smtp_url": "smtp://smtp2.example.com", "smtp_password": ""}},
+    )
+
+    limits = CommonConfig.read(benches_root).resource_limits
+    assert (limits.smtp_url, limits.smtp_password) == ("smtp://smtp2.example.com", "secret")
+
+
+def test_patch_rejects_recipients_without_a_mail_server(tmp_path: Path) -> None:
+    benches_root = tmp_path / "benches"
+    client = _client(benches_root / "current")
+
+    response = client.patch(
+        "/api/v1/settings", json={"resource_limits": {"email_recipients": ["ops@example.com"]}}
+    )
+
+    assert response.status_code == 422
+    assert CommonConfig.read(benches_root).resource_limits.email_recipients == []
 
 
 def test_patch_rejects_invalid_limit_without_saving(tmp_path: Path) -> None:

@@ -193,10 +193,13 @@ def resource_limits_payload(config: BenchConfig) -> dict:
         "memory_usage_limit": limits.memory_usage_limit,
         "disk_space_limit": limits.disk_space_limit,
         "site_uptime": limits.site_uptime,
-        # Tokens stay server-side; the UI only needs to know one is stored.
+        # Secrets stay server-side; the UI only needs to know one is stored.
         "webhook_endpoints": [
             {"url": url, "token_set": bool(token)} for url, token in limits.webhook_endpoints.items()
         ],
+        "smtp_url": limits.smtp_url,
+        "smtp_password_set": bool(limits.smtp_password),
+        "email_recipients": limits.email_recipients,
     }
 
 

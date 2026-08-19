@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pilot.config import BenchConfig, FirewallRule, S3Config, WafCondition, WafRule, WorkerGroup
-from pilot.config.alert_limit import RESOURCE_LIMIT_FIELDS
+from pilot.config.alert_limit import RESOURCE_LIMIT_FIELDS, ResourceLimitConfig
 from pilot.config.llm import LLMConfig
 
 
@@ -76,11 +76,26 @@ class ConfigPatcher:
             limits.webhook_endpoints = self._webhook_endpoints(
                 resource_limits["webhook_endpoints"] or [], limits.webhook_endpoints
             )
+        self._apply_alert_mail(limits, resource_limits)
         try:
             limits.validate()
         except ValueError as error:
             return str(error)
         return None
+
+    @staticmethod
+    def _apply_alert_mail(limits: ResourceLimitConfig, resource_limits: dict) -> None:
+        """A blank password keeps the stored one, the same way webhook tokens work."""
+        if "smtp_url" in resource_limits:
+            limits.smtp_url = str(resource_limits["smtp_url"]).strip()
+        if resource_limits.get("smtp_password"):
+            limits.smtp_password = str(resource_limits["smtp_password"])
+        if "email_recipients" in resource_limits:
+            limits.email_recipients = [
+                address.strip()
+                for address in map(str, resource_limits["email_recipients"] or [])
+                if address.strip()
+            ]
 
     @staticmethod
     def _webhook_endpoints(entries: list[dict], stored: dict[str, str]) -> dict[str, str]:
