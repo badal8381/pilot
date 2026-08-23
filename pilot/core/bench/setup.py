@@ -217,6 +217,7 @@ class ProductionSetup:
             data.get("production", {}).pop("nginx", None)
 
     def _write_dns_multitenancy(self) -> None:
+        self.bench.sites_path.mkdir(parents=True, exist_ok=True)
         common_config_path = self.bench.sites_path / "common_site_config.json"
         existing_data: dict = {}
         if common_config_path.exists():
