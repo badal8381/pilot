@@ -302,10 +302,6 @@ base_tools_present() {
     return 0
 }
 
-# A normal workstation often has the bootstrap tools already, but that does not
-# mean Pilot's database and production dependencies were provisioned. Check the
-# packages that require host-level installation before letting the non-root
-# second pass skip package setup.
 system_packages_present() {
     base_tools_present || return 1
 
