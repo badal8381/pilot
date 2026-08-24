@@ -51,32 +51,6 @@ def _pids_listening(port: int) -> set[int]:
     return {int(m) for m in re.findall(pid_pattern, result.stdout)}
 
 
-def _process_command(pid: int) -> str:
-    try:
-        result = subprocess.run(
-            ["ps", "-ww", "-p", str(pid), "-o", "command="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return ""
-    return result.stdout.strip() if result.returncode == 0 else ""
-
-
-def _parent_pid(pid: int) -> int:
-    try:
-        result = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "ppid="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        return int(result.stdout.strip())
-    except (FileNotFoundError, subprocess.SubprocessError, ValueError):
-        return 0
-
-
 def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
     from pilot.managers.platform import is_macos
 
@@ -99,26 +73,6 @@ def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
     return (
         result.returncode == 0
         and re.search(rf"(?:^|\s){re.escape(expected)}(?:\s|$)", result.stdout) is not None
-    )
-
-
-def _is_setup_wizard_for_bench(command: str, bench_root: Path) -> bool:
-    try:
-        argv = shlex.split(command)
-        module_index = argv.index("-m")
-    except ValueError:
-        return False
-    module_args = argv[module_index + 1 :]
-    if not module_args or module_args[0] != "admin.backend.run_server":
-        return False
-    try:
-        bench_root_index = module_args.index("--bench-root")
-    except ValueError:
-        return False
-    return (
-        "--wizard" in module_args
-        and bench_root_index + 1 < len(module_args)
-        and module_args[bench_root_index + 1] == str(bench_root)
     )
 
 
@@ -246,52 +200,22 @@ class ProcessManager:
         if record is None:
             return False
         pid, recorded_stamp = record
-        if not recorded_stamp:
-            return self._stop_legacy_record(pid)
         current_stamp = get_process_stamp(pid)
         if current_stamp is None:
             raise BenchError(f"Could not inspect bench supervisor {pid}. Try again.")
         if current_stamp != recorded_stamp:
             self._unlink_supervisor_record(pid, recorded_stamp)
             return False
-        return self._terminate_supervisor(pid, recorded_stamp, recorded_stamp)
+        return self._terminate_supervisor(pid, recorded_stamp)
 
-    def _stop_legacy_record(self, pid: int) -> bool:
-        """A record from an older pilot carries no identity stamp. Signal it only
-        on structural proof: a listener on this bench's ports descends from it."""
-        stamp = get_process_stamp(pid)
-        if stamp == "":
-            self._unlink_supervisor_record(pid, "")
-            return False
-        if stamp is None or not self._is_ancestor_of_port_holder(pid):
-            raise BenchError(
-                f"Bench process {pid} was recorded by an older pilot and cannot be verified. "
-                f"Stop it manually, or remove {self.pid_file} if the process is not this bench."
-            )
-        return self._terminate_supervisor(pid, stamp, "")
-
-    def _is_ancestor_of_port_holder(self, pid: int) -> bool:
-        """A reused pid cannot fake having this bench's own listeners as descendants."""
-        holders = {holder for pids in self._port_holders().values() for holder in pids}
-        for holder in holders:
-            current = holder
-            for _hop in range(5):
-                current = _parent_pid(current)
-                if current == pid:
-                    return True
-                if current <= 1:
-                    break
-        return False
-
-    def _terminate_supervisor(self, pid: int, live_stamp: str, recorded_stamp: str) -> bool:
-        """recorded_stamp is what the record holds on disk — empty for legacy records."""
+    def _terminate_supervisor(self, pid: int, stamp: str) -> bool:
         try:
             os.kill(pid, signal.SIGTERM)
         except (ProcessLookupError, PermissionError):
-            self._unlink_supervisor_record(pid, recorded_stamp)
+            self._unlink_supervisor_record(pid, stamp)
             return False
-        self._wait_for_exit(pid, live_stamp)
-        self._unlink_supervisor_record(pid, recorded_stamp)
+        self._wait_for_exit(pid, stamp)
+        self._unlink_supervisor_record(pid, stamp)
         return True
 
     def _stop_port_holders(self) -> bool:
@@ -304,9 +228,7 @@ class ProcessManager:
         return bool(owned_pids)
 
     def _owns_process(self, pid: int) -> bool:
-        if _process_has_bench_root(pid, self.bench.path):
-            return True
-        return _is_setup_wizard_for_bench(_process_command(pid), self.bench.path)
+        return _process_has_bench_root(pid, self.bench.path)
 
     def _port_holders(self) -> dict[int, set[int]]:
         return {port: pids for port in self._configured_ports if (pids := _pids_listening(port))}
@@ -342,13 +264,14 @@ class ProcessManager:
         atomic_write_private_text(self.pid_file, f"{pid}\n{stamp}\n")
 
     def _read_supervisor_record(self) -> tuple[int, str] | None:
-        """(pid, stamp); the stamp is empty for a record written by an older pilot."""
+        """(pid, stamp); anything else in the file is not a record."""
         try:
             lines = self.pid_file.read_text().strip().splitlines()
             pid = int(lines[0])
+            stamp = lines[1].strip()
         except (OSError, ValueError, IndexError):
             return None
-        return pid, lines[1].strip() if len(lines) > 1 else ""
+        return (pid, stamp) if stamp else None
 
     def _unlink_supervisor_record(self, pid: int, stamp: str) -> None:
         """Remove the record only while it still holds the values this stop acted on."""
@@ -361,7 +284,7 @@ class ProcessManager:
         if record is None:
             return False
         pid, recorded_stamp = record
-        return bool(recorded_stamp) and get_process_stamp(pid) == recorded_stamp
+        return get_process_stamp(pid) == recorded_stamp
 
     def stop_admin(self) -> None:
         pass
