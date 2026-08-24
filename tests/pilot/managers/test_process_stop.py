@@ -143,7 +143,7 @@ def test_stop_with_stale_pid_file_kills_port_holders(tmp_path: Path, monkeypatch
 
     manager.stop()
 
-    assert orphan.poll() is not None
+    orphan.wait(timeout=5)
     assert not manager.pid_file.exists()
 
 
