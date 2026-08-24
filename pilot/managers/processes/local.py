@@ -173,8 +173,7 @@ def _without_pilot_group_options(args: list[str]) -> list[str]:
 
 def _process_runs_from_bench(pid: int, bench_root: Path) -> bool:
     cwd = _process_cwd(pid)
-    root = bench_root.resolve()
-    return cwd is not None and (cwd == root or root in cwd.parents)
+    return cwd is not None and cwd == bench_root.resolve()
 
 
 _RELOAD_REQUEST_FILE = "reload.request"
