@@ -103,6 +103,26 @@ def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
     )
 
 
+def _is_setup_wizard_for_bench(command: str, bench_root: Path) -> bool:
+    try:
+        argv = shlex.split(command)
+        module_index = argv.index("-m")
+    except ValueError:
+        return False
+    module_args = argv[module_index + 1 :]
+    if not module_args or module_args[0] != "admin.backend.run_server":
+        return False
+    try:
+        bench_root_index = module_args.index("--bench-root")
+    except ValueError:
+        return False
+    return (
+        "--wizard" in module_args
+        and bench_root_index + 1 < len(module_args)
+        and module_args[bench_root_index + 1] == str(bench_root)
+    )
+
+
 _RELOAD_REQUEST_FILE = "reload.request"
 _STOP_WAIT_SECONDS = 15.0
 _STOP_POLL_SECONDS = 0.2
@@ -274,11 +294,7 @@ class ProcessManager:
     def _owns_process(self, pid: int) -> bool:
         if _process_has_bench_root(pid, self.bench.path):
             return True
-        command = _process_command(pid)
-        return all(
-            marker in command
-            for marker in ("admin.backend.run_server", "--wizard", "--bench-root", str(self.bench.path))
-        )
+        return _is_setup_wizard_for_bench(_process_command(pid), self.bench.path)
 
     def _port_holders(self) -> dict[int, set[int]]:
         config = self.bench.config

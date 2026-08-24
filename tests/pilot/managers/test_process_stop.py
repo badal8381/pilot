@@ -188,6 +188,25 @@ def test_stop_accepts_matching_setup_wizard(tmp_path: Path, monkeypatch) -> None
     kill.assert_called_once_with(123, process_module.signal.SIGTERM)
 
 
+def test_stop_rejects_setup_wizard_for_longer_bench_path(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    monkeypatch.setattr(manager, "_port_holders", lambda: {7000: {123}})
+    monkeypatch.setattr(
+        process_module,
+        "_process_command",
+        lambda _pid: (
+            f"python -m admin.backend.run_server --bench-root {manager.bench.path}-other --port 7000 --wizard"
+        ),
+    )
+    kill = MagicMock()
+    monkeypatch.setattr(process_module.os, "kill", kill)
+
+    with pytest.raises(BenchError, match="not owned by this bench"):
+        manager.stop()
+
+    kill.assert_not_called()
+
+
 def test_stop_verifies_ports_after_supervisor_exits(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     supervisor = _spawn_reaped_sleep()
