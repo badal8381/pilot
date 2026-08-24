@@ -158,3 +158,18 @@ def test_different_expected_arguments_are_stale(owned_process) -> None:
     identity = inspector.capture(process.pid, argv, launch_id)
 
     assert inspector.inspect(identity, [*argv, "other"]) == ProcessOwnership.STALE
+
+
+def test_get_process_stamp_is_stable_while_alive_and_empty_after_exit() -> None:
+    from pilot.internal.tasks.process_identity import get_process_stamp
+
+    process = subprocess.Popen(["sleep", "5"])
+    try:
+        stamp = get_process_stamp(process.pid)
+        assert stamp
+        assert get_process_stamp(process.pid) == stamp
+    finally:
+        process.terminate()
+        process.wait()
+
+    assert get_process_stamp(process.pid) == ""
