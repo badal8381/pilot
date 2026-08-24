@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import contextlib
 import subprocess
 import sys
 import threading
@@ -70,17 +69,15 @@ def test_pids_listening_uses_platform_tool(
     assert run.call_args.args[0] == expected_argv
 
 
-def test_read_supervisor_record_parses_new_and_legacy_formats(tmp_path: Path) -> None:
+def test_read_supervisor_record_requires_pid_and_stamp(tmp_path: Path) -> None:
     manager = _manager(tmp_path)
 
     manager.pid_file.write_text("123\nstamp value\n")
     assert manager._read_supervisor_record() == (123, "stamp value")
 
-    manager.pid_file.write_text("123\n")
-    assert manager._read_supervisor_record() == (123, "")
-
-    manager.pid_file.write_text("not a pid")
-    assert manager._read_supervisor_record() is None
+    for content in ("123\n", "not a pid", ""):
+        manager.pid_file.write_text(content)
+        assert manager._read_supervisor_record() is None
 
     manager.pid_file.unlink()
     assert manager._read_supervisor_record() is None
@@ -135,7 +132,7 @@ def test_supervisor_cleanup_preserves_replacement_record(tmp_path: Path, monkeyp
 
 def test_stop_with_stale_pid_file_kills_port_holders(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
-    manager.pid_file.write_text("999999")
+    manager.pid_file.write_text("999999\nstale-stamp\n")
     orphan = _spawn_reaped_sleep(start_new_session=True, bench_root=manager.bench.path)
     monkeypatch.setattr(
         "pilot.managers.processes.local._pids_listening",
@@ -150,69 +147,17 @@ def test_stop_with_stale_pid_file_kills_port_holders(tmp_path: Path, monkeypatch
     assert not manager.pid_file.exists()
 
 
-def test_stop_refuses_live_legacy_record_without_descendants(tmp_path: Path, monkeypatch) -> None:
+def test_stop_ignores_stamp_less_pid_file(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
-    proc = _spawn_reaped_sleep()
-    manager.pid_file.write_text(str(proc.pid))
+    manager.pid_file.write_text("123")
     monkeypatch.setattr(manager, "_port_holders", lambda: {})
     kill = MagicMock()
     monkeypatch.setattr(process_module.os, "kill", kill)
 
-    try:
-        with pytest.raises(BenchError, match="recorded by an older pilot"):
-            manager.stop()
-        kill.assert_not_called()
-        assert manager.pid_file.exists()
-    finally:
-        monkeypatch.undo()
-        proc.terminate()
-
-
-def test_stop_signals_legacy_supervisor_with_descendant_port_holder(
-    tmp_path: Path, monkeypatch
-) -> None:
-    manager = _manager(tmp_path)
-    proc = subprocess.Popen(
-        [
-            sys.executable,
-            "-c",
-            "import subprocess, sys, time\n"
-            "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])\n"
-            "print(child.pid, flush=True)\n"
-            "time.sleep(30)",
-        ],
-        stdout=subprocess.PIPE,
-        text=True,
-    )
-    threading.Thread(target=proc.wait, daemon=True).start()
-    assert proc.stdout is not None
-    child_pid = int(proc.stdout.readline())
-    manager.pid_file.write_text(str(proc.pid))
-    monkeypatch.setattr(manager, "_port_holders", lambda: {8000: {child_pid}})
-
-    try:
-        manager.stop()
-    finally:
-        with contextlib.suppress(ProcessLookupError):
-            process_module.os.kill(child_pid, process_module.signal.SIGKILL)
-
-    assert proc.poll() is not None
-    assert not manager.pid_file.exists()
-
-
-def test_parent_pid_resolves_for_the_current_process() -> None:
-    assert process_module._parent_pid(process_module.os.getpid()) > 0
-
-
-def test_stop_keeps_legacy_record_when_inspection_fails(tmp_path: Path, monkeypatch) -> None:
-    manager = _manager(tmp_path)
-    manager.pid_file.write_text("123")
-    monkeypatch.setattr(process_module, "get_process_stamp", lambda _pid: None)
-
-    with pytest.raises(BenchError, match="recorded by an older pilot"):
+    with pytest.raises(BenchNotRunningError, match="not running"):
         manager.stop()
 
-    assert manager.pid_file.exists()
+    kill.assert_not_called()
 
 
 def test_stop_raises_when_supervisor_inspection_fails(tmp_path: Path, monkeypatch) -> None:
@@ -233,7 +178,6 @@ def test_stop_ignores_unowned_port_holder(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     monkeypatch.setattr(manager, "_port_holders", lambda: {7000: {123}})
     monkeypatch.setattr(process_module, "_process_has_bench_root", lambda _pid, _root: False)
-    monkeypatch.setattr(process_module, "_process_command", lambda _pid: "/usr/bin/python other.py")
     kill = MagicMock()
     monkeypatch.setattr(process_module.os, "kill", kill)
 
@@ -248,52 +192,12 @@ def test_stop_signals_owned_and_skips_foreign_holder(tmp_path: Path, monkeypatch
     monkeypatch.setattr(manager, "_port_holders", lambda: {7000: {123}, 8000: {456}})
     monkeypatch.setattr(manager, "_wait_for_ports", lambda: None)
     monkeypatch.setattr(process_module, "_process_has_bench_root", lambda pid, _root: pid == 456)
-    monkeypatch.setattr(process_module, "_process_command", lambda _pid: "/usr/bin/python other.py")
     kill = MagicMock()
     monkeypatch.setattr(process_module.os, "kill", kill)
 
     manager.stop()
 
     kill.assert_called_once_with(456, process_module.signal.SIGTERM)
-
-
-def test_stop_accepts_matching_setup_wizard(tmp_path: Path, monkeypatch) -> None:
-    manager = _manager(tmp_path)
-    monkeypatch.setattr(manager, "_port_holders", lambda: {7000: {123}})
-    monkeypatch.setattr(manager, "_wait_for_ports", lambda: None)
-    monkeypatch.setattr(
-        process_module,
-        "_process_command",
-        lambda _pid: (
-            f"python -m admin.backend.run_server --bench-root {manager.bench.path} --port 7000 --wizard"
-        ),
-    )
-    kill = MagicMock()
-    monkeypatch.setattr(process_module.os, "kill", kill)
-
-    manager.stop()
-
-    kill.assert_called_once_with(123, process_module.signal.SIGTERM)
-
-
-def test_stop_rejects_sibling_bench_wizard(tmp_path: Path, monkeypatch) -> None:
-    manager = _manager(tmp_path)
-    monkeypatch.setattr(manager, "_port_holders", lambda: {7000: {123}})
-    monkeypatch.setattr(process_module, "_process_has_bench_root", lambda _pid, _root: False)
-    monkeypatch.setattr(
-        process_module,
-        "_process_command",
-        lambda _pid: (
-            f"python -m admin.backend.run_server --bench-root {manager.bench.path}2 --port 7000 --wizard"
-        ),
-    )
-    kill = MagicMock()
-    monkeypatch.setattr(process_module.os, "kill", kill)
-
-    with pytest.raises(BenchNotRunningError, match="not running"):
-        manager.stop()
-
-    kill.assert_not_called()
 
 
 def test_stop_does_not_signal_reused_supervisor_pid(tmp_path: Path, monkeypatch) -> None:
