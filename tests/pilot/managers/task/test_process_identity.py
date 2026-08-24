@@ -173,3 +173,13 @@ def test_get_process_stamp_is_stable_while_alive_and_empty_after_exit() -> None:
         process.wait()
 
     assert get_process_stamp(process.pid) == ""
+
+
+def test_get_process_stamp_returns_none_when_inspection_fails(monkeypatch) -> None:
+    from pilot.internal.tasks import process_identity
+
+    def broken_backend():
+        raise OSError("ps unavailable")
+
+    monkeypatch.setattr(process_identity, "_default_backend", broken_backend)
+    assert process_identity.get_process_stamp(123) is None
