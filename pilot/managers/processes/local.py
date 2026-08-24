@@ -33,17 +33,20 @@ def _tcp_port_open(port: int, host: str = "127.0.0.1") -> bool:
 
 
 def _pids_listening(port: int) -> set[int]:
-    """PIDs listening on port (this user), via ss."""
+    """PIDs listening on port (this user)."""
+    from pilot.managers.platform import is_macos
+
+    if is_macos():
+        argv = ["lsof", "-ti", f"tcp:{port}", "-sTCP:LISTEN"]
+        pid_pattern = r"(\d+)"
+    else:
+        argv = ["ss", "-H", "-ltnp", f"sport = :{port}"]
+        pid_pattern = r"pid=(\d+)"
     try:
-        result = subprocess.run(
-            ["ss", "-H", "-ltnp", f"sport = :{port}"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+        result = subprocess.run(argv, capture_output=True, text=True, timeout=5)
     except (FileNotFoundError, subprocess.SubprocessError):
         return set()
-    return {int(m) for m in re.findall(r"pid=(\d+)", result.stdout)}
+    return {int(m) for m in re.findall(pid_pattern, result.stdout)}
 
 
 _RELOAD_REQUEST_FILE = "reload.request"
@@ -150,25 +153,56 @@ class ProcessManager:
         self.start()
 
     def stop(self) -> None:
-        if self.pid_file.exists():
-            pid = int(self.pid_file.read_text().strip())
-            self.pid_file.unlink(missing_ok=True)
-            try:
-                os.kill(pid, signal.SIGTERM)
-            except ProcessLookupError as exc:
-                raise BenchError(f"Process {pid} is not running. Removed stale PID file.") from exc
+        if self._stop_supervisor():
             return
-
-        # No pid file (e.g. pre-init setup wizard): stop by port.
-        config = self.bench.config
-        pids = set()
-        for port in (config.admin.port, config.http_port):
-            pids |= _pids_listening(port)
-        if not pids:
+        # No live supervisor: kill whatever still holds the bench ports
+        # (setup wizard, or children orphaned by a crashed supervisor).
+        if not self._stop_port_holders():
             raise BenchError("Bench is not running.")
+
+    def _stop_supervisor(self) -> bool:
+        """SIGTERM the dev supervisor and wait until it has released its ports."""
+        if not self.pid_file.exists():
+            return False
+        pid = int(self.pid_file.read_text().strip())
+        self.pid_file.unlink(missing_ok=True)
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return False
+        self._wait_for_exit(pid)
+        return True
+
+    def _stop_port_holders(self) -> bool:
+        config = self.bench.config
+        ports = (
+            config.admin.port,
+            config.http_port,
+            config.socketio_port,
+            config.redis.cache_port,
+            config.redis.queue_port,
+        )
+        pids = set()
+        for port in ports:
+            pids |= _pids_listening(port)
+        pids.discard(os.getpid())
+        if not pids:
+            return False
         for pid in pids:
             with contextlib.suppress(ProcessLookupError):
                 os.kill(pid, signal.SIGTERM)
+        for pid in pids:
+            self._wait_for_exit(pid)
+        return True
+
+    def _wait_for_exit(self, pid: int, timeout: float = 15.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return
+            time.sleep(0.2)
 
     def is_running(self) -> bool:
         if not self.pid_file.exists():
