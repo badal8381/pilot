@@ -6,7 +6,7 @@ import subprocess
 from collections.abc import Callable
 from typing import TYPE_CHECKING, cast
 
-from pilot.exceptions import BenchError
+from pilot.exceptions import BenchError, BenchNotRunningError
 
 if TYPE_CHECKING:
     from pilot.core.app import App
@@ -123,9 +123,7 @@ class BenchRuntime:
 
         try:
             ProcessManager(self.bench).stop()
-        except BenchError as exc:
-            if str(exc) != "Bench is not running.":
-                raise
+        except BenchNotRunningError as exc:
             logging.debug("Best-effort stop of a stale process manager failed: %s", exc)
         if not initialized:
             self._start_wizard(on_progress)

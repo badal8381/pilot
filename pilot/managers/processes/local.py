@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import hashlib
 import os
 import re
 import shlex
@@ -13,7 +12,8 @@ import time
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pilot.exceptions import BenchError, CommandError
+from pilot.exceptions import BenchError, BenchNotRunningError, CommandError
+from pilot.internal.tasks.process_identity import get_process_stamp
 from pilot.managers.environment import AdminEnvManager
 from pilot.managers.gunicorn import GunicornManager
 from pilot.managers.processes.definitions import ProcessDefinition, ProcessDefinitionBuilder
@@ -61,21 +61,6 @@ def _process_command(pid: int) -> str:
     except (FileNotFoundError, subprocess.SubprocessError):
         return ""
     return result.stdout.strip() if result.returncode == 0 else ""
-
-
-def _process_fingerprint(pid: int) -> str:
-    try:
-        result = subprocess.run(
-            ["ps", "-ww", "-p", str(pid), "-o", "lstart=,uid=,command="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-    except (FileNotFoundError, subprocess.SubprocessError):
-        return ""
-    if result.returncode != 0 or not result.stdout.strip():
-        return ""
-    return hashlib.sha256(result.stdout.strip().encode()).hexdigest()
 
 
 def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
@@ -126,6 +111,7 @@ def _is_setup_wizard_for_bench(command: str, bench_root: Path) -> bool:
 _RELOAD_REQUEST_FILE = "reload.request"
 _STOP_WAIT_SECONDS = 15.0
 _STOP_POLL_SECONDS = 0.2
+_CHILD_STOP_SECONDS = 5.0
 BENCH_ROOT_ENV = "PILOT_BENCH_ROOT"
 # Redis holds the job queue, and the admin plane is what issues the reload.
 # Both must survive it, so only app-code processes are restarted.
@@ -149,6 +135,7 @@ class ProcessManager:
         self.bench = bench
         self.watch_admin_js = bench.config.watch_admin_js if watch_admin_js is None else watch_admin_js
         self._procs: dict[str, subprocess.Popen] = {}
+        self._stop_timeouts: dict[str, int | None] = {}
         self._colors: dict[str, str] = {}
         self._stopping = False
 
@@ -224,26 +211,25 @@ class ProcessManager:
             raise BenchError(f"Procfile not found at {self.procfile_path}. Run 'pilot init' first.")
         self.write_config()
         pid = os.getpid()
-        fingerprint = _process_fingerprint(pid)
-        if not fingerprint:
+        stamp = get_process_stamp(pid)
+        if not stamp:
             raise BenchError("Could not capture the development supervisor identity.")
         self.pid_file.write_text(str(pid))
-        self.supervisor_identity_file.write_text(fingerprint)
+        self.supervisor_identity_file.write_text(stamp)
         try:
             self._run_processes(self._process_definitions())
         finally:
-            self._unlink_supervisor_record(pid, fingerprint)
+            self._unlink_supervisor_record(pid, stamp)
             self._cleanup_proc_pid_files()
 
     def start_workload(self) -> None:
         self.start()
 
     def stop(self) -> None:
-        if self._stop_supervisor():
-            self._wait_for_ports()
-            return
-        if not self._stop_port_holders():
-            raise BenchError("Bench is not running.")
+        stopped = self._stop_supervisor() or self._stop_port_holders()
+        if not stopped:
+            raise BenchNotRunningError("Bench is not running.")
+        self._wait_for_ports()
 
     def _stop_supervisor(self) -> bool:
         """SIGTERM the dev supervisor and wait for it to finish cleanup."""
@@ -255,41 +241,46 @@ class ProcessManager:
             self.pid_file.unlink(missing_ok=True)
             self.supervisor_identity_file.unlink(missing_ok=True)
             return False
-        try:
-            expected_fingerprint = self.supervisor_identity_file.read_text().strip()
-        except OSError:
-            expected_fingerprint = ""
-        if not expected_fingerprint or _process_fingerprint(pid) != expected_fingerprint:
-            self._unlink_supervisor_record(pid, expected_fingerprint)
+        recorded_stamp = self._recorded_stamp
+        if not recorded_stamp:
+            return self._stop_legacy_supervisor(pid)
+        if get_process_stamp(pid) != recorded_stamp:
+            self._unlink_supervisor_record(pid, recorded_stamp)
             return False
+        return self._terminate_supervisor(pid, recorded_stamp, recorded_stamp)
+
+    def _stop_legacy_supervisor(self, pid: int) -> bool:
+        """Stop a supervisor recorded by an older pilot, before identity stamps existed."""
+        stamp = get_process_stamp(pid)
+        if not stamp:
+            self.pid_file.unlink(missing_ok=True)
+            return False
+        command = _process_command(pid)
+        if "pilot" not in command or "start" not in command.split():
+            raise BenchError(
+                f"Recorded bench process {pid} does not look like a pilot supervisor. "
+                f"Stop it manually and remove {self.pid_file}."
+            )
+        return self._terminate_supervisor(pid, stamp, "")
+
+    def _terminate_supervisor(self, pid: int, live_stamp: str, recorded_stamp: str) -> bool:
         try:
             os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            self._unlink_supervisor_record(pid, expected_fingerprint)
+        except (ProcessLookupError, PermissionError):
+            self._unlink_supervisor_record(pid, recorded_stamp)
             return False
-        self._wait_for_exit(pid)
-        self._unlink_supervisor_record(pid, expected_fingerprint)
+        self._wait_for_exit(pid, live_stamp)
+        self._unlink_supervisor_record(pid, recorded_stamp)
         return True
 
     def _stop_port_holders(self) -> bool:
-        holders = self._port_holders()
-        pids = {pid for port_pids in holders.values() for pid in port_pids}
+        pids = {pid for port_pids in self._port_holders().values() for pid in port_pids}
         pids.discard(os.getpid())
-        if not pids:
-            return False
         owned_pids = {pid for pid in pids if self._owns_process(pid)}
-        if unowned_pids := pids - owned_pids:
-            ports = sorted(port for port, port_pids in holders.items() if port_pids & unowned_pids)
-            rendered_ports = ", ".join(str(port) for port in ports)
-            raise BenchError(
-                "Refusing to stop process(es) not owned by this bench "
-                f"on configured port(s): {rendered_ports}."
-            )
         for pid in owned_pids:
             with contextlib.suppress(ProcessLookupError):
                 os.kill(pid, signal.SIGTERM)
-        self._wait_for_ports()
-        return True
+        return bool(owned_pids)
 
     def _owns_process(self, pid: int) -> bool:
         if _process_has_bench_root(pid, self.bench.path):
@@ -297,59 +288,76 @@ class ProcessManager:
         return _is_setup_wizard_for_bench(_process_command(pid), self.bench.path)
 
     def _port_holders(self) -> dict[int, set[int]]:
-        config = self.bench.config
-        ports = (
-            config.admin.port,
-            config.http_port,
-            config.socketio_port,
-            config.redis.cache_port,
-            config.redis.queue_port,
-        )
-        return {port: pids for port in ports if (pids := _pids_listening(port))}
+        return {port: pids for port in self._configured_ports if (pids := _pids_listening(port))}
 
-    def _wait_for_exit(self, pid: int, timeout: float = _STOP_WAIT_SECONDS) -> None:
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                os.kill(pid, 0)
-            except ProcessLookupError:
-                return
+    @property
+    def _configured_ports(self) -> tuple[int, ...]:
+        config = self.bench.config
+        ports = [config.admin.port, config.http_port, config.redis.cache_port, config.redis.queue_port]
+        if not self.bench.is_lite_mode:
+            ports.append(config.socketio_port)
+        return tuple(ports)
+
+    def _wait_for_exit(self, pid: int, stamp: str, timeout: float | None = None) -> None:
+        """Wait until the stamped process is gone; zombies and reused pids count as exited."""
+        deadline = time.monotonic() + (self._supervisor_stop_seconds if timeout is None else timeout)
+        while get_process_stamp(pid) == stamp:
             if time.monotonic() >= deadline:
                 raise BenchError(f"Timed out waiting for bench supervisor {pid} to stop.")
             time.sleep(_STOP_POLL_SECONDS)
 
+    @property
+    def _supervisor_stop_seconds(self) -> float:
+        """The supervisor honors its slowest child's stop timeout; allow that plus slack."""
+        slowest = max((pd.stop_timeout or 0 for pd in self._process_definitions()), default=0)
+        return float(max(slowest, _STOP_WAIT_SECONDS)) + 10.0
+
     def _wait_for_ports(self, timeout: float = _STOP_WAIT_SECONDS) -> None:
         deadline = time.monotonic() + timeout
-        while holders := self._port_holders():
+        ownership: dict[int, bool] = {}
+        while owned_ports := self._owned_port_holders(ownership):
             if time.monotonic() >= deadline:
-                ports = ", ".join(str(port) for port in sorted(holders))
-                raise BenchError(f"Timed out waiting for bench port(s) to be released: {ports}.")
+                rendered = ", ".join(str(port) for port in sorted(owned_ports))
+                raise BenchError(f"Timed out waiting for bench port(s) to be released: {rendered}.")
             time.sleep(_STOP_POLL_SECONDS)
 
-    def _unlink_supervisor_record(self, pid: int, fingerprint: str) -> None:
+    def _owned_port_holders(self, ownership: dict[int, bool]) -> set[int]:
+        """Ports still held by this bench's processes; foreign holders are ignored."""
+        owned_ports = set()
+        for port, pids in self._port_holders().items():
+            for pid in pids:
+                if pid not in ownership:
+                    ownership[pid] = self._owns_process(pid)
+                if ownership[pid]:
+                    owned_ports.add(port)
+        return owned_ports
+
+    def _unlink_supervisor_record(self, pid: int, recorded_stamp: str) -> None:
+        """Remove the record only while it still holds the values this stop acted on."""
         try:
             current_pid = int(self.pid_file.read_text().strip())
         except (OSError, ValueError):
             return
-        try:
-            current_fingerprint = self.supervisor_identity_file.read_text().strip()
-        except FileNotFoundError:
-            current_fingerprint = ""
-        except OSError:
-            return
-        if current_pid == pid and current_fingerprint == fingerprint:
+        if current_pid == pid and self._recorded_stamp == recorded_stamp:
             self.pid_file.unlink(missing_ok=True)
             self.supervisor_identity_file.unlink(missing_ok=True)
+
+    @property
+    def _recorded_stamp(self) -> str:
+        try:
+            return self.supervisor_identity_file.read_text().strip()
+        except OSError:
+            return ""
 
     def is_running(self) -> bool:
         if not self.pid_file.exists():
             return False
         try:
             pid = int(self.pid_file.read_text().strip())
-            expected_fingerprint = self.supervisor_identity_file.read_text().strip()
-        except (ValueError, OSError):
+        except (OSError, ValueError):
             return False
-        return bool(expected_fingerprint) and _process_fingerprint(pid) == expected_fingerprint
+        recorded_stamp = self._recorded_stamp
+        return bool(recorded_stamp) and get_process_stamp(pid) == recorded_stamp
 
     def stop_admin(self) -> None:
         pass
@@ -403,13 +411,15 @@ class ProcessManager:
             self._spawn(definition)
 
     def _terminate(self, proc: subprocess.Popen) -> None:
-        with contextlib.suppress(ProcessLookupError, OSError):
-            os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        self._signal_group(proc, signal.SIGTERM)
         try:
-            proc.wait(timeout=5)
+            proc.wait(timeout=_CHILD_STOP_SECONDS)
         except subprocess.TimeoutExpired:
-            with contextlib.suppress(ProcessLookupError, OSError):
-                os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+            self._signal_group(proc, signal.SIGKILL)
+
+    def _signal_group(self, proc: subprocess.Popen, signum: int) -> None:
+        with contextlib.suppress(ProcessLookupError, OSError):
+            os.killpg(os.getpgid(proc.pid), signum)
 
     def _spawn(self, pd: ProcessDefinition) -> None:
         proc = subprocess.Popen(
@@ -439,6 +449,7 @@ class ProcessManager:
         signal.signal(signal.SIGINT, _stop)
 
         self.reload_request_file.unlink(missing_ok=True)
+        self._stop_timeouts = {pd.name: pd.stop_timeout for pd in defs}
         for pd in defs:
             self._spawn(pd)
 
@@ -471,15 +482,19 @@ class ProcessManager:
             sys.stdout.flush()
 
     def _stop_all(self) -> None:
+        # SIGTERM everyone first, then measure each child's stop timeout from
+        # that broadcast, so slow children drain concurrently rather than 5s each.
+        started = time.monotonic()
         for proc in self._procs.values():
-            with contextlib.suppress(ProcessLookupError, OSError):
-                os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
-        for proc in self._procs.values():
+            self._signal_group(proc, signal.SIGTERM)
+        for name, proc in self._procs.items():
+            budget = self._stop_timeouts.get(name) or _CHILD_STOP_SECONDS
             try:
-                proc.wait(timeout=5)
+                proc.wait(timeout=max(started + budget - time.monotonic(), 0))
             except subprocess.TimeoutExpired:
-                with contextlib.suppress(ProcessLookupError, OSError):
-                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                self._signal_group(proc, signal.SIGKILL)
+                with contextlib.suppress(subprocess.TimeoutExpired):
+                    proc.wait(timeout=_CHILD_STOP_SECONDS)
         self.reload_request_file.unlink(missing_ok=True)
 
     def _cleanup_proc_pid_files(self) -> None:
