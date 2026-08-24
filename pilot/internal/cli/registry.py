@@ -136,8 +136,10 @@ def _run_for_bench(
         print(f"== {name} == (skipped: dev mode)")
         return True
     print(f"== {name} ==")
+    command = command_from_args(cls, args, bench)
+    command.prepare_all_sweep()
     try:
-        command_from_args(cls, args, bench).run()
+        command.run()
     except BenchNotRunningError as e:
         print(str(e))
     except BenchError as e:
