@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import os
 import re
 import shlex
@@ -62,6 +63,21 @@ def _process_command(pid: int) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def _process_fingerprint(pid: int) -> str:
+    try:
+        result = subprocess.run(
+            ["ps", "-ww", "-p", str(pid), "-o", "lstart=,uid=,command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return ""
+    if result.returncode != 0 or not result.stdout.strip():
+        return ""
+    return hashlib.sha256(result.stdout.strip().encode()).hexdigest()
+
+
 def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
     from pilot.managers.platform import is_macos
 
@@ -81,7 +97,10 @@ def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
         )
     except (FileNotFoundError, subprocess.SubprocessError):
         return False
-    return result.returncode == 0 and expected in result.stdout
+    return (
+        result.returncode == 0
+        and re.search(rf"(?:^|\s){re.escape(expected)}(?:\s|$)", result.stdout) is not None
+    )
 
 
 _RELOAD_REQUEST_FILE = "reload.request"
@@ -147,6 +166,10 @@ class ProcessManager:
         return self.bench.pids_path / "bench.pid"
 
     @property
+    def supervisor_identity_file(self) -> Path:
+        return self.bench.pids_path / "bench.identity"
+
+    @property
     def reload_request_file(self) -> Path:
         return self.bench.pids_path / _RELOAD_REQUEST_FILE
 
@@ -180,11 +203,16 @@ class ProcessManager:
         if not self.is_configured():
             raise BenchError(f"Procfile not found at {self.procfile_path}. Run 'pilot init' first.")
         self.write_config()
-        self.pid_file.write_text(str(os.getpid()))
+        pid = os.getpid()
+        fingerprint = _process_fingerprint(pid)
+        if not fingerprint:
+            raise BenchError("Could not capture the development supervisor identity.")
+        self.pid_file.write_text(str(pid))
+        self.supervisor_identity_file.write_text(fingerprint)
         try:
             self._run_processes(self._process_definitions())
         finally:
-            self._unlink_pid_file(os.getpid())
+            self._unlink_supervisor_record(pid, fingerprint)
             self._cleanup_proc_pid_files()
 
     def start_workload(self) -> None:
@@ -205,14 +233,22 @@ class ProcessManager:
             pid = int(self.pid_file.read_text().strip())
         except (OSError, ValueError):
             self.pid_file.unlink(missing_ok=True)
+            self.supervisor_identity_file.unlink(missing_ok=True)
+            return False
+        try:
+            expected_fingerprint = self.supervisor_identity_file.read_text().strip()
+        except OSError:
+            expected_fingerprint = ""
+        if not expected_fingerprint or _process_fingerprint(pid) != expected_fingerprint:
+            self._unlink_supervisor_record(pid, expected_fingerprint)
             return False
         try:
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
-            self._unlink_pid_file(pid)
+            self._unlink_supervisor_record(pid, expected_fingerprint)
             return False
         self._wait_for_exit(pid)
-        self._unlink_pid_file(pid)
+        self._unlink_supervisor_record(pid, expected_fingerprint)
         return True
 
     def _stop_port_holders(self) -> bool:
@@ -274,23 +310,30 @@ class ProcessManager:
                 raise BenchError(f"Timed out waiting for bench port(s) to be released: {ports}.")
             time.sleep(_STOP_POLL_SECONDS)
 
-    def _unlink_pid_file(self, pid: int) -> None:
-        """Remove only the PID file that identified this supervisor."""
+    def _unlink_supervisor_record(self, pid: int, fingerprint: str) -> None:
         try:
             current_pid = int(self.pid_file.read_text().strip())
-        except (FileNotFoundError, OSError, ValueError):
+        except (OSError, ValueError):
             return
-        if current_pid == pid:
+        try:
+            current_fingerprint = self.supervisor_identity_file.read_text().strip()
+        except FileNotFoundError:
+            current_fingerprint = ""
+        except OSError:
+            return
+        if current_pid == pid and current_fingerprint == fingerprint:
             self.pid_file.unlink(missing_ok=True)
+            self.supervisor_identity_file.unlink(missing_ok=True)
 
     def is_running(self) -> bool:
         if not self.pid_file.exists():
             return False
         try:
-            os.kill(int(self.pid_file.read_text().strip()), 0)
-            return True
-        except (ValueError, ProcessLookupError, PermissionError, OSError):
+            pid = int(self.pid_file.read_text().strip())
+            expected_fingerprint = self.supervisor_identity_file.read_text().strip()
+        except (ValueError, OSError):
             return False
+        return bool(expected_fingerprint) and _process_fingerprint(pid) == expected_fingerprint
 
     def stop_admin(self) -> None:
         pass

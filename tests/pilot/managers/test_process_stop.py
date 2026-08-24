@@ -31,6 +31,11 @@ def _spawn_reaped_sleep(
     return proc
 
 
+def _record_supervisor(manager: ProcessManager, proc: subprocess.Popen) -> None:
+    manager.pid_file.write_text(str(proc.pid))
+    manager.supervisor_identity_file.write_text(process_module._process_fingerprint(proc.pid))
+
+
 @pytest.mark.parametrize(
     ("macos", "stdout", "expected_argv", "expected_pids"),
     [
@@ -57,29 +62,34 @@ def test_pids_listening_uses_platform_tool(
 def test_stop_terminates_supervisor_and_waits_for_exit(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     proc = _spawn_reaped_sleep()
-    manager.pid_file.write_text(str(proc.pid))
+    _record_supervisor(manager, proc)
     monkeypatch.setattr(manager, "_port_holders", lambda: {})
 
     manager.stop()
 
     assert proc.poll() is not None
     assert not manager.pid_file.exists()
+    assert not manager.supervisor_identity_file.exists()
 
 
 def test_stop_preserves_pid_file_replaced_during_shutdown(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     manager.pid_file.write_text("123")
+    manager.supervisor_identity_file.write_text("original")
 
     def replace_pid(_pid: int) -> None:
         manager.pid_file.write_text("456")
+        manager.supervisor_identity_file.write_text("replacement")
 
     monkeypatch.setattr("pilot.managers.processes.local.os.kill", MagicMock())
+    monkeypatch.setattr(process_module, "_process_fingerprint", lambda _pid: "original")
     monkeypatch.setattr(manager, "_wait_for_exit", replace_pid)
     monkeypatch.setattr(manager, "_wait_for_ports", lambda: None)
 
     manager.stop()
 
     assert manager.pid_file.read_text() == "456"
+    assert manager.supervisor_identity_file.read_text() == "replacement"
 
 
 def test_supervisor_cleanup_preserves_replacement_pid_file(tmp_path: Path, monkeypatch) -> None:
@@ -87,11 +97,17 @@ def test_supervisor_cleanup_preserves_replacement_pid_file(tmp_path: Path, monke
     monkeypatch.setattr(manager, "is_configured", lambda: True)
     monkeypatch.setattr(manager, "write_config", lambda: None)
     monkeypatch.setattr(manager, "_process_definitions", lambda: [])
-    monkeypatch.setattr(manager, "_run_processes", lambda _definitions: manager.pid_file.write_text("456"))
+
+    def replace_supervisor(_definitions) -> None:
+        manager.pid_file.write_text("456")
+        manager.supervisor_identity_file.write_text("replacement")
+
+    monkeypatch.setattr(manager, "_run_processes", replace_supervisor)
 
     manager.start()
 
     assert manager.pid_file.read_text() == "456"
+    assert manager.supervisor_identity_file.read_text() == "replacement"
 
 
 def test_stop_with_stale_pid_file_kills_port_holders(tmp_path: Path, monkeypatch) -> None:
@@ -175,7 +191,7 @@ def test_stop_accepts_matching_setup_wizard(tmp_path: Path, monkeypatch) -> None
 def test_stop_verifies_ports_after_supervisor_exits(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     supervisor = _spawn_reaped_sleep()
-    manager.pid_file.write_text(str(supervisor.pid))
+    _record_supervisor(manager, supervisor)
     wait_for_ports = MagicMock()
     monkeypatch.setattr(manager, "_wait_for_ports", wait_for_ports)
 
@@ -183,6 +199,38 @@ def test_stop_verifies_ports_after_supervisor_exits(tmp_path: Path, monkeypatch)
 
     assert supervisor.poll() is not None
     wait_for_ports.assert_called_once_with()
+
+
+def test_stop_does_not_signal_reused_supervisor_pid(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    manager.pid_file.write_text("123")
+    manager.supervisor_identity_file.write_text("original")
+    monkeypatch.setattr(process_module, "_process_fingerprint", lambda _pid: "replacement")
+    monkeypatch.setattr(manager, "_port_holders", lambda: {})
+    kill = MagicMock()
+    monkeypatch.setattr(process_module.os, "kill", kill)
+
+    with pytest.raises(BenchError, match="not running"):
+        manager.stop()
+
+    kill.assert_not_called()
+    assert not manager.pid_file.exists()
+    assert not manager.supervisor_identity_file.exists()
+
+
+def test_macos_bench_root_match_requires_environment_boundary(tmp_path: Path, monkeypatch) -> None:
+    bench_root = tmp_path / "bench"
+    output = f"python worker.py {process_module.BENCH_ROOT_ENV}={bench_root}2 OTHER=value"
+    run = MagicMock(return_value=subprocess.CompletedProcess([], 0, stdout=output))
+    monkeypatch.setattr("pilot.managers.platform.is_macos", lambda: True)
+    monkeypatch.setattr(process_module.subprocess, "run", run)
+
+    assert process_module._process_has_bench_root(123, bench_root) is False
+
+    run.return_value = subprocess.CompletedProcess(
+        [], 0, stdout=f"python worker.py {process_module.BENCH_ROOT_ENV}={bench_root} OTHER=value"
+    )
+    assert process_module._process_has_bench_root(123, bench_root) is True
 
 
 def test_stop_raises_when_nothing_is_running(tmp_path: Path, monkeypatch) -> None:
