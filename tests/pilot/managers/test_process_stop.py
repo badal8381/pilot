@@ -19,9 +19,14 @@ def _manager(tmp_path: Path) -> ProcessManager:
     return ProcessManager(bench)
 
 
-def _spawn_reaped_sleep(*, start_new_session: bool = False) -> subprocess.Popen:
+def _spawn_reaped_sleep(
+    *, start_new_session: bool = False, bench_root: Path | None = None
+) -> subprocess.Popen:
     """A sleeping child whose zombie gets reaped, so os.kill(pid, 0) sees it die."""
-    proc = subprocess.Popen(["sleep", "30"], start_new_session=start_new_session)
+    env = None
+    if bench_root is not None:
+        env = {**process_module.os.environ, process_module.BENCH_ROOT_ENV: str(bench_root)}
+    proc = subprocess.Popen(["sleep", "30"], start_new_session=start_new_session, env=env)
     threading.Thread(target=proc.wait, daemon=True).start()
     return proc
 
@@ -92,7 +97,7 @@ def test_supervisor_cleanup_preserves_replacement_pid_file(tmp_path: Path, monke
 def test_stop_with_stale_pid_file_kills_port_holders(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     manager.pid_file.write_text("999999")
-    orphan = _spawn_reaped_sleep(start_new_session=True)
+    orphan = _spawn_reaped_sleep(start_new_session=True, bench_root=manager.bench.path)
     (manager.bench.pids_path / "redis_queue.pid").write_text(str(orphan.pid))
     monkeypatch.setattr(
         "pilot.managers.processes.local._pids_listening",
@@ -114,24 +119,38 @@ def test_stop_refuses_unowned_port_holder(tmp_path: Path, monkeypatch) -> None:
     kill = MagicMock()
     monkeypatch.setattr(process_module.os, "kill", kill)
 
-    with pytest.raises(BenchError, match="not owned by this bench.*7000"):
+    with pytest.raises(BenchError, match=r"not owned by this bench.*7000"):
         manager.stop()
 
     kill.assert_not_called()
 
 
-def test_stop_accepts_recorded_process_group(tmp_path: Path, monkeypatch) -> None:
+def test_stop_accepts_matching_bench_environment(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
-    (manager.bench.pids_path / "web.pid").write_text("123")
     monkeypatch.setattr(manager, "_port_holders", lambda: {8000: {456}})
     monkeypatch.setattr(manager, "_wait_for_ports", lambda: None)
-    monkeypatch.setattr(process_module.os, "getpgid", lambda _pid: 123)
+    monkeypatch.setattr(process_module, "_process_has_bench_root", lambda _pid, _root: True)
     kill = MagicMock()
     monkeypatch.setattr(process_module.os, "kill", kill)
 
     manager.stop()
 
     kill.assert_called_once_with(456, process_module.signal.SIGTERM)
+
+
+def test_stop_rejects_reused_recorded_process_group(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    (manager.bench.pids_path / "web.pid").write_text("123")
+    monkeypatch.setattr(manager, "_port_holders", lambda: {8000: {456}})
+    monkeypatch.setattr(process_module, "_process_has_bench_root", lambda _pid, _root: False)
+    monkeypatch.setattr(process_module, "_process_command", lambda _pid: "/usr/bin/python other.py")
+    kill = MagicMock()
+    monkeypatch.setattr(process_module.os, "kill", kill)
+
+    with pytest.raises(BenchError, match="not owned by this bench"):
+        manager.stop()
+
+    kill.assert_not_called()
 
 
 def test_stop_accepts_matching_setup_wizard(tmp_path: Path, monkeypatch) -> None:
@@ -142,8 +161,7 @@ def test_stop_accepts_matching_setup_wizard(tmp_path: Path, monkeypatch) -> None
         process_module,
         "_process_command",
         lambda _pid: (
-            "python -m admin.backend.run_server "
-            f"--bench-root {manager.bench.path} --port 7000 --wizard"
+            f"python -m admin.backend.run_server --bench-root {manager.bench.path} --port 7000 --wizard"
         ),
     )
     kill = MagicMock()

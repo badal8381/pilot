@@ -62,9 +62,32 @@ def _process_command(pid: int) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
+    from pilot.managers.platform import is_macos
+
+    expected = f"{BENCH_ROOT_ENV}={bench_root}"
+    if not is_macos():
+        try:
+            environment = (Path("/proc") / str(pid) / "environ").read_bytes().split(b"\0")
+        except OSError:
+            return False
+        return expected.encode() in environment
+    try:
+        result = subprocess.run(
+            ["ps", "-E", "-ww", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return False
+    return result.returncode == 0 and expected in result.stdout
+
+
 _RELOAD_REQUEST_FILE = "reload.request"
 _STOP_WAIT_SECONDS = 15.0
 _STOP_POLL_SECONDS = 0.2
+BENCH_ROOT_ENV = "PILOT_BENCH_ROOT"
 # Redis holds the job queue, and the admin plane is what issues the reload.
 # Both must survive it, so only app-code processes are restarted.
 _NON_RELOADABLE = frozenset({"admin", "admin-ui", "redis_cache", "redis_queue", "watch"})
@@ -213,33 +236,13 @@ class ProcessManager:
         return True
 
     def _owns_process(self, pid: int) -> bool:
-        try:
-            if os.getpgid(pid) in self._recorded_process_groups():
-                return True
-        except OSError:
-            pass
+        if _process_has_bench_root(pid, self.bench.path):
+            return True
         command = _process_command(pid)
         return all(
             marker in command
             for marker in ("admin.backend.run_server", "--wizard", "--bench-root", str(self.bench.path))
         )
-
-    def _recorded_process_groups(self) -> set[int]:
-        try:
-            pid_files = list(self.bench.pids_path.glob("*.pid"))
-        except OSError:
-            return set()
-        groups = set()
-        for path in pid_files:
-            if path == self.pid_file:
-                continue
-            try:
-                pid = int(path.read_text().strip())
-            except (OSError, ValueError):
-                continue
-            if pid > 0:
-                groups.add(pid)
-        return groups
 
     def _port_holders(self) -> dict[int, set[int]]:
         config = self.bench.config
@@ -356,7 +359,7 @@ class ProcessManager:
             stderr=subprocess.STDOUT,
             preexec_fn=os.setsid,
             cwd=str(pd.working_dir) if pd.working_dir else None,
-            env={**os.environ, **pd.env} if pd.env else None,
+            env={**os.environ, **pd.env, BENCH_ROOT_ENV: str(self.bench.path)},
         )
         self._procs[pd.name] = proc
         (self.bench.pids_path / f"{pd.name}.pid").write_text(str(proc.pid))
