@@ -267,12 +267,15 @@ def _default_backend() -> _ProcessBackend:
     return _DarwinPsBackend() if is_macos() else _ProcSysBackend()
 
 
-def get_process_stamp(pid: int) -> str:
-    """Reboot-safe identity for a live process; empty when it is gone, a zombie, or unreadable."""
+def get_process_stamp(pid: int) -> str | None:
+    """Reboot-safe identity for a live process: a stamp while it runs, "" once it
+    is gone or a zombie, None when inspection failed and liveness is unknown."""
     try:
         return _default_backend().get_process_stamp(pid)
-    except (ProcessLookupError, OSError, ValueError):
+    except (ProcessLookupError, FileNotFoundError):
         return ""
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return None
 
 
 class ProcessInspector:
