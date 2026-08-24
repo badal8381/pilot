@@ -49,7 +49,22 @@ def _pids_listening(port: int) -> set[int]:
     return {int(m) for m in re.findall(pid_pattern, result.stdout)}
 
 
+def _process_command(pid: int) -> str:
+    try:
+        result = subprocess.run(
+            ["ps", "-ww", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 _RELOAD_REQUEST_FILE = "reload.request"
+_STOP_WAIT_SECONDS = 15.0
+_STOP_POLL_SECONDS = 0.2
 # Redis holds the job queue, and the admin plane is what issues the reload.
 # Both must survive it, so only app-code processes are restarted.
 _NON_RELOADABLE = frozenset({"admin", "admin-ui", "redis_cache", "redis_queue", "watch"})
@@ -146,7 +161,7 @@ class ProcessManager:
         try:
             self._run_processes(self._process_definitions())
         finally:
-            self.pid_file.unlink(missing_ok=True)
+            self._unlink_pid_file(os.getpid())
             self._cleanup_proc_pid_files()
 
     def start_workload(self) -> None:
@@ -154,26 +169,79 @@ class ProcessManager:
 
     def stop(self) -> None:
         if self._stop_supervisor():
+            self._wait_for_ports()
             return
-        # No live supervisor: kill whatever still holds the bench ports
-        # (setup wizard, or children orphaned by a crashed supervisor).
         if not self._stop_port_holders():
             raise BenchError("Bench is not running.")
 
     def _stop_supervisor(self) -> bool:
-        """SIGTERM the dev supervisor and wait until it has released its ports."""
+        """SIGTERM the dev supervisor and wait for it to finish cleanup."""
         if not self.pid_file.exists():
             return False
-        pid = int(self.pid_file.read_text().strip())
-        self.pid_file.unlink(missing_ok=True)
+        try:
+            pid = int(self.pid_file.read_text().strip())
+        except (OSError, ValueError):
+            self.pid_file.unlink(missing_ok=True)
+            return False
         try:
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
+            self._unlink_pid_file(pid)
             return False
         self._wait_for_exit(pid)
+        self._unlink_pid_file(pid)
         return True
 
     def _stop_port_holders(self) -> bool:
+        holders = self._port_holders()
+        pids = {pid for port_pids in holders.values() for pid in port_pids}
+        pids.discard(os.getpid())
+        if not pids:
+            return False
+        owned_pids = {pid for pid in pids if self._owns_process(pid)}
+        if unowned_pids := pids - owned_pids:
+            ports = sorted(port for port, port_pids in holders.items() if port_pids & unowned_pids)
+            rendered_ports = ", ".join(str(port) for port in ports)
+            raise BenchError(
+                "Refusing to stop process(es) not owned by this bench "
+                f"on configured port(s): {rendered_ports}."
+            )
+        for pid in owned_pids:
+            with contextlib.suppress(ProcessLookupError):
+                os.kill(pid, signal.SIGTERM)
+        self._wait_for_ports()
+        return True
+
+    def _owns_process(self, pid: int) -> bool:
+        try:
+            if os.getpgid(pid) in self._recorded_process_groups():
+                return True
+        except OSError:
+            pass
+        command = _process_command(pid)
+        return all(
+            marker in command
+            for marker in ("admin.backend.run_server", "--wizard", "--bench-root", str(self.bench.path))
+        )
+
+    def _recorded_process_groups(self) -> set[int]:
+        try:
+            pid_files = list(self.bench.pids_path.glob("*.pid"))
+        except OSError:
+            return set()
+        groups = set()
+        for path in pid_files:
+            if path == self.pid_file:
+                continue
+            try:
+                pid = int(path.read_text().strip())
+            except (OSError, ValueError):
+                continue
+            if pid > 0:
+                groups.add(pid)
+        return groups
+
+    def _port_holders(self) -> dict[int, set[int]]:
         config = self.bench.config
         ports = (
             config.admin.port,
@@ -182,27 +250,35 @@ class ProcessManager:
             config.redis.cache_port,
             config.redis.queue_port,
         )
-        pids = set()
-        for port in ports:
-            pids |= _pids_listening(port)
-        pids.discard(os.getpid())
-        if not pids:
-            return False
-        for pid in pids:
-            with contextlib.suppress(ProcessLookupError):
-                os.kill(pid, signal.SIGTERM)
-        for pid in pids:
-            self._wait_for_exit(pid)
-        return True
+        return {port: pids for port in ports if (pids := _pids_listening(port))}
 
-    def _wait_for_exit(self, pid: int, timeout: float = 15.0) -> None:
+    def _wait_for_exit(self, pid: int, timeout: float = _STOP_WAIT_SECONDS) -> None:
         deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
+        while True:
             try:
                 os.kill(pid, 0)
             except ProcessLookupError:
                 return
-            time.sleep(0.2)
+            if time.monotonic() >= deadline:
+                raise BenchError(f"Timed out waiting for bench supervisor {pid} to stop.")
+            time.sleep(_STOP_POLL_SECONDS)
+
+    def _wait_for_ports(self, timeout: float = _STOP_WAIT_SECONDS) -> None:
+        deadline = time.monotonic() + timeout
+        while holders := self._port_holders():
+            if time.monotonic() >= deadline:
+                ports = ", ".join(str(port) for port in sorted(holders))
+                raise BenchError(f"Timed out waiting for bench port(s) to be released: {ports}.")
+            time.sleep(_STOP_POLL_SECONDS)
+
+    def _unlink_pid_file(self, pid: int) -> None:
+        """Remove only the PID file that identified this supervisor."""
+        try:
+            current_pid = int(self.pid_file.read_text().strip())
+        except (FileNotFoundError, OSError, ValueError):
+            return
+        if current_pid == pid:
+            self.pid_file.unlink(missing_ok=True)
 
     def is_running(self) -> bool:
         if not self.pid_file.exists():

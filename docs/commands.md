@@ -22,6 +22,8 @@ Bench commands with `--bench NAME` can run from outside the bench directory. `Be
 - `pilot build`: build assets or download prebuilt assets when available.
 - `pilot frappe -- ...`: pass through to Frappe's bench helper.
 
+In development, `pilot stop` waits until the foreground runner exits and releases its configured ports. If the runner crashed, Pilot stops only the recorded bench processes or its setup wizard. Pilot refuses to signal unrelated processes that use a configured port.
+
 Some runtime commands support all benches when invoked with the CLI option for all-bench execution.
 
 ## App Commands
