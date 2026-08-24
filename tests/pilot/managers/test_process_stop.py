@@ -118,6 +118,45 @@ def test_supervisor_cleanup_preserves_replacement_pid_file(tmp_path: Path, monke
     assert manager.supervisor_identity_file.read_text() == "replacement"
 
 
+def test_supervisor_record_publication_is_serialized(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    manager._write_supervisor_record(123, "original")
+    pid_written = threading.Event()
+    allow_identity_write = threading.Event()
+    read_done = threading.Event()
+    record = []
+    write_text = Path.write_text
+
+    def pause_after_pid_write(path: Path, data: str, *args, **kwargs) -> int:
+        written = write_text(path, data, *args, **kwargs)
+        if path == manager.pid_file:
+            pid_written.set()
+            allow_identity_write.wait(timeout=5)
+        return written
+
+    def read_record() -> None:
+        record.append(manager._read_supervisor_record())
+        read_done.set()
+
+    monkeypatch.setattr(Path, "write_text", pause_after_pid_write)
+    writer = threading.Thread(target=manager._write_supervisor_record, args=(456, "replacement"))
+    reader = threading.Thread(target=read_record)
+    writer.start()
+    try:
+        assert pid_written.wait(timeout=5)
+        reader.start()
+        assert not read_done.wait(timeout=0.05)
+    finally:
+        allow_identity_write.set()
+        writer.join(timeout=5)
+        if reader.ident is not None:
+            reader.join(timeout=5)
+
+    assert not writer.is_alive()
+    assert not reader.is_alive()
+    assert record == [(456, "replacement")]
+
+
 def test_stop_with_stale_pid_file_kills_port_holders(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     manager.pid_file.write_text("999999")
@@ -141,6 +180,7 @@ def test_stop_legacy_pid_file_signals_pilot_supervisor(tmp_path: Path, monkeypat
     proc = _spawn_reaped_sleep()
     manager.pid_file.write_text(str(proc.pid))
     monkeypatch.setattr(process_module, "_process_command", lambda _pid: "/usr/local/bin/pilot start")
+    monkeypatch.setattr(process_module, "_process_cwd", lambda _pid: manager.bench.path)
     monkeypatch.setattr(manager, "_port_holders", lambda: {})
 
     manager.stop()
@@ -153,15 +193,34 @@ def test_stop_legacy_pid_file_rejects_unrelated_process(tmp_path: Path, monkeypa
     manager = _manager(tmp_path)
     proc = _spawn_reaped_sleep()
     manager.pid_file.write_text(str(proc.pid))
-    monkeypatch.setattr(process_module, "_process_command", lambda _pid: "nginx: master process")
+    monkeypatch.setattr(process_module, "_process_command", lambda _pid: "python worker.py pilot start")
+    monkeypatch.setattr(process_module, "_process_cwd", lambda _pid: manager.bench.path)
     kill = MagicMock()
     monkeypatch.setattr(process_module.os, "kill", kill)
 
     try:
-        with pytest.raises(BenchError, match="does not look like a pilot supervisor"):
+        with pytest.raises(BenchError, match="does not match this bench's Pilot supervisor"):
             manager.stop()
         kill.assert_not_called()
         assert manager.pid_file.exists()
+    finally:
+        monkeypatch.undo()
+        proc.terminate()
+
+
+def test_stop_legacy_pid_file_rejects_other_bench_supervisor(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    proc = _spawn_reaped_sleep()
+    manager.pid_file.write_text(str(proc.pid))
+    monkeypatch.setattr(process_module, "_process_command", lambda _pid: "/usr/local/bin/pilot start")
+    monkeypatch.setattr(process_module, "_process_cwd", lambda _pid: tmp_path / "other-bench")
+    kill = MagicMock()
+    monkeypatch.setattr(process_module.os, "kill", kill)
+
+    try:
+        with pytest.raises(BenchError, match="does not match this bench's Pilot supervisor"):
+            manager.stop()
+        kill.assert_not_called()
     finally:
         monkeypatch.undo()
         proc.terminate()

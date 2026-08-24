@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import os
 import re
 import shlex
@@ -9,6 +10,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Iterator
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -63,6 +65,32 @@ def _process_command(pid: int) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def _process_cwd(pid: int) -> Path | None:
+    from pilot.managers.platform import is_macos
+
+    if not is_macos():
+        try:
+            return (Path("/proc") / str(pid) / "cwd").resolve(strict=True)
+        except OSError:
+            return None
+    try:
+        result = subprocess.run(
+            ["lsof", "-a", "-p", str(pid), "-d", "cwd", "-Fn"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    path = next((line[1:] for line in result.stdout.splitlines() if line.startswith("n")), "")
+    try:
+        return Path(path).resolve(strict=True) if path else None
+    except OSError:
+        return None
+
+
 def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
     from pilot.managers.platform import is_macos
 
@@ -106,6 +134,47 @@ def _is_setup_wizard_for_bench(command: str, bench_root: Path) -> bool:
         and bench_root_index + 1 < len(module_args)
         and module_args[bench_root_index + 1] == str(bench_root)
     )
+
+
+def _is_pilot_start(command: str) -> bool:
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return False
+    args = _pilot_args(argv)
+    return args is not None and _without_pilot_group_options(args) == ["start"]
+
+
+def _pilot_args(argv: list[str]) -> list[str] | None:
+    if not argv:
+        return None
+    executable = Path(argv[0]).name
+    if executable == "pilot":
+        return argv[1:]
+    if executable.startswith("python") and len(argv) > 1 and Path(argv[1]).name == "pilot":
+        return argv[2:]
+    return None
+
+
+def _without_pilot_group_options(args: list[str]) -> list[str]:
+    index = 0
+    while index < len(args):
+        option = args[index]
+        if option in ("--verbose", "--yes", "-y"):
+            index += 1
+        elif option in ("--bench", "-b"):
+            index += 2
+        elif option.startswith(("--bench=", "-b=")):
+            index += 1
+        else:
+            break
+    return args[index:]
+
+
+def _process_runs_from_bench(pid: int, bench_root: Path) -> bool:
+    cwd = _process_cwd(pid)
+    root = bench_root.resolve()
+    return cwd is not None and (cwd == root or root in cwd.parents)
 
 
 _RELOAD_REQUEST_FILE = "reload.request"
@@ -177,6 +246,10 @@ class ProcessManager:
         return self.bench.pids_path / "bench.identity"
 
     @property
+    def supervisor_lock_file(self) -> Path:
+        return self.bench.pids_path / "bench.lock"
+
+    @property
     def reload_request_file(self) -> Path:
         return self.bench.pids_path / _RELOAD_REQUEST_FILE
 
@@ -214,8 +287,7 @@ class ProcessManager:
         stamp = get_process_stamp(pid)
         if not stamp:
             raise BenchError("Could not capture the development supervisor identity.")
-        self.pid_file.write_text(str(pid))
-        self.supervisor_identity_file.write_text(stamp)
+        self._write_supervisor_record(pid, stamp)
         try:
             self._run_processes(self._process_definitions())
         finally:
@@ -233,15 +305,10 @@ class ProcessManager:
 
     def _stop_supervisor(self) -> bool:
         """SIGTERM the dev supervisor and wait for it to finish cleanup."""
-        if not self.pid_file.exists():
+        record = self._read_supervisor_record()
+        if record is None:
             return False
-        try:
-            pid = int(self.pid_file.read_text().strip())
-        except (OSError, ValueError):
-            self.pid_file.unlink(missing_ok=True)
-            self.supervisor_identity_file.unlink(missing_ok=True)
-            return False
-        recorded_stamp = self._recorded_stamp
+        pid, recorded_stamp = record
         if not recorded_stamp:
             return self._stop_legacy_supervisor(pid)
         if get_process_stamp(pid) != recorded_stamp:
@@ -253,12 +320,12 @@ class ProcessManager:
         """Stop a supervisor recorded by an older pilot, before identity stamps existed."""
         stamp = get_process_stamp(pid)
         if not stamp:
-            self.pid_file.unlink(missing_ok=True)
+            self._unlink_supervisor_record(pid, "")
             return False
         command = _process_command(pid)
-        if "pilot" not in command or "start" not in command.split():
+        if not _is_pilot_start(command) or not _process_runs_from_bench(pid, self.bench.path):
             raise BenchError(
-                f"Recorded bench process {pid} does not look like a pilot supervisor. "
+                f"Recorded bench process {pid} does not match this bench's Pilot supervisor. "
                 f"Stop it manually and remove {self.pid_file}."
             )
         return self._terminate_supervisor(pid, stamp, "")
@@ -332,31 +399,53 @@ class ProcessManager:
                     owned_ports.add(port)
         return owned_ports
 
+    def _write_supervisor_record(self, pid: int, stamp: str) -> None:
+        with self._supervisor_record_lock():
+            self.pid_file.write_text(str(pid))
+            self.supervisor_identity_file.write_text(stamp)
+
+    def _read_supervisor_record(self) -> tuple[int, str] | None:
+        with self._supervisor_record_lock():
+            return self._read_supervisor_record_unlocked()
+
     def _unlink_supervisor_record(self, pid: int, recorded_stamp: str) -> None:
-        """Remove the record only while it still holds the values this stop acted on."""
-        try:
-            current_pid = int(self.pid_file.read_text().strip())
-        except (OSError, ValueError):
-            return
-        if current_pid == pid and self._recorded_stamp == recorded_stamp:
+        """Remove the record only while it still holds the values this stop used."""
+        with self._supervisor_record_lock():
+            if self._read_supervisor_record_unlocked() != (pid, recorded_stamp):
+                return
             self.pid_file.unlink(missing_ok=True)
             self.supervisor_identity_file.unlink(missing_ok=True)
 
-    @property
-    def _recorded_stamp(self) -> str:
-        try:
-            return self.supervisor_identity_file.read_text().strip()
-        except OSError:
-            return ""
-
-    def is_running(self) -> bool:
-        if not self.pid_file.exists():
-            return False
+    def _read_supervisor_record_unlocked(self) -> tuple[int, str] | None:
         try:
             pid = int(self.pid_file.read_text().strip())
+        except FileNotFoundError:
+            return None
         except (OSError, ValueError):
+            self.pid_file.unlink(missing_ok=True)
+            self.supervisor_identity_file.unlink(missing_ok=True)
+            return None
+        try:
+            stamp = self.supervisor_identity_file.read_text().strip()
+        except OSError:
+            stamp = ""
+        return pid, stamp
+
+    @contextlib.contextmanager
+    def _supervisor_record_lock(self) -> Iterator[None]:
+        self.bench.pids_path.mkdir(parents=True, exist_ok=True)
+        with self.supervisor_lock_file.open("a+") as lock_file:
+            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+
+    def is_running(self) -> bool:
+        record = self._read_supervisor_record()
+        if record is None:
             return False
-        recorded_stamp = self._recorded_stamp
+        pid, recorded_stamp = record
         return bool(recorded_stamp) and get_process_stamp(pid) == recorded_stamp
 
     def stop_admin(self) -> None:
