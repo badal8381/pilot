@@ -64,6 +64,19 @@ def _process_command(pid: int) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+def _parent_pid(pid: int) -> int:
+    try:
+        result = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "ppid="],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return int(result.stdout.strip())
+    except (FileNotFoundError, subprocess.SubprocessError, ValueError):
+        return 0
+
+
 def _process_has_bench_root(pid: int, bench_root: Path) -> bool:
     from pilot.managers.platform import is_macos
 
@@ -241,26 +254,44 @@ class ProcessManager:
         if current_stamp != recorded_stamp:
             self._unlink_supervisor_record(pid, recorded_stamp)
             return False
-        return self._terminate_supervisor(pid, recorded_stamp)
+        return self._terminate_supervisor(pid, recorded_stamp, recorded_stamp)
 
     def _stop_legacy_record(self, pid: int) -> bool:
-        """A record from an older pilot carries no identity stamp; never signal it."""
-        if get_process_stamp(pid) == "":
+        """A record from an older pilot carries no identity stamp. Signal it only
+        on structural proof: a listener on this bench's ports descends from it."""
+        stamp = get_process_stamp(pid)
+        if stamp == "":
             self._unlink_supervisor_record(pid, "")
             return False
-        raise BenchError(
-            f"Bench process {pid} was recorded by an older pilot and cannot be verified. "
-            f"Stop it manually, or remove {self.pid_file} if the process is not this bench."
-        )
+        if stamp is None or not self._is_ancestor_of_port_holder(pid):
+            raise BenchError(
+                f"Bench process {pid} was recorded by an older pilot and cannot be verified. "
+                f"Stop it manually, or remove {self.pid_file} if the process is not this bench."
+            )
+        return self._terminate_supervisor(pid, stamp, "")
 
-    def _terminate_supervisor(self, pid: int, stamp: str) -> bool:
+    def _is_ancestor_of_port_holder(self, pid: int) -> bool:
+        """A reused pid cannot fake having this bench's own listeners as descendants."""
+        holders = {holder for pids in self._port_holders().values() for holder in pids}
+        for holder in holders:
+            current = holder
+            for _hop in range(5):
+                current = _parent_pid(current)
+                if current == pid:
+                    return True
+                if current <= 1:
+                    break
+        return False
+
+    def _terminate_supervisor(self, pid: int, live_stamp: str, recorded_stamp: str) -> bool:
+        """recorded_stamp is what the record holds on disk — empty for legacy records."""
         try:
             os.kill(pid, signal.SIGTERM)
         except (ProcessLookupError, PermissionError):
-            self._unlink_supervisor_record(pid, stamp)
+            self._unlink_supervisor_record(pid, recorded_stamp)
             return False
-        self._wait_for_exit(pid, stamp)
-        self._unlink_supervisor_record(pid, stamp)
+        self._wait_for_exit(pid, live_stamp)
+        self._unlink_supervisor_record(pid, recorded_stamp)
         return True
 
     def _stop_port_holders(self) -> bool:
