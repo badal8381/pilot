@@ -391,13 +391,15 @@ class ProcessManager:
         signal.signal(signal.SIGTERM, _stop)
         signal.signal(signal.SIGINT, _stop)
 
-        self.reload_request_file.unlink(missing_ok=True)
-        for pd in defs:
-            self._spawn(pd)
-        self._supervise(defs)
-        self._stop_all()
-        signal.signal(signal.SIGTERM, original_sigterm)
-        signal.signal(signal.SIGINT, original_sigint)
+        try:
+            self.reload_request_file.unlink(missing_ok=True)
+            for pd in defs:
+                self._spawn(pd)
+            self._supervise(defs)
+        finally:
+            self._stop_all()
+            signal.signal(signal.SIGTERM, original_sigterm)
+            signal.signal(signal.SIGINT, original_sigint)
 
     def _supervise(self, defs: list[ProcessDefinition]) -> None:
         defs_by_name = {pd.name: pd for pd in defs}

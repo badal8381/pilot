@@ -6,7 +6,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 
@@ -327,6 +327,31 @@ def test_wait_for_ports_rechecks_process_ownership(tmp_path: Path, monkeypatch) 
     monkeypatch.setattr(process_module.time, "sleep", lambda _seconds: None)
 
     manager._wait_for_ports(timeout=1)
+
+
+def test_run_processes_cleans_up_and_restores_signals_after_failure(
+    tmp_path: Path, monkeypatch
+) -> None:
+    manager = _manager(tmp_path)
+    original_term = object()
+    original_int = object()
+    set_signal = MagicMock()
+    stop_all = MagicMock()
+    monkeypatch.setattr(
+        process_module.signal, "getsignal", MagicMock(side_effect=[original_term, original_int])
+    )
+    monkeypatch.setattr(process_module.signal, "signal", set_signal)
+    monkeypatch.setattr(manager, "_spawn", MagicMock(side_effect=RuntimeError("spawn failed")))
+    monkeypatch.setattr(manager, "_stop_all", stop_all)
+
+    with pytest.raises(RuntimeError, match="spawn failed"):
+        manager._run_processes([MagicMock()])
+
+    stop_all.assert_called_once_with()
+    assert set_signal.call_args_list[-2:] == [
+        call(process_module.signal.SIGTERM, original_term),
+        call(process_module.signal.SIGINT, original_int),
+    ]
 
 
 def test_stop_all_escalates_to_sigkill_after_deadline(tmp_path: Path, monkeypatch) -> None:
