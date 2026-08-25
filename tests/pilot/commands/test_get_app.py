@@ -19,6 +19,11 @@ def register_app_on_branch(bench, name: str, branch: str) -> str:
     app_dir = bench.apps_path / name
     app_dir.mkdir(parents=True)
     subprocess.run(["git", "init", "-b", branch, str(app_dir)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(app_dir), "remote", "add", "origin", f"https://github.com/frappe/{name}"],
+        check=True,
+        capture_output=True,
+    )
     (app_dir / "hooks.py").write_text("")
     subprocess.run(["git", "-C", str(app_dir), "add", "hooks.py"], check=True, capture_output=True)
     subprocess.run(
@@ -114,6 +119,17 @@ def test_reinstall_with_a_different_branch_fails_loudly(tmp_path: Path) -> None:
     cmd = GetAppCommand(bench, repo="https://github.com/frappe/myapp", branch="version-16-hotfix")
 
     with pytest.raises(BenchError, match="already installed from branch 'version-16'"):
+        cmd.run()
+
+
+def test_reinstall_from_a_different_repository_fails_loudly(tmp_path: Path) -> None:
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    register_app_on_branch(bench, "myapp", "version-16")
+
+    cmd = GetAppCommand(bench, repo="https://github.com/acme/myapp", branch="version-16")
+
+    with pytest.raises(BenchError, match="already installed from a different repository"):
         cmd.run()
 
 
