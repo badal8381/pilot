@@ -10,7 +10,7 @@ from pilot.config.letsencrypt import LetsEncryptConfig
 from pilot.config.mariadb import MariaDBConfig
 from pilot.config.postgres import PostgresConfig
 from pilot.config.secret_box import decrypt, encrypt
-from pilot.internal.atomic_file import atomic_write_private_text
+from pilot.internal.atomic_file import exclusive_file_lock, replace_private_text_locked
 from pilot.internal.toml import ConfigDict, Toml
 
 FILENAME = "common_config.toml"
@@ -67,7 +67,13 @@ class CommonConfig:
         )
 
     def write(self, benches_root: Path) -> None:
-        atomic_write_private_text(self.path(benches_root), Toml.dumps(self._to_toml_dict(benches_root)))
+        path = self.path(benches_root)
+        # The smtp_password encryption key is created lazily on first save, so it
+        # must be built under the same lock as the write: two concurrent first
+        # saves outside this lock could each mint their own key and strand
+        # whichever ciphertext lands second, undecryptable, on disk.
+        with exclusive_file_lock(path):
+            replace_private_text_locked(path, Toml.dumps(self._to_toml_dict(benches_root)))
 
     def _to_toml_dict(self, benches_root: Path) -> ConfigDict:
         data: ConfigDict = {
