@@ -46,8 +46,10 @@ class Command:
 
     bench: Bench | None = None
 
-    def prepare_all_sweep(self) -> None:
-        """Adjust the command for a `-b all` sweep; a no-op for most commands."""
+    def prepare_all_sweep(self) -> str | None:
+        """Adjust the command for a `-b all` sweep. Return a reason to skip this
+        bench, or None to run; most commands run unchanged."""
+        return None
 
     def run(self) -> None:
         raise NotImplementedError

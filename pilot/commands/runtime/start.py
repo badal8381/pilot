@@ -15,9 +15,13 @@ class RunCommand(Command):
 
     detach: Annotated[bool, Arg(help="Run the development bench in the background.")] = False
 
-    def prepare_all_sweep(self) -> None:
-        if not self.bench.config.production.enabled:
-            self.detach = True
+    def prepare_all_sweep(self) -> str | None:
+        if self.bench.config.production.enabled:
+            self.detach = False
+            return None
+        if self.detach:
+            return None
+        return "development bench; start it in its own terminal, or pass --detach"
 
     def run(self) -> None:
         if self.detach:
