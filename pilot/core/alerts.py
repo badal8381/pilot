@@ -55,6 +55,7 @@ def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> 
     # smtplib's own default context does not verify the peer, so pass one that does:
     # an unverified hop would hand the password to whoever answers.
     context = ssl.create_default_context()
+    server: smtplib.SMTP
     if endpoint.is_ssl:
         server = smtplib.SMTP_SSL(
             endpoint.host, endpoint.port, timeout=ALERT_TIMEOUT_SECONDS, context=context
