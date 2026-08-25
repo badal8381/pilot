@@ -290,7 +290,7 @@ class ProcessManager:
                 self.pid_file.unlink(missing_ok=True)
 
     @property
-    def supervisor_pid(self) -> int | None:
+    def running_supervisor_pid(self) -> int | None:
         record = self._read_supervisor_record()
         if record is None:
             return None
@@ -298,7 +298,7 @@ class ProcessManager:
         return pid if get_process_stamp(pid) == recorded_stamp else None
 
     def is_running(self) -> bool:
-        return self.supervisor_pid is not None
+        return self.running_supervisor_pid is not None
 
     def stop_admin(self) -> None:
         pass
