@@ -146,8 +146,25 @@ def test_upgrade_dev_skips_rebuild_when_already_on_latest_tag() -> None:
     assert messages == ["Already on the latest version (v0.0.2-pre-alpha)."]
 
 
+def test_upgrade_dev_rejects_a_detached_commit() -> None:
+    branch, tag, fetch = _patch_git_state("")
+    with (
+        patch.object(updater, "cli_root", return_value=Path("/opt/pilot")),
+        branch,
+        tag,
+        fetch,
+        patch.object(updater, "latest_release") as latest,
+        patch.object(updater, "_rebuild_dev_install") as rebuild,
+        pytest.raises(BenchError, match="not on a release tag"),
+    ):
+        updater._upgrade_dev(lambda _m: None)
+
+    latest.assert_not_called()
+    rebuild.assert_not_called()
+
+
 def test_upgrade_dev_fails_when_tag_cannot_be_fetched() -> None:
-    branch, tag, _fetch = _patch_git_state("")
+    branch, tag, _fetch = _patch_git_state("", tag_at_head="v0.0.1-pre-alpha")
     with (
         patch.object(updater, "cli_root", return_value=Path("/opt/pilot")),
         branch, tag,

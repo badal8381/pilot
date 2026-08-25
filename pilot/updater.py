@@ -77,11 +77,14 @@ def _checkout_latest_tag(repo: GitRepo, on_progress: Progress) -> bool:
     """Move a tag-pinned checkout to the newest release tag. Returns False when already there."""
     from pilot.utils import run_command
 
+    current_tag = repo.tag_at_head
+    if not current_tag:
+        raise BenchError("Cannot upgrade a detached checkout that is not on a release tag.")
     release = latest_release()
     if not release or not release["tag"]:
         raise BenchError("Could not determine the latest release tag.")
     tag = release["tag"]
-    if repo.tag_at_head == tag:
+    if current_tag == tag:
         on_progress(f"Already on the latest version ({tag}).")
         return False
     on_progress(f"Updating tag-pinned install to {tag}...")
