@@ -204,6 +204,20 @@ def test_switch_branch_requires_a_branch(tmp_path: Path) -> None:
     assert response.status_code == 422
 
 
+def test_switch_branch_rejects_invalid_app_and_branch_names(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    _make_cloned_app(bench_root, "suite")
+    client = _client(bench_root)
+
+    invalid_app = client.post("/api/v1/apps/bad.name/switch-branch", json={"branch": "develop"})
+    invalid_branch = client.post(
+        "/api/v1/apps/suite/switch-branch", json={"branch": "../develop"}
+    )
+
+    assert invalid_app.status_code == 422
+    assert invalid_branch.status_code == 422
+
+
 def test_switch_branch_404s_when_app_missing(tmp_path: Path) -> None:
     bench_root = tmp_path / "benches" / "current"
     client = _client(bench_root)
