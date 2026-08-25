@@ -48,7 +48,8 @@ def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> 
     message["Subject"] = f"[Pilot] {payload['message']}"
     # An anonymous relay has no login name to send as, and an empty From would
     # become MAIL FROM:<>, the null bounce sender most relays reject.
-    message["From"] = endpoint.username or f"pilot@{endpoint.host}"
+    host = f"[{endpoint.host}]" if ":" in endpoint.host else endpoint.host
+    message["From"] = endpoint.username or f"pilot@{host}"
     message["To"] = ", ".join(limits.email_recipients)
     message.set_content(f"{payload['message']}\n\n{json.dumps(payload['context'], indent=2)}")
 

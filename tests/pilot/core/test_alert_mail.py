@@ -142,6 +142,14 @@ def test_a_relay_without_a_login_name_sends_anonymously() -> None:
     assert sent.messages[0]["From"] == "pilot@smtp.test"
 
 
+def test_an_anonymous_ipv6_relay_gets_a_bracketed_sender() -> None:
+    with patch("smtplib.SMTP", FakeSMTP):
+        send_mail(_limits(smtp_url="smtp://[2001:db8::1]:587"), PAYLOAD)
+
+    sent = FakeSMTP.sends[0]
+    assert sent.messages[0]["From"] == "pilot@[2001:db8::1]"
+
+
 def test_a_refused_recipient_is_not_a_delivery(tmp_path: Path) -> None:
     """send_message reports per-recipient refusals by returning them; a partial
     send must not retire the alert for the mailbox that never got it."""
