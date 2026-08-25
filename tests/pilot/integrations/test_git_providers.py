@@ -89,6 +89,14 @@ def test_list_branches_wraps_a_timeout() -> None:
         GitHubProvider(token="").list_branches("acme/slow")
 
 
+def test_list_branches_wraps_a_missing_git_executable() -> None:
+    with (
+        patch("pilot.integrations.git.github.subprocess.run", side_effect=FileNotFoundError),
+        pytest.raises(GitProviderError, match="Git is required"),
+    ):
+        GitHubProvider(token="").list_branches("acme/repo")
+
+
 def test_stored_token_travels_as_git_config_not_in_the_url(tmp_path: Path) -> None:
     """A token in the clone URL lands in argv (/proc) and in .git/config; a header
     scoped to the host does neither."""

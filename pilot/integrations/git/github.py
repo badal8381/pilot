@@ -94,6 +94,8 @@ class GitHubProvider(GitProvider):
             )
         except subprocess.TimeoutExpired as exc:
             raise GitProviderError(f"Timed out listing branches for {full_name}.") from exc
+        except OSError as exc:
+            raise GitProviderError("Git is required to list repository branches.") from exc
         if result.returncode != 0:
             if "authentication failed" in result.stderr.lower():
                 raise GitAuthError(f"GitHub rejected the stored token for {full_name}.")
