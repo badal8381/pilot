@@ -9,6 +9,7 @@ from pilot.config.datum import DatumConfig
 from pilot.config.letsencrypt import LetsEncryptConfig
 from pilot.config.mariadb import MariaDBConfig
 from pilot.config.postgres import PostgresConfig
+from pilot.config.secret_box import decrypt, encrypt
 from pilot.internal.atomic_file import atomic_write_private_text
 from pilot.internal.toml import ConfigDict, Toml
 
@@ -42,30 +43,33 @@ class CommonConfig:
         path = cls.path(benches_root)
         if not path.exists():
             return cls()
-        return cls.from_raw_dict(Toml.loads(path.read_text(encoding="utf-8")))
+        return cls.from_raw_dict(Toml.loads(path.read_text(encoding="utf-8")), benches_root)
 
     @classmethod
-    def from_raw_dict(cls, data: dict) -> "CommonConfig":
+    def from_raw_dict(cls, data: dict, benches_root: Path | None = None) -> "CommonConfig":
         """Build from a parsed TOML dict shaped like common_config.toml (or a
         bench.toml that still carries these tables pre-migration)."""
         admin = data.get("admin", {})
+        resource_limits = _known_fields(ResourceLimitConfig, data.get("resource_limits", {}))
+        if benches_root is not None:
+            resource_limits["smtp_password"] = decrypt(
+                benches_root, resource_limits.get("smtp_password", "")
+            )
         return cls(
             mariadb=MariaDBConfig(**_known_fields(MariaDBConfig, data.get("mariadb", {}))),
             postgres=PostgresConfig(**_known_fields(PostgresConfig, data.get("postgres", {}))),
             letsencrypt=LetsEncryptConfig.from_dict(data.get("letsencrypt", {})),
             central=CentralConfig.from_dict(data.get("central", {})),
             datum=DatumConfig.from_dict(data.get("datum", {})),
-            resource_limits=ResourceLimitConfig(
-                **_known_fields(ResourceLimitConfig, data.get("resource_limits", {}))
-            ),
+            resource_limits=ResourceLimitConfig(**resource_limits),
             jwks_url=admin.get("jwks_url", ""),
             jwks_audience=admin.get("jwks_audience", ""),
         )
 
     def write(self, benches_root: Path) -> None:
-        atomic_write_private_text(self.path(benches_root), Toml.dumps(self._to_toml_dict()))
+        atomic_write_private_text(self.path(benches_root), Toml.dumps(self._to_toml_dict(benches_root)))
 
-    def _to_toml_dict(self) -> ConfigDict:
+    def _to_toml_dict(self, benches_root: Path) -> ConfigDict:
         data: ConfigDict = {
             "mariadb": {
                 "host": self.mariadb.host,
@@ -92,7 +96,9 @@ class CommonConfig:
         if self.datum != DatumConfig():
             data["datum"] = {"endpoint": self.datum.endpoint, "token": self.datum.token}
         if self.resource_limits != ResourceLimitConfig():
-            data["resource_limits"] = asdict(self.resource_limits)
+            limits = asdict(self.resource_limits)
+            limits["smtp_password"] = encrypt(benches_root, limits["smtp_password"])
+            data["resource_limits"] = limits
         if self.jwks_url:
             data["admin"] = {"jwks_url": self.jwks_url, "jwks_audience": self.jwks_audience}
         return data

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from pilot.config.alert_limit import ResourceLimitConfig
 from pilot.config.central import CentralConfig
 from pilot.config.common import CommonConfig
 from pilot.config.datum import DatumConfig
@@ -66,6 +67,20 @@ def test_central_omitted_from_output_when_unset(tmp_path: Path) -> None:
 def test_datum_omitted_from_output_when_unset(tmp_path: Path) -> None:
     CommonConfig().write(tmp_path)
     assert "[datum]" not in CommonConfig.path(tmp_path).read_text()
+
+
+def test_smtp_password_is_not_stored_as_plaintext(tmp_path: Path) -> None:
+    config = CommonConfig(
+        resource_limits=ResourceLimitConfig(
+            smtp_url="smtp://alerts@smtp.test:587",
+            smtp_password="s3cret",
+            email_recipients=["ops@example.com"],
+        )
+    )
+    config.write(tmp_path)
+
+    assert "s3cret" not in CommonConfig.path(tmp_path).read_text()
+    assert CommonConfig.read(tmp_path).resource_limits.smtp_password == "s3cret"
 
 
 def test_datum_is_shared_by_every_bench(tmp_path: Path) -> None:

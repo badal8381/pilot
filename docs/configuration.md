@@ -243,7 +243,7 @@ Alerts always go to Central. Each entry in `webhook_endpoints` receives them too
 
 The certificate is verified in both modes, so a server with a self-signed certificate is refused rather than trusted silently.
 
-The password belongs in `smtp_password`, never in the URL - a URL carrying one is rejected. Like the other secrets in this file, it is stored as written; `common_config.toml` is written owner-only (`0600`). The Admin API never returns it, reporting only whether one is stored.
+The password belongs in `smtp_password`, never in the URL - a URL carrying one is rejected. Unlike the other secrets in this file, it is encrypted at rest with a key generated alongside `common_config.toml` (`.secret_key`, also `0600`); `common_config.toml` itself is written owner-only too. The Admin API never returns it, reporting only whether one is stored.
 
 `BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, `config.central`, `config.datum`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
 
