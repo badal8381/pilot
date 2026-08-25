@@ -50,17 +50,18 @@ def encrypt(benches_root: Path, plaintext: str) -> str:
 
 
 def decrypt(benches_root: Path, ciphertext: str) -> str:
-    """Decrypt a secret read from common_config.toml. A value written before
-    encryption was added has no key file yet and reads as unset, not fatal.
-    A ciphertext that fails against an existing key is corrupt or was
-    encrypted under a key that no longer exists - raise instead of quietly
-    returning "", which a later unrelated save would persist as "cleared"
-    and destroy the real secret for good."""
+    """Decrypt a secret read from common_config.toml. smtp_password has never
+    been stored any other way, so non-empty ciphertext with no matching key -
+    whether the key file is missing or was replaced - means the secret is
+    unreadable. Raise instead of quietly returning "", which a later
+    unrelated save would persist as "cleared" and destroy it for good."""
     if not ciphertext:
         return ""
     path = _key_path(benches_root)
     if not path.exists():
-        return ""
+        raise ConfigError(
+            f"resource_limits.smtp_password could not be decrypted; {path} is missing."
+        )
     fernet = Fernet(path.read_bytes())
     try:
         return fernet.decrypt(ciphertext.encode()).decode()

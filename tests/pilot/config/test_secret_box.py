@@ -20,9 +20,12 @@ def test_empty_secret_round_trips_without_a_key_file(tmp_path: Path) -> None:
     assert not _key_path(tmp_path).exists()
 
 
-def test_ciphertext_with_no_key_file_reads_as_unset(tmp_path: Path) -> None:
-    """A value written before encryption was added has no key file yet."""
-    assert decrypt(tmp_path, "not-actually-ciphertext") == ""
+def test_ciphertext_with_no_key_file_raises(tmp_path: Path) -> None:
+    """smtp_password has never been stored unencrypted, so ciphertext with no
+    key file means the key was lost, not that this predates encryption.
+    Silently reading it as "" would let a later unrelated save destroy it."""
+    with pytest.raises(ConfigError, match="could not be decrypted"):
+        decrypt(tmp_path, "some-ciphertext")
 
 
 def test_ciphertext_that_fails_against_an_existing_key_raises(tmp_path: Path) -> None:
