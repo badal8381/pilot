@@ -97,6 +97,20 @@ def test_stop_terminates_supervisor_and_waits_for_ports(tmp_path: Path, monkeypa
     wait_for_ports.assert_called_once_with()
 
 
+def test_stop_also_terminates_orphans_after_supervisor(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    stop_supervisor = MagicMock(return_value=True)
+    stop_port_holders = MagicMock(return_value=True)
+    monkeypatch.setattr(manager, "_stop_supervisor", stop_supervisor)
+    monkeypatch.setattr(manager, "_stop_port_holders", stop_port_holders)
+    monkeypatch.setattr(manager, "_wait_for_ports", lambda: None)
+
+    manager.stop()
+
+    stop_supervisor.assert_called_once_with()
+    stop_port_holders.assert_called_once_with()
+
+
 def test_stop_preserves_record_replaced_during_shutdown(tmp_path: Path, monkeypatch) -> None:
     manager = _manager(tmp_path)
     manager.pid_file.write_text("123\noriginal\n")
@@ -172,6 +186,18 @@ def test_stop_raises_when_supervisor_inspection_fails(tmp_path: Path, monkeypatc
 
     kill.assert_not_called()
     assert manager.pid_file.exists()
+
+
+def test_stop_preserves_supervisor_record_on_permission_error(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    manager.pid_file.write_text("123\noriginal\n")
+    monkeypatch.setattr(process_module, "get_process_stamp", lambda _pid: "original")
+    monkeypatch.setattr(process_module.os, "kill", MagicMock(side_effect=PermissionError))
+
+    with pytest.raises(BenchError, match="permission denied"):
+        manager.stop()
+
+    assert manager._read_supervisor_record() == (123, "original")
 
 
 def test_stop_ignores_unowned_port_holder(tmp_path: Path, monkeypatch) -> None:
@@ -291,6 +317,16 @@ def test_wait_for_ports_ignores_foreign_holders(tmp_path: Path, monkeypatch) -> 
     monkeypatch.setattr(manager, "_owns_process", lambda _pid: False)
 
     manager._wait_for_ports(timeout=0)
+
+
+def test_wait_for_ports_rechecks_process_ownership(tmp_path: Path, monkeypatch) -> None:
+    manager = _manager(tmp_path)
+    holders = iter(({11000: {123}}, {11000: {456}}))
+    monkeypatch.setattr(manager, "_port_holders", lambda: next(holders))
+    monkeypatch.setattr(manager, "_owns_process", lambda pid: pid == 123)
+    monkeypatch.setattr(process_module.time, "sleep", lambda _seconds: None)
+
+    manager._wait_for_ports(timeout=1)
 
 
 def test_stop_all_escalates_to_sigkill_after_deadline(tmp_path: Path, monkeypatch) -> None:

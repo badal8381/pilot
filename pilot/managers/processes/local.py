@@ -189,8 +189,9 @@ class ProcessManager:
         self.start()
 
     def stop(self) -> None:
-        stopped = self._stop_supervisor() or self._stop_port_holders()
-        if not stopped:
+        supervisor_stopped = self._stop_supervisor()
+        processes_stopped = self._stop_port_holders()
+        if not supervisor_stopped and not processes_stopped:
             raise BenchNotRunningError("Bench is not running.")
         self._wait_for_ports()
 
@@ -211,9 +212,11 @@ class ProcessManager:
     def _terminate_supervisor(self, pid: int, stamp: str) -> bool:
         try:
             os.kill(pid, signal.SIGTERM)
-        except (ProcessLookupError, PermissionError):
+        except ProcessLookupError:
             self._unlink_supervisor_record(pid, stamp)
             return False
+        except PermissionError as exc:
+            raise BenchError(f"Could not stop bench supervisor {pid}: permission denied.") from exc
         self._wait_for_exit(pid, stamp)
         self._unlink_supervisor_record(pid, stamp)
         return True
@@ -223,8 +226,12 @@ class ProcessManager:
         pids.discard(os.getpid())
         owned_pids = {pid for pid in pids if self._owns_process(pid)}
         for pid in owned_pids:
-            with contextlib.suppress(ProcessLookupError):
+            try:
                 os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                continue
+            except PermissionError as exc:
+                raise BenchError(f"Could not stop bench process {pid}: permission denied.") from exc
         return bool(owned_pids)
 
     def _owns_process(self, pid: int) -> bool:
@@ -252,9 +259,12 @@ class ProcessManager:
 
     def _wait_for_ports(self, timeout: float = _STOP_WAIT_SECONDS) -> None:
         """Wait until this bench's own processes release its ports; foreign holders are ignored."""
-        owned = {pid for pids in self._port_holders().values() for pid in pids if self._owns_process(pid)}
         deadline = time.monotonic() + timeout
-        while held := {port for port, pids in self._port_holders().items() if pids & owned}:
+        while held := {
+            port
+            for port, pids in self._port_holders().items()
+            if any(self._owns_process(pid) for pid in pids)
+        }:
             if time.monotonic() >= deadline:
                 rendered = ", ".join(str(port) for port in sorted(held))
                 raise BenchError(f"Timed out waiting for bench port(s) to be released: {rendered}.")
@@ -279,12 +289,16 @@ class ProcessManager:
             if self._read_supervisor_record() == (pid, stamp):
                 self.pid_file.unlink(missing_ok=True)
 
-    def is_running(self) -> bool:
+    @property
+    def supervisor_pid(self) -> int | None:
         record = self._read_supervisor_record()
         if record is None:
-            return False
+            return None
         pid, recorded_stamp = record
-        return get_process_stamp(pid) == recorded_stamp
+        return pid if get_process_stamp(pid) == recorded_stamp else None
+
+    def is_running(self) -> bool:
+        return self.supervisor_pid is not None
 
     def stop_admin(self) -> None:
         pass
