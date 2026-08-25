@@ -83,9 +83,6 @@ class GitHubProvider(GitProvider):
         return basic_auth_config(repo_url, "x-access-token", self.token)
 
     def list_branches(self, full_name: str) -> list[str]:
-        """Every head via one `git ls-remote`. The REST listing pages at 100
-        and GitHub sorts alphabetically, so branch-heavy repos would lose
-        their version-* tail to any page cap."""
         repo_url = f"https://{self.host}/{full_name}"
         try:
             result = subprocess.run(

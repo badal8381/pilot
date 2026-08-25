@@ -32,8 +32,6 @@ def _ls_remote(returncode: int = 0, stdout: str = "", stderr: str = "") -> subpr
 
 
 def test_list_branches_returns_every_head_from_one_ls_remote() -> None:
-    """The REST listing paged at 100 and lost erpnext's version-16-hotfix
-    (position 588 of 589); ls-remote returns all heads in one call."""
     stdout = (
         "aaa\trefs/heads/develop\n"
         "bbb\trefs/heads/l10n_version-16-hotfix\n"
