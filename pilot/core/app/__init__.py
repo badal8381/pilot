@@ -245,14 +245,25 @@ class App:
             return
         run_command(["yarn", "--cwd", str(self.path), "build"])
 
-    def _reject_branch_mismatch(self) -> None:
+    def _reject_revision_mismatch(self, commit: str = "") -> None:
         requested = self.config.branch
-        if not requested or self.is_commit_hash(requested):
+        installed = self.bench.app(self.module_name)
+        requested_commit = commit or (requested if self.is_commit_hash(requested) else "")
+        if requested_commit:
+            if not installed.is_on_revision(RevisionPin(kind="commit", ref=requested_commit)):
+                raise BenchError(
+                    f"'{self.config.name}' is already installed at a different commit, "
+                    f"so this install cannot deliver '{requested_commit}'. Remove the app and "
+                    f"add it again to change its revision."
+                )
             return
-        current = self.bench.app(self.module_name).current_branch
-        if current and requested != current:
+        if not requested:
+            return
+        current = installed.current_branch
+        if requested != current:
+            source = f"branch '{current}'" if current else "a detached commit"
             raise BenchError(
-                f"'{self.config.name}' is already installed from branch '{current}', "
+                f"'{self.config.name}' is already installed from {source}, "
                 f"so this install cannot deliver '{requested}'. Remove the app and "
                 f"add it again to change its branch."
             )
@@ -274,7 +285,7 @@ class App:
     ) -> AppInstallResult:
         """Pinned commit based Clone, validate, install, register, and build app assets."""
         if self.bench.is_app_installed(self.config.name):
-            self._reject_branch_mismatch()
+            self._reject_revision_mismatch(commit)
             return self._skip_already_installed(on_progress, install_dependencies)
 
         existing_clone = self.existing_clone_path
