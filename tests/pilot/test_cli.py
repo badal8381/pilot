@@ -257,7 +257,7 @@ def test_dispatch_all_stop_tolerates_stopped_benches(tmp_path, monkeypatch):
         registry.dispatch_all(args, argparse.ArgumentParser(), context)
 
 
-def test_dispatch_all_start_detaches_dev_benches(tmp_path, monkeypatch):
+def test_dispatch_all_start_skips_dev_benches_without_detach(tmp_path, monkeypatch, capsys):
     import argparse
     from types import SimpleNamespace
     from unittest.mock import MagicMock
@@ -276,9 +276,18 @@ def test_dispatch_all_start_detaches_dev_benches(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(registry, "load_bench", lambda _context: dev_bench)
     context = CliContext(installation_root=tmp_path, bench_name="all")
-    args = argparse.Namespace(_command_cls=RunCommand, detach=False)
 
-    registry.dispatch_all(args, argparse.ArgumentParser(), context)
+    registry.dispatch_all(
+        argparse.Namespace(_command_cls=RunCommand, detach=False), argparse.ArgumentParser(), context
+    )
+
+    dev_bench.start.assert_not_called()
+    dev_bench.start_detached.assert_not_called()
+    assert "pass --detach" in capsys.readouterr().out
+
+    registry.dispatch_all(
+        argparse.Namespace(_command_cls=RunCommand, detach=True), argparse.ArgumentParser(), context
+    )
 
     dev_bench.start_detached.assert_called_once()
     dev_bench.start.assert_not_called()
