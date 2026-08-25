@@ -83,9 +83,6 @@ def test_run_short_circuits_when_app_already_registered(tmp_path: Path) -> None:
 
 
 def test_reinstall_with_a_different_branch_fails_loudly(tmp_path: Path) -> None:
-    """Silently reusing the installed checkout delivered the wrong branch:
-    importing erpnext@version-16-hotfix over an existing version-16 clone
-    reported success while installing version-16."""
     bench = make_bench(tmp_path)
     bench.create_directories()
     register_app_on_branch(bench, "myapp", "version-16")

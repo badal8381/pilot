@@ -27,7 +27,7 @@ Some runtime commands support all benches when invoked with the CLI option for a
 ## App Commands
 
 - `pilot new-app APP`: scaffold a new Frappe app under `apps/` and install it. Prompts for title, description, publisher, email, license, GitHub workflow, and branch; pass any of `--title/--description/--publisher/--email/--license/--branch/--github-workflow` to skip prompts (branch defaults to `develop`).
-- `pilot get-app REPO_OR_NAME`: clone and install an app into the bench.
+- `pilot get-app REPO_OR_NAME [--branch BRANCH]`: clone and install an app into the bench. Without `--branch`, Git uses the remote default branch. An explicit branch that differs from an existing checkout fails instead of reusing that checkout.
 - `pilot list-apps`: list apps present in the bench.
 - `pilot install-app APP --site SITE`: install apps on a site. An app the site only has disabled is enabled instead, bringing back anything it requires first.
 - `pilot uninstall-app APP --site SITE`: uninstall apps from a site, dropping their data.

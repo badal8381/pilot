@@ -246,8 +246,6 @@ class App:
         run_command(["yarn", "--cwd", str(self.path), "build"])
 
     def _reject_branch_mismatch(self) -> None:
-        """A bench holds one checkout per app, so an install cannot deliver a
-        second branch. Refuse loudly instead of keeping the current one."""
         requested = self.config.branch
         if not requested or self.is_commit_hash(requested):
             return
