@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import os
+import tempfile
 from pathlib import Path
 
 from cryptography.fernet import Fernet, InvalidToken
 
-from pilot.utils import open_private
+from pilot.exceptions import ConfigError
+from pilot.utils import PRIVATE_FILE_MODE
 
 KEY_FILENAME = ".secret_key"
 
@@ -14,12 +17,26 @@ def _key_path(benches_root: Path) -> Path:
 
 
 def _load_or_create_key(benches_root: Path) -> bytes:
+    """Called under CommonConfig.write()'s file lock, but read by callers
+    outside it - a reader must never be able to observe a partial key, so the
+    new key is written to a temp file and moved into place with a single
+    atomic rename rather than written in place."""
     path = _key_path(benches_root)
     if path.exists():
         return path.read_bytes()
     key = Fernet.generate_key()
-    with open_private(path, mode="wb") as handle:
-        handle.write(key)
+    descriptor, temporary_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as handle:
+            os.fchmod(handle.fileno(), PRIVATE_FILE_MODE)
+            handle.write(key)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    except BaseException:
+        temporary_path.unlink(missing_ok=True)
+        raise
     return key
 
 
@@ -33,8 +50,12 @@ def encrypt(benches_root: Path, plaintext: str) -> str:
 
 
 def decrypt(benches_root: Path, ciphertext: str) -> str:
-    """Decrypt a secret read from common_config.toml. A missing key or a value
-    written before encryption was added is treated as unreadable, not fatal."""
+    """Decrypt a secret read from common_config.toml. A value written before
+    encryption was added has no key file yet and reads as unset, not fatal.
+    A ciphertext that fails against an existing key is corrupt or was
+    encrypted under a key that no longer exists - raise instead of quietly
+    returning "", which a later unrelated save would persist as "cleared"
+    and destroy the real secret for good."""
     if not ciphertext:
         return ""
     path = _key_path(benches_root)
@@ -44,4 +65,7 @@ def decrypt(benches_root: Path, ciphertext: str) -> str:
     try:
         return fernet.decrypt(ciphertext.encode()).decode()
     except InvalidToken:
-        return ""
+        raise ConfigError(
+            "resource_limits.smtp_password could not be decrypted; the key at "
+            f"{path} does not match the stored value."
+        ) from None
