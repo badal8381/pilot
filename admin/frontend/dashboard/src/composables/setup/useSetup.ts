@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useSetupHandoff } from '@/composables/setup/useSetupHandoff'
 import { apiErrorMessage } from '@/api/client'
 import { setupApi } from '@/api/setup'
+import { branchComboboxOptions } from '@/utils/branchComboboxOptions'
 import { generateRandomPassword } from '@/utils/randomPassword'
 
 // Static dropdown options
@@ -79,29 +80,11 @@ export const useSetup = () => {
   const dbPortPlaceholder = computed(() => (dbType.value === 'mariadb' ? '3306' : '5432'))
   const resolvedDbUser = computed(() => dbUser.value || rootUserPlaceholder.value)
 
-  const branchOptions = computed(() => {
-    const selected = appBranch.value
-    const isKnown = availableBranches.value.includes(selected)
-    const options = availableBranches.value.map((branch) => ({ label: branch, value: branch }))
-    if (selected && !isKnown) options.unshift({ label: selected, value: selected })
-    return [
-      ...options,
-      {
-        type: 'custom',
-        key: 'typed-branch',
-        label: 'Use typed branch',
-        slot: 'typed-branch',
-        condition: ({ query }) => {
-          const typed = query.trim()
-          return Boolean(typed) && !options.some((option) => option.value === typed)
-        },
-        onClick: ({ query }) => {
-          const typed = query.trim()
-          if (typed) appBranch.value = typed
-        },
-      },
-    ]
-  })
+  const branchOptions = computed(() =>
+    branchComboboxOptions(availableBranches.value, appBranch.value, (typed) => {
+      appBranch.value = typed
+    }),
+  )
 
   // Steps
   const stepSequence = computed(() => ['database', 'customize'])
