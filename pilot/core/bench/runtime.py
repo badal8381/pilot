@@ -125,7 +125,7 @@ class BenchRuntime:
         """Run `pilot start` for this bench as a background session."""
         from pilot.utils import cli_root
 
-        if self.bench.config.production.process_manager:
+        if self.bench.config.production.enabled:
             raise BenchError("--detach only applies to development benches.")
         if not self._is_initialized():
             raise BenchError("Bench is not initialized. Run 'pilot start' in the foreground to finish setup.")
@@ -152,9 +152,10 @@ class BenchRuntime:
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 raise BenchError(f"Background start exited with code {process.returncode}. See {log_path}.")
-            if manager.is_running():
+            if manager.running_supervisor_pid == process.pid:
                 return
             time.sleep(0.2)
+        process.terminate()
         raise BenchError(f"Timed out waiting for the background supervisor. See {log_path}.")
 
     def _start_development(self, initialized: bool, on_progress: Callable[[str], None]) -> None:
