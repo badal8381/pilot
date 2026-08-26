@@ -110,7 +110,7 @@ onMounted(load)
     </template>
   </PageHero>
 
-  <div class="mx-auto max-w-3xl pb-40">
+  <div class="px-4 mx-auto max-w-3xl pb-40">
     <!-- Filters -->
     <MarketplaceFilters
       v-model:search="search"

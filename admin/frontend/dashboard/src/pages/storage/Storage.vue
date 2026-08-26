@@ -32,7 +32,7 @@ onMounted(load)
 </script>
 
 <template>
-  <section class="mx-auto max-w-5xl">
+  <section class="p-3 md:p-4 mx-auto max-w-5xl">
     <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
       <h2 class="flex items-center gap-2 font-medium text-ink-gray-8 text-lg">
         <span class="size-4 lucide-hard-drive" />

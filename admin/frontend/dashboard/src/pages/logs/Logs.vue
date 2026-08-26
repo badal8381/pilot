@@ -210,8 +210,7 @@ onUnmounted(() => stopLive())
 </script>
 
 <template>
-  <!-- 5rem = 3rem sticky header + the shell's 2rem vertical page padding -->
-  <div class="flex flex-col h-[calc(100dvh-5rem)]">
+  <div class="p-3 md:p-4 flex flex-col h-[calc(100dvh-3rem)]">
     <div class="flex flex-1 sm:gap-4 min-h-0 overflow-hidden">
       <!-- Sidebar: log list -->
       <div

@@ -10,7 +10,7 @@ withDefaults(defineProps<Props>(), {
 
 <template>
   <div
-    class="relative -mx-3 sm:-mx-4 -mt-3 sm:-mt-4 px-3 sm:px-4 pt-3 sm:pt-4 pb-2 overflow-hidden"
+    class="relative px-3 sm:px-4 pt-3 sm:pt-4 pb-2 overflow-hidden"
   >
     <!-- Bleeds past the shell gutters so the dots reach the page edges, then
          re-constrains the card to the body column. -->

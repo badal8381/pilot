@@ -36,7 +36,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="p-3 md:p-4 mx-auto max-w-3xl">
     <!-- Header -->
     <div class="flex justify-between items-center gap-3">
       <div>

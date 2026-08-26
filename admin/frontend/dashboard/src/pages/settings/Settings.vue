@@ -22,7 +22,7 @@ const themeOptions = [
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="p-3 md:p-4 mx-auto max-w-3xl">
     <div
       class="flex flex-col divide-y divide-outline-gray-1 rounded-6 border border-outline-gray-1"
     >

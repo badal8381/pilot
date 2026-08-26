@@ -612,7 +612,7 @@ onUnmounted(() => clearTimeout(statsTimer))
 </script>
 
 <template>
-  <div class="mx-auto">
+  <div class="p-3 md:p-4 mx-auto">
     <StickyToolbar class="flex items-center gap-2 pb-3">
       <Select
         v-model="target"
@@ -644,10 +644,7 @@ onUnmounted(() => clearTimeout(statsTimer))
         align="start"
       >
         <template #prefix>
-          <span
-            v-if="!isHistorical"
-            class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
-          />
+          <span v-if="!isHistorical" class="bg-surface-green-8 rounded-full size-1.5 animate-pulse" />
         </template>
       </Select>
     </StickyToolbar>

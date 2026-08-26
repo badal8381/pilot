@@ -433,7 +433,7 @@ onMounted(load)
     />
   </Teleport>
 
-  <div class="flex flex-col gap-4">
+  <div class="p-3 md:p-4 flex flex-col gap-4">
     <div v-if="loading && !diagnostics" class="flex justify-center py-16">
       <LoadingText />
     </div>

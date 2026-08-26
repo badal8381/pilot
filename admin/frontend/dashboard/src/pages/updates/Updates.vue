@@ -111,7 +111,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="p-3 md:p-4 mx-auto max-w-3xl">
     <!-- The tabs need a phone's full content width, so Refresh only joins them
          once there is room to spare. -->
     <Teleport v-if="isMobile" defer to="#header-actions">

@@ -207,14 +207,14 @@ onMounted(() => {
       </template>
     </PageHero>
 
-    <div class="mx-auto w-full max-w-3xl">
+    <div class="px-3 md:px-4 pb-3 md:pb-4 mx-auto w-full max-w-3xl">
       <StickyToolbar class="py-2 md:py-3">
         <Skeleton class="rounded-4 w-64 h-7 sm:h-8" />
       </StickyToolbar>
     </div>
   </template>
 
-  <div v-else-if="error" class="py-12">
+  <div v-else-if="error" class="p-3 md:p-4 py-12">
     <ErrorMessage :message="error" />
   </div>
 
@@ -257,7 +257,7 @@ onMounted(() => {
       </template>
     </PageHero>
 
-    <div class="mx-auto w-full max-w-3xl">
+    <div class="px-3 md:px-4 pb-3 md:pb-4 mx-auto w-full max-w-3xl">
       <StickyToolbar class="py-2 md:py-3">
         <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
       </StickyToolbar>

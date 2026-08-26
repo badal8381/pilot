@@ -198,7 +198,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex flex-col" :class="siteName ? '' : 'mx-auto max-w-4xl h-[calc(100vh-5rem)]'">
+  <div class="p-3 md:p-4 flex flex-col" :class="siteName ? '' : 'mx-auto max-w-4xl h-[calc(100vh-3rem)]'">
     <div v-if="!siteName">
       <h1 class="font-semibold text-ink-gray-9 text-xl">Activity</h1>
       <p class="mt-1 text-ink-gray-5 text-p-base">

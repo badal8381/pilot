@@ -236,7 +236,7 @@ onMounted(async () => {
 
   <div
     v-if="!selectedSite"
-    class="flex flex-col justify-center items-center gap-4 text-center"
+    class="p-3 md:p-4 flex flex-col justify-center items-center gap-4 text-center"
     style="height: 75vh;"
   >
     <span
@@ -258,7 +258,7 @@ onMounted(async () => {
     </div>
   </div>
 
-  <div v-else class="flex flex-col gap-3">
+  <div v-else class="p-3 md:p-4 flex flex-col gap-3">
     <!-- Editor card -->
     <div class="border rounded-6 border-outline-gray-2 overflow-hidden transition-colors">
       <div class="h-44 sm:h-[220px]">

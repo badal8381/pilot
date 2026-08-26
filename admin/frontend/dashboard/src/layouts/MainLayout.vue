@@ -107,7 +107,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
       </div>
     </header>
 
-    <main class="p-3">
+    <main>
       <slot />
     </main>
 
@@ -149,9 +149,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
       </div>
     </header>
 
-    <div class="p-4">
-      <slot />
-    </div>
+    <slot />
   </DesktopShell>
 
   <SettingsDialog v-model="showSettings" />

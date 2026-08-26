@@ -106,15 +106,15 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="loading" class="flex justify-center py-12">
+  <div v-if="loading" class="p-3 md:p-4 flex justify-center py-12">
     <LoadingText />
   </div>
 
-  <div v-else-if="error" class="py-12">
+  <div v-else-if="error" class="p-3 md:p-4 py-12">
     <ErrorMessage :message="error" />
   </div>
 
-  <div v-else-if="task" class="mx-auto max-w-3xl">
+  <div v-else-if="task" class="p-3 md:p-4 mx-auto max-w-3xl">
     <Teleport defer to="#header-badge">
       <Badge
         :label="statusConfig(task).label"

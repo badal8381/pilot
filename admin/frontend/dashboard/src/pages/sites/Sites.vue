@@ -158,7 +158,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="p-3 md:p-4 mx-auto max-w-3xl">
     <StickyToolbar v-if="sites.length > 10" class="flex items-center gap-2 py-2 md:py-3">
       <FormControl
         v-model="search"

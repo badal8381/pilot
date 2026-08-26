@@ -200,7 +200,7 @@ onUnmounted(() => clearTimeout(timer))
 </script>
 
 <template>
-  <div class="mx-auto max-w-3xl">
+  <div class="p-3 md:p-4 mx-auto max-w-3xl">
     <!-- Skeleton mirrors the page: meta row, then a card of rows. -->
     <div v-if="loading && !op" class="px-2">
       <div class="flex justify-between items-center py-2">
