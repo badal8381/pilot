@@ -747,7 +747,6 @@ _SECTIONS: tuple[_Section, ...] = (
     _Section(
         "lite_mode",
         lambda data: LiteModeConfig.from_dict(data.get("lite_mode", {})),
-        # A bench that opted out never carries the section.
         lambda config: config._lite_mode_section() if config.lite_mode.enabled else None,
     ),
     _Section(
