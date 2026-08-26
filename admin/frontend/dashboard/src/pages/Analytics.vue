@@ -613,7 +613,7 @@ onUnmounted(() => clearTimeout(statsTimer))
 
 <template>
   <div class="px-4 pb-4">
-    <StickyToolbar class="flex items-center gap-2 pt-4 pb-2 mb-2">
+    <StickyToolbar class="flex items-center gap-2 py-2 md:py-3">
       <Select
         v-model="target"
         :options="targetOptions"
