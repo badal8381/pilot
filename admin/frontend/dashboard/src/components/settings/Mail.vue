@@ -138,9 +138,12 @@ onMounted(async () => {
       </div>
       <ErrorMessage v-if="portError" :message="portError" />
 
-      <Checkbox v-model="useSsl" label="Use SSL instead of STARTTLS" />
+      <!-- Checkbox is inline-flex by default, so the column has to come from here. -->
+      <div class="flex flex-col items-start gap-3">
+        <Checkbox v-model="useSsl" label="Use SSL instead of STARTTLS" />
+        <Checkbox v-model="loginIsDifferent" label="Use a different login name" />
+      </div>
 
-      <Checkbox v-model="loginIsDifferent" label="Use a different login name" />
       <FormControl
         v-if="loginIsDifferent"
         label="Login name"
