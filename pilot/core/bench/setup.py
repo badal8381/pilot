@@ -60,9 +60,9 @@ class ProductionSetup:
 
             self._build_admin_for_production()
 
-            self._persist_production_state()
             self._setup_monitoring()
             self._setup_log_shipping()
+            self._persist_production_state()
         except BaseException:
             # A later step failed but the new admin route is already live at the
             # provider; release it so a failed setup leaves no dead external route.
