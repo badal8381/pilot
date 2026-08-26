@@ -60,8 +60,9 @@ class ProductionSetup:
 
             self._build_admin_for_production()
 
-            self._persist_production_state()
             self._setup_monitoring()
+            self._setup_log_shipping()
+            self._persist_production_state()
         except BaseException:
             # A later step failed but the new admin route is already live at the
             # provider; release it so a failed setup leaves no dead external route.
@@ -151,6 +152,18 @@ class ProductionSetup:
         uptime = UptimeMonitorConfigurator(self.bench)
         uptime.install()
         uptime.setup()
+
+    def _setup_log_shipping(self) -> None:
+        """Install Fluent Bit as a systemd service, if a logs endpoint is configured."""
+        from pilot.managers.fluentbit import LogsConfigurator
+
+        log_config = self.bench.config.logs
+        if not log_config.is_enabled:
+            return
+
+        configurator = LogsConfigurator(self.bench)
+        configurator.setup()
+        configurator.install(log_config)
 
     def _persist_production_state(self) -> None:
         """Write the production state to bench.toml LAST, so the switcher never
