@@ -221,8 +221,12 @@ memory_usage_limit = 90
 disk_space_limit = 0
 site_uptime = true
 webhook_endpoints = { "https://alerts.example.com/pilot" = "bearer-token" }
-smtp_url = "smtp://alerts@example.com@smtp.example.com:587"
+smtp_server = "smtp.example.com"
+smtp_port = 587
+smtp_email = "alerts@example.com"
+smtp_login = ""
 smtp_password = ""
+smtp_use_ssl = false
 email_recipients = ["ops@example.com"]
 ```
 
@@ -230,20 +234,24 @@ email_recipients = ["ops@example.com"]
 
 `[resource_limits]` sets when an alert is raised and where it goes. A usage percentage of `0` disables that alert; `site_uptime` covers sites that stop answering their ping. A condition must hold for five minutes before anything is sent.
 
-Alerts always go to Central. Each entry in `webhook_endpoints` receives them too, as a POST with an `Authorization: Bearer` header. Mail is a third sink, off until `smtp_url` and `email_recipients` are both set.
+Alerts always go to Central. Each entry in `webhook_endpoints` receives them too, as a POST with an `Authorization: Bearer` header. Mail is a third sink, off until `smtp_server`, `smtp_email`, and `email_recipients` are all set.
 
-`smtp_url` carries the server, port, and login name together:
+The mail fields follow the framework's Email Account, one setting per field:
 
-- `smtp://` upgrades the connection with STARTTLS and defaults to port 587
-- `smtps://` connects over SSL and defaults to port 465
-- a port in the URL overrides that default, as in `smtp://smtp.example.com:2525`
-- the login name goes before the host - `smtp://alerts@example.com@smtp.example.com` is a full email address as the user, and needs no escaping
-- omit the login name for a relay that takes no credentials
-- the login name is also the sender address
+- `smtp_server` is the outgoing mail server, `smtp_port` the port it listens on
+- `smtp_use_ssl` connects over SSL; left `false`, the connection is upgraded with STARTTLS instead
+- `smtp_port` may be left at `0`, which means 465 with SSL and 587 with STARTTLS
+- `smtp_email` is the address alerts are sent from, and the login name by default
+- `smtp_login` only when the server expects a login name that is not that address
+- leave `smtp_password` empty for a relay that takes no credentials
 
 The certificate is verified in both modes, so a server with a self-signed certificate is refused rather than trusted silently.
 
-The password belongs in `smtp_password`, never in the URL - a URL carrying one is rejected. Unlike the other secrets in this file, it is encrypted at rest with a key generated alongside `common_config.toml` (`.secret_key`, also `0600`); `common_config.toml` itself is written owner-only too. The Admin API never returns it, reporting only whether one is stored.
+Saving these through the Admin UI opens a session against the server first, so a wrong password or an unreachable host is reported then rather than at the first alert.
+
+Unlike the other secrets in this file, `smtp_password` is encrypted at rest with a key generated alongside `common_config.toml` (`.secret_key`, also `0600`); `common_config.toml` itself is written owner-only too. The Admin API never returns it, reporting only whether one is stored.
+
+`email_recipients` is edited on the notification settings page, the mailbox on its own one, so either may be saved before the other exists.
 
 `BenchConfig` is the only reader/writer of this file - it merges these values into `config.mariadb`, `config.postgres`, `config.letsencrypt`, `config.central`, `config.datum`, and `config.admin.jwks_url`/`jwks_audience` on every read, and writes them back on save. Other code reaches these values through a bench's own `BenchConfig`, never by reading `common_config.toml` directly. `admin.tls` is not part of this file - it stays a per-bench choice in `bench.toml`.
 

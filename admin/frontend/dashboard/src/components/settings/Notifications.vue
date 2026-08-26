@@ -1,12 +1,10 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
 import { Button, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
-
-import EmptyState from '@/components/common/EmptyState.vue'
-import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
-
+import { computed, onMounted, ref } from 'vue'
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
+import EmptyState from '@/components/common/EmptyState.vue'
+import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
 
 // Every resource alert starts off; site uptime is the only one on by default.
 const RESOURCE_ALERTS = [
@@ -38,6 +36,9 @@ const enabled = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key
 const limits = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key, ''])))
 const siteUptime = ref(true)
 const webhooks = ref([])
+const recipients = ref([])
+// Recipients are useless without a mailbox to send from, and that lives in Mail settings.
+const mailConfigured = ref(false)
 
 const savedPayload = ref('')
 const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
@@ -57,7 +58,22 @@ const buildPayload = () => {
       token: webhook.token,
       original_url: webhook.original_url,
     })),
+    email_recipients: recipients.value.map((address) => address.trim()).filter(Boolean),
   }
+}
+
+const addRecipient = () => {
+  recipients.value.push('')
+}
+
+const removeRecipient = (index) => {
+  recipients.value.splice(index, 1)
+}
+
+const recipientError = (address) => {
+  const trimmed = address.trim()
+  if (trimmed && !/^[^@\s]+@[^@\s]+$/.test(trimmed)) return 'Must be an email address.'
+  return ''
 }
 
 const setEnabled = (key, on) => {
@@ -98,7 +114,8 @@ const limitError = (key) => {
 const canSave = computed(
   () =>
     RESOURCE_ALERTS.every((alert) => !limitError(alert.key)) &&
-    webhooks.value.every((webhook) => webhookIsComplete(webhook) && !webhookError(webhook)),
+    webhooks.value.every((webhook) => webhookIsComplete(webhook) && !webhookError(webhook)) &&
+    recipients.value.every((address) => !recipientError(address)),
 )
 
 const save = async () => {
@@ -144,6 +161,8 @@ onMounted(async () => {
       token_set: Boolean(webhook.token_set),
       original_url: webhook.url || '',
     }))
+    recipients.value = [...(saved.email_recipients || [])]
+    mailConfigured.value = Boolean(saved.smtp_server)
     savedPayload.value = JSON.stringify(buildPayload())
   } catch (e) {
     error.value = e.message || 'Could not load settings.'
@@ -186,8 +205,53 @@ onMounted(async () => {
       </div>
     </div>
 
+    <div class="space-y-2">
+      <div class="flex justify-between items-center">
+        <p class="font-medium text-ink-gray-8 text-base leading-normal">Email recipients</p>
+        <Button variant="subtle" icon-left="lucide-plus" @click="addRecipient"
+          >Add recipient</Button
+        >
+      </div>
+
+      <p class="text-ink-gray-5 text-p-sm">
+        Alerts are emailed to these addresses, using the mailbox in Mail settings.
+      </p>
+
+      <EmptyState
+        compact
+        v-if="!recipients.length"
+        icon="lucide-mail"
+        title="No email recipients"
+        description="Add an address to receive alerts by email."
+      />
+
+      <div v-else class="space-y-2">
+        <div v-for="(address, index) in recipients" :key="index">
+          <div class="flex items-center gap-2">
+            <TextInput v-model="recipients[index]" placeholder="ops@example.com" class="w-full" />
+            <Button
+              variant="subtle"
+              icon="lucide-x"
+              label="Remove recipient"
+              tooltip="Remove recipient"
+              @click="removeRecipient(index)"
+            />
+          </div>
+          <p v-if="recipientError(address)" class="mt-1.5 text-ink-red-5 text-p-sm">
+            {{ recipientError(address) }}
+          </p>
+        </div>
+      </div>
+
+      <p v-if="recipients.length && !mailConfigured" class="text-ink-amber-5 text-p-sm">
+        Set up a mailbox in Mail settings before these addresses receive anything.
+      </p>
+    </div>
+
     <details class="group">
-      <summary class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none">
+      <summary
+        class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
+      >
         <span class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"></span>
         Advanced
       </summary>
@@ -200,7 +264,8 @@ onMounted(async () => {
 
         <p class="text-ink-gray-5 text-p-sm">
           Alerts go to Central. Endpoints listed here receive them too, as a POST carrying an
-          <code>Authorization: Bearer</code> header, so the token stays out of the URL.
+          <code>Authorization: Bearer</code>
+          header, so the token stays out of the URL.
         </p>
 
         <EmptyState

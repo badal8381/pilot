@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import smtplib
 import ssl
@@ -37,22 +38,10 @@ def send_alert(endpoint: str, token: str, payload: dict[str, typing.Any]) -> Non
         pass
 
 
-def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> None:
-    """Email one alert to every configured recipient.
-
-    Raises if any recipient is refused: a partial send still leaves someone
-    uninformed, and the caller retires the alert once this returns.
-    """
+@contextlib.contextmanager
+def smtp_session(limits: "ResourceLimitConfig") -> typing.Iterator[smtplib.SMTP]:
+    """A connected, encrypted, logged-in SMTP session for these settings."""
     endpoint = limits.get_mail_endpoint()
-    message = EmailMessage()
-    message["Subject"] = f"[Pilot] {payload['message']}"
-    # An anonymous relay has no login name to send as, and an empty From would
-    # become MAIL FROM:<>, the null bounce sender most relays reject.
-    host = f"[{endpoint.host}]" if ":" in endpoint.host else endpoint.host
-    message["From"] = endpoint.username or f"pilot@{host}"
-    message["To"] = ", ".join(limits.email_recipients)
-    message.set_content(f"{payload['message']}\n\n{json.dumps(payload['context'], indent=2)}")
-
     # smtplib's own default context does not verify the peer, so pass one that does:
     # an unverified hop would hand the password to whoever answers.
     context = ssl.create_default_context()
@@ -68,6 +57,29 @@ def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> 
             server.starttls(context=context)
         if endpoint.username:
             server.login(endpoint.username, limits.smtp_password)
+        yield server
+
+
+def check_mail_credentials(limits: "ResourceLimitConfig") -> None:
+    """Open a session and drop it, so bad settings are reported while they are
+    being saved rather than at the first alert. Raises like `send_mail` does."""
+    with smtp_session(limits):
+        pass
+
+
+def send_mail(limits: "ResourceLimitConfig", payload: dict[str, typing.Any]) -> None:
+    """Email one alert to every configured recipient.
+
+    Raises if any recipient is refused: a partial send still leaves someone
+    uninformed, and the caller retires the alert once this returns.
+    """
+    message = EmailMessage()
+    message["Subject"] = f"[Pilot] {payload['message']}"
+    message["From"] = limits.get_mail_endpoint().sender
+    message["To"] = ", ".join(limits.email_recipients)
+    message.set_content(f"{payload['message']}\n\n{json.dumps(payload['context'], indent=2)}")
+
+    with smtp_session(limits) as server:
         refused = server.send_message(message)
         if refused:
             raise smtplib.SMTPRecipientsRefused(refused)

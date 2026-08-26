@@ -73,7 +73,8 @@ def test_datum_omitted_from_output_when_unset(tmp_path: Path) -> None:
 def test_smtp_password_is_not_stored_as_plaintext(tmp_path: Path) -> None:
     config = CommonConfig(
         resource_limits=ResourceLimitConfig(
-            smtp_url="smtp://alerts@smtp.test:587",
+            smtp_server="smtp.test",
+            smtp_email="alerts@smtp.test",
             smtp_password="s3cret",
             email_recipients=["ops@example.com"],
         )
@@ -113,7 +114,8 @@ def test_key_creation_is_covered_by_the_write_lock(tmp_path: Path, monkeypatch) 
 
     CommonConfig(
         resource_limits=ResourceLimitConfig(
-            smtp_url="smtp://alerts@smtp.test:587",
+            smtp_server="smtp.test",
+            smtp_email="alerts@smtp.test",
             smtp_password="s3cret",
             email_recipients=["ops@example.com"],
         )

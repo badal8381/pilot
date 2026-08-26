@@ -1,5 +1,6 @@
 """Tests for the email sink on the alert fan-out."""
 
+import smtplib
 import ssl
 from pathlib import Path
 from typing import ClassVar
@@ -9,7 +10,7 @@ import pytest
 
 from pilot.config import BenchConfig, MariaDBConfig, RedisConfig, WorkerConfig
 from pilot.config.alert_limit import ResourceLimitConfig
-from pilot.core.alerts import notify, send_mail
+from pilot.core.alerts import check_mail_credentials, notify, send_mail
 from pilot.core.bench import Bench
 
 PAYLOAD = {
@@ -60,7 +61,8 @@ def _clear_sends():
 
 def _limits(**overrides) -> ResourceLimitConfig:
     limits = ResourceLimitConfig(
-        smtp_url="smtp://alerts@test@smtp.test",
+        smtp_server="smtp.test",
+        smtp_email="alerts@test",
         smtp_password="secret",
         email_recipients=["ops@test"],
     )
@@ -101,7 +103,7 @@ def test_both_transports_verify_the_server_certificate() -> None:
     with patch("smtplib.SMTP", FakeSMTP):
         send_mail(_limits(), PAYLOAD)
     with patch("smtplib.SMTP_SSL", FakeSMTP):
-        send_mail(_limits(smtp_url="smtps://alerts@test@smtp.test"), PAYLOAD)
+        send_mail(_limits(smtp_use_ssl=True), PAYLOAD)
 
     for send in FakeSMTP.sends:
         assert send.context is not None
@@ -109,45 +111,50 @@ def test_both_transports_verify_the_server_certificate() -> None:
         assert send.context.check_hostname
 
 
-def test_the_login_name_is_also_the_sender() -> None:
+def test_the_address_is_the_sender_and_the_default_login_name() -> None:
     with patch("smtplib.SMTP", FakeSMTP):
         send_mail(_limits(), PAYLOAD)
 
-    assert FakeSMTP.sends[0].messages[0]["From"] == "alerts@test"
+    sent = FakeSMTP.sends[0]
+    assert sent.messages[0]["From"] == "alerts@test"
+    assert sent.logged_in_as == ("alerts@test", "secret")
 
 
-def test_smtps_connects_over_ssl_on_465() -> None:
+def test_a_separate_login_name_does_not_change_the_sender() -> None:
+    """The framework's Email Account allows a login that is not the address; the
+    mail still has to come from the address the operator configured."""
+    with patch("smtplib.SMTP", FakeSMTP):
+        send_mail(_limits(smtp_login="alerts"), PAYLOAD)
+
+    sent = FakeSMTP.sends[0]
+    assert sent.logged_in_as == ("alerts", "secret")
+    assert sent.messages[0]["From"] == "alerts@test"
+
+
+def test_ssl_connects_on_465() -> None:
     with patch("smtplib.SMTP_SSL", FakeSMTP):
-        send_mail(_limits(smtp_url="smtps://alerts@test@smtp.test"), PAYLOAD)
+        send_mail(_limits(smtp_use_ssl=True), PAYLOAD)
 
     sent = FakeSMTP.sends[0]
     assert (sent.host, sent.port) == ("smtp.test", 465)
     assert not sent.started_tls
 
 
-def test_the_url_port_wins_over_the_scheme_default() -> None:
+def test_a_configured_port_wins_over_the_default() -> None:
     with patch("smtplib.SMTP", FakeSMTP):
-        send_mail(_limits(smtp_url="smtp://alerts@test@smtp.test:2525"), PAYLOAD)
+        send_mail(_limits(smtp_port=2525), PAYLOAD)
 
     assert FakeSMTP.sends[0].port == 2525
 
 
-def test_a_relay_without_a_login_name_sends_anonymously() -> None:
+def test_a_relay_without_a_password_sends_anonymously() -> None:
     with patch("smtplib.SMTP", FakeSMTP):
-        send_mail(_limits(smtp_url="smtp://smtp.test"), PAYLOAD)
+        send_mail(_limits(smtp_password=""), PAYLOAD)
 
     sent = FakeSMTP.sends[0]
     assert sent.logged_in_as is None
     # An empty From becomes MAIL FROM:<>, which most relays refuse.
-    assert sent.messages[0]["From"] == "pilot@smtp.test"
-
-
-def test_an_anonymous_ipv6_relay_gets_a_bracketed_sender() -> None:
-    with patch("smtplib.SMTP", FakeSMTP):
-        send_mail(_limits(smtp_url="smtp://[2001:db8::1]:587"), PAYLOAD)
-
-    sent = FakeSMTP.sends[0]
-    assert sent.messages[0]["From"] == "pilot@[2001:db8::1]"
+    assert sent.messages[0]["From"] == "alerts@test"
 
 
 def test_a_refused_recipient_is_not_a_delivery(tmp_path: Path) -> None:
@@ -161,11 +168,11 @@ def test_a_refused_recipient_is_not_a_delivery(tmp_path: Path) -> None:
     assert not delivered
 
 
-def test_a_broken_url_disables_mail_instead_of_raising(tmp_path: Path) -> None:
+def test_broken_settings_disable_mail_instead_of_raising(tmp_path: Path) -> None:
     """common_config.toml can be hand-edited, and most config reads skip validation,
-    so a bad URL has to read as "no mail sink" rather than kill the monitor tick."""
-    for url in ("http://smtp.test", "smtp://", "not-a-url"):
-        limits = _limits(smtp_url=url)
+    so bad settings have to read as "no mail sink" rather than kill the monitor tick."""
+    for overrides in ({"smtp_email": "not-an-address"}, {"smtp_port": 70000}, {"smtp_server": ""}):
+        limits = _limits(**overrides)
         assert not limits.is_mail_configured
         with patch("smtplib.SMTP", FakeSMTP):
             assert notify(_bench(tmp_path, limits), PAYLOAD) is False
@@ -197,25 +204,41 @@ def test_no_mail_goes_out_without_recipients(tmp_path: Path) -> None:
     assert FakeSMTP.sends == []
 
 
-def test_recipients_need_a_mail_server_and_an_address() -> None:
-    with pytest.raises(ValueError, match="smtp_url is required"):
-        _limits(smtp_url="").validate()
+def test_recipients_may_be_saved_before_a_mailbox_exists() -> None:
+    """Recipients are configured on the notifications page, the mailbox on its
+    own one, so neither order of setting them up may fail validation."""
+    _limits(smtp_server="", smtp_email="", smtp_password="").validate()
 
+
+def test_a_bad_recipient_is_rejected() -> None:
     with pytest.raises(ValueError, match="bad address"):
         _limits(email_recipients=["ops.test"]).validate()
 
 
-def test_a_malformed_url_is_rejected() -> None:
-    with pytest.raises(ValueError, match="smtp:// or smtps://"):
-        _limits(smtp_url="smtp.test:587").validate()
+def test_malformed_server_settings_are_rejected() -> None:
+    with pytest.raises(ValueError, match="smtp_email must be an email address"):
+        _limits(smtp_email="alerts").validate()
 
-    with pytest.raises(ValueError, match="needs a mail server"):
-        _limits(smtp_url="smtp://").validate()
-
-    with pytest.raises(ValueError, match="invalid port"):
-        _limits(smtp_url="smtp://smtp.test:abc").validate()
+    with pytest.raises(ValueError, match="smtp_port must be a port number"):
+        _limits(smtp_port=70000).validate()
 
 
-def test_the_password_may_not_hide_in_the_url() -> None:
-    with pytest.raises(ValueError, match="not in smtp_url"):
-        _limits(smtp_url="smtp://user:pw@smtp.test").validate()
+def test_the_credential_check_opens_and_drops_a_session() -> None:
+    """Settings are proved against the server while they are being saved, the
+    way the framework's Email Account opens a session on save."""
+    with patch("smtplib.SMTP", FakeSMTP):
+        check_mail_credentials(_limits())
+
+    sent = FakeSMTP.sends[0]
+    assert sent.logged_in_as == ("alerts@test", "secret")
+    assert sent.messages == []
+
+
+def test_the_credential_check_raises_on_a_bad_password() -> None:
+    error = smtplib.SMTPAuthenticationError(535, b"Bad credentials")
+    with (
+        patch("smtplib.SMTP", FakeSMTP),
+        patch.object(FakeSMTP, "login", side_effect=error),
+        pytest.raises(smtplib.SMTPAuthenticationError),
+    ):
+        check_mail_credentials(_limits())

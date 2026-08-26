@@ -1,62 +1,61 @@
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
-import { Button, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
+import { Button, Checkbox, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
+import { computed, onMounted, ref } from 'vue'
 
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
 
+const ADDRESS_RE = /^[^@\s]+@[^@\s]+$/
+
 const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
-const smtpUrl = ref('')
-const smtpPassword = ref('')
-const smtpPasswordSet = ref(false)
-const recipients = ref([])
+const server = ref('')
+const port = ref('')
+const email = ref('')
+const login = ref('')
+const password = ref('')
+const passwordSet = ref(false)
+const useSsl = ref(false)
+const loginIsDifferent = ref(false)
 
 const savedPayload = ref('')
 const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
 
+// Blank port means "whatever the encryption mode defaults to", so the field can
+// be left alone; the placeholder shows which one that is.
+const defaultPort = computed(() => (useSsl.value ? 465 : 587))
+
 const buildPayload = () => ({
-  smtp_url: smtpUrl.value.trim(),
-  smtp_password: smtpPassword.value,
-  email_recipients: recipients.value.map((r) => r.trim()).filter(Boolean),
+  smtp_server: server.value.trim(),
+  smtp_port: Number(port.value) || 0,
+  smtp_email: email.value.trim(),
+  smtp_login: loginIsDifferent.value ? login.value.trim() : '',
+  smtp_password: password.value,
+  smtp_use_ssl: useSsl.value,
 })
 
-const addRecipient = () => {
-  recipients.value.push('')
-}
-
-const removeRecipient = (index) => {
-  recipients.value.splice(index, 1)
-}
-
-// Mirrors the server: scheme, a host, a readable port, and no inline password.
-const mailUrlIsValid = (url) => {
-  if (!/^smtps?:\/\//.test(url) || !URL.canParse(url)) return false
-  const parsed = new URL(url)
-  return Boolean(parsed.hostname) && !/\s/.test(url)
-}
-
-const mailUrlHasPassword = (url) => URL.canParse(url) && Boolean(new URL(url).password)
-
-const recipientError = (address) => {
-  const trimmed = address.trim()
-  if (trimmed && !/^[^@\s]+@[^@\s]+$/.test(trimmed)) return 'Must be an email address.'
-  return ''
-}
-
-const mailError = computed(() => {
-  const url = smtpUrl.value.trim()
-  if (url && !mailUrlIsValid(url))
-    return 'Server URL must look like smtp://user@mail.example.com:587 or smtps://...'
-  if (url && mailUrlHasPassword(url)) return 'Put the password in the field below, not in the URL.'
-  const addresses = buildPayload().email_recipients
-  if (addresses.length && !url) return 'A server URL is required to send alert emails.'
+const portError = computed(() => {
+  if (!port.value) return ''
+  const value = Number(port.value)
+  if (!Number.isInteger(value) || value < 1 || value > 65535)
+    return 'Port must be a number between 1 and 65535.'
   return ''
 })
 
+const emailError = computed(() => {
+  if (email.value.trim() && !ADDRESS_RE.test(email.value.trim())) return 'Must be an email address.'
+  return ''
+})
+
+// Everything the server needs, so Save stays dead until the check could pass.
 const canSave = computed(
-  () => !mailError.value && recipients.value.every((address) => !recipientError(address)),
+  () =>
+    Boolean(server.value.trim()) &&
+    Boolean(email.value.trim()) &&
+    !emailError.value &&
+    !portError.value &&
+    (passwordSet.value || Boolean(password.value)),
 )
 
 const save = async () => {
@@ -70,8 +69,8 @@ const save = async () => {
       error.value = apiErrorMessage(result, 'Failed to save.')
       return
     }
-    smtpPasswordSet.value = smtpPasswordSet.value || Boolean(smtpPassword.value)
-    smtpPassword.value = ''
+    passwordSet.value = passwordSet.value || Boolean(password.value)
+    password.value = ''
     savedPayload.value = JSON.stringify(buildPayload())
     toast.success('Mail settings saved')
   } catch (e) {
@@ -85,9 +84,13 @@ onMounted(async () => {
   try {
     const data = await settingsApi.get()
     const saved = data.resource_limits || {}
-    smtpUrl.value = saved.smtp_url || ''
-    smtpPasswordSet.value = Boolean(saved.smtp_password_set)
-    recipients.value = saved.email_recipients?.length ? [...saved.email_recipients] : ['']
+    server.value = saved.smtp_server || ''
+    port.value = saved.smtp_port ? String(saved.smtp_port) : ''
+    email.value = saved.smtp_email || ''
+    login.value = saved.smtp_login || ''
+    loginIsDifferent.value = Boolean(saved.smtp_login)
+    useSsl.value = Boolean(saved.smtp_use_ssl)
+    passwordSet.value = Boolean(saved.smtp_password_set)
     savedPayload.value = JSON.stringify(buildPayload())
   } catch (e) {
     error.value = e.message || 'Could not load settings.'
@@ -104,60 +107,61 @@ onMounted(async () => {
 
   <div v-else class="space-y-6">
     <p class="text-ink-gray-5 text-p-sm">
-      Send resource and uptime alerts to a mailbox, alongside Central and any webhook endpoints.
+      The mailbox alert emails are sent from. Settings are checked against the server when you save.
+      Recipients live in Notification settings.
     </p>
 
-    <div class="space-y-1.5">
-      <p class="font-medium text-ink-gray-7 text-base">Server URL</p>
-      <TextInput
-        v-model="smtpUrl"
-        placeholder="smtp://alerts@example.com@smtp.example.com:587"
-        class="w-full"
+    <div class="space-y-4">
+      <FormControl
+        label="Email address"
+        type="text"
+        v-model="email"
+        placeholder="alerts@example.com"
       />
-    </div>
+      <ErrorMessage v-if="emailError" :message="emailError" />
 
-    <div class="space-y-1.5">
-      <p class="font-medium text-ink-gray-7 text-base">Password</p>
-      <TextInput
-        v-model="smtpPassword"
+      <div class="flex sm:flex-row flex-col gap-4">
+        <FormControl
+          label="Outgoing server"
+          type="text"
+          v-model="server"
+          placeholder="smtp.example.com"
+          class="w-full"
+        />
+        <FormControl
+          label="Port"
+          type="text"
+          v-model="port"
+          :placeholder="String(defaultPort)"
+          class="w-full"
+        />
+      </div>
+      <ErrorMessage v-if="portError" :message="portError" />
+
+      <Checkbox v-model="useSsl" label="Use SSL instead of STARTTLS" />
+
+      <Checkbox v-model="loginIsDifferent" label="Use a different login name" />
+      <FormControl
+        v-if="loginIsDifferent"
+        label="Login name"
+        type="text"
+        v-model="login"
+        placeholder="alerts"
+      />
+
+      <FormControl
+        label="Password"
         type="password"
-        :placeholder="smtpPasswordSet ? 'Unchanged' : 'SMTP password'"
-        class="w-full"
+        v-model="password"
+        :placeholder="passwordSet ? 'Unchanged' : 'SMTP password'"
       />
-    </div>
 
-    <div class="space-y-2">
-      <div class="flex justify-between items-center">
-        <p class="font-medium text-ink-gray-7 text-base">Recipients</p>
-        <Button variant="subtle" icon-left="lucide-plus" @click="addRecipient">Add recipient</Button>
+      <ErrorMessage v-if="error" :message="error" />
+      <div v-if="dirty" class="flex justify-end">
+        <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
+          Save changes
+        </Button>
       </div>
-
-      <div class="space-y-2">
-        <div v-for="(address, index) in recipients" :key="index">
-          <div class="flex items-center gap-2">
-            <TextInput v-model="recipients[index]" placeholder="ops@example.com" class="w-full" />
-            <Button
-              variant="subtle"
-              icon="lucide-x"
-              label="Remove recipient"
-              tooltip="Remove recipient"
-              @click="removeRecipient(index)"
-            />
-          </div>
-          <p v-if="recipientError(address)" class="mt-1.5 text-ink-red-5 text-p-sm">
-            {{ recipientError(address) }}
-          </p>
-        </div>
-      </div>
-    </div>
-
-    <p v-if="mailError" class="text-ink-red-5 text-p-sm">{{ mailError }}</p>
-
-    <ErrorMessage v-if="error" :message="error" />
-    <div v-if="dirty" class="flex justify-end">
-      <Button variant="solid" :loading="saving" :disabled="!canSave" @click="save">
-        Save changes
-      </Button>
     </div>
   </div>
 </template>

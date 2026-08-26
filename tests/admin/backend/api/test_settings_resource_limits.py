@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import smtplib
 from pathlib import Path
+from unittest.mock import patch
 
 from flask import Flask
 
@@ -13,6 +15,12 @@ from pilot.config.common import CommonConfig
 
 def _config() -> BenchConfig:
     return BenchConfig._from_dict({"bench": {"name": "test-bench", "python": "3.14"}})
+
+
+def _accepting_server():
+    """Saving mail settings opens a session against the server; these tests are
+    about what gets stored, not about reaching a relay."""
+    return patch("admin.backend.api.v1.settings.config.check_mail_credentials")
 
 
 def _client(bench_root: Path):
@@ -71,7 +79,11 @@ def test_settings_response_exposes_limits() -> None:
         "disk_space_limit": 0,
         "site_uptime": True,
         "webhook_endpoints": [],
-        "smtp_url": "",
+        "smtp_server": "",
+        "smtp_port": 0,
+        "smtp_email": "",
+        "smtp_login": "",
+        "smtp_use_ssl": False,
         "smtp_password_set": False,
         "email_recipients": [],
     }
@@ -146,17 +158,24 @@ def test_patch_persists_mail_settings(tmp_path: Path) -> None:
     benches_root = tmp_path / "benches"
     client = _client(benches_root / "current")
     mail = {
-        "smtp_url": "smtps://alerts@example.com@smtp.example.com",
+        "smtp_server": "smtp.example.com",
+        "smtp_email": "alerts@example.com",
         "smtp_password": "secret",
-        "email_recipients": ["ops@example.com", " oncall@example.com "],
+        "smtp_use_ssl": True,
     }
 
-    response = client.patch("/api/v1/settings", json={"resource_limits": mail})
+    with _accepting_server():
+        response = client.patch("/api/v1/settings", json={"resource_limits": mail})
 
     assert response.status_code == 200
     limits = CommonConfig.read(benches_root).resource_limits
-    assert limits.get_mail_endpoint() == ("smtp.example.com", 465, True, "alerts@example.com")
-    assert limits.email_recipients == ["ops@example.com", "oncall@example.com"]
+    assert limits.get_mail_endpoint() == (
+        "smtp.example.com",
+        465,
+        True,
+        "alerts@example.com",
+        "alerts@example.com",
+    )
     read_back = client.get("/api/v1/settings").get_json()["resource_limits"]
     assert read_back["smtp_password_set"] is True
     assert "secret" not in str(read_back)
@@ -165,32 +184,40 @@ def test_patch_persists_mail_settings(tmp_path: Path) -> None:
 def test_patch_keeps_stored_mail_password_when_blank(tmp_path: Path) -> None:
     benches_root = tmp_path / "benches"
     client = _client(benches_root / "current")
-    mail = {"smtp_url": "smtp://smtp.example.com", "smtp_password": "secret"}
-    client.patch("/api/v1/settings", json={"resource_limits": mail})
+    mail = {"smtp_server": "smtp.example.com", "smtp_email": "alerts@example.com"}
+    with _accepting_server():
+        client.patch("/api/v1/settings", json={"resource_limits": {**mail, "smtp_password": "secret"}})
 
-    client.patch(
-        "/api/v1/settings",
-        json={"resource_limits": {"smtp_url": "smtp://smtp2.example.com", "smtp_password": ""}},
-    )
+        client.patch(
+            "/api/v1/settings",
+            json={"resource_limits": {**mail, "smtp_server": "smtp2.example.com", "smtp_password": ""}},
+        )
 
     limits = CommonConfig.read(benches_root).resource_limits
-    assert (limits.smtp_url, limits.smtp_password) == ("smtp://smtp2.example.com", "secret")
+    assert (limits.smtp_server, limits.smtp_password) == ("smtp2.example.com", "secret")
 
 
-def test_patch_clears_the_password_with_the_server_url(tmp_path: Path) -> None:
-    """Blank means "keep" for the password, so clearing the URL is the way out
+def test_patch_clears_the_password_with_the_server(tmp_path: Path) -> None:
+    """Blank means "keep" for the password, so clearing the server is the way out
     for a credential that has been rotated away."""
     benches_root = tmp_path / "benches"
     client = _client(benches_root / "current")
-    client.patch(
-        "/api/v1/settings",
-        json={"resource_limits": {"smtp_url": "smtp://smtp.example.com", "smtp_password": "secret"}},
-    )
+    with _accepting_server():
+        client.patch(
+            "/api/v1/settings",
+            json={
+                "resource_limits": {
+                    "smtp_server": "smtp.example.com",
+                    "smtp_email": "alerts@example.com",
+                    "smtp_password": "secret",
+                }
+            },
+        )
 
-    client.patch("/api/v1/settings", json={"resource_limits": {"smtp_url": ""}})
+        client.patch("/api/v1/settings", json={"resource_limits": {"smtp_server": ""}})
 
     limits = CommonConfig.read(benches_root).resource_limits
-    assert (limits.smtp_url, limits.smtp_password) == ("", "")
+    assert (limits.smtp_server, limits.smtp_password) == ("", "")
 
 
 def test_patch_rejects_an_unusable_recipient(tmp_path: Path) -> None:
@@ -199,19 +226,16 @@ def test_patch_rejects_an_unusable_recipient(tmp_path: Path) -> None:
 
     response = client.patch(
         "/api/v1/settings",
-        json={
-            "resource_limits": {
-                "smtp_url": "smtp://smtp.example.com",
-                "email_recipients": ["ops@example.com nope"],
-            }
-        },
+        json={"resource_limits": {"email_recipients": ["ops@example.com nope"]}},
     )
 
     assert response.status_code == 422
     assert CommonConfig.read(benches_root).resource_limits.email_recipients == []
 
 
-def test_patch_rejects_recipients_without_a_mail_server(tmp_path: Path) -> None:
+def test_patch_accepts_recipients_before_a_mailbox_exists(tmp_path: Path) -> None:
+    """Recipients are edited on the notifications page and the mailbox on its own
+    one, so saving them in either order has to work."""
     benches_root = tmp_path / "benches"
     client = _client(benches_root / "current")
 
@@ -219,8 +243,44 @@ def test_patch_rejects_recipients_without_a_mail_server(tmp_path: Path) -> None:
         "/api/v1/settings", json={"resource_limits": {"email_recipients": ["ops@example.com"]}}
     )
 
+    assert response.status_code == 200
+    assert CommonConfig.read(benches_root).resource_limits.email_recipients == ["ops@example.com"]
+
+
+def test_patch_checks_the_mail_credentials_before_storing_them(tmp_path: Path) -> None:
+    """The framework's Email Account opens a session on save; settings that cannot
+    reach the server must not be stored as if they were working."""
+    benches_root = tmp_path / "benches"
+    client = _client(benches_root / "current")
+
+    with patch(
+        "admin.backend.api.v1.settings.config.check_mail_credentials",
+        side_effect=smtplib.SMTPAuthenticationError(535, b"Bad credentials"),
+    ):
+        response = client.patch(
+            "/api/v1/settings",
+            json={
+                "resource_limits": {
+                    "smtp_server": "smtp.example.com",
+                    "smtp_email": "alerts@example.com",
+                    "smtp_password": "wrong",
+                }
+            },
+        )
+
     assert response.status_code == 422
-    assert CommonConfig.read(benches_root).resource_limits.email_recipients == []
+    assert "login name and password" in response.get_json()["error"]["message"]
+    assert CommonConfig.read(benches_root).resource_limits.smtp_server == ""
+
+
+def test_a_save_that_leaves_mail_alone_does_not_dial_the_relay(tmp_path: Path) -> None:
+    benches_root = tmp_path / "benches"
+    client = _client(benches_root / "current")
+
+    with patch("admin.backend.api.v1.settings.config.check_mail_credentials") as check:
+        client.patch("/api/v1/settings", json={"resource_limits": {"cpu_usage_limit": 85}})
+
+    check.assert_not_called()
 
 
 def test_patch_rejects_invalid_limit_without_saving(tmp_path: Path) -> None:

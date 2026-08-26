@@ -206,7 +206,11 @@ def resource_limits_payload(config: BenchConfig) -> dict:
         "webhook_endpoints": [
             {"url": url, "token_set": bool(token)} for url, token in limits.webhook_endpoints.items()
         ],
-        "smtp_url": limits.smtp_url,
+        "smtp_server": limits.smtp_server,
+        "smtp_port": limits.smtp_port,
+        "smtp_email": limits.smtp_email,
+        "smtp_login": limits.smtp_login,
+        "smtp_use_ssl": limits.smtp_use_ssl,
         "smtp_password_set": bool(limits.smtp_password),
         "email_recipients": limits.email_recipients,
     }
