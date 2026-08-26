@@ -1,6 +1,3 @@
-// Cron entries run in the server's timezone, which Pilot keeps as UTC. The schedule pickers work
-// in the browser's local time, so every expression is converted on the way in and out.
-
 export type Frequency = 'daily' | 'weekly' | 'monthly'
 
 export type SchedulePicks = {
@@ -29,9 +26,9 @@ const toInt = (value: string | undefined, fallback = 0) => {
 
 const wrapWeekday = (day: number) => ((day % DAYS_IN_WEEK) + DAYS_IN_WEEK) % DAYS_IN_WEEK
 
-// Cron cannot say "last day of the month", so a day-1 schedule that lands on the previous UTC
-// day wraps to 31 and skips shorter months.
-const wrapMonthDay = (day: number) => (((day - 1) % MAX_MONTH_DAY) + MAX_MONTH_DAY) % MAX_MONTH_DAY + 1
+// Clamped, never wrapped: rolling day 1 back to 31 would skip every month without a 31st, so a
+// schedule that crosses a month boundary keeps its day and fires a day either side instead.
+const clampMonthDay = (day: number) => Math.min(MAX_MONTH_DAY, Math.max(1, day))
 
 // Whether the UTC calendar day of `moment` is behind, level with, or ahead of its local day.
 const dayOffset = (moment: Date) => {
@@ -41,7 +38,12 @@ const dayOffset = (moment: Date) => {
   return difference
 }
 
-/** The UTC cron expression that fires at the local time these picks describe. */
+/** The UTC cron expression that fires at the local time these picks describe.
+ *
+ * Cron entries run in the server's timezone, which Pilot keeps as UTC, while the pickers work in
+ * the browser's local time. The offset is the one in effect on `reference`, so a fixed expression
+ * cannot follow a later DST transition; that needs a timezone stored alongside the schedule.
+ */
 export const picksToCron = (picks: SchedulePicks, reference = new Date()): string => {
   const moment = new Date(reference.getTime())
   moment.setHours(picks.hour, picks.minute, 0, 0)
@@ -49,7 +51,7 @@ export const picksToCron = (picks: SchedulePicks, reference = new Date()): strin
   const time = `${moment.getUTCMinutes()} ${moment.getUTCHours()}`
   const offset = dayOffset(moment)
   if (picks.frequency === 'weekly') return `${time} * * ${wrapWeekday(picks.weekday + offset)}`
-  if (picks.frequency === 'monthly') return `${time} ${wrapMonthDay(picks.monthDay + offset)} * *`
+  if (picks.frequency === 'monthly') return `${time} ${clampMonthDay(picks.monthDay + offset)} * *`
   return `${time} * * *`
 }
 
@@ -69,7 +71,7 @@ export const cronToPicks = (cron: string, reference = new Date()): SchedulePicks
   }
   if (monthDayField !== '*') {
     picks.frequency = 'monthly'
-    picks.monthDay = wrapMonthDay(toInt(monthDayField, 1) + offset)
+    picks.monthDay = clampMonthDay(toInt(monthDayField, 1) + offset)
   } else if (weekdayField !== '*') {
     picks.frequency = 'weekly'
     picks.weekday = wrapWeekday(toInt(weekdayField) + offset)

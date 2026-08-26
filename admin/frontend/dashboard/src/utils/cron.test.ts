@@ -64,6 +64,31 @@ test('the day of month rolls with the same crossing', () => {
   })
 })
 
+test('a day-one monthly schedule never rolls back to day 31', () => {
+  // Rolling day 1 back would land on day 31 and skip every month without one.
+  inZone('Asia/Kolkata', () => {
+    const cron = picksToCron(picks({ frequency: 'monthly', monthDay: 1, hour: 1 }), REFERENCE)
+    assert.equal(cron, '30 19 1 * *')
+    // Held at day 1, the run lands a day later in local time, which is what the picker reads back.
+    assert.equal(cronToPicks(cron, REFERENCE).monthDay, 2)
+  })
+})
+
+test('a day-31 monthly schedule never rolls past the end of the month', () => {
+  inZone('America/New_York', () => {
+    const cron = picksToCron(picks({ frequency: 'monthly', monthDay: 31, hour: 20 }), REFERENCE)
+    assert.equal(cron, '0 0 31 * *')
+  })
+})
+
+test('a clamped monthly schedule stays put once it is read back', () => {
+  inZone('Asia/Kolkata', () => {
+    const first = picksToCron(picks({ frequency: 'monthly', monthDay: 1, hour: 1 }), REFERENCE)
+    const reread = picksToCron(cronToPicks(first, REFERENCE), REFERENCE)
+    assert.equal(reread, first)
+  })
+})
+
 test('every frequency round-trips in a half-hour zone', () => {
   inZone('Asia/Kolkata', () => {
     for (const over of [
