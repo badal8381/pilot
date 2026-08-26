@@ -1,6 +1,4 @@
--- ============================================================
 -- Pilot -> Datum normalizer
--- ============================================================
 
 local function json_escape(value)
     if value == nil then
@@ -40,9 +38,7 @@ local function serialize_attributes(attributes)
 end
 
 
--- ============================================================
 -- Extract filename from Path_Key
--- ============================================================
 
 local function get_source(filename)
     if filename == nil then
@@ -58,9 +54,7 @@ local function get_source(filename)
 end
 
 
--- ============================================================
 -- Filename -> service
--- ============================================================
 
 local function get_service(source)
 
@@ -92,13 +86,11 @@ local function get_service(source)
 end
 
 
--- ============================================================
 -- Python timestamp
 --
 -- 2026-07-29 07:14:51,626
 -- ->
 -- 2026-07-29T07:14:51.626Z
--- ============================================================
 
 local function python_timestamp(value)
 
@@ -130,9 +122,7 @@ local function python_timestamp(value)
 end
 
 
--- ============================================================
 -- Nginx error timestamp
--- ============================================================
 
 local function nginx_error_timestamp(value)
 
@@ -163,13 +153,11 @@ local function nginx_error_timestamp(value)
 end
 
 
--- ============================================================
 -- Nginx access timestamp
 --
 -- 21/Jul/2026:07:25:38 +0000
 -- ->
 -- 2026-07-21T07:25:38.000+00:00
--- ============================================================
 
 local months = {
     Jan = "01",
@@ -224,13 +212,11 @@ local function nginx_access_timestamp(value)
 end
 
 
--- ============================================================
 -- Redis timestamp
 --
 -- Redis parser:
 --   date = "21 Jul 2026"
 --   time = "07:20:39.665"
--- ============================================================
 
 local redis_months = {
     Jan = "01",
@@ -283,12 +269,10 @@ local function redis_timestamp(record)
 end
 
 
--- ============================================================
 -- Worker pool timestamp
 --
 -- Worker pool only gives HH:MM:SS.
 -- Use Fluent Bit's record timestamp for the date.
--- ============================================================
 
 local function worker_pool_timestamp(timestamp, value)
 
@@ -319,12 +303,10 @@ local function worker_pool_timestamp(timestamp, value)
 end
 
 
--- ============================================================
 -- Level normalization
 --
 -- We NEVER infer severity from message text.
 -- If the source does not provide a level, use info.
--- ============================================================
 
 local function normalize_level(level)
 
@@ -338,9 +320,7 @@ local function normalize_level(level)
 end
 
 
--- ============================================================
 -- Add a field to attributes if present
--- ============================================================
 
 local function add_attribute(attributes, key, value)
 
@@ -350,9 +330,7 @@ local function add_attribute(attributes, key, value)
 end
 
 
--- ============================================================
 -- Datum request body
--- ============================================================
 
 local function build_body(
     ts,
@@ -378,9 +356,7 @@ local function build_body(
 end
 
 
--- ============================================================
 -- Main
--- ============================================================
 
 function normalize(tag, timestamp, record)
 
@@ -392,9 +368,7 @@ function normalize(tag, timestamp, record)
     local ts
 
 
-    -- ========================================================
     -- Timestamp
-    -- ========================================================
 
     if tag == "pilot.python" then
 
@@ -438,9 +412,7 @@ function normalize(tag, timestamp, record)
     end
 
 
-    -- ========================================================
     -- Fixed Datum fields
-    -- ========================================================
 
     local level = normalize_level(
         record["level"]
@@ -451,7 +423,6 @@ function normalize(tag, timestamp, record)
     local attributes = {}
 
 
-    -- ========================================================
     -- Python / Frappe
     --
     -- Fixed:
@@ -464,7 +435,6 @@ function normalize(tag, timestamp, record)
     --
     -- Parsed:
     --   logger -> attributes
-    -- ========================================================
 
     if tag == "pilot.python" then
 
@@ -475,12 +445,10 @@ function normalize(tag, timestamp, record)
         )
 
 
-    -- ========================================================
     -- JSONL
     --
     -- Everything except Datum's fixed fields becomes an
     -- attribute.
-    -- ========================================================
 
     elseif tag == "pilot.json" then
 
@@ -515,9 +483,7 @@ function normalize(tag, timestamp, record)
         end
 
 
-    -- ========================================================
     -- Nginx access
-    -- ========================================================
 
     elseif tag == "pilot.nginx.access" then
 
@@ -565,9 +531,7 @@ function normalize(tag, timestamp, record)
         )
 
 
-    -- ========================================================
     -- Nginx error
-    -- ========================================================
 
     elseif tag == "pilot.nginx.error" then
 
@@ -600,7 +564,6 @@ function normalize(tag, timestamp, record)
         end
 
 
-    -- ========================================================
     -- Redis
     --
     -- Redis severity markers:
@@ -612,7 +575,6 @@ function normalize(tag, timestamp, record)
     --
     -- If an unknown marker appears, use info.
     -- We do NOT infer severity from the message.
-    -- ========================================================
 
     elseif tag == "pilot.redis" then
 
@@ -658,7 +620,6 @@ function normalize(tag, timestamp, record)
         )
 
 
-    -- ========================================================
     -- Worker pool
     --
     -- Examples:
@@ -679,7 +640,6 @@ function normalize(tag, timestamp, record)
     --
     -- Worker pool has no severity field.
     -- Therefore EVERYTHING is info.
-    -- ========================================================
 
     elseif tag == "pilot.worker_pool" then
 
@@ -690,9 +650,7 @@ function normalize(tag, timestamp, record)
             or ""
 
 
-        -- ----------------------------------------------------
         -- Starting worker pool
-        -- ----------------------------------------------------
 
         local pool_id, pid =
             string.match(
@@ -716,9 +674,7 @@ function normalize(tag, timestamp, record)
         end
 
 
-        -- ----------------------------------------------------
         -- Worker started
-        -- ----------------------------------------------------
 
         local worker_id, worker_pid, version =
             string.match(
@@ -748,9 +704,7 @@ function normalize(tag, timestamp, record)
         end
 
 
-        -- ----------------------------------------------------
         -- Worker subscribing
-        -- ----------------------------------------------------
 
         local subscribing_worker, channel =
             string.match(
@@ -774,9 +728,7 @@ function normalize(tag, timestamp, record)
         end
 
 
-        -- ----------------------------------------------------
         -- Worker cleaning registry
-        -- ----------------------------------------------------
 
         local cleaning_worker, queue =
             string.match(
@@ -800,9 +752,7 @@ function normalize(tag, timestamp, record)
         end
 
 
-        -- ----------------------------------------------------
         -- Listening on queues
-        -- ----------------------------------------------------
 
         local queues =
             string.match(
@@ -820,9 +770,7 @@ function normalize(tag, timestamp, record)
         end
 
 
-        -- ----------------------------------------------------
         -- Shutdown signal
-        -- ----------------------------------------------------
 
         local shutdown_signal =
             string.match(
@@ -840,9 +788,7 @@ function normalize(tag, timestamp, record)
         end
 
 
-        -- ----------------------------------------------------
         -- Shutdown worker
-        -- ----------------------------------------------------
 
         local shutdown_worker =
             string.match(
@@ -861,9 +807,7 @@ function normalize(tag, timestamp, record)
     end
 
 
-    -- ========================================================
     -- Build Datum request
-    -- ========================================================
 
     record["body"] = build_body(
         ts,
