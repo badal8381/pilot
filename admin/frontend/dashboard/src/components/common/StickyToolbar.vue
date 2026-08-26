@@ -8,6 +8,6 @@
 div::after {
   content: "";
   background: linear-gradient(to bottom, var(--surface-base), transparent);
-  @apply top-full absolute inset-x-0 h-4 pointer-events-none;
+  @apply top-full absolute inset-x-0 h-1/2 pointer-events-none;
 }
 </style>
