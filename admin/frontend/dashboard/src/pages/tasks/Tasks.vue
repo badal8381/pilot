@@ -16,7 +16,8 @@ import {
   siteLabel,
   statusConfig,
   TASK_TYPES,
-  taskTiming,
+  taskDuration,
+  taskLastRun,
   taskType,
 } from '@/utils/taskFormat'
 import { taskDetailRoute } from '@/utils/taskRoute'
@@ -55,6 +56,7 @@ const columns = [
   { label: 'Task', key: 'title', class: 'w-1/3' },
   { label: 'Site', key: 'site' },
   { label: 'Status', key: 'badge' },
+  { label: 'Duration', key: 'duration' },
   { label: 'Last run', key: 'timing', class: 'text-right' },
 ]
 
@@ -64,7 +66,8 @@ const rows = computed(() =>
     title: commandLabel(task.command),
     site: siteLabel(task),
     badge: task.status === 'success' ? null : statusConfig(task),
-    timing: taskTiming(task),
+    duration: taskDuration(task),
+    timing: taskLastRun(task),
   })),
 )
 

@@ -65,6 +65,7 @@ const columns = [
   { label: 'Update', key: 'title', class: 'w-1/3' },
   { label: 'Site', key: 'site' },
   { label: 'Status', key: 'badge' },
+  { label: 'Duration', key: 'duration' },
   { label: 'Last run', key: 'timing', class: 'text-right' },
 ]
 
@@ -75,20 +76,17 @@ const rows = computed(() =>
     site: sitesLabel(op),
     siteNames: siteNames(op),
     badge: badge(op),
-    timing: timing(op),
+    duration: duration(op),
+    timing: relativeTime(op.started_at || op.created_at),
   })),
 )
 
 const getRowRoute = (row) => ({ name: 'UpdateDetail', params: { operationId: row.id } })
 
-const timing = (op) => {
-  const parts = []
-  if (op.finished_at && op.started_at) {
-    parts.push(`took ${fmtDuration((new Date(op.finished_at) - new Date(op.started_at)) / 1000)}`)
-  }
-  parts.push(relativeTime(op.started_at || op.created_at))
-  return parts.filter(Boolean).join(' · ')
-}
+const duration = (op) =>
+  op.finished_at && op.started_at
+    ? fmtDuration((new Date(op.finished_at) - new Date(op.started_at)) / 1000)
+    : ''
 
 const load = async () => {
   loading.value = true
