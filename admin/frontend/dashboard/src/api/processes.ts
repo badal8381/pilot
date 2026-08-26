@@ -1,7 +1,7 @@
-import { request } from '@/api/client'
+import { request, unwrap } from '@/api/client'
 
 export const processesApi = {
-  list: () => request.get('processes').json(),
-  restart: (name) => request.post(`processes/${encodeURIComponent(name)}/actions/restart`).json(),
-  restartWorkload: () => request.post('processes/actions/restart').json(),
+  list: () => unwrap(request.get('processes').json()),
+  restart: (name) => unwrap(request.post(`processes/${encodeURIComponent(name)}/actions/restart`).json()),
+  restartWorkload: () => unwrap(request.post('processes/actions/restart').json()),
 }

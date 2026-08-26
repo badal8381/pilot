@@ -32,10 +32,13 @@ class ProcessDefinition:
 def hook_wrapped_argv(pd: ProcessDefinition) -> list[str]:
     """argv for managers with no native pre/post hooks (supervisor, dev runner).
 
-    Supervisor and the dev runner send SIGTERM to the whole process group, which
-    would kill this wrapper's `sh` before it reaches post_run. A trap runs post_run
-    on the wrapper's own exit - whether that's the child finishing or `sh` itself
-    being signalled - so post_run fires on a managed stop, not just a self-exit."""
+    Supervisor and the dev runner send SIGTERM to the whole process group. An
+    EXIT-only trap does not reliably fire when `sh` itself is killed by that
+    signal while blocked waiting on the foreground child - only an explicit
+    TERM trap runs before the shell's default disposition takes it down. So
+    TERM is trapped to forward the signal to the child, wait for it, then run
+    post_run and exit; EXIT is also trapped for the self-exit case (post_run
+    or pre_run itself failing)."""
     if not pd.pre_run and not pd.post_run:
         return pd.argv
     script = shlex.join(pd.argv)
@@ -45,8 +48,19 @@ def hook_wrapped_argv(pd: ProcessDefinition) -> list[str]:
         # Defined as a function rather than inlined into the trap string, since
         # post_run's own argv is already shlex-quoted and a second layer of
         # quoting around it (single or double) breaks on any quote it contains.
+        # _post_run runs at most once, guarded by _ran: a TERM trap fires it and
+        # forwards the signal to the backgrounded child, then the shell's own
+        # exit re-fires the EXIT trap - which the guard turns into a no-op.
         post = shlex.join(pd.post_run)
-        script = f"_post_run() {{ {post}; }}\ntrap _post_run EXIT\n{script}"
+        script = (
+            f"_ran=0\n"
+            f"_post_run() {{ [ \"$_ran\" = 1 ] && return; _ran=1; {post}; }}\n"
+            f"trap _post_run EXIT\n"
+            f'trap "kill \\$child 2>/dev/null" TERM\n'
+            f"{script} &\n"
+            f"child=$!\n"
+            f"wait $child"
+        )
     return ["sh", "-c", script]
 
 

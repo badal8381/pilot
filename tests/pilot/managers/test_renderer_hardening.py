@@ -1,5 +1,6 @@
 """Renderers reject control chars as a last gate before writing unit files."""
 
+import contextlib
 from pathlib import Path
 
 import pytest
@@ -137,15 +138,64 @@ def test_hook_wrapper_traps_post_run_on_exit_and_quotes_args() -> None:
     pd = _hooked(post_run=["/bin/cleanup.sh", "a b"])
     argv = hook_wrapped_argv(pd)
     assert argv[:2] == ["sh", "-c"]
-    # A trap on EXIT fires post_run whether the child exits on its own or the
-    # wrapper is killed as part of its process group (supervisor/dev runner stop).
     # post_run is wrapped in a function rather than inlined into the trap string,
     # since a post_run argv containing its own quotes (e.g. `bash -c '...'`) would
     # break a second layer of quoting around it.
     assert "trap _post_run EXIT" in argv[2]
     assert "'a b'" in argv[2]  # arg with a space stays one arg
 
-    import subprocess
 
-    result = subprocess.run(["sh", "-c", argv[2].replace("/bin/flow serve", "true")], capture_output=True)
-    assert result.returncode == 0  # the wrapper itself must be valid sh, not just look right
+def test_hook_wrapper_runs_post_run_when_group_is_signalled(tmp_path: Path) -> None:
+    """An EXIT-only trap does not reliably fire when `sh` itself is killed by a
+    signal while blocked waiting on a foreground child - only an explicit TERM
+    trap runs before the shell's default disposition takes it down. This is the
+    actual failure mode supervisor/the dev runner produce (SIGTERM to the whole
+    process group via os.killpg), so exercise it for real rather than just
+    asserting the wrapper script's text looks right."""
+    import os
+    import signal
+    import subprocess
+    import time
+
+    marker = tmp_path / "stopped"
+    pd = ProcessDefinition(
+        name="mail-x",
+        argv=["sleep", "999"],
+        log_file=Path("/tmp/x.log"),
+        post_run=["bash", "-c", f"echo stopped >> {marker}"],
+    )
+    proc = subprocess.Popen(hook_wrapped_argv(pd), preexec_fn=os.setsid)
+    try:
+        time.sleep(0.3)
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        proc.wait(timeout=5)
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    assert marker.read_text() == "stopped\n"
+
+
+def test_hook_wrapper_runs_post_run_exactly_once_on_signal(tmp_path: Path) -> None:
+    """The EXIT trap re-fires after the TERM trap's handler returns; a guard
+    must stop post_run running twice on a managed stop."""
+    import os
+    import signal
+    import subprocess
+    import time
+
+    marker = tmp_path / "stopped"
+    pd = ProcessDefinition(
+        name="mail-x",
+        argv=["sleep", "999"],
+        log_file=Path("/tmp/x.log"),
+        post_run=["bash", "-c", f"echo stopped >> {marker}"],
+    )
+    proc = subprocess.Popen(hook_wrapped_argv(pd), preexec_fn=os.setsid)
+    try:
+        time.sleep(0.3)
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+        proc.wait(timeout=5)
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    assert marker.read_text().count("stopped") == 1
