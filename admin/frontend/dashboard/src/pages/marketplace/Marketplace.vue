@@ -110,16 +110,15 @@ onMounted(load)
     </template>
   </PageHero>
 
-  <div class="px-4 mx-auto max-w-3xl pb-40">
-    <!-- Filters -->
-    <MarketplaceFilters
-      v-model:search="search"
-      v-model:pill="selectedPill"
-      v-model:works-with="worksWith"
-      :works-with-options="worksWithOptions"
-      @add-from-github="showAddFromGithub = true"
-    />
+  <MarketplaceFilters
+    v-model:search="search"
+    v-model:pill="selectedPill"
+    v-model:works-with="worksWith"
+    :works-with-options="worksWithOptions"
+    @add-from-github="showAddFromGithub = true"
+  />
 
+  <div class="px-4 mx-auto max-w-3xl pb-40">
     <!-- Mirrors one section of the real grid so apps land in place. -->
     <section v-if="loading" class="mt-12">
       <div class="flex items-center h-4">

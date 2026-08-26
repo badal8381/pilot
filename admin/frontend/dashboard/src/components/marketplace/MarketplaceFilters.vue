@@ -49,7 +49,7 @@ const worksWithLabel = computed(() => {
 
 <template>
   <StickyToolbar class="py-4">
-    <div class="flex sm:flex-row flex-col gap-2">
+    <div class="px-4 mx-auto max-w-3xl flex sm:flex-row flex-col gap-2">
       <FormControl
         v-model="searchModel"
         class="flex-1"
@@ -90,13 +90,12 @@ const worksWithLabel = computed(() => {
     </div>
 
     <!-- Scrolls rather than clips: TabButtons' rail is overflow-hidden and does not wrap. -->
-    <div class="mt-3 overflow-x-auto">
       <TabButtons
         v-model="pillModel"
         :options="pillOptions"
         variant="ghost"
         :size="isMobile ? 'md' : 'sm'"
+        class="px-4 mx-auto max-w-3xl mt-3 overflow-x-auto"
       />
-    </div>
   </StickyToolbar>
 </template>
