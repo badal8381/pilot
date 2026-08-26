@@ -618,7 +618,6 @@ onUnmounted(() => clearTimeout(statsTimer))
         v-model="target"
         :options="targetOptions"
         :size="isMobile ? 'md' : 'sm'"
-        variant="outline"
         side="bottom"
         align="start"
         placeholder="Select site"
@@ -630,7 +629,6 @@ onUnmounted(() => clearTimeout(statsTimer))
         v-model="metric"
         :options="metricOptions"
         :size="isMobile ? 'md' : 'sm'"
-        variant="outline"
         side="bottom"
         align="start"
       />
@@ -639,7 +637,6 @@ onUnmounted(() => clearTimeout(statsTimer))
         v-model="windowModel"
         :options="windowOptions"
         :size="isMobile ? 'md' : 'sm'"
-        variant="outline"
         side="bottom"
         align="start"
       >
