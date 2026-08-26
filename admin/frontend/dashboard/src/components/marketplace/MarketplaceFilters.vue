@@ -48,8 +48,8 @@ const worksWithLabel = computed(() => {
 </script>
 
 <template>
-  <StickyToolbar class="py-4">
-    <div class="px-4 mx-auto max-w-3xl flex sm:flex-row flex-col gap-2">
+  <StickyToolbar class="px-3 sm:px-4 py-2 sm:py-3">
+    <div class="mx-auto w-full max-w-3xl flex sm:flex-row flex-col gap-2">
       <FormControl
         v-model="searchModel"
         class="flex-1"
@@ -95,7 +95,7 @@ const worksWithLabel = computed(() => {
         :options="pillOptions"
         variant="ghost"
         :size="isMobile ? 'md' : 'sm'"
-        class="px-4 mx-auto max-w-3xl mt-3 overflow-x-auto"
+        class="mx-auto w-full max-w-3xl mt-3 overflow-x-auto"
       />
   </StickyToolbar>
 </template>
