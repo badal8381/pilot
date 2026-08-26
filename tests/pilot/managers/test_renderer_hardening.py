@@ -139,5 +139,13 @@ def test_hook_wrapper_traps_post_run_on_exit_and_quotes_args() -> None:
     assert argv[:2] == ["sh", "-c"]
     # A trap on EXIT fires post_run whether the child exits on its own or the
     # wrapper is killed as part of its process group (supervisor/dev runner stop).
-    assert "trap '" in argv[2] and "' EXIT" in argv[2]
+    # post_run is wrapped in a function rather than inlined into the trap string,
+    # since a post_run argv containing its own quotes (e.g. `bash -c '...'`) would
+    # break a second layer of quoting around it.
+    assert "trap _post_run EXIT" in argv[2]
     assert "'a b'" in argv[2]  # arg with a space stays one arg
+
+    import subprocess
+
+    result = subprocess.run(["sh", "-c", argv[2].replace("/bin/flow serve", "true")], capture_output=True)
+    assert result.returncode == 0  # the wrapper itself must be valid sh, not just look right

@@ -42,8 +42,11 @@ def hook_wrapped_argv(pd: ProcessDefinition) -> list[str]:
     if pd.pre_run:
         script = f"{shlex.join(pd.pre_run)} && {script}"
     if pd.post_run:
+        # Defined as a function rather than inlined into the trap string, since
+        # post_run's own argv is already shlex-quoted and a second layer of
+        # quoting around it (single or double) breaks on any quote it contains.
         post = shlex.join(pd.post_run)
-        script = f"trap '{post}' EXIT; {script}"
+        script = f"_post_run() {{ {post}; }}\ntrap _post_run EXIT\n{script}"
     return ["sh", "-c", script]
 
 
