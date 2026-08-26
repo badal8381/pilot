@@ -5,7 +5,7 @@ import { Alert, Button, Dialog, FormControl, TabButtons } from 'frappe-ui'
 
 import SQLCodeEditor from '@/components/database/SQLCodeEditor.vue'
 import SQLSchemaDialog from '@/components/database/SQLSchemaDialog.vue'
-import SimpleTable from '@/components/common/SimpleTable.vue'
+import Table from '@/components/common/Table.vue'
 
 import { apiErrorMessage } from '@/api/client'
 import { databaseApi } from '@/api/database'
@@ -60,16 +60,22 @@ const pageOptions = [
   { label: '100', value: 100 },
 ]
 
-const resultColumns = computed(() =>
-  currentResult.value ? currentResult.value.columns.map((c) => ({ key: c, label: c })) : [],
-)
+const resultColumns = computed(() => {
+  if (!currentResult.value) return []
+  return [
+    { key: 'sqlTableIndex', label: '#', class: 'w-8 tabular-nums text-ink-gray-4 text-xs' },
+    ...currentResult.value.columns.map((c) => ({ key: c, label: c })),
+  ]
+})
 
 const paginatedRowObjects = computed(() => {
   if (!currentResult.value) return []
   const { columns, rows } = currentResult.value
-  return rows
-    .slice((page.value - 1) * perPage.value, page.value * perPage.value)
-    .map((row) => Object.fromEntries(columns.map((col, i) => [col, row[i]])))
+  const offset = (page.value - 1) * perPage.value
+  return rows.slice(offset, offset + perPage.value).map((row, i) => ({
+    sqlTableIndex: offset + i + 1,
+    ...Object.fromEntries(columns.map((col, j) => [col, row[j]])),
+  }))
 })
 
 const totalPages = computed(() =>
@@ -322,7 +328,7 @@ onMounted(async () => {
         <TabButtons v-model="activeTab" type="underline" :options="tabOptions" />
       </div>
 
-      <div v-if="currentResult" class="border rounded-6 border-outline-gray-2 overflow-hidden">
+      <div v-if="currentResult" class="border rounded-4 overflow-hidden">
         <!-- Write query success (no result set) -->
         <div
           v-if="!currentResult.columns.length"
@@ -336,18 +342,19 @@ onMounted(async () => {
         </div>
 
         <template v-else>
-          <SimpleTable
-            :columns="resultColumns"
-            :rows="paginatedRowObjects"
-            :show-index="true"
-            :index-offset="(page - 1) * perPage"
-            min-height="320px"
-            :mono="false"
-            truncate
-            show-null
-            empty-text="No rows returned."
-            :bordered="false"
-          />
+          <Table height="h-auto" :columns="resultColumns" :rows="paginatedRowObjects">
+            <template v-for="name in currentResult.columns" :key="name" #[name]="{ row }">
+              <span v-if="row[name] === null" class="text-ink-gray-3 italic">null</span>
+              <span v-else class="block max-w-xs truncate">{{ row[name] }}</span>
+            </template>
+          </Table>
+
+          <p
+            v-if="!paginatedRowObjects.length"
+            class="flex justify-center items-center min-h-[320px] text-ink-gray-4 text-sm"
+          >
+            No rows returned.
+          </p>
 
           <!-- Table footer -->
           <div

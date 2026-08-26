@@ -1,12 +1,10 @@
 <script setup lang="ts" generic="Row extends Record<string, any>">
-import type { Component } from 'vue'
 import Scrollbar from '@/components/common/Scrollbar.vue'
 
 interface Column {
   key: string
   label: string
   class?: string
-  component?: Component
 }
 
 interface Props {
@@ -18,7 +16,7 @@ interface Props {
 defineProps<Props>()
 
 defineSlots<{
-  [key: string]: (props: { row: Row; index: number }) => any
+  [key: string]: (props: { row: Row; column: Column; index: number }) => any
 }>()
 </script>
 
@@ -30,7 +28,7 @@ defineSlots<{
           <th
             v-for="(column, i) in columns"
             :key="column.key"
-            class="bg-surface-gray-2 px-3 py-2 font-normal text-ink-gray-5 text-sm whitespace-nowrap"
+            class="bg-surface-gray-2 px-4 py-2 font-normal text-ink-gray-5 text-sm whitespace-nowrap"
             :class="[column.class, i === 0 && 'rounded-l-4', i === columns.length - 1 && 'rounded-r-4']"
           >
             {{ column.label }}
@@ -44,14 +42,20 @@ defineSlots<{
             v-for="column in columns"
             :key="column.key"
             class="px-4 py-3 whitespace-nowrap"
-            :class="[column.class, index < rows.length - 1 && 'border-b border-outline-gray-1']"
+            :class="column.class"
           >
-            <slot v-if="$slots[column.key]" :name="column.key" :row="row" :index="index" />
-            <component :is="column.component" v-else-if="column.component" :row="row" />
-            <template v-else>{{ row[column.key] }}</template>
+            <slot :name="column.key" :row="row" :column="column" :index="index">
+              {{ row[column.key] }}
+            </slot>
           </td>
         </tr>
       </tbody>
     </table>
   </Scrollbar>
 </template>
+
+<style scoped>
+tbody tr:not(:last-child) td {
+  @apply border-b border-outline-gray-1;
+}
+</style>
