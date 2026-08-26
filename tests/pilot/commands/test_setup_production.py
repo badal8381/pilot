@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import tomllib
 from pathlib import Path
@@ -60,6 +61,20 @@ def test_persist_preserves_other_fields(tmp_path: Path) -> None:
     assert data["apps"][0]["name"] == "frappe"
     # mariadb lives in common_config.toml now, untouched by this rewrite too.
     assert bench.config.mariadb.root_password == "root"
+
+
+def test_write_dns_multitenancy_creates_missing_sites_directory(tmp_path: Path) -> None:
+    bench = _make_bench(tmp_path)
+    bench.sites_path.rmdir()
+
+    assert not bench.sites_path.exists()
+
+    ProductionSetup(bench)._write_dns_multitenancy()
+
+    common_config = bench.sites_path / "common_site_config.json"
+    assert bench.sites_path.is_dir()
+    assert common_config.is_file()
+    assert json.loads(common_config.read_text())["dns_multitenant"] == 1
 
 
 def test_check_admin_domain_uses_toml_value(tmp_path: Path) -> None:
