@@ -38,12 +38,6 @@ const enabled = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key
 const limits = ref(Object.fromEntries(RESOURCE_ALERTS.map((alert) => [alert.key, ''])))
 const siteUptime = ref(true)
 const webhooks = ref([])
-const mail = ref({
-  smtp_url: '',
-  smtp_password: '',
-  smtp_password_set: false,
-  email_recipients: '',
-})
 
 const savedPayload = ref('')
 const dirty = computed(() => JSON.stringify(buildPayload()) !== savedPayload.value)
@@ -63,17 +57,8 @@ const buildPayload = () => {
       token: webhook.token,
       original_url: webhook.original_url,
     })),
-    smtp_url: mail.value.smtp_url.trim(),
-    smtp_password: mail.value.smtp_password,
-    email_recipients: recipients(),
   }
 }
-
-const recipients = () =>
-  mail.value.email_recipients
-    .split(',')
-    .map((address) => address.trim())
-    .filter(Boolean)
 
 const setEnabled = (key, on) => {
   enabled.value[key] = on
@@ -110,32 +95,10 @@ const limitError = (key) => {
   return ''
 }
 
-// Mirrors the server: scheme, a host, a readable port, and no inline password.
-const mailUrlIsValid = (url) => {
-  if (!/^smtps?:\/\//.test(url) || !URL.canParse(url)) return false
-  const parsed = new URL(url)
-  return Boolean(parsed.hostname) && !/\s/.test(url)
-}
-
-const mailUrlHasPassword = (url) => URL.canParse(url) && Boolean(new URL(url).password)
-
-const mailError = computed(() => {
-  const url = mail.value.smtp_url.trim()
-  if (url && !mailUrlIsValid(url))
-    return 'Server URL must look like smtp://user@mail.example.com:587 or smtps://...'
-  if (url && mailUrlHasPassword(url)) return 'Put the password in the field below, not in the URL.'
-  const addresses = recipients()
-  if (addresses.length && !url) return 'A server URL is required to send alert emails.'
-  if (addresses.some((address) => !/^[^@\s]+@[^@\s]+$/.test(address)))
-    return 'Recipients must be comma-separated email addresses.'
-  return ''
-})
-
 const canSave = computed(
   () =>
     RESOURCE_ALERTS.every((alert) => !limitError(alert.key)) &&
-    webhooks.value.every((webhook) => webhookIsComplete(webhook) && !webhookError(webhook)) &&
-    !mailError.value,
+    webhooks.value.every((webhook) => webhookIsComplete(webhook) && !webhookError(webhook)),
 )
 
 const save = async () => {
@@ -156,8 +119,6 @@ const save = async () => {
       webhook.token = ''
       webhook.original_url = webhook.url.trim()
     }
-    mail.value.smtp_password_set = mail.value.smtp_password_set || Boolean(mail.value.smtp_password)
-    mail.value.smtp_password = ''
     savedPayload.value = JSON.stringify(buildPayload())
     toast.success('Notification settings saved')
   } catch (e) {
@@ -183,12 +144,6 @@ onMounted(async () => {
       token_set: Boolean(webhook.token_set),
       original_url: webhook.url || '',
     }))
-    mail.value = {
-      smtp_url: saved.smtp_url || '',
-      smtp_password: '',
-      smtp_password_set: Boolean(saved.smtp_password_set),
-      email_recipients: (saved.email_recipients || []).join(', '),
-    }
     savedPayload.value = JSON.stringify(buildPayload())
   } catch (e) {
     error.value = e.message || 'Could not load settings.'
@@ -229,44 +184,6 @@ onMounted(async () => {
         />
         <span class="text-ink-gray-6 text-base">% and above</span>
       </div>
-    </div>
-
-    <div class="space-y-2">
-      <p class="font-medium text-ink-gray-8 text-base leading-normal">Email</p>
-
-      <p class="text-ink-gray-5 text-p-sm">Send alerts to a mailbox.</p>
-
-      <div class="gap-3 grid grid-cols-2">
-        <div class="space-y-1.5 col-span-2">
-          <p class="font-medium text-ink-gray-7 text-base">Server URL</p>
-          <TextInput
-            v-model="mail.smtp_url"
-            placeholder="smtp://alerts@example.com@smtp.example.com:587"
-            class="w-full"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-base">Password</p>
-          <TextInput
-            v-model="mail.smtp_password"
-            type="password"
-            :placeholder="mail.smtp_password_set ? 'Unchanged' : 'SMTP password'"
-            class="w-full"
-          />
-        </div>
-
-        <div class="space-y-1.5">
-          <p class="font-medium text-ink-gray-7 text-base">Recipients</p>
-          <TextInput
-            v-model="mail.email_recipients"
-            placeholder="ops@example.com, oncall@example.com"
-            class="w-full"
-          />
-        </div>
-      </div>
-
-      <p v-if="mailError" class="text-ink-red-5 text-p-sm">{{ mailError }}</p>
     </div>
 
     <details class="group">
