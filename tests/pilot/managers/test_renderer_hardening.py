@@ -119,14 +119,25 @@ def test_supervisor_wraps_hooks_and_honours_restart() -> None:
     assert "autorestart=false\n" in text
 
 
+def test_supervisor_restart_on_failure_maps_to_unexpected_not_any_exit() -> None:
+    # 'true' would also restart a clean, expected (0) exit - only 'unexpected'
+    # matches systemd's Restart=on-failure semantics.
+    pd = _hooked(restart_on_failure=True)
+    text = SupervisorRenderer("bench", Path("/tmp")).render(pd)
+    assert "autorestart=unexpected\n" in text
+    assert "exitcodes=0\n" in text
+
+
 def test_hook_wrapping_is_skipped_without_hooks() -> None:
     pd = _hooked()
     assert hook_wrapped_argv(pd) == ["/bin/flow", "serve"]
 
 
-def test_hook_wrapper_preserves_exit_code_and_quotes_args() -> None:
+def test_hook_wrapper_traps_post_run_on_exit_and_quotes_args() -> None:
     pd = _hooked(post_run=["/bin/cleanup.sh", "a b"])
     argv = hook_wrapped_argv(pd)
     assert argv[:2] == ["sh", "-c"]
-    assert "rc=$?" in argv[2] and "exit $rc" in argv[2]
+    # A trap on EXIT fires post_run whether the child exits on its own or the
+    # wrapper is killed as part of its process group (supervisor/dev runner stop).
+    assert "trap '" in argv[2] and "' EXIT" in argv[2]
     assert "'a b'" in argv[2]  # arg with a space stays one arg

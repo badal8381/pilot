@@ -30,14 +30,20 @@ class ProcessDefinition:
 
 
 def hook_wrapped_argv(pd: ProcessDefinition) -> list[str]:
-    """argv for managers with no native pre/post hooks (supervisor, dev runner)."""
+    """argv for managers with no native pre/post hooks (supervisor, dev runner).
+
+    Supervisor and the dev runner send SIGTERM to the whole process group, which
+    would kill this wrapper's `sh` before it reaches post_run. A trap runs post_run
+    on the wrapper's own exit - whether that's the child finishing or `sh` itself
+    being signalled - so post_run fires on a managed stop, not just a self-exit."""
     if not pd.pre_run and not pd.post_run:
         return pd.argv
     script = shlex.join(pd.argv)
     if pd.pre_run:
         script = f"{shlex.join(pd.pre_run)} && {script}"
     if pd.post_run:
-        script = f"{script}; rc=$?; {shlex.join(pd.post_run)}; exit $rc"
+        post = shlex.join(pd.post_run)
+        script = f"trap '{post}' EXIT; {script}"
     return ["sh", "-c", script]
 
 
@@ -84,13 +90,34 @@ class ProcessDefinitionBuilder:
         defs.append(self.redis_definition("redis_cache", "redis_cache.conf"))
         defs.append(self.redis_definition("redis_queue", "redis_queue.conf"))
         defs.extend(self.app_process_definitions())
+        self._reject_name_collisions(defs)
         return defs
+
+    def _reject_name_collisions(self, defs: list[ProcessDefinition]) -> None:
+        """Supervisor normalizes underscores to dashes in program names, so two
+        distinct pd.name values can render to the same unit/program name."""
+        seen: dict[str, str] = {}
+        for pd in defs:
+            normalized = pd.name.replace("_", "-")
+            if normalized in seen and seen[normalized] != pd.name:
+                raise ValueError(
+                    f"process name '{pd.name}' collides with '{seen[normalized]}' "
+                    f"once normalized to '{normalized}'"
+                )
+            seen[normalized] = pd.name
 
     def app_process_definitions(self) -> list[ProcessDefinition]:
         """A malformed declaration raises rather than being skipped - a skipped app
-        reads as "removed" to reconciliation, which would stop its live services."""
+        reads as "removed" to reconciliation, which would stop its live services.
+
+        An operator can still opt an app out via bench.toml's disabled_app_processes,
+        the escape hatch for a third-party app whose declaration can't be fixed
+        in time - that skip is explicit, not automatic."""
+        disabled = set(self.bench.config.disabled_app_processes)
         defs: list[ProcessDefinition] = []
         for app in self.bench.apps():
+            if app.config.name in disabled:
+                continue
             defs.extend(app.requirements.process_definitions())
         return defs
 

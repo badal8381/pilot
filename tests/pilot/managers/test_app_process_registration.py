@@ -57,3 +57,30 @@ def test_removed_app_drops_out_of_definitions(tmp_path: Path) -> None:
 
     subprocess.run(["rm", "-rf", str(bench.apps_path / "mail")], check=True)
     assert "mail-stalwart" not in [d.name for d in _builder(bench).prod_process_definitions()]
+
+
+def test_name_collision_after_dash_normalization_is_rejected(tmp_path: Path) -> None:
+    """Supervisor normalizes underscores to dashes in program names, so an app
+    named 'redis' declaring a process 'cache' collides with the bench's own
+    redis_cache process once both are rendered - must fail loud, not silently
+    duplicate the config."""
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _make_app(bench, "redis", '[tool.pilot.background_processes.cache]\ncmd = ["/usr/bin/x"]\n')
+
+    with pytest.raises(ValueError):
+        _builder(bench).prod_process_definitions()
+
+
+def test_disabled_app_processes_opts_out_a_broken_app(tmp_path: Path) -> None:
+    """An operator can disable a specific app's declarations via bench.toml so a
+    third-party app's bad declaration doesn't refuse to start the whole bench."""
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _make_app(bench, "broken", "[tool.pilot\n")  # malformed TOML
+    _make_app(bench, "mail", _GOOD)
+    bench.config.disabled_app_processes = ["broken"]
+
+    names = [d.name for d in _builder(bench).prod_process_definitions()]
+    assert "mail-stalwart" in names
+    assert "web" in names
