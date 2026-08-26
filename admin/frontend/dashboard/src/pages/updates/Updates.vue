@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, ErrorMessage, TabButtons } from 'frappe-ui'
+import { Badge, Button, ErrorMessage, TabButtons } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
-import StatusListView from '@/components/common/StatusListView.vue'
+import Table from '@/components/common/Table.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
 
 import { useIsMobile } from '@/composables/common/useIsMobile'
@@ -61,17 +61,13 @@ const badge = (op) => {
   return { label: stateLabel(op.state), theme: tone === 'orange' ? 'amber' : tone }
 }
 
-// Numeric widths are fr units (ListView convention) so the columns stretch to
-// fill the row instead of leaving dead space.
 const columns = [
-  { label: 'Update', key: 'title', align: 'left', width: 2 },
-  { label: 'Site', key: 'site', align: 'left', width: 2, getTooltip: (row) => row.siteNames },
-  { label: 'Status', key: 'badge', align: 'left', width: 1.5 },
-  { label: 'Last run', key: 'timing', align: 'right', width: 2 },
+  { label: 'Update', key: 'title', class: 'w-1/3' },
+  { label: 'Site', key: 'site' },
+  { label: 'Status', key: 'badge' },
+  { label: 'Last run', key: 'timing', class: 'text-right' },
 ]
 
-// ListRowItem reads row[column.key], so the operation is flattened to the four
-// strings the columns render.
 const rows = computed(() =>
   visibleOperations.value.map((op) => ({
     id: op.id,
@@ -131,7 +127,7 @@ onMounted(load)
 
     <!-- A flex item sizes to the strip's natural width and overflows the screen;
          a block child is held to the content width and fits. -->
-    <StickyToolbar class="py-2 md:py-3" :class="isMobile ? '' : 'flex items-center gap-2'">
+    <StickyToolbar class="mt-5" :class="isMobile ? '' : 'flex items-center gap-2'">
       <TabButtons
         :size="isMobile ? 'md' : 'sm'"
         :options="UPDATE_FILTERS"
@@ -157,13 +153,19 @@ onMounted(load)
       <ErrorMessage :message="error" />
     </div>
 
-    <StatusListView
-      v-else-if="rows.length"
-      class="mt-4"
-      :columns="columns"
-      :rows="rows"
-      :get-row-route="getRowRoute"
-    />
+    <Table v-else-if="rows.length" :columns="columns" :rows="rows" height="h-auto" class="mt-4">
+      <template #title="{ row }">
+        <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0 hover:underline">{{ row.title }}</router-link>
+      </template>
+
+      <template #site="{ row }">
+        <span :title="row.siteNames">{{ row.site }}</span>
+      </template>
+
+      <template #badge="{ row }">
+        <Badge v-if="row.badge" :label="row.badge.label" :theme="row.badge.theme" />
+      </template>
+    </Table>
 
     <EmptyState
       v-else

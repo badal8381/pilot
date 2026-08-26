@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
+import { Badge, Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
-import StatusListView from '@/components/common/StatusListView.vue'
+import Table from '@/components/common/Table.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
 
 import { useIsMobile } from '@/composables/common/useIsMobile'
@@ -51,16 +51,13 @@ const visibleTasks = computed(() =>
   ),
 )
 
-// Numeric widths are fr units (ListView convention) so the columns stretch to
-// fill the row instead of leaving dead space.
 const columns = [
-  { label: 'Task', key: 'title', align: 'left', width: 2 },
-  { label: 'Site', key: 'site', align: 'left', width: 2 },
-  { label: 'Status', key: 'badge', align: 'left', width: 1.5 },
-  { label: 'Last run', key: 'timing', align: 'right', width: 2 },
+  { label: 'Task', key: 'title', class: 'w-1/3' },
+  { label: 'Site', key: 'site' },
+  { label: 'Status', key: 'badge' },
+  { label: 'Last run', key: 'timing', class: 'text-right' },
 ]
 
-// ListRowItem reads row[column.key], so each task is flattened to what renders.
 const rows = computed(() =>
   visibleTasks.value.map((task) => ({
     id: task.task_id,
@@ -183,13 +180,15 @@ onMounted(() => load(statusFilter.value))
       <ErrorMessage :message="error" />
     </div>
 
-    <StatusListView
-      v-else-if="rows.length"
-      class="mt-4"
-      :columns="columns"
-      :rows="rows"
-      :get-row-route="getRowRoute"
-    />
+    <Table v-else-if="rows.length" :columns="columns" :rows="rows" height="h-auto" class="mt-4">
+      <template #title="{ row }">
+        <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0 hover:underline">{{ row.title }}</router-link>
+      </template>
+
+      <template #badge="{ row }">
+        <Badge v-if="row.badge" :label="row.badge.label" :theme="row.badge.theme" />
+      </template>
+    </Table>
 
     <EmptyState
       v-else

@@ -37,12 +37,12 @@ defineSlots<{
       </thead>
 
       <tbody>
-        <tr v-for="(row, index) in rows" :key="row.id ?? index">
+        <tr v-for="(row, index) in rows" :key="row.id ?? index" class="group relative">
           <td
-            v-for="column in columns"
+            v-for="(column, i) in columns"
             :key="column.key"
-            class="px-2 h-10 whitespace-nowrap"
-            :class="column.class"
+            class="px-2 h-10 whitespace-nowrap group-hover:bg-surface-gray-1"
+            :class="[column.class, i === 0 && 'rounded-l-4', i === columns.length - 1 && 'rounded-r-4']"
           >
             <slot :name="column.key" :row="row" :column="column" :index="index">
               {{ row[column.key] }}
