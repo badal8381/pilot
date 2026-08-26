@@ -7,7 +7,8 @@ import Table from '@/components/common/Table.vue'
 
 import { useActivities } from '@/composables/activities/useActivities'
 import { useSites } from '@/composables/sites/useSites'
-import { commandLabel, relativeTime } from '@/utils/taskFormat'
+import { relativeTime } from '@/utils/time'
+import { commandLabel } from '@/utils/taskFormat'
 import type { AuditEntry } from '@/types/audit'
 
 const props = defineProps<{ siteName?: string }>()

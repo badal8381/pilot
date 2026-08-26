@@ -21,7 +21,8 @@ import {
   stateTone,
   UPDATE_FILTERS,
 } from '@/utils/updateFormat'
-import { fmtDuration, relativeTime } from '@/utils/taskFormat'
+import { relativeTime } from '@/utils/time'
+import { fmtDuration } from '@/utils/taskFormat'
 
 const route = useRoute()
 const router = useRouter()

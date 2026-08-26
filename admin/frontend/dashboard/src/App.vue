@@ -17,6 +17,10 @@ const { awaitingTerminal } = useSetupHandoff()
 const { signedOut } = useSignedOut()
 
 useColorScheme()
+
+// dayjs.updateLocale('en', {
+//   relativeTime: { m: '1m', mm: '%dm', h: '1h', hh: '%dh', d: '1d', dd: '%dd' },
+// })
 </script>
 
 <template>

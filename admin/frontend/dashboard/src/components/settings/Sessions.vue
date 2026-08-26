@@ -15,7 +15,8 @@ import EmptyState from '@/components/common/EmptyState.vue'
 
 import { auditApi } from '@/api/audit'
 import { sessionApi } from '@/api/session'
-import { commandLabel, fmtDateTime, relativeTime } from '@/utils/taskFormat'
+import { relativeTime } from '@/utils/time'
+import { commandLabel, fmtDateTime } from '@/utils/taskFormat'
 
 const nestedView = defineModel('nestedView')
 // The session whose activity is showing - a route param (owned by SettingsDialog),
@@ -85,12 +86,13 @@ const rows = computed(() =>
   activeTokens.value
     .map((t) => {
       const isCurrent = t.jti === currentJti.value
+      const lastSeenAgo = t.last_seen && relativeTime(t.last_seen * 1000)
       return {
         jti: t.jti,
         ip: t.ip || '-',
         isCurrent,
         lastSeen: t.last_seen || 0,
-        activity: isCurrent ? 'Current session' : relativeTimeOrDash(t.last_seen),
+        activity: isCurrent ? 'Current session' : lastSeenAgo || '-',
         activityTooltip: isCurrent ? '' : formatDate(t.last_seen),
         exp: formatDate(t.exp),
       }
@@ -167,10 +169,6 @@ const auditEntryDetail = (entry) => {
   const detail = [...new Set(DETAIL_KEYS.map((key) => source[key]).filter(Boolean))].join(' · ')
   const head = auditEntryHead(entry)
   return detail ? `${head} — ${detail}` : head
-}
-
-const relativeTimeOrDash = (seconds) => {
-  return seconds ? relativeTime(new Date(seconds * 1000).toISOString()) : '-'
 }
 
 const formatDate = (seconds) => {

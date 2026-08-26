@@ -5,13 +5,11 @@ import {
   isTaskActive,
   isTaskCancellable,
   redirectRouteOnSuccess,
-  relativeTime,
   SERVER_SCOPE,
   siteLabel,
   siteRoute,
   statusConfig,
   taskDuration,
-  taskLastRun,
   taskScope,
 } from './taskFormat.ts'
 
@@ -25,11 +23,6 @@ test('queued and running tasks are active', () => {
   assert.equal(isTaskActive({ status: 'running' }), true)
   assert.equal(isTaskActive({ status: 'success' }), false)
   assert.equal(isTaskActive(null), false)
-})
-
-test('task timing tolerates a missing timestamp', () => {
-  assert.equal(relativeTime(null), '')
-  assert.equal(relativeTime(undefined), '')
 })
 
 test('siteLabel names the site, or the server when a task has none', () => {
@@ -125,9 +118,4 @@ test('taskDuration is empty when the queue has not reported a position', () => {
 
 test('taskDuration reports how long a finished task took', () => {
   assert.equal(taskDuration({ status: 'success', duration_seconds: 93 }), '1m 33s')
-})
-
-test('taskLastRun falls back to the queued time when a task never started', () => {
-  const queuedAt = new Date(Date.now() - 3 * 60 * 1000).toISOString()
-  assert.equal(taskLastRun({ status: 'killed', queued_at: queuedAt }), relativeTime(queuedAt))
 })

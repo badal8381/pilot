@@ -17,9 +17,9 @@ import {
   statusConfig,
   TASK_TYPES,
   taskDuration,
-  taskLastRun,
   taskType,
 } from '@/utils/taskFormat'
+import { relativeTime } from '@/utils/time'
 import { taskDetailRoute } from '@/utils/taskRoute'
 
 const route = useRoute()
@@ -67,7 +67,7 @@ const rows = computed(() =>
     site: siteLabel(task),
     badge: task.status === 'success' ? null : statusConfig(task),
     duration: taskDuration(task),
-    timing: taskLastRun(task),
+    timing: relativeTime(task.started_at || task.queued_at),
   })),
 )
 

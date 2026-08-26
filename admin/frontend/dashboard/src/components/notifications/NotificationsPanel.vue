@@ -17,7 +17,7 @@ import Scrollbar from '@/components/common/Scrollbar.vue'
 
 import { useNotifications } from '@/composables/notifications/useNotifications'
 import type { Notification } from '@/types/notification'
-import { relativeTime } from '@/utils/taskFormat'
+import { relativeTime } from '@/utils/time'
 
 interface SeverityLook {
   icon: string

@@ -26,8 +26,9 @@ import TableSizesDialog from '@/components/database/TableSizesDialog.vue'
 
 import { databaseApi } from '@/api/database'
 import { formatBytes } from '@/utils/format'
+import { relativeTime } from '@/utils/time'
 import { apiErrorMessage } from '@/api/client'
-import { relativeTime } from '@/utils/taskFormat'
+
 
 const AUTO_REFRESH_INTERVAL_MS = 2000
 
@@ -143,7 +144,7 @@ const binlogRows = computed(() =>
   binlogs.value.map((file, index) => ({
     number: index + 1,
     name: file.name,
-    date: fileAge(file),
+    date: relativeTime(file.modified_ms),
     size: formatBytes(file.size_bytes),
     index,
     isActive: index === binlogs.value.length - 1,
@@ -212,10 +213,6 @@ const truncateQuery = (query) => {
 
 const formatSeconds = (seconds) => {
   return seconds == null ? '—' : `${Math.round(seconds)}s`
-}
-
-const fileAge = (file) => {
-  return file.modified_ms ? relativeTime(new Date(file.modified_ms).toISOString()) : '—'
 }
 
 // Purging is contiguous from the oldest file, so ticking one file ticks every

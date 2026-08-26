@@ -9,6 +9,7 @@ import LogView from '@/components/logs/LogView.vue'
 import { logsApi } from '@/api/logs'
 import { escapeHtml, processLine } from '@/utils/ansi'
 import { formatBytes } from '@/utils/format'
+import { relativeTime } from '@/utils/time'
 import { useBench } from '@/composables/benches/useBench'
 import { useIsMobile } from '@/composables/common/useIsMobile'
 
@@ -16,16 +17,6 @@ const route = useRoute()
 const router = useRouter()
 
 const { name: benchName, load: loadBench } = useBench()
-
-const shortRelativeTime = (iso) => {
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 60) return 'just now'
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return `${Math.floor(hours / 24)}d ago`
-}
 
 const hasErrors = (log) => {
   return log.filename.endsWith('.error.log') && log.size_bytes > 0
@@ -266,7 +257,7 @@ onUnmounted(() => stopLive())
               </Tooltip>
 
               <span class="text-ink-gray-4 text-xs shrink-0">
-                {{ shortRelativeTime(log.last_modified) }}
+                {{ relativeTime(log.last_modified) }}
               </span>
             </div>
 

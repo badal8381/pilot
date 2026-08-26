@@ -197,18 +197,6 @@ export const redirectRouteOnSuccess = (task) => {
   return { ...route, query: { app, action: APP_ACTION_FOR_COMMAND[task.command] } }
 }
 
-export const relativeTime = (iso) => {
-  if (!iso) return ''
-  const seconds = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
-  if (seconds < 5) return 'just now'
-  if (seconds < 60) return `${seconds} sec ago`
-  const minutes = Math.floor(seconds / 60)
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} hr ago`
-  return `${Math.floor(hours / 24)} d ago`
-}
-
 /**
  * The one duration format. `precise` keeps a decimal on sub-minute values for
  * step timings, where the difference between 0.4s and 1.2s is worth reading -
@@ -235,5 +223,3 @@ export const taskDuration = (task) => {
   }
   return fmtDuration(task.duration_seconds)
 }
-
-export const taskLastRun = (task) => relativeTime(task.started_at || task.queued_at)
