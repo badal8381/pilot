@@ -78,6 +78,9 @@ class AppRequirements:
             env=env,
             working_dir=working_dir,
             stop_timeout=stop_timeout,
+            # An app-declared process crashing must not take down the whole bench -
+            # only the bench's own core processes (web, workers, redis) are critical.
+            critical=False,
             restart_on_failure=restart_on_failure,
             pre_run=pre_run,
             post_run=post_run,

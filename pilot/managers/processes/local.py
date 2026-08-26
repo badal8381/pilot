@@ -280,6 +280,28 @@ class ProcessManager:
     def _color(self, name: str) -> str:
         return self._colors.setdefault(name, _COLORS[len(self._colors) % len(_COLORS)])
 
+    def _reap_exited(self, defs_by_name: dict[str, ProcessDefinition]) -> None:
+        """One pass over running processes: restart a non-critical one that
+        failed and is marked restart_on_failure, drop a non-critical one that
+        exited otherwise, or stop the whole bench if a critical one exited."""
+        for name, proc in list(self._procs.items()):
+            if proc.poll() is None:
+                continue
+            pd = defs_by_name[name]
+            if pd.critical:
+                print(f"[{name}] exited with code {proc.returncode}", file=sys.stderr)
+                self._stopping = True
+                break
+            if pd.restart_on_failure and proc.returncode != 0:
+                print(f"[{name}] exited with code {proc.returncode}; restarting", file=sys.stderr)
+                del self._procs[name]
+                (self.bench.pids_path / f"{name}.pid").unlink(missing_ok=True)
+                self._spawn(pd)
+                continue
+            print(f"[{name}] exited with code {proc.returncode}; continuing without it", file=sys.stderr)
+            del self._procs[name]
+            (self.bench.pids_path / f"{name}.pid").unlink(missing_ok=True)
+
     def _run_processes(self, defs: list[ProcessDefinition]) -> None:
         original_sigterm = signal.getsignal(signal.SIGTERM)
         original_sigint = signal.getsignal(signal.SIGINT)
@@ -296,18 +318,8 @@ class ProcessManager:
             self._spawn(pd)
 
         defs_by_name = {pd.name: pd for pd in defs}
-        is_critical = {pd.name: pd.critical for pd in defs}
         while not self._stopping:
-            for name, proc in list(self._procs.items()):
-                if proc.poll() is None:
-                    continue
-                if is_critical[name]:
-                    print(f"[{name}] exited with code {proc.returncode}", file=sys.stderr)
-                    self._stopping = True
-                    break
-                print(f"[{name}] exited with code {proc.returncode}; continuing without it", file=sys.stderr)
-                del self._procs[name]
-                (self.bench.pids_path / f"{name}.pid").unlink(missing_ok=True)
+            self._reap_exited(defs_by_name)
             if not self._stopping:
                 self._apply_reload_request(defs_by_name)
                 time.sleep(0.5)

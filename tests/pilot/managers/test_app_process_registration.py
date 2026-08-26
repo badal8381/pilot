@@ -35,6 +35,20 @@ def test_app_processes_appended(tmp_path: Path) -> None:
     assert "web" in names  # core processes still present
 
 
+def test_app_process_is_not_critical(tmp_path: Path) -> None:
+    """An app-declared process crashing must not take down the whole bench under
+    the dev runner - only the bench's own core processes are critical. Confirmed
+    live: without this, killing meet's sfu-server process stopped redis and every
+    other bench process along with it."""
+    bench = make_bench(tmp_path)
+    bench.create_directories()
+    _make_app(bench, "mail", _GOOD)
+
+    defs = {d.name: d for d in _builder(bench).prod_process_definitions()}
+    assert defs["mail-stalwart"].critical is False
+    assert defs["web"].critical is True  # unchanged for the bench's own processes
+
+
 def test_one_bad_app_fails_loudly(tmp_path: Path) -> None:
     """A skipped app would look "removed" to systemd/supervisor, which then stop
     its running services. Refusing to build the set leaves the bench alone."""
