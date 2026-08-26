@@ -612,8 +612,8 @@ onUnmounted(() => clearTimeout(statsTimer))
 </script>
 
 <template>
-  <div class="p-3 md:p-4 mx-auto">
-    <StickyToolbar class="flex items-center gap-2 pb-3">
+  <div class="px-4 pb-4">
+    <StickyToolbar class="flex items-center gap-2 py-4">
       <Select
         v-model="target"
         :options="targetOptions"
@@ -662,8 +662,8 @@ onUnmounted(() => clearTimeout(statsTimer))
     </template>
 
     <template v-else-if="pageLoading">
-      <Skeleton v-if="!isHistorical" class="mb-6 rounded-6 h-[88px]" />
-      <div class="gap-4 grid md:grid-cols-2 mb-6">
+      <Skeleton v-if="!isHistorical" class="mb-4 rounded-6 h-[88px]" />
+      <div class="gap-4 grid md:grid-cols-2 mb-4">
         <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
       </div>
     </template>
@@ -672,7 +672,7 @@ onUnmounted(() => clearTimeout(statsTimer))
       <!-- Live stats bar: CPU / Memory / Storage -->
       <div
         v-if="liveStats"
-        class="bg-surface-white mb-6 border rounded-6 border-outline-gray-2 overflow-hidden"
+        class="bg-surface-white mb-4 border rounded-6 border-outline-gray-2 overflow-hidden"
       >
         <div class="flex sm:flex-row flex-col divide-outline-gray-2 sm:divide-x">
           <div
@@ -707,7 +707,7 @@ onUnmounted(() => clearTimeout(statsTimer))
         />
       </template>
 
-      <div v-if="showCharts" class="gap-4 grid md:grid-cols-2 mb-6">
+      <div v-if="showCharts" class="gap-4 grid md:grid-cols-2 mb-4">
         <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
           <AxisChart
             :config="chart.config"
@@ -717,7 +717,7 @@ onUnmounted(() => clearTimeout(statsTimer))
       </div>
 
       <!-- Live mode collecting its first points, with the stat bar already up -->
-      <div v-else-if="!isHistorical" class="gap-4 grid md:grid-cols-2 mb-6">
+      <div v-else-if="!isHistorical" class="gap-4 grid md:grid-cols-2 mb-4">
         <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
       </div>
 
