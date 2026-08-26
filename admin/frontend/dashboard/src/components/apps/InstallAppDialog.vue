@@ -7,7 +7,12 @@ import SiteRow from '@/components/sites/SiteRow.vue'
 
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
-import { openSitePage, openTaskDetailPage } from '@/utils/taskRoute'
+import { openTaskDetailPage } from '@/utils/taskRoute'
+
+const openSitePage = (router, siteName, app = '') => {
+  const route = { name: 'SiteDetail', params: { name: siteName, tab: 'apps' } }
+  router.push(app ? { ...route, query: { app, action: 'install-app' } } : route)
+}
 
 interface Props {
   app?: Record<string, any> | null

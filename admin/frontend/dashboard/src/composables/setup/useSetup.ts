@@ -3,7 +3,15 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useSetupHandoff } from '@/composables/setup/useSetupHandoff'
 import { apiErrorMessage } from '@/api/client'
 import { setupApi } from '@/api/setup'
-import { generateRandomPassword } from '@/utils/randomPassword'
+
+// Excludes quote/shell-special characters and visually ambiguous ones (0/O, 1/l/I)
+// since this ends up in bench.toml, SQL statements, and shell commands.
+const charset = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+
+const generateRandomPassword = (length = 32) => {
+  const bytes = crypto.getRandomValues(new Uint8Array(length))
+  return Array.from(bytes, (byte) => charset[byte % charset.length]).join('')
+}
 
 // Static dropdown options
 const DB_TYPE_OPTIONS = [

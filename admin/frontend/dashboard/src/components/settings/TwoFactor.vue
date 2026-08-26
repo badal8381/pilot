@@ -43,9 +43,7 @@ const atDeviceLimit = computed(
   () => status.value.max_devices > 0 && status.value.credentials.length >= status.value.max_devices,
 )
 
-const fmtTimestamp = (seconds) => {
-  return seconds ? fmtDateTime(new Date(seconds * 1000).toISOString()) : 'Never'
-}
+const fmtTimestamp = (seconds) => (seconds ? fmtDateTime(seconds * 1000) : 'Never')
 
 // A device only counts once its code has been verified; half-finished ones are noise.
 const devices = computed(() => status.value.credentials.filter((row) => row.confirmed))

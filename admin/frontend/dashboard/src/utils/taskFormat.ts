@@ -1,4 +1,4 @@
-export const STATUS_CONFIG = {
+const STATUS_CONFIG = {
   queued: {
     label: 'Queued',
     theme: 'blue',
@@ -211,9 +211,9 @@ export const fmtDuration = (seconds, { precise = false } = {}) => {
   return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`
 }
 
-export const fmtDateTime = (iso) => {
-  if (!iso) return '-'
-  return new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+export const fmtDateTime = (value) => {
+  if (!value) return '-'
+  return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 /** A queued task has no duration, so its place in the queue takes that slot. */

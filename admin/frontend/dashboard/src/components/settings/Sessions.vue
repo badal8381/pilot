@@ -171,9 +171,7 @@ const auditEntryDetail = (entry) => {
   return detail ? `${head} — ${detail}` : head
 }
 
-const formatDate = (seconds) => {
-  return seconds ? fmtDateTime(new Date(seconds * 1000).toISOString()) : '-'
-}
+const formatDate = (seconds) => (seconds ? fmtDateTime(seconds * 1000) : '-')
 
 const menuOptions = (row) => {
   return [

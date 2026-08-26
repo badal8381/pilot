@@ -12,8 +12,18 @@ import PilotLogo from '@/components/icons/Pilot.vue'
 import { apiErrorMessage } from '@/api/client'
 import { authApi } from '@/api/auth'
 import { useSession } from '@/composables/auth/useSession'
-import { redirectAfterLogin } from '@/utils/redirect'
+import { safeRedirect } from '@/utils/redirect'
 import { useIsMobile } from '@/composables/common/useIsMobile'
+
+// Off-SPA targets (the code editor) have no route here and need a full load.
+const redirectAfterLogin = (router, value) => {
+  const target = safeRedirect(value)
+  if (router.resolve(target).matched.length) {
+    router.replace(target)
+  } else {
+    window.location.assign(target)
+  }
+}
 
 const route = useRoute()
 const router = useRouter()

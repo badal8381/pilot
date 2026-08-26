@@ -17,11 +17,20 @@ import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
 
 import { sitesApi } from '@/api/sites'
 import { tasksApi } from '@/api/tasks'
-import { cronToLabel } from '@/utils/backup'
+import { formatHour, WEEKDAYS } from '@/utils/backup'
 import { apiErrorMessage } from '@/api/client'
 import { fmtDateTime } from '@/utils/taskFormat'
 import { useSite } from '@/composables/sites/useSite'
 import { openTaskDetailPage } from '@/utils/taskRoute'
+
+const cronToLabel = (cron) => {
+  if (!cron) return ''
+  const [, hour, dom, , dow] = cron.split(' ')
+  const time = formatHour(parseInt(hour) || 0)
+  if (dom !== '*') return `Monthly on day ${dom}, ${time}`
+  if (dow !== '*') return `Weekly on ${WEEKDAYS[parseInt(dow)] || 'Sunday'}, ${time}`
+  return `Daily at ${time}`
+}
 
 interface Props {
   siteName: string

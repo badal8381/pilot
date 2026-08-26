@@ -49,7 +49,6 @@ const hourOptions = Array.from({ length: 24 }, (_, h) => {
   return { label, value: h }
 })
 
-const WEEKDAY_FULL = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const PRESET_CRONS = ['0 2 * * *', '0 2 * * 0']
 
 const disabled = ref(true)
@@ -65,17 +64,10 @@ const schedWeekday = ref(0)
 const schedMonthDay = ref(1)
 const schedHour = ref(2)
 
-const formatHour = (h) => {
-  if (h === 0) return '12:00 AM'
-  if (h < 12) return `${h}:00 AM`
-  if (h === 12) return '12:00 PM'
-  return `${h - 12}:00 PM`
-}
-
 const customScheduleLabel = computed(() => {
   const time = formatHour(schedHour.value)
   if (schedFrequency.value === 'weekly')
-    return `Weekly, ${WEEKDAY_FULL[schedWeekday.value]} ${time}`
+    return `Weekly, ${WEEKDAYS[schedWeekday.value]} ${time}`
   if (schedFrequency.value === 'monthly') return `Monthly, ${schedMonthDay.value} ${time}`
   return `Daily, ${time}`
 })
