@@ -72,6 +72,7 @@ FLAT_KEYS = {
     "admin_allow_bench_management": "admin.allow_bench_management",
     "letsencrypt_email": "letsencrypt.email",
     "production_process_manager": "production.process_manager",
+    "lite_mode_enabled": "lite_mode.enabled",
 }
 
 # Framework branches the setup wizard offers, newest/recommended first.
@@ -746,7 +747,6 @@ _SECTIONS: tuple[_Section, ...] = (
     _Section(
         "lite_mode",
         lambda data: LiteModeConfig.from_dict(data.get("lite_mode", {})),
-        # Off by default, so an ordinary bench.toml never carries the section.
         lambda config: config._lite_mode_section() if config.lite_mode.enabled else None,
     ),
     _Section(
