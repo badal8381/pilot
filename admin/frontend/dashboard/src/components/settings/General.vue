@@ -81,8 +81,6 @@ onMounted(async () => {
         interactive
         @click="!saving && toggleAllowDeveloperMode(!allowDeveloperMode)"
       >
-        <!-- The Switch handles its own clicks; without stop the row would toggle
-             a second time and land back where it started. -->
         <Switch
           :model-value="allowDeveloperMode"
           :disabled="saving"

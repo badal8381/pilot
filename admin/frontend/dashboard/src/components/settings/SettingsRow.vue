@@ -14,9 +14,6 @@ withDefaults(defineProps<Props>(), {
 </script>
 
 <template>
-  <!-- `as="button"` when the row itself is the control. A row whose slot already
-       holds one stays a div and forwards the click: a control nested in a button
-       is invalid markup, and the inner one stops receiving its own clicks. -->
   <component
     :is="as"
     :type="as === 'button' ? 'button' : undefined"
@@ -24,7 +21,6 @@ withDefaults(defineProps<Props>(), {
     :class="interactive ? 'w-full rounded-4 transition-colors cursor-pointer text-left hover:bg-surface-alpha-gray-1' : ''"
   >
     <div class="flex flex-col gap-1">
-      <!-- Matches frappe-ui's InputLabel (text-base) / InputDescription (text-p-sm). -->
       <p class="font-medium text-ink-gray-8">{{ label }}</p>
       <p v-if="description" class="text-ink-gray-6 text-p-sm">{{ description }}</p>
     </div>

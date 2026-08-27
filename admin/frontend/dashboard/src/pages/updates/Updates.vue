@@ -112,8 +112,6 @@ onMounted(load)
 
 <template>
   <div class="p-3 md:p-4 mx-auto max-w-3xl">
-    <!-- The tabs need a phone's full content width, so Refresh only joins them
-         once there is room to spare. -->
     <Teleport v-if="isMobile" defer to="#header-actions">
       <Button
         :loading="loading"
@@ -124,9 +122,7 @@ onMounted(load)
       />
     </Teleport>
 
-    <!-- A flex item sizes to the strip's natural width and overflows the screen;
-         a block child is held to the content width and fits. -->
-    <StickyToolbar class="mt-5" :class="isMobile ? '' : 'flex items-center gap-2'">
+    <StickyToolbar class="lg:mt-5" :class="isMobile ? '' : 'flex items-center gap-2'">
       <TabButtons
         :size="isMobile ? 'md' : 'sm'"
         :options="UPDATE_FILTERS"

@@ -20,8 +20,6 @@ const handlePasswordChanged = () => {
     <component :is="openSection.component" @passwordChanged="handlePasswordChanged" />
   </div>
 
-  <!-- -mx cancels the rows' own padding, so their text still lines up with the
-       section heading while a hovered row reads as inset. -->
   <div v-else class="-mx-2.5 divide-y divide-outline-alpha-gray-1 hover-merges-dividers">
     <SettingsRow
       v-for="section in sections"

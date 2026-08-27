@@ -131,8 +131,6 @@ onMounted(load)
         </div>
       </div>
 
-      <!-- mouseleave sits on the strip, not the bars: per-bar leave events fire
-           while crossing the gap between two bars and flicker the readout. -->
       <div class="flex items-end gap-[3px] h-16" @mouseleave="hovered = null">
         <div
           v-for="(bucket, i) in data.buckets"

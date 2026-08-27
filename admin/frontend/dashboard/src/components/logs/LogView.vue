@@ -62,8 +62,6 @@ defineExpose({ scrollToBottom })
 </script>
 
 <template>
-  <!-- text-p-sm: a log body is stacked copy; text-sm's 1.15 line-height packs
-       it solid. gray-2: the solid ramp steps much harder in dark mode. -->
   <div
     ref="el"
     class="bg-surface-gray-2 overflow-auto font-mono text-ink-gray-8 text-p-sm"

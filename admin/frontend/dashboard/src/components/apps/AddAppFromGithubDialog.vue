@@ -200,7 +200,6 @@ const submit = async () => {
 <template>
   <Dialog v-model="open" title="Import app from GitHub" size="md">
     <div class="space-y-4">
-      <!-- The pill span has no data-slot; without w-full the highlight stays content-width. -->
       <TabButtons
         v-model="tab"
         :options="tabOptions"
@@ -276,7 +275,6 @@ const submit = async () => {
           </template>
         </template>
 
-        <!-- Progress, success and error share one hint slot under the input. -->
         <ErrorMessage v-if="error" :message="error" class="mt-1.5" />
         <p v-else-if="fetching" class="mt-1.5 text-ink-gray-5 text-sm">Loading branches…</p>
         <p v-else-if="resolving" class="mt-1.5 text-ink-gray-5 text-sm">Checking repository…</p>

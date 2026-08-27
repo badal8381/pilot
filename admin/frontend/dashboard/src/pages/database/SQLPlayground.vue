@@ -252,7 +252,6 @@ onMounted(async () => {
       </p>
     </div>
 
-    <!-- Wrapped: FormControl's own w-full beats a width utility passed to it. -->
     <div class="w-56">
       <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
     </div>

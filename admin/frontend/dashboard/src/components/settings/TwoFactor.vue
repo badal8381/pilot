@@ -265,8 +265,6 @@ onMounted(load)
     </ListView>
 
     <div v-if="status.enabled" class="pt-2 border-t border-outline-gray-1">
-      <!-- -mx on the row alone: on the rule above it the border would overhang
-           the list it divides. -->
       <div class="-mx-2.5">
         <SettingsRow
           label="Recovery codes"

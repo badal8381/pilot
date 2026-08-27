@@ -270,7 +270,6 @@ onUnmounted(() => stopLive())
         class="md:flex flex-col flex-1 min-w-0 overflow-hidden"
         :class="selectedFile ? 'flex' : 'hidden'"
       >
-        <!-- Already inside a bordered panel, so no dashed box of its own. -->
         <div v-if="!selectedFile" class="flex flex-1 justify-center items-center">
           <EmptyState
             :bordered="false"
@@ -417,7 +416,6 @@ onUnmounted(() => stopLive())
   </div>
 </template>
 
-<!-- Unscoped: the <mark>s are injected via v-html and never get the scope attribute. -->
 <style>
 .log-match {
   background: var(--surface-amber-3);

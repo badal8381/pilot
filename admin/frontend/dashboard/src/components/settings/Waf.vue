@@ -198,7 +198,6 @@ onMounted(async () => {
         </div>
 
         <div class="space-y-1.5">
-          <!-- Label markup matches frappe-ui's InputLabel. -->
           <span class="block text-ink-gray-5">Sensitivity</span>
           <TabButtons :options="SENSITIVITY_OPTIONS" v-model="paranoia" />
           <p class="text-ink-gray-5 text-p-sm">{{ sensitivityHint }}</p>
@@ -216,8 +215,6 @@ onMounted(async () => {
     />
 
     <details class="group">
-      <!-- Chrome marks a clicked summary :focus-visible; blur keeps the focus
-           ring for keyboard only. w-fit so the ring hugs the word. -->
       <summary
         class="flex items-center gap-1.5 pr-1.5 rounded-1 w-fit text-ink-gray-6 cursor-pointer select-none"
         @click="(e) => e.currentTarget.blur()"

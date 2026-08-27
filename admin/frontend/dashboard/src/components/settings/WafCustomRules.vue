@@ -190,7 +190,6 @@ const confirmRemove = () => {
         ]"
         @dragover.prevent="onDragOver(rule)"
       >
-        <!-- The whole row toggles; interactive children stop the click. -->
         <div
           class="flex items-center gap-3 px-2.5 h-10 rounded-4 transition-colors cursor-pointer select-none hover:bg-surface-alpha-gray-1"
           @click="toggleOpen(rule)"
@@ -224,14 +223,11 @@ const confirmRemove = () => {
               {{ ruleSummary(rule) }}
             </span>
 
-            <!-- What the rule does outranks what it matches on: never truncate it. -->
             <span class="shrink-0 text-ink-gray-6 text-p-sm">→ {{ actionLabel(rule) }}</span>
           </button>
 
           <!-- The nginx renderer silently drops broken rules. -->
           <Badge v-if="ruleProblem(rule)" class="shrink-0" theme="amber">Incomplete</Badge>
-          <!-- A bare Switch has no accessible name (attrs land on the wrapper);
-               `label` gives the <label for> association, sr-only hides it. -->
           <Switch
             class="shrink-0 [&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
             label="Rule enabled"
@@ -241,8 +237,6 @@ const confirmRemove = () => {
           />
         </div>
 
-        <!-- Indent on the left only: the fields keep the header's right edge.
-             pl clears the drag handle so the fields line up under the rule name. -->
         <div v-if="isOpen(rule)" class="space-y-4 pt-1 pr-2.5 pb-5 pl-[2.375rem]">
         <FormControl
           label="Rule name"
@@ -251,11 +245,7 @@ const confirmRemove = () => {
         />
 
         <div class="space-y-3">
-          <!-- All/Any only once there is something to combine. gap-1 is about a
-               space at this size, so the row reads as a sentence. -->
           <div class="flex flex-wrap items-center gap-1 text-ink-gray-7">
-            <!-- One phrase when there is no Select between the words, or the flex
-                 gap reads as a double space. -->
             <template v-if="rule.conditions.length > 1">
               <span>When</span>
               <Select v-model="rule.match" :options="MATCH_OPTIONS" />
@@ -265,8 +255,6 @@ const confirmRemove = () => {
             <span v-else>When this matches:</span>
           </div>
 
-          <!-- Anchored here, not to the group, so it clears the label whatever
-               that row's height is - it grows when the All/Any select appears. -->
           <div class="relative space-y-3">
             <span
               aria-hidden="true"
@@ -279,7 +267,6 @@ const confirmRemove = () => {
                 :key="keyOf(cond)"
                 class="gap-2 grid grid-cols-1 sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
               >
-                <!-- Stacked inside the field column to keep rows aligned. -->
                 <div class="space-y-1.5 min-w-0">
                   <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
                   <TextInput
@@ -308,7 +295,6 @@ const confirmRemove = () => {
               </div>
             </div>
 
-            <!-- Indented with the conditions so it reads as one more row of them. -->
             <div class="pl-5">
               <Button variant="ghost" icon-left="lucide-plus" @click="addCondition(rule)">
                 Add condition
@@ -318,8 +304,6 @@ const confirmRemove = () => {
         </div>
 
         <div class="relative space-y-1.5 pl-5">
-          <!-- -top-4 spans the group gap above so the line is unbroken; the
-               extra 0.875rem drops the curve to the middle of this row. -->
           <span
             aria-hidden="true"
             class="absolute left-1 -top-4 h-[1.875rem] w-2.5 border-l border-b rounded-bl-6 border-outline-gray-3"

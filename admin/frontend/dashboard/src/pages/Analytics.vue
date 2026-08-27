@@ -660,9 +660,9 @@ onUnmounted(() => clearTimeout(statsTimer))
     </template>
 
     <template v-else>
-      <!-- Live stats bar: CPU / Memory / Storage -->
       <Skeleton v-if="!isHistorical && !liveStats" class="mb-4 rounded-6 h-[88px]" />
 
+      <!-- Live stats bar: CPU / Memory / Storage -->
       <div
         v-else-if="liveStats"
         class="bg-surface-white mb-4 border rounded-6 border-outline-gray-2 overflow-hidden"

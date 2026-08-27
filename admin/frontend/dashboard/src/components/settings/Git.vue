@@ -131,7 +131,6 @@ onMounted(load)
       />
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <!-- The token is the one required field; Enter still hits the guard. -->
         <Button variant="solid" :loading="connecting" :disabled="!token.trim()" @click="verifyAndConnect">
           {{ connected ? 'Update Token' : 'Verify & Connect' }}
         </Button>

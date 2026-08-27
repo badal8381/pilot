@@ -93,8 +93,6 @@ const runUpdate = async () => {
             </Button>
           </div>
 
-          <!-- The row is the checkbox; the inner Checkbox is inert decoration
-               (tabindex/aria-hidden reach its <input> via attr passthrough). -->
           <div class="flex flex-col gap-3 max-h-80 overflow-y-auto">
             <button
               v-for="name in appNames"

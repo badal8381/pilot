@@ -25,7 +25,6 @@ const descriptionWidth = computed(
     <Skeleton class="rounded-[6px] size-8 shrink-0" />
 
     <div class="flex-1 py-2 min-w-0">
-      <!-- Wrappers carry the real card's line-box heights so the swap shifts nothing. -->
       <div class="flex items-center h-4">
         <Skeleton class="rounded-4 h-3" :class="titleWidth" />
       </div>

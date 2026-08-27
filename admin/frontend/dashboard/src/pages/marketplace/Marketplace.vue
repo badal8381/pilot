@@ -119,7 +119,6 @@ onMounted(load)
   />
 
   <div class="px-3 sm:px-4 mx-auto box-content max-w-3xl pb-40">
-    <!-- Mirrors one section of the real grid so apps land in place. -->
     <section v-if="loading" class="mt-12">
       <div class="flex items-center h-4">
         <Skeleton class="rounded-4 w-32 h-3.5" />

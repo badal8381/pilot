@@ -160,8 +160,6 @@ const submit = async () => {
         <div v-else class="space-y-1.5">
           <span class="text-ink-gray-7 text-p-sm-medium">Site name</span>
           <div class="flex items-stretch gap-2">
-            <!-- A lone domain is fixed, so it rides inside the field. pe-28
-                 keeps typing clear of the max-w-24 suffix. -->
             <FormControl
               v-model="sitePrefix"
               class="flex-1 min-w-0"
@@ -202,8 +200,6 @@ const submit = async () => {
           <span class="text-ink-gray-5 text-xs"> {{ selectedApps.length }} selected </span>
         </div>
 
-        <!-- Cancels the dialog gutter and re-applies it as padding, so the
-             scrollbar rides the modal edge rather than the checkboxes. -->
         <div
           ref="appList"
           :data-fade="fadeEdges"

@@ -199,7 +199,6 @@ onMounted(async () => {
             />
           </div>
 
-          <!-- Under the row it belongs to, not pooled at the bottom of the page. -->
           <p v-if="ipError(rule)" class="mt-1.5 text-ink-red-5 text-p-sm">{{ ipError(rule) }}</p>
         </div>
       </div>

@@ -201,7 +201,6 @@ onUnmounted(() => clearTimeout(timer))
 
 <template>
   <div class="p-3 md:p-4 mx-auto max-w-3xl">
-    <!-- Skeleton mirrors the page: meta row, then a card of rows. -->
     <div v-if="loading && !op" class="px-2">
       <div class="flex justify-between items-center py-2">
         <Skeleton class="rounded-4 w-44 h-4" />
@@ -257,7 +256,6 @@ onUnmounted(() => clearTimeout(timer))
             </h2>
           </div>
 
-          <!-- Tool output indents and box-draws; keep it preformatted. -->
           <pre
             v-if="op.diagnosis?.message"
             class="mt-2 max-h-96 overflow-auto whitespace-pre-wrap break-words font-mono text-xs leading-5 text-ink-gray-8"
@@ -429,7 +427,6 @@ onUnmounted(() => clearTimeout(timer))
                 :class="siteJobs(site.name).length ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
                 @click="toggleSiteJobs(site.name)"
               >
-                <!-- Hidden, not omitted: keeps job-less rows aligned. -->
                 <span
                   class="size-4 text-ink-gray-5 transition-transform shrink-0 lucide-chevron-right"
                   :class="[

@@ -78,14 +78,12 @@ const iconBg = computed(() => STATUS_ICON_BG[props.status] || STATUS_ICON_BG.pen
         <span v-else-if="status === 'running'" class="animate-pulse">running</span>
       </span>
 
-      <!-- Hidden, not omitted: keeps the chevron's space so durations stay aligned. -->
       <span
         class="size-4 text-ink-gray-4 transition-transform shrink-0 lucide-chevron-down"
         :class="[hasOutput ? '' : 'invisible', expanded ? 'rotate-180' : '']"
       />
     </div>
 
-    <!-- The step list insets this by p-1, so its rounding never reaches here. -->
     <LogView v-if="expanded && hasOutput" class="mt-1" :lines="lines" :streaming="streaming" />
   </div>
 </template>

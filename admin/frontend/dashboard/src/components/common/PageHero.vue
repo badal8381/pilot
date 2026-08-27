@@ -12,8 +12,6 @@ withDefaults(defineProps<Props>(), {
   <div
     class="relative px-3 sm:px-4 pt-3 sm:pt-4 pb-2 overflow-hidden"
   >
-    <!-- Bleeds past the shell gutters so the dots reach the page edges, then
-         re-constrains the card to the body column. -->
     <div class="absolute inset-0 pointer-events-none dot-field" aria-hidden="true" />
     <div
       class="relative flex justify-between items-center gap-3 mx-auto mt-2 bg-surface-base p-2 sm:p-4 border rounded-7 w-full max-w-3xl border-outline-gray-2"

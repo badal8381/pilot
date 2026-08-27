@@ -23,7 +23,6 @@ const subtitleWidth = computed(() => SUBTITLE_WIDTHS[props.index % SUBTITLE_WIDT
     <Skeleton class="rounded-4 size-6 shrink-0" />
 
     <div class="flex-1 min-w-0">
-      <!-- Wrappers carry the real row's line-box heights so the swap shifts nothing. -->
       <div class="flex items-center h-4">
         <Skeleton class="rounded-4 h-3" :class="titleWidth" />
       </div>

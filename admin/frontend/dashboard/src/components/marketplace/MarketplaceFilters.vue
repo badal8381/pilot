@@ -61,7 +61,6 @@ const worksWithLabel = computed(() => {
         </template>
       </FormControl>
 
-      <!-- Width-bound row: flex-1 must resolve against the row, not content. -->
       <div class="flex gap-2 w-full sm:w-auto">
         <div class="flex-1 sm:flex-none min-w-0">
           <Dropdown :options="worksWithMenu">
@@ -89,7 +88,6 @@ const worksWithLabel = computed(() => {
       </div>
     </div>
 
-    <!-- Scrolls rather than clips: TabButtons' rail is overflow-hidden and does not wrap. -->
       <TabButtons
         v-model="pillModel"
         :options="pillOptions"

@@ -118,11 +118,7 @@ const goBack = () => {
 <template>
   <Dialog v-model="open" bare size="5xl">
     <template #default="{ close }">
-      <!-- 6rem = the Dialog's own chrome (overlay py-4 + content my-8); a
-           literal 100vh overflows and sets the overlay scrolling. -->
       <div class="relative flex sm:h-[calc(100vh-6rem)] max-h-[calc(100vh-6rem)]">
-        <!-- Sizing and tokens from frappe-ui's own SettingsSidebar.
-             surface-sidebar is theme-aware: light gray in light, transparent in dark. -->
         <div
           class="flex-col bg-surface-sidebar p-2 sm:border-r border-outline-gray-1 w-full sm:w-[220px] shrink-0"
           :class="activeSection ? 'hidden sm:flex' : 'flex'"
@@ -164,7 +160,6 @@ const goBack = () => {
           </div>
         </div>
 
-        <!-- frappe-ui's SettingsHeader/SettingsBody padding; off below sm. -->
         <div
           class="flex-col flex-1 px-6 sm:px-[4.4rem] pt-6 sm:pt-10 pb-10 sm:pb-16 overflow-y-auto"
           :class="activeSection ? 'flex' : 'hidden sm:flex'"

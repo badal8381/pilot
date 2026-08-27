@@ -122,7 +122,6 @@ onMounted(() => {
       />
     </Teleport>
 
-    <!-- In place on mobile; the header row has no room for these there. -->
     <Teleport defer to="#header-actions" :disabled="isMobile">
       <div class="flex items-center gap-2" :class="isMobile ? 'mb-4' : ''">
         <Button
