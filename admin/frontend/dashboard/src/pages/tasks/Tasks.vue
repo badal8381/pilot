@@ -126,53 +126,50 @@ onMounted(() => load(statusFilter.value))
 
 <template>
   <div class="p-3 md:p-4 mx-auto max-w-3xl">
-    <StickyToolbar class="flex sm:flex-row flex-col sm:items-center gap-2 py-2 md:py-3">
+    <StickyToolbar class="flex flex-wrap gap-2 py-2 md:py-3">
       <TabButtons
-        class="shrink-0"
+        class="w-full sm:w-auto"
         :size="isMobile ? 'md' : 'sm'"
         :options="filterOptions"
         :modelValue="statusFilter"
         @update:modelValue="onFilterChange"
       />
-      <div class="flex flex-1 items-center gap-2 min-w-0">
-        <Dropdown :options="typeMenu">
-          <template #default="{ open }">
-            <Button
-              :size="isMobile ? 'md' : 'sm'"
-              :active="open"
-              class="[&>.truncate]:text-left text-base"
-            >
-              <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-              {{ typeLabel }}
-            </Button>
-          </template>
-        </Dropdown>
 
-        <div class="flex-1 sm:flex-none min-w-0">
-          <Dropdown :options="siteMenu">
-            <template #default="{ open }">
-              <Button
-                :size="isMobile ? 'md' : 'sm'"
-                :active="open"
-                class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base w-full sm:w-auto min-w-0"
-              >
-                <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-                {{ siteLabelText }}
-              </Button>
-            </template>
-          </Dropdown>
-        </div>
+      <Dropdown :options="typeMenu">
+        <template #default="{ open }">
+          <Button
+            :size="isMobile ? 'md' : 'sm'"
+            :active="open"
+            class="[&>.truncate]:text-left text-base"
+          >
+            <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
+            {{ typeLabel }}
+          </Button>
+        </template>
+      </Dropdown>
 
-        <Button
-          class="ml-auto sm:ml-auto"
-          :size="isMobile ? 'md' : 'sm'"
-          icon="lucide-refresh-cw"
-          label="Refresh"
-          tooltip="Refresh"
-          :loading="loading"
-          @click="load(statusFilter)"
-        />
-      </div>
+      <Dropdown :options="siteMenu">
+        <template #default="{ open }">
+          <Button
+            :size="isMobile ? 'md' : 'sm'"
+            :active="open"
+            class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base flex-1 sm:flex-none min-w-0"
+          >
+            <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
+            {{ siteLabelText }}
+          </Button>
+        </template>
+      </Dropdown>
+
+      <Button
+        class="ml-auto"
+        :size="isMobile ? 'md' : 'sm'"
+        icon="lucide-refresh-cw"
+        label="Refresh"
+        tooltip="Refresh"
+        :loading="loading"
+        @click="load(statusFilter)"
+      />
     </StickyToolbar>
 
     <div v-if="loading" class="-mx-3 mt-4">
