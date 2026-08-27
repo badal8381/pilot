@@ -120,8 +120,8 @@ onMounted(() => load(statusFilter.value))
 </script>
 
 <template>
-  <div class="p-3 md:p-4 mx-auto max-w-3xl">
-    <StickyToolbar class="flex flex-wrap gap-2 lg:py-2">
+  <div class="px-3 md:px-4 mx-auto max-w3xl">
+    <StickyToolbar class="flex flex-wrap gap-2 py-4">
       <TabButtons
         class="w-full sm:w-auto"
         :size="isMobile ? 'md' : 'sm'"
@@ -168,7 +168,7 @@ onMounted(() => load(statusFilter.value))
       <ErrorMessage :message="error" />
     </div>
 
-    <Table v-else-if="rows.length" :columns="columns" :rows="rows" height="h-auto" class="mt-4">
+    <Table v-else-if="rows.length" :columns="columns" :rows="rows">
       <template #title="{ row }">
         <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0">{{ row.title }}</router-link>
       </template>
