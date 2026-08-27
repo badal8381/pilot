@@ -1,8 +1,6 @@
 """Apply a retention policy to one site's backups, local and offsite."""
 
 import re
-import shlex
-import sys
 from dataclasses import asdict
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -155,11 +153,13 @@ class SiteBackups:
         return OffsiteBackup.from_config(self.site.bench.config.s3, self.site.bench.path)
 
     def _cron_command(self) -> str:
-        log_file = self.site.bench.logs_path / f"backup-{self.site.config.name}.log"
-        python, bench, site, log = (
-            shlex.quote(str(p)) for p in (sys.executable, self.site.bench.path, self.site.config.name, log_file)
+        from pilot.managers.cron import cron_module_command
+
+        return cron_module_command(
+            "pilot.tasks.backup_site",
+            [self.site.bench.path, self.site.config.name, "--with-files"],
+            self.site.bench.logs_path / f"backup-{self.site.config.name}.log",
         )
-        return f"{python} -m pilot.tasks.backup_site {bench} {site} --with-files >> {log} 2>&1"
 
 
 def retention_from_payload(block: dict | None):
