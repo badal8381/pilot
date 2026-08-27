@@ -83,7 +83,6 @@ export const TASK_TYPES = [
       'get-app',
       'remove-app',
       'get-and-install-app',
-      'fetch-all-app-updates',
       'switch-branch',
       'revert-apps',
     ],
