@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { LoadingText, ErrorMessage, AxisChart, Select, Skeleton } from 'frappe-ui'
+import { ErrorMessage, AxisChart, Select, Skeleton } from 'frappe-ui'
 
 import ChartCard from '@/components/common/ChartCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -356,8 +356,6 @@ const allEmpty = computed(
     systemEmpty.value &&
     appEmpty.value,
 )
-// Live mode only waits on the stat bar's own data; the charts wait on showCharts.
-const pageLoading = computed(() => (isHistorical.value ? historyLoading.value : !stats.value))
 const showCharts = computed(() =>
   isHistorical.value
     ? !historyLoading.value && !historyError.value && !systemEmpty.value
@@ -613,7 +611,7 @@ onUnmounted(() => clearTimeout(statsTimer))
 
 <template>
   <div class="px-4 pb-4">
-    <StickyToolbar class="flex items-center gap-2 py-2 md:py-3">
+    <StickyToolbar class="flex items-center gap-2 py-4">
       <Select
         v-model="target"
         :options="targetOptions"
@@ -641,7 +639,10 @@ onUnmounted(() => clearTimeout(statsTimer))
         align="start"
       >
         <template #prefix>
-          <span v-if="!isHistorical" class="bg-surface-green-8 rounded-full size-1.5 animate-pulse" />
+          <span
+            v-if="!isHistorical"
+            class="bg-surface-green-8 rounded-full size-1.5 animate-pulse"
+          />
         </template>
       </Select>
     </StickyToolbar>
@@ -658,17 +659,12 @@ onUnmounted(() => clearTimeout(statsTimer))
       />
     </template>
 
-    <template v-else-if="pageLoading">
-      <Skeleton v-if="!isHistorical" class="mb-4 rounded-6 h-[88px]" />
-      <div class="gap-4 grid md:grid-cols-2 mb-4">
-        <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
-      </div>
-    </template>
-
     <template v-else>
       <!-- Live stats bar: CPU / Memory / Storage -->
+      <Skeleton v-if="!isHistorical && !liveStats" class="mb-4 rounded-6 h-[88px]" />
+
       <div
-        v-if="liveStats"
+        v-else-if="liveStats"
         class="bg-surface-white mb-4 border rounded-6 border-outline-gray-2 overflow-hidden"
       >
         <div class="flex sm:flex-row flex-col divide-outline-gray-2 sm:divide-x">
@@ -693,9 +689,8 @@ onUnmounted(() => clearTimeout(statsTimer))
       </div>
 
       <!-- Historical empty states -->
-      <template v-if="isHistorical">
-        <LoadingText v-if="historyLoading" />
-        <ErrorMessage v-else-if="historyError" :message="historyError" />
+      <template v-if="isHistorical && !historyLoading">
+        <ErrorMessage v-if="historyError" :message="historyError" />
         <EmptyState
           v-else-if="allEmpty"
           icon="lucide-chart-line"
@@ -704,18 +699,19 @@ onUnmounted(() => clearTimeout(statsTimer))
         />
       </template>
 
-      <div v-if="showCharts" class="gap-4 grid md:grid-cols-2 mb-4">
-        <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
-          <AxisChart
-            :config="chart.config"
-            class="min-h-[300px]"
-          />
-        </ChartCard>
-      </div>
+      <div class="gap-4 grid md:grid-cols-2">
+        <template v-if="showCharts">
+          <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
+            <AxisChart
+              :config="chart.config"
+              class="min-h-[300px]"
+            />
+          </ChartCard>
+        </template>
 
-      <!-- Live mode collecting its first points, with the stat bar already up -->
-      <div v-else-if="!isHistorical" class="gap-4 grid md:grid-cols-2 mb-4">
-        <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
+        <template v-else-if="!isHistorical || historyLoading">
+          <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
+        </template>
       </div>
 
       <!-- WAF analytics (only renders when the WAF has logged activity) -->
