@@ -120,7 +120,7 @@ onMounted(() => load(statusFilter.value))
 </script>
 
 <template>
-  <div class="px-3 md:px-4 mx-auto max-w3xl">
+  <div class="px-3 md:px-4">
     <StickyToolbar class="flex flex-wrap gap-2 py-4">
       <TabButtons
         class="w-full sm:w-auto"
@@ -160,17 +160,19 @@ onMounted(() => load(statusFilter.value))
       />
     </StickyToolbar>
 
-    <div v-if="loading" class="-mx-3 mt-4">
+    <template v-if="loading">
       <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
-    </div>
+    </template>
 
-    <div v-else-if="error" class="mt-4">
+    <template v-else-if="error">
       <ErrorMessage :message="error" />
-    </div>
+    </template>
 
     <Table v-else-if="rows.length" :columns="columns" :rows="rows">
       <template #title="{ row }">
-        <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0">{{ row.title }}</router-link>
+        <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0"
+          >{{ row.title }}</router-link
+        >
       </template>
 
       <template #badge="{ row }">
@@ -180,7 +182,6 @@ onMounted(() => load(statusFilter.value))
 
     <EmptyState
       v-else
-      class="mt-4"
       icon="lucide-list-checks"
       :title="isFiltered ? 'No matching tasks' : 'No tasks yet'"
       :description="

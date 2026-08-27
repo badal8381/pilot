@@ -111,7 +111,7 @@ onMounted(load)
 </script>
 
 <template>
-  <div class="p-3 md:p-4 mx-auto max-w-3xl">
+  <div class="px-3 md:px-4">
     <Teleport v-if="isMobile" defer to="#header-actions">
       <Button
         :loading="loading"
@@ -122,7 +122,7 @@ onMounted(load)
       />
     </Teleport>
 
-    <StickyToolbar class="lg:mt-5" :class="isMobile ? '' : 'flex items-center gap-2'">
+    <StickyToolbar class="py-4" :class="isMobile ? '' : 'flex items-center gap-2'">
       <TabButtons
         :size="isMobile ? 'md' : 'sm'"
         :options="UPDATE_FILTERS"
@@ -140,17 +140,19 @@ onMounted(load)
       />
     </StickyToolbar>
 
-    <div v-if="loading && !operations.length" class="-mx-3 mt-4">
+    <template v-if="loading && !operations.length">
       <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
-    </div>
+    </template>
 
-    <div v-else-if="error" class="mt-4">
+    <template v-else-if="error">
       <ErrorMessage :message="error" />
-    </div>
+    </template>
 
-    <Table v-else-if="rows.length" :columns="columns" :rows="rows" height="h-auto" class="mt-4">
+    <Table v-else-if="rows.length" :columns="columns" :rows="rows">
       <template #title="{ row }">
-        <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0">{{ row.title }}</router-link>
+        <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0">
+          {{ row.title }}
+        </router-link>
       </template>
 
       <template #site="{ row }">
@@ -164,7 +166,6 @@ onMounted(load)
 
     <EmptyState
       v-else
-      class="mt-8"
       icon="lucide-git-pull-request-arrow"
       :title="isFiltered ? 'No matching updates' : 'No updates yet'"
       :description="
