@@ -135,6 +135,7 @@ class ProcessDefinitionBuilder:
         ]
         if dev:
             argv.append("--dev")
+            argv.append("--verbose")
         return ProcessDefinition(
             name="web",
             argv=argv,
