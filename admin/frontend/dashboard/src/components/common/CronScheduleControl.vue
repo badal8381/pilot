@@ -2,6 +2,9 @@
 import { computed, onMounted, ref } from 'vue'
 import { Button, Dialog, Dropdown, ErrorMessage, Select } from 'frappe-ui'
 
+import { formatTime, WEEKDAYS } from '@/utils/backup'
+import { cronToPicks, picksToCron } from '@/utils/cron'
+
 interface Props {
   title?: string
   // Lowercase plural noun used in button/dialog copy, e.g. "backups", "snapshots".
@@ -31,31 +34,35 @@ const FREQ_OPTIONS = [
   { label: 'Monthly', value: 'monthly' },
 ]
 
-const WEEKDAY_OPTIONS = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-].map((label, value) => ({ label, value }))
+const WEEKDAY_OPTIONS = WEEKDAYS.map((label, value) => ({ label, value }))
 
 const monthDayOptions = Array.from({ length: 31 }, (_, i) => ({ label: `${i + 1}`, value: i + 1 }))
 
-const hourOptions = Array.from({ length: 24 }, (_, h) => {
-  const label =
-    h === 0 ? '12:00 AM' : h < 12 ? `${h}:00 AM` : h === 12 ? '12:00 PM' : `${h - 12}:00 PM`
-  return { label, value: h }
-})
+const hourOptions = Array.from({ length: 24 }, (_, h) => ({ label: formatTime(h), value: h }))
 
-const PRESET_CRONS = ['0 2 * * *', '0 2 * * 0']
+
+// Local-time presets; the server stores their UTC equivalents.
+const PRESETS = [
+  { label: 'Daily, 2:00 AM', picks: { frequency: 'daily', weekday: 0, monthDay: 1, hour: 2, minute: 0 } },
+  { label: 'Weekly, Sunday 2:00 AM', picks: { frequency: 'weekly', weekday: 0, monthDay: 1, hour: 2, minute: 0 } },
+]
+
+const presetCron = (index) => picksToCron(PRESETS[index].picks)
+
+const matchingPreset = (picks) =>
+  PRESETS.findIndex(
+    (preset) =>
+      preset.picks.frequency === picks.frequency &&
+      preset.picks.hour === picks.hour &&
+      preset.picks.minute === picks.minute &&
+      (picks.frequency !== 'weekly' || preset.picks.weekday === picks.weekday),
+  )
 
 const disabled = ref(true)
 const loading = ref(false)
 const error = ref('')
 
-const schedulePreset = ref(PRESET_CRONS[0])
+const schedulePreset = ref(0)
 const showCustomDialog = ref(false)
 const showDisableConfirm = ref(false)
 const scheduleSaving = ref(false)
@@ -63,21 +70,29 @@ const schedFrequency = ref('daily')
 const schedWeekday = ref(0)
 const schedMonthDay = ref(1)
 const schedHour = ref(2)
+const schedMinute = ref(0)
+
+const schedHourPick = computed({
+  get: () => schedHour.value,
+  set: (value) => {
+    schedHour.value = value
+    schedMinute.value = 0
+  },
+})
 
 const customScheduleLabel = computed(() => {
-  const time = formatHour(schedHour.value)
+  const time = formatTime(schedHour.value, schedMinute.value)
   if (schedFrequency.value === 'weekly')
     return `Weekly, ${WEEKDAYS[schedWeekday.value]} ${time}`
   if (schedFrequency.value === 'monthly') return `Monthly, ${schedMonthDay.value} ${time}`
   return `Daily, ${time}`
 })
 
-const currentScheduleLabel = computed(() => {
-  if (schedulePreset.value === 'custom') return customScheduleLabel.value
-  if (schedulePreset.value === '0 2 * * *') return 'Daily, 2:00 AM'
-  if (schedulePreset.value === '0 2 * * 0') return 'Weekly, Sunday 2:00 AM'
-  return 'Custom'
-})
+const currentScheduleLabel = computed(() =>
+  schedulePreset.value === 'custom'
+    ? customScheduleLabel.value
+    : PRESETS[schedulePreset.value]?.label || 'Custom',
+)
 
 const scheduleOptions = computed(() => {
   const customEntry = {
@@ -86,10 +101,10 @@ const scheduleOptions = computed(() => {
       showCustomDialog.value = true
     },
   }
-  const presets = [
-    { label: 'Daily, 2:00 AM', onClick: () => setPreset('0 2 * * *') },
-    { label: 'Weekly, Sunday 2:00 AM', onClick: () => setPreset('0 2 * * 0') },
-  ]
+  const presets = PRESETS.map((preset, index) => ({
+    label: preset.label,
+    onClick: () => setPreset(index),
+  }))
   const disableEntry = {
     label: `Disable ${props.noun}`,
     theme: 'red',
@@ -102,23 +117,25 @@ const scheduleOptions = computed(() => {
     : [...presets, customEntry, disableEntry]
 })
 
-const schedCron = computed(() => {
-  const h = schedHour.value
-  if (schedFrequency.value === 'weekly') return `0 ${h} * * ${schedWeekday.value}`
-  if (schedFrequency.value === 'monthly') return `0 ${h} ${schedMonthDay.value} * *`
-  return `0 ${h} * * *`
-})
+// The pickers hold local time; the server stores the schedule in UTC.
+const schedCron = computed(() =>
+  picksToCron({
+    frequency: schedFrequency.value,
+    weekday: schedWeekday.value,
+    monthDay: schedMonthDay.value,
+    hour: schedHour.value,
+    minute: schedMinute.value,
+  }),
+)
 
 const parseCronToState = (cron) => {
-  const [, h, dom, , dow] = cron.split(' ')
-  schedHour.value = isNaN(parseInt(h)) ? 0 : parseInt(h)
-  if (dom !== '*') {
-    schedFrequency.value = 'monthly'
-    schedMonthDay.value = parseInt(dom) || 1
-  } else if (dow !== '*') {
-    schedFrequency.value = 'weekly'
-    schedWeekday.value = parseInt(dow) || 0
-  } else schedFrequency.value = 'daily'
+  const picks = cronToPicks(cron)
+  schedFrequency.value = picks.frequency
+  schedWeekday.value = picks.weekday
+  schedMonthDay.value = picks.monthDay
+  schedHour.value = picks.hour
+  schedMinute.value = picks.minute
+  return picks
 }
 
 const load = async () => {
@@ -129,18 +146,18 @@ const load = async () => {
       return
     }
     disabled.value = false
-    parseCronToState(data.schedule)
-    schedulePreset.value = PRESET_CRONS.includes(data.schedule) ? data.schedule : 'custom'
+    const matched = matchingPreset(parseCronToState(data.schedule))
+    schedulePreset.value = matched === -1 ? 'custom' : matched
   } catch (e) {
     error.value = e.message || 'Failed to load schedule.'
   }
 }
 
-const setPreset = async (cron) => {
+const setPreset = async (index) => {
   error.value = ''
   try {
-    await props.setSchedule(cron)
-    schedulePreset.value = cron
+    await props.setSchedule(presetCron(index))
+    schedulePreset.value = index
     disabled.value = false
   } catch (e) {
     error.value = e.message || 'Failed to save schedule.'
@@ -180,9 +197,9 @@ const enable = async () => {
   error.value = ''
   loading.value = true
   try {
-    await props.setSchedule(PRESET_CRONS[0])
+    await props.setSchedule(presetCron(0))
     disabled.value = false
-    schedulePreset.value = PRESET_CRONS[0]
+    schedulePreset.value = 0
   } catch (e) {
     error.value = e.message || `Failed to enable ${props.noun}.`
   } finally {
@@ -212,7 +229,7 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
         >
         <Dropdown v-else :options="scheduleOptions">
           <template #default="{ open }">
-            <Button :loading="loading" :active="open">
+            <Button variant="subtle" size="sm" :loading="loading" :active="open">
               <template #suffix><span class="size-4 lucide-chevron-down" /></template>
               {{ currentScheduleLabel }}
             </Button>
@@ -226,6 +243,7 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
   </div>
 
+  <!-- Custom schedule dialog -->
   <Dialog v-model="showCustomDialog" :title="`Custom ${noun} schedule`" size="sm">
     <div class="space-y-4">
       <div class="space-y-1.5">
@@ -245,7 +263,7 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
 
       <div class="space-y-1.5">
         <p class="font-medium text-ink-gray-7 text-sm">Time</p>
-        <Select v-model="schedHour" :options="hourOptions" class="w-full" />
+        <Select v-model.number="schedHourPick" :options="hourOptions" class="w-full" />
       </div>
 
       <p v-if="retentionHint" class="text-ink-gray-4 text-p-sm">{{ retentionHint }}</p>
@@ -260,6 +278,7 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
     </div>
   </Dialog>
 
+  <!-- Disable confirmation -->
   <Dialog v-model="showDisableConfirm" :title="`Disable ${noun}`" size="sm">
     <p class="text-ink-gray-7 text-sm">{{ disableBody }}</p>
     <div class="flex justify-end gap-2 mt-4">
