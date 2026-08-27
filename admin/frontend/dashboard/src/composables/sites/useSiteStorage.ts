@@ -12,6 +12,8 @@ let fetchedAt = 0
 let pending = null
 
 export const useSiteStorage = () => {
+  // `force` skips the shared client cache, not the server's report - the
+  // numbers themselves only move when the timer runs.
   const load = (force = false) => {
     if (!force) {
       if (pending) return pending

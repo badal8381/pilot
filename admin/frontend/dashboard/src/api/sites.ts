@@ -5,10 +5,10 @@ const INLINE_TIMEOUT = 120_000
 
 export const sitesApi = {
   list: () => request.get('sites').json(),
-  // Served from the report the site-storage timer refreshes; `refresh` walks
-  // the disk instead and is as slow as the collection itself.
-  storage: (refresh = false) =>
-    request.get('sites/storage', { searchParams: refresh ? { refresh: 'true' } : {} }).json(),
+  // The report the site-storage timer refreshes. The route also takes
+  // ?refresh=true to measure instead, which no page should ask for: it walks
+  // every site directory and is as slow as the collection itself.
+  storage: () => request.get('sites/storage').json(),
   detail: (name) => request.get(`sites/${encodeURIComponent(name)}`).json(),
   create: (payload) => request.post('sites', { json: payload }).json(),
   loginLink: (name) => request.post(`sites/${encodeURIComponent(name)}/login`).json(),
