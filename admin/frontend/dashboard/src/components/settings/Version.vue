@@ -136,7 +136,7 @@ pilot admin upgrade</pre>
     </div>
 
     <div v-else-if="updating" class="flex flex-col gap-3">
-      <p class="text-ink-gray-7 text-base">Updating to {{ latestVersion }}…</p>
+      <p class="text-ink-gray-7">Updating to {{ latestVersion }}…</p>
       <div v-if="!log" class="flex justify-center items-center py-8">
         <Spinner size="lg" class="text-ink-gray-4" />
       </div>

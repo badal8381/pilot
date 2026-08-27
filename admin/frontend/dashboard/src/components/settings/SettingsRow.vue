@@ -25,7 +25,7 @@ withDefaults(defineProps<Props>(), {
   >
     <div class="flex flex-col gap-1">
       <!-- Matches frappe-ui's InputLabel (text-base) / InputDescription (text-p-sm). -->
-      <p class="font-medium text-ink-gray-8 text-base">{{ label }}</p>
+      <p class="font-medium text-ink-gray-8">{{ label }}</p>
       <p v-if="description" class="text-ink-gray-6 text-p-sm">{{ description }}</p>
     </div>
 

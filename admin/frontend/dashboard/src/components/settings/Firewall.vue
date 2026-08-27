@@ -157,7 +157,7 @@ onMounted(async () => {
 
     <div class="space-y-2">
       <div class="flex justify-between items-center">
-        <p class="font-medium text-ink-gray-8 text-base leading-normal">Rules</p>
+        <p class="font-medium text-ink-gray-8 leading-normal">Rules</p>
         <Button icon-left="lucide-plus" @click="addRule">Add rule</Button>
       </div>
 
@@ -177,17 +177,17 @@ onMounted(async () => {
         <div v-for="(rule, index) in rules" :key="index">
           <div class="flex items-end gap-2">
             <div class="space-y-1.5 w-28 shrink-0">
-              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Action</p>
+              <p v-if="index === 0" class="font-medium text-ink-gray-7">Action</p>
               <Select v-model="rule.action" :options="ACTION_OPTIONS" class="w-full" />
             </div>
 
             <div class="flex-1 space-y-1.5">
-              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">IP / CIDR</p>
+              <p v-if="index === 0" class="font-medium text-ink-gray-7">IP / CIDR</p>
               <TextInput v-model="rule.ip" placeholder="203.0.113.4 or 10.0.0.0/8" class="w-full" />
             </div>
 
             <div class="flex-1 space-y-1.5">
-              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Note</p>
+              <p v-if="index === 0" class="font-medium text-ink-gray-7">Note</p>
               <TextInput v-model="rule.description" placeholder="optional" class="w-full" />
             </div>
 

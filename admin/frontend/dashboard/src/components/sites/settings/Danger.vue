@@ -123,7 +123,7 @@ const confirmDrop = async () => {
 
 <template>
   <div>
-    <p class="font-semibold text-ink-gray-8 text-base">Danger</p>
+    <p class="font-semibold text-ink-gray-8">Danger</p>
     <div class="mt-1">
       <div
         v-for="d in DangerActions"
@@ -131,7 +131,7 @@ const confirmDrop = async () => {
         class="flex justify-between items-start gap-x-2.5 py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
       >
         <div class="flex flex-col gap-1 min-w-0">
-          <p class="font-medium text-ink-gray-8 text-base">{{ d.label }}</p>
+          <p class="font-medium text-ink-gray-8">{{ d.label }}</p>
           <p class="text-ink-gray-6 text-p-sm line-clamp-2 sm:line-clamp-none">
             {{ d.description }}
           </p>

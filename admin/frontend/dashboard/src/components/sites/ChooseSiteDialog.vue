@@ -39,7 +39,7 @@ const choose = (name) => {
           @click="choose('')"
         >
           <template #suffix>
-            <span v-if="!site" class="size-4 text-ink-gray-9 shrink-0 lucide-check" />
+            <span v-if="!site" class="size-4 shrink-0 lucide-check" />
           </template>
         </SiteRow>
 
@@ -57,7 +57,7 @@ const choose = (name) => {
 
             <span
               v-if="s.name === site"
-              class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+              class="size-4 shrink-0 lucide-check"
             />
           </template>
         </SiteRow>

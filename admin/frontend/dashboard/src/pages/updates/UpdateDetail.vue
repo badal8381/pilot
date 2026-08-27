@@ -243,7 +243,7 @@ onUnmounted(() => clearTimeout(timer))
         />
       </Teleport>
 
-      <p class="mt-5 px-2 font-medium text-ink-gray-8 text-base truncate">{{ metaLine }}</p>
+      <p class="mt-5 px-2 font-medium text-ink-gray-8 truncate">{{ metaLine }}</p>
 
       <ErrorMessage v-if="error" class="mt-4" :message="error" />
 
@@ -252,7 +252,7 @@ onUnmounted(() => clearTimeout(timer))
         <div class="p-4">
           <div class="flex items-center gap-2">
             <span class="lucide-alert-triangle size-4 shrink-0 text-ink-red-5" />
-            <h2 class="font-medium text-ink-red-7 text-base">
+            <h2 class="font-medium text-ink-red-7">
               {{ alertTitle }}
             </h2>
           </div>
@@ -368,7 +368,7 @@ onUnmounted(() => clearTimeout(timer))
             >
               <div class="flex items-center gap-2 min-w-0 flex-1">
                 <AppIcon :name="app.name" class="!rounded-1 size-5" initial-class="text-xs" />
-                <p class="min-w-0 truncate text-ink-gray-9 text-base">
+                <p class="min-w-0 truncate">
                   {{ app.name }}
                 </p>
               </div>
@@ -437,7 +437,7 @@ onUnmounted(() => clearTimeout(timer))
                     expandedSites.has(site.name) ? 'rotate-90' : '',
                   ]"
                 />
-                <p class="flex-1 min-w-0 text-ink-gray-9 text-base truncate">
+                <p class="flex-1 min-w-0 truncate">
                   {{ site.name }}
                 </p>
 

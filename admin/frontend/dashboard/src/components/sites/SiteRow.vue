@@ -32,7 +32,7 @@ const stateClass = computed(() => {
     :disabled="interactive && disabled ? true : null"
   >
     <span class="size-4 text-ink-gray-6 shrink-0" :class="icon" />
-    <p class="flex-1 text-ink-gray-8 text-base truncate">{{ label }}</p>
+    <p class="flex-1 text-ink-gray-8 truncate">{{ label }}</p>
     <slot name="suffix" />
   </component>
 </template>

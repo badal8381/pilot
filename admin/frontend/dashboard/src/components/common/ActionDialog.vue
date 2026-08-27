@@ -52,7 +52,7 @@ const emit = defineEmits(['confirm'])
           />
           <div class="min-w-0">
             <div class="flex items-center gap-1.5">
-              <p class="font-medium text-ink-gray-8 text-base truncate">{{ subject.label }}</p>
+              <p class="font-medium text-ink-gray-8 truncate">{{ subject.label }}</p>
               <span v-if="subject.badge" class="text-ink-gray-5 text-xs shrink-0">
                 {{ subject.badge }}
               </span>

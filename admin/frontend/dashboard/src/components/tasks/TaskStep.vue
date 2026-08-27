@@ -67,7 +67,7 @@ const iconBg = computed(() => STATUS_ICON_BG[props.status] || STATUS_ICON_BG.pen
       </span>
 
       <span
-        class="flex-1 min-w-0 text-base truncate"
+        class="flex-1 min-w-0 truncate"
         :class="status === 'pending' ? 'text-ink-gray-4' : 'font-medium text-ink-gray-9'"
       >
         {{ label }}

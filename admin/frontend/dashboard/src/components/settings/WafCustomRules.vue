@@ -152,7 +152,7 @@ const confirmRemove = () => {
   <div class="space-y-3" ref="root">
     <div class="flex justify-between items-start gap-4">
       <div class="min-w-0">
-        <p class="font-medium text-ink-gray-8 text-base">Custom rules</p>
+        <p class="font-medium text-ink-gray-8">Custom rules</p>
         <p class="mt-0.5 max-w-md text-ink-gray-5 text-p-sm">
           Checked before the managed rules, top to bottom.
         </p>
@@ -214,7 +214,7 @@ const confirmRemove = () => {
             @click.stop="toggleOpen(rule)"
           >
             <span
-              class="min-w-0 font-medium text-base truncate"
+              class="min-w-0 font-medium truncate"
               :class="rule.enabled ? 'text-ink-gray-8' : 'text-ink-gray-5'"
             >
               {{ rule.name || 'Untitled rule' }}
@@ -253,7 +253,7 @@ const confirmRemove = () => {
         <div class="space-y-3">
           <!-- All/Any only once there is something to combine. gap-1 is about a
                space at this size, so the row reads as a sentence. -->
-          <div class="flex flex-wrap items-center gap-1 text-ink-gray-7 text-base">
+          <div class="flex flex-wrap items-center gap-1 text-ink-gray-7">
             <!-- One phrase when there is no Select between the words, or the flex
                  gap reads as a double space. -->
             <template v-if="rule.conditions.length > 1">
@@ -324,7 +324,7 @@ const confirmRemove = () => {
             aria-hidden="true"
             class="absolute left-1 -top-4 h-[1.875rem] w-2.5 border-l border-b rounded-bl-6 border-outline-gray-3"
           />
-          <div class="flex flex-wrap items-center gap-2 text-ink-gray-7 text-base">
+          <div class="flex flex-wrap items-center gap-2 text-ink-gray-7">
             <span>Then</span>
             <Select v-model="rule.action" :options="actionOptions" class="w-48" />
             <Button

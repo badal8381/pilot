@@ -86,7 +86,7 @@ onMounted(load)
 
   <PageHero v-else icon="lucide-store">
     <template #title>
-      <h1 class="font-medium text-ink-gray-9 text-lg truncate">Frappe Marketplace</h1>
+      <h1 class="font-medium text-lg truncate">Frappe Marketplace</h1>
       <Badge v-if="benchVersionLabel" :label="benchVersionLabel" class="shrink-0">
         <template #prefix><span class="size-2.5 lucide-box" /></template>
       </Badge>
@@ -136,7 +136,7 @@ onMounted(load)
 
     <template v-else-if="isFiltered">
       <section v-if="filteredApps.length" class="mt-12">
-        <h2 class="font-medium text-ink-gray-9 text-base">
+        <h2 class="font-medium">
           {{ filteredHeading }}
         </h2>
 
@@ -155,7 +155,7 @@ onMounted(load)
 
     <template v-else>
       <section v-if="otherBenchApps.length" class="mt-12">
-        <h2 class="font-medium text-ink-gray-9 text-base">Your custom apps</h2>
+        <h2 class="font-medium">Your custom apps</h2>
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in otherBenchApps"
@@ -167,7 +167,7 @@ onMounted(load)
       </section>
 
       <section v-if="frappeApps.length" :class="otherBenchApps.length ? 'mt-10' : 'mt-12'">
-        <h2 class="font-medium text-ink-gray-9 text-base">From Frappe</h2>
+        <h2 class="font-medium">From Frappe</h2>
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in frappeApps"
@@ -179,7 +179,7 @@ onMounted(load)
       </section>
 
       <section v-if="communityApps.length" class="mt-10">
-        <h2 class="font-medium text-ink-gray-9 text-base">Community</h2>
+        <h2 class="font-medium">Community</h2>
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in communityApps"

@@ -116,7 +116,7 @@ const treeNodes = computed(() => reactive([
 <template>
   <section class="p-5 min-w-0">
     <div class="flex justify-between items-center gap-3 mb-4">
-      <h3 class="flex items-center gap-2 font-medium text-ink-gray-8 text-base">
+      <h3 class="flex items-center gap-2 font-medium text-ink-gray-8">
         <lucide-box class="size-4" />
         App storage
       </h3>

@@ -128,7 +128,7 @@ const goBack = () => {
           :class="activeSection ? 'hidden sm:flex' : 'flex'"
         >
           <h3
-            class="mb-1 p-2 pb-3 border-b sm:border-b-0 border-outline-gray-1 font-semibold text-ink-gray-9 text-base"
+            class="mb-1 p-2 pb-3 border-b sm:border-b-0 border-outline-gray-1 font-semibold"
           >
             Settings
           </h3>
@@ -181,7 +181,7 @@ const goBack = () => {
                 tooltip="Back"
                 @click="goBack"
               />
-              <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
+              <h3 class="font-semibold text-lg">{{ headerTitle }}</h3>
             </div>
 
             <div id="settings-header-actions" class="contents"></div>

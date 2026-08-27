@@ -136,7 +136,7 @@ onMounted(load)
       class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3"
     >
       <div>
-        <p class="font-medium text-ink-gray-8 text-base">Connected to {{ bucket }}</p>
+        <p class="font-medium text-ink-gray-8">Connected to {{ bucket }}</p>
         <p class="text-ink-gray-5 text-p-sm">{{ providerLabel }} · Access key {{ accessKey }}</p>
       </div>
 

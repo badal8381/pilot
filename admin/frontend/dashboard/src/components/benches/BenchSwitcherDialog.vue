@@ -241,7 +241,7 @@ watch(show, (open) => {
             v-if="column.key === 'name'"
             class="flex items-center gap-2 w-full min-w-0 text-left"
           >
-            <span class="font-medium text-ink-gray-9 text-sm truncate">{{ row.name }}</span>
+            <span class="font-medium text-sm truncate">{{ row.name }}</span>
             <Badge v-if="isCurrentBench(row.bench)" theme="green" size="sm" label="Current" />
           </div>
 

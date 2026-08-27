@@ -247,7 +247,7 @@ const createBench = async () => {
       <div v-if="provisioning" class="flex flex-col items-center gap-5 py-8 text-center">
         <LoadingIndicator class="w-10 h-10 text-ink-gray-5" />
         <div class="flex flex-col gap-2">
-          <p class="font-semibold text-ink-gray-9 text-lg">This may take a few minutes</p>
+          <p class="font-semibold text-lg">This may take a few minutes</p>
           <p class="max-w-xs text-ink-gray-6 text-sm">Opens automatically when ready.</p>
         </div>
 
@@ -303,7 +303,7 @@ const createBench = async () => {
                 : 'border-outline-gray-2 hover:bg-surface-alpha-gray-1'"
               @click="processManager = opt.value"
             >
-              <span class="block font-medium text-ink-gray-9 text-sm">{{ opt.label }}</span>
+              <span class="block font-medium text-sm">{{ opt.label }}</span>
               <span class="block text-ink-gray-5 text-xs">{{ opt.hint }}</span>
             </button>
           </div>

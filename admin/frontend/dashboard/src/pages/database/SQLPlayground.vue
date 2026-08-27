@@ -246,7 +246,7 @@ onMounted(async () => {
     </span>
 
     <div>
-      <p class="font-medium text-ink-gray-7 text-base">Select a site to get started</p>
+      <p class="font-medium text-ink-gray-7">Select a site to get started</p>
       <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
         Queries run against that site's database.
       </p>

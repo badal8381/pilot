@@ -182,13 +182,13 @@ onMounted(async () => {
           class="w-24"
           :aria-label="`${alert.label} limit`"
         />
-        <span class="text-ink-gray-6 text-base">% and above</span>
+        <span class="text-ink-gray-6">% and above</span>
       </div>
     </div>
 
     <div class="space-y-2">
       <div class="flex justify-between items-center">
-        <p class="font-medium text-ink-gray-8 text-base leading-normal">Webhook endpoints</p>
+        <p class="font-medium text-ink-gray-8 leading-normal">Webhook endpoints</p>
         <Button icon-left="lucide-plus" @click="addWebhook">Add endpoint</Button>
       </div>
 
@@ -209,7 +209,7 @@ onMounted(async () => {
         <div v-for="(webhook, index) in webhooks" :key="index">
           <div class="flex items-end gap-2">
             <div class="flex-1 space-y-1.5">
-              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Endpoint URL</p>
+              <p v-if="index === 0" class="font-medium text-ink-gray-7">Endpoint URL</p>
               <TextInput
                 v-model="webhook.url"
                 placeholder="https://alerts.example.com/pilot"
@@ -218,7 +218,7 @@ onMounted(async () => {
             </div>
 
             <div class="flex-1 space-y-1.5">
-              <p v-if="index === 0" class="font-medium text-ink-gray-7 text-base">Token</p>
+              <p v-if="index === 0" class="font-medium text-ink-gray-7">Token</p>
               <TextInput
                 v-model="webhook.token"
                 type="password"

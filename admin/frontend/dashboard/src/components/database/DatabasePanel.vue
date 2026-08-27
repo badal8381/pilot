@@ -29,7 +29,7 @@ const badges = computed(() => [props.badge].flat().filter(Boolean))
     <div class="flex justify-between items-start gap-3 p-4">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-2">
-          <h3 class="font-semibold text-ink-gray-9 text-base">{{ title }}</h3>
+          <h3 class="font-semibold">{{ title }}</h3>
           <Badge v-for="label in badges" :key="label" :label="label" size="sm" />
         </div>
 

@@ -200,7 +200,7 @@ onMounted(() => {
 <template>
   <div class="p-3 md:p-4 flex flex-col" :class="siteName ? '' : 'mx-auto max-w-4xl h-[calc(100vh-3rem)]'">
     <div v-if="!siteName">
-      <h1 class="font-semibold text-ink-gray-9 text-xl">Activity</h1>
+      <h1 class="font-semibold text-xl">Activity</h1>
       <p class="mt-1 text-ink-gray-5 text-p-base">
         A trail of actions taken on this bench - logins, backups, app changes and more.
       </p>
@@ -246,7 +246,7 @@ onMounted(() => {
             <span class="size-3.5" :class="activityTypeMeta(row.entry).icon" />
           </span>
 
-          <span class="font-medium text-ink-gray-9 text-sm">{{ row.activity }}</span>
+          <span class="font-medium text-sm">{{ row.activity }}</span>
         </template>
 
         <template #actions="{ row }">

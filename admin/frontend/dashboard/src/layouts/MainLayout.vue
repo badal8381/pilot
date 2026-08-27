@@ -87,7 +87,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
         <template v-if="route.name == 'Home'">
           <div class="flex items-center gap-2">
             <PilotLogo class="size-6 rounded-1" />
-            <span class="text-ink-gray-9">Home</span>
+            <span>Home</span>
           </div>
         </template>
 

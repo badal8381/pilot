@@ -243,7 +243,7 @@ onUnmounted(() => stopLive())
             @click="selectedFile = log.filename"
           >
             <div class="flex items-center gap-2">
-              <span class="flex-1 font-medium text-ink-gray-8 text-base truncate">
+              <span class="flex-1 font-medium text-ink-gray-8 truncate">
                 {{ log.filename }}
               </span>
 

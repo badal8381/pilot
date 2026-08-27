@@ -164,7 +164,7 @@ onMounted(() => {
         />
       </RouterLink>
 
-      <p class="text-ink-gray-8 text-base shrink-0">{{ metaLine }}</p>
+      <p class="text-ink-gray-8 shrink-0">{{ metaLine }}</p>
     </div>
 
     <ErrorMessage v-if="actionError" :message="actionError" class="mt-3" />

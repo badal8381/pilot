@@ -218,7 +218,7 @@ const submit = async () => {
             @click="toggleApp(app.name)"
           >
             <AppIcon :name="app.name" size="lg" />
-            <span class="flex-1 min-w-0 text-ink-gray-8 text-base truncate">
+            <span class="flex-1 min-w-0 text-ink-gray-8 truncate">
               {{ app.title || app.name }}
             </span>
 

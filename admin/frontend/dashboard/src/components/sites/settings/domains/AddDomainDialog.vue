@@ -151,7 +151,7 @@ const confirmAdd = async () => {
           <span class="size-6 text-ink-green-2 lucide-check" />
         </div>
 
-        <p class="font-medium text-ink-gray-8 text-base">No DNS records needed</p>
+        <p class="font-medium text-ink-gray-8">No DNS records needed</p>
       </div>
 
       <ErrorMessage v-if="error" :message="error" class="mt-2" />

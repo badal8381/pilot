@@ -84,7 +84,7 @@ onMounted(load)
   <Skeleton v-if="loading" class="rounded-6 h-full min-h-[340px]" />
   <div v-else class="flex flex-col bg-surface-white border rounded-6 border-outline-gray-2 h-full">
     <div class="flex items-center px-4 py-3 border-b border-outline-gray-2">
-      <h3 class="font-medium text-ink-gray-8 text-base">Uptime</h3>
+      <h3 class="font-medium text-ink-gray-8">Uptime</h3>
     </div>
 
     <ErrorMessage v-if="error" :message="error" class="m-4" />

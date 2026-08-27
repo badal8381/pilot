@@ -40,7 +40,7 @@ onMounted(async () => {
     <!-- Header -->
     <div class="flex justify-between items-center gap-3">
       <div>
-        <h1 class="font-semibold text-ink-gray-9 text-xl">Code editor</h1>
+        <h1 class="font-semibold text-xl">Code editor</h1>
         <p class="mt-1 text-ink-gray-5 text-p-sm sm:hidden">Edit installed app files.</p>
         <p class="mt-1 text-ink-gray-5 text-p-base hidden sm:block">Browse and edit the files of installed apps.</p>
       </div>
@@ -55,7 +55,7 @@ onMounted(async () => {
     </div>
 
     <section v-else-if="appObjects.length" class="mt-6">
-      <p class="font-medium text-ink-gray-9 text-base">
+      <p class="font-medium">
         Installed apps · {{ appObjects.length }}
       </p>
 

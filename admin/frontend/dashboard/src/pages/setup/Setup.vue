@@ -68,7 +68,7 @@ const {
           Step {{ stepNumber }} of {{ stepSequence.length }}
         </p>
 
-        <h1 class="font-semibold text-ink-gray-9 text-lg">{{ stepTitle }}</h1>
+        <h1 class="font-semibold text-lg">{{ stepTitle }}</h1>
         <p v-show="stepSubtitle" class="mt-0.5 text-ink-gray-5 text-p-base">{{ stepSubtitle }}</p>
       </div>
 

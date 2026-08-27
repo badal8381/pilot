@@ -194,7 +194,7 @@ onMounted(load)
 
   <div v-else class="space-y-5">
     <div class="flex justify-between items-center">
-      <p class="font-medium text-ink-gray-8 text-base">
+      <p class="font-medium text-ink-gray-8">
         Devices
         <span class="font-normal text-ink-gray-5">
           ({{ devices.length }} of {{ status.max_devices }})
@@ -235,7 +235,7 @@ onMounted(load)
       <template #cell="{ column, row, item }">
         <span
           v-if="column.key === 'name'"
-          class="block min-w-0 max-w-full text-ink-gray-7 text-base truncate"
+          class="block min-w-0 max-w-full text-ink-gray-7 truncate"
           :title="row.name"
         >
           {{ row.name }}
@@ -300,7 +300,7 @@ onMounted(load)
 
         <details class="group">
           <summary
-            class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
+            class="flex items-center gap-1.5 text-ink-gray-6 cursor-pointer select-none"
           >
             <span
               class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
@@ -309,7 +309,7 @@ onMounted(load)
           </summary>
 
           <div class="bg-surface-gray-2 mt-2 p-3 rounded-6">
-            <p class="font-mono text-ink-gray-8 text-base break-all">{{ enrollment.secret }}</p>
+            <p class="font-mono text-ink-gray-8 break-all">{{ enrollment.secret }}</p>
             <button class="mt-1 text-ink-blue-2 text-sm" @click="copy(enrollment.secret)">
               Copy key
             </button>

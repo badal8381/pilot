@@ -75,7 +75,7 @@ const toggle = async (s, value) => {
 
 <template>
   <div>
-    <p class="font-semibold text-ink-gray-8 text-base">General</p>
+    <p class="font-semibold text-ink-gray-8">General</p>
     <div class="mt-1">
       <div
         v-for="s in visibleSettings"

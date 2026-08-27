@@ -104,7 +104,7 @@ watch(nginxEnabled, (enabled) => {
 
 <template>
   <div v-if="nginxEnabled">
-    <p class="font-semibold text-ink-gray-8 text-base">Domains</p>
+    <p class="font-semibold text-ink-gray-8">Domains</p>
     <div v-if="loading" class="flex justify-center py-8">
       <LoadingText />
     </div>
@@ -125,7 +125,7 @@ watch(nginxEnabled, (enabled) => {
             </Tooltip>
 
             <div class="flex items-center gap-2 min-w-0">
-              <p class="font-medium text-ink-gray-8 text-base truncate">{{ row.domain }}</p>
+              <p class="font-medium text-ink-gray-8 truncate">{{ row.domain }}</p>
               <Badge
                 v-if="row.isPrimary"
                 label="Primary"

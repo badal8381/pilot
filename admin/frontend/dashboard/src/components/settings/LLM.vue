@@ -189,7 +189,7 @@ onMounted(load)
       class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3"
     >
       <div>
-        <p class="font-medium text-ink-gray-8 text-base">Connected to {{ providerLabel }}</p>
+        <p class="font-medium text-ink-gray-8">Connected to {{ providerLabel }}</p>
         <p class="text-ink-gray-5 text-p-sm">Model {{ model || '—' }} · API key set</p>
       </div>
 
@@ -255,7 +255,7 @@ onMounted(load)
 
       <details class="group">
         <summary
-          class="flex items-center gap-1.5 text-ink-gray-6 text-base cursor-pointer select-none"
+          class="flex items-center gap-1.5 text-ink-gray-6 cursor-pointer select-none"
         >
           <span
             class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"

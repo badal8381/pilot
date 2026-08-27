@@ -201,7 +201,7 @@ onMounted(load)
               class="flex sm:flex-row sm:items-center sm:justify-between flex-col gap-3 py-3"
             >
               <div class="min-w-0">
-                <code class="font-medium text-ink-gray-8 text-base break-all">
+                <code class="font-medium text-ink-gray-8 break-all">
                   {{ variable.name }}
                 </code>
               </div>
@@ -248,7 +248,7 @@ onMounted(load)
   >
     <div v-if="editing && editor" class="space-y-4">
       <div v-if="editor.value_type === 'boolean'" class="flex items-center justify-between gap-4">
-        <p class="font-medium text-ink-gray-8 text-base">Enabled</p>
+        <p class="font-medium text-ink-gray-8">Enabled</p>
         <Switch
           class="[&_[data-slot='label']]:sr-only [&>div]:!gap-x-0 [&>div]:!py-0"
           :label="editing.name"

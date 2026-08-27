@@ -107,7 +107,7 @@ const runUpdate = async () => {
             >
               <AppIcon :name="name" size="xl" />
               <span class="flex-1 min-w-0">
-                <p class="font-medium text-ink-gray-8 text-base truncate">
+                <p class="font-medium text-ink-gray-8 truncate">
                   {{ titleMap[name] || name }}
                 </p>
 

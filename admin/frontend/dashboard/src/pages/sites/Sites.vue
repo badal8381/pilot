@@ -212,7 +212,7 @@ onMounted(() => {
           </div>
 
           <div class="flex flex-1 flex-wrap items-center gap-x-1.5 min-w-0">
-            <span class="flex-1 max-w-fit font-medium text-ink-gray-9 text-base truncate">
+            <span class="flex-1 max-w-fit font-medium truncate">
               {{ site.name }}
             </span>
 

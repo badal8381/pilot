@@ -141,7 +141,7 @@ onUnmounted(() => clearInterval(badgeTimer))
       class="flex flex-col bg-surface-base md:border-r border-outline-gray-1 w-screen md:w-[430px] h-[calc(100dvh-3.5rem)] md:h-screen"
     >
       <header class="flex items-center gap-1 py-2 pr-2 pl-4 border-outline-gray-1 border-b">
-        <span class="mr-auto font-medium text-base">Notifications</span>
+        <span class="mr-auto font-medium">Notifications</span>
         <Button
           v-if="unread > 0"
           variant="ghost"
@@ -188,7 +188,7 @@ onUnmounted(() => clearInterval(badgeTimer))
 
           <span class="flex-1 min-w-0">
             <span class="flex items-start gap-2">
-              <span class="flex-1 min-w-0 font-medium text-ink-gray-9 text-base">
+              <span class="flex-1 min-w-0 font-medium">
                 {{ item.title }}
               </span>
 

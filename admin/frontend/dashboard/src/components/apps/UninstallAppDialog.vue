@@ -108,7 +108,7 @@ const uninstallApp = async () => {
       >
         <span class="mt-0.5 size-4 text-ink-gray-6 shrink-0" :class="option.icon" />
         <span class="min-w-0">
-          <span class="block text-ink-gray-8 text-base">{{ option.label }}</span>
+          <span class="block text-ink-gray-8">{{ option.label }}</span>
           <span class="block mt-0.5 text-ink-gray-5 text-p-sm leading-5">{{ option.description }}</span>
         </span>
       </button>

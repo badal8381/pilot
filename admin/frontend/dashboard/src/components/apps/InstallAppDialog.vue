@@ -122,7 +122,7 @@ const confirmInstall = async () => {
 
         <span
           v-if="targetInstalled"
-          class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+          class="size-4 shrink-0 lucide-check"
           role="img"
           aria-label="Already installed"
         />
@@ -159,7 +159,7 @@ const confirmInstall = async () => {
 
           <span
             v-if="isInstalled(s)"
-            class="size-4 text-ink-gray-9 shrink-0 lucide-check"
+            class="size-4 shrink-0 lucide-check"
             role="img"
             aria-label="Already installed"
           />
