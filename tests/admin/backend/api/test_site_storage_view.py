@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from pilot.core.site.storage import SiteStorageCollector, SiteStorageReport, SiteStorageUsage
+from pilot.tasks.refresh_storage_usage import RefreshStorageUsageTask
 from tests.admin.backend.test_admin_app import _client
 
 
@@ -23,6 +24,12 @@ def _report(collected_at: str | None = None) -> SiteStorageReport:
             )
         ],
     )
+
+
+def _write_site(bench_root: Path, name: str) -> None:
+    site_path = bench_root / "sites" / name
+    site_path.mkdir(parents=True)
+    (site_path / "site_config.json").write_text(json.dumps({"installed_apps": []}))
 
 
 def _write_report(bench_root: Path, report: SiteStorageReport) -> None:
@@ -81,16 +88,46 @@ def test_storage_is_collected_on_demand_when_no_report_exists(tmp_path: Path) ->
     assert response.get_json()["sites"][0]["total_bytes"] == 620
 
 
-def test_refresh_measures_instead_of_reading_the_report(tmp_path: Path) -> None:
+def test_an_old_report_is_served_without_measuring(tmp_path: Path) -> None:
+    """Only the timer and the refresh action measure, so a page load stays
+    fast however old the numbers are."""
     bench_root = tmp_path / "benches" / "current"
     client = _client(bench_root)
-    _write_report(bench_root, _report())
+    _write_report(bench_root, _report(collected_at="2020-01-01T00:00:00+00:00"))
 
-    with patch.object(SiteStorageCollector, "collect", return_value=_report()) as collect:
-        response = client.get("/api/v1/sites/storage?refresh=true")
+    with patch.object(SiteStorageCollector, "collect") as collect:
+        response = client.get("/api/v1/sites/storage")
 
-    collect.assert_called_once()
+    collect.assert_not_called()
     assert response.status_code == 200
+    assert response.get_json()["collected_at"] == "2020-01-01T00:00:00+00:00"
+
+
+def test_refresh_queues_a_task_instead_of_measuring_inline(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    client = _client(bench_root)
+    _write_site(bench_root, "s.localhost")
+
+    with patch(
+        "pilot.internal.tasks.runner.task_workers.wake",
+        return_value=False,
+    ):
+        response = client.post("/api/v1/sites/s.localhost/actions/refresh-storage")
+
+    body = response.get_json()
+    assert response.status_code == 202
+    assert body["command"] == "refresh-storage-usage"
+    assert response.headers["Location"] == f"/api/v1/tasks/{body['task_id']}"
+
+
+def test_refresh_is_not_offered_for_a_site_that_does_not_exist(tmp_path: Path) -> None:
+    client = _client(tmp_path / "benches" / "current")
+
+    with patch.object(RefreshStorageUsageTask, "queue") as queue:
+        response = client.post("/api/v1/sites/missing.localhost/actions/refresh-storage")
+
+    assert response.status_code == 404
+    queue.assert_not_called()
 
 
 def test_storage_reports_an_error_when_it_cannot_be_measured(tmp_path: Path) -> None:

@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 from pilot.config import BenchConfig
 from pilot.core.bench import Bench
-from pilot.core.site.storage import COLLECTION_INTERVAL_SECONDS, SiteStorageCollector
+from pilot.core.site.storage import SiteStorageCollector, collect_all_benches
 
 
 def _bench(tmp_path: Path, db_type: str = "mariadb") -> Bench:
@@ -85,31 +85,37 @@ def test_get_report_measures_when_the_file_is_missing(tmp_path: Path) -> None:
     assert collector.path.exists()
 
 
-def test_get_report_measures_again_once_the_file_outlives_the_interval(tmp_path: Path) -> None:
-    """A host without the timer - a local bench, or one where install failed -
-    would otherwise serve its first reading forever."""
+def test_an_old_report_is_served_rather_than_measured_again(tmp_path: Path) -> None:
+    """Reading never measures: refreshing belongs to the timer and the
+    refresh-storage-usage task, so a page load stays fast however old the
+    numbers are."""
     bench = _bench(tmp_path)
     _make_site(bench, "site1.local")
     collector = _collector(bench, {"site1_db": 500})
     collector.collect()
 
-    aged = datetime.now(UTC) - timedelta(seconds=COLLECTION_INTERVAL_SECONDS + 60)
+    aged = datetime.now(UTC) - timedelta(days=30)
     payload = json.loads(collector.path.read_text())
     payload["collected_at"] = aged.isoformat()
     collector.path.write_text(json.dumps(payload))
 
     bench._db.get_schema_sizes.return_value = {"site1_db": 900}
-    assert collector.get_report().sites[0].database_bytes == 900
+    report = collector.get_report()
+
+    assert report.sites[0].database_bytes == 500
+    assert report.collected_at == aged.isoformat()
 
 
-def test_refresh_measures_even_with_a_fresh_file(tmp_path: Path) -> None:
+def test_collect_replaces_the_stored_report(tmp_path: Path) -> None:
     bench = _bench(tmp_path)
     _make_site(bench, "site1.local")
     collector = _collector(bench, {"site1_db": 500})
     collector.collect()
 
     bench._db.get_schema_sizes.return_value = {"site1_db": 900}
-    assert collector.get_report(refresh=True).sites[0].database_bytes == 900
+    collector.collect()
+
+    assert collector.get_report().sites[0].database_bytes == 900
 
 
 def test_a_corrupt_file_is_measured_again_rather_than_raising(tmp_path: Path) -> None:
@@ -135,7 +141,7 @@ def test_sqlite_sites_are_measured_from_their_own_database_file(tmp_path: Path) 
     assert report.sites[0].database_bytes >= 40960
 
 
-def test_main_skips_a_bench_it_cannot_measure(tmp_path: Path, capsys) -> None:
+def test_a_bench_that_cannot_be_measured_does_not_stop_the_others(tmp_path: Path, capsys) -> None:
     from pilot.core.site import storage
 
     healthy = _bench(tmp_path, db_type="sqlite")
@@ -154,7 +160,7 @@ def test_main_skips_a_bench_it_cannot_measure(tmp_path: Path, capsys) -> None:
         patch.object(storage, "iter_sibling_benches", return_value=benches),
         patch.object(SiteStorageCollector, "collect", collect),
     ):
-        storage.main()
+        collect_all_benches()
 
     assert "could not collect site storage: database is down" in capsys.readouterr().err
     assert healthy.site_storage.path.exists()

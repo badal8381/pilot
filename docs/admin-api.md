@@ -70,7 +70,9 @@ Two app operations answer inline instead of returning a task id, because both ar
 
 `GET /sites/storage` returns every site's `private_bytes`, `public_bytes`, `database_bytes`, and `total_bytes`, plus the `collected_at` of the reading. `database_bytes` is what the schema holds on disk, allocated-but-freed pages included, since nothing else can use that space until the tables are rebuilt.
 
-Measuring means a `du` per site directory and one schema-size query, so the route serves `logs/site-storage.json` instead - written by the `site-storage` systemd timer every six hours (`pilot.core.site.storage_config`). It measures inline only when that file is missing, unreadable, or older than the collection interval, so a bench without the timer still answers. `?refresh=true` measures unconditionally.
+Measuring means a `du` per site directory and one schema-size query, so the route serves `logs/site-storage.json` instead - written by the `site-storage` systemd timer every six hours (`pilot.core.site.storage`). Reading never measures, however old the report is; the route falls back to measuring only when there is no report at all, which is the first read on a bench whose timer has not run yet.
+
+`POST /sites/<name>/actions/refresh-storage` queues `refresh-storage-usage` to measure again on demand. One report covers every site on the bench, so the task re-measures all of them and concurrent requests fold into one run.
 
 ### Setup
 

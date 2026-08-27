@@ -197,7 +197,7 @@ def test_require_production_inputs_passes_with_domain_and_email(tmp_path: Path) 
 def test_setup_monitoring_runs_privileged_setup_at_provision_time(tmp_path: Path, monkeypatch) -> None:
     """Privileged log-dir/logrotate setup must run here, not in the user-service daemons."""
     from pilot.core.server.monitoring import MonitorConfigurator
-    from pilot.core.site.storage_config import SiteStorageConfigurator
+    from pilot.core.site.storage.systemd import SiteStorageConfigurator
     from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
     bench = _make_bench(tmp_path, process_manager="systemd")
@@ -225,7 +225,7 @@ class _BlockPsutil:
 def test_setup_monitoring_runs_without_psutil(tmp_path: Path, monkeypatch) -> None:
     """The CLI runs on the system python, which has no third-party packages."""
     from pilot.core.server.monitoring_config import MonitorConfigurator
-    from pilot.core.site.storage_config import SiteStorageConfigurator
+    from pilot.core.site.storage.systemd import SiteStorageConfigurator
     from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
     bench = _make_bench(tmp_path, process_manager="systemd")

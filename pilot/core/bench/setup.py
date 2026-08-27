@@ -143,7 +143,7 @@ class ProductionSetup:
 
     def _setup_monitoring(self):
         from pilot.core.server.monitoring_config import MonitorConfigurator
-        from pilot.core.site.storage_config import SiteStorageConfigurator
+        from pilot.core.site.storage.systemd import SiteStorageConfigurator
         from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
         monitor = MonitorConfigurator(self.bench)

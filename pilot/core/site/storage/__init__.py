@@ -1,5 +1,3 @@
-"""Entry point for the site-storage systemd timer; one pass per invocation."""
-
 from __future__ import annotations
 
 import json
@@ -17,7 +15,6 @@ if typing.TYPE_CHECKING:
     from pilot.core.bench import Bench
     from pilot.core.site import Site
 
-COLLECTION_INTERVAL_SECONDS = 6 * 60 * 60
 REPORT_FILE_NAME = "site-storage.json"
 
 
@@ -35,15 +32,11 @@ class SiteStorageReport:
     collected_at: str
     sites: list[SiteStorageUsage] = field(default_factory=list)
 
-    @property
-    def is_stale(self) -> bool:
-        age = datetime.now(UTC) - datetime.fromisoformat(self.collected_at)
-        return age.total_seconds() >= COLLECTION_INTERVAL_SECONDS
-
 
 class SiteStorageCollector:
     """Every site's files and database size, kept in one file so the Admin API
-    answers without walking the disk. Reach it as `bench.site_storage`."""
+    answers without walking the disk. The site-storage timer refreshes it;
+    reach it as `bench.site_storage`."""
 
     def __init__(self, bench: "Bench") -> None:
         self.bench = bench
@@ -52,14 +45,11 @@ class SiteStorageCollector:
     def path(self) -> Path:
         return self.bench.logs_path / REPORT_FILE_NAME
 
-    def get_report(self, refresh: bool = False) -> SiteStorageReport:
-        """The stored report unless it is missing, unreadable, or older than the
-        collection interval - a host without the timer still self-heals."""
-        if not refresh:
-            report = self.read()
-            if report is not None and not report.is_stale:
-                return report
-        return self.collect()
+    def get_report(self) -> SiteStorageReport:
+        """The stored report, measured once when there is none. Refreshing it
+        is the timer's job, or the refresh-storage-usage task's - never a
+        reader's, however old the numbers are."""
+        return self.read() or self.collect()
 
     def read(self) -> SiteStorageReport | None:
         """None for anything unusable: this is a cache, so a truncated file
@@ -78,7 +68,7 @@ class SiteStorageCollector:
         database_bytes = self.get_database_bytes(sites)
         report = SiteStorageReport(
             collected_at=datetime.now(UTC).isoformat(),
-            sites=[self._usage(site, database_bytes[site.config.name]) for site in sites],
+            sites=[self.get_usage(site, database_bytes[site.config.name]) for site in sites],
         )
         self.path.parent.mkdir(parents=True, exist_ok=True)
         atomic_write_private_text(self.path, json.dumps(asdict(report), indent=1))
@@ -96,7 +86,7 @@ class SiteStorageCollector:
         }
 
     @staticmethod
-    def _usage(site: "Site", database_bytes: int) -> SiteStorageUsage:
+    def get_usage(site: "Site", database_bytes: int) -> SiteStorageUsage:
         private_bytes = directory_bytes(site.path / "private")
         public_bytes = directory_bytes(site.path / "public")
         return SiteStorageUsage(
@@ -108,8 +98,9 @@ class SiteStorageCollector:
         )
 
 
-def main() -> None:
-    """A stopped database on one bench must not cost the others their refresh."""
+def collect_all_benches() -> None:
+    """One timer pass over every bench on the host. A stopped database on one
+    must not cost the others their refresh."""
     from pilot.core.bench import Bench
 
     sentinel = cli_root() / "benches" / ".site-storage-placeholder"
@@ -118,7 +109,3 @@ def main() -> None:
             SiteStorageCollector(Bench(bench_config, bench_path)).collect()
         except Exception as error:
             print(f"{bench_config.name}: could not collect site storage: {error}", file=sys.stderr)
-
-
-if __name__ == "__main__":
-    main()
