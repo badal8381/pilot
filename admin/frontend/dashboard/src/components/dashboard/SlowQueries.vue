@@ -72,7 +72,7 @@ const charts = computed(() => {
     <AxisChart
       v-else
       :config="chart.config"
-      class="w-full min-w-0 h-full min-h-[320px] px-2 sm:px-4 pb-2"
+      class="min-h-[320px]"
     />
   </ChartCard>
 </template>

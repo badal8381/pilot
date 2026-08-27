@@ -708,7 +708,7 @@ onUnmounted(() => clearTimeout(statsTimer))
         <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
           <AxisChart
             :config="chart.config"
-            class="w-full min-w-0 h-full min-h-[300px] px-2 sm:px-4 pb-2"
+            class="min-h-[300px]"
           />
         </ChartCard>
       </div>
