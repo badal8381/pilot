@@ -143,6 +143,7 @@ class ProductionSetup:
 
     def _setup_monitoring(self):
         from pilot.core.server.monitoring_config import MonitorConfigurator
+        from pilot.core.site.storage.systemd import SiteStorageConfigurator
         from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
         monitor = MonitorConfigurator(self.bench)
@@ -152,6 +153,8 @@ class ProductionSetup:
         uptime = UptimeMonitorConfigurator(self.bench)
         uptime.install()
         uptime.setup()
+
+        SiteStorageConfigurator().install()
 
     def _setup_log_shipping(self) -> None:
         """Install Fluent Bit as a systemd service, if a logs endpoint is configured."""
