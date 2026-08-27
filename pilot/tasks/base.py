@@ -65,7 +65,15 @@ class Task:
     # Queued tasks can always be cancelled - nothing has run yet.
     is_cancellable_while_running: ClassVar[bool] = True
     # Non-sensitive queue args safe to record in the audit entry.
-    _AUDIT_ARG_KEYS: ClassVar[tuple[str, ...]] = ("site", "app", "name", "repo", "branch", "marketplace_app")
+    _AUDIT_ARG_KEYS: ClassVar[tuple[str, ...]] = (
+        "site",
+        "app",
+        "name",
+        "new_name",
+        "repo",
+        "branch",
+        "marketplace_app",
+    )
 
     bench: "Bench"
     bench_root: Path
