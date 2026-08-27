@@ -9,7 +9,7 @@ admin/backend/api/v1/
   benches/   bench creation, readiness, support data
   setup/     first-run and database setup
   settings/  bench config read/write/apply
-  sites/     site apps, backups, domains, login, config
+  sites/     site apps, backups, domains, login, config, storage
   apps.py    bench app inventory and actions
   tasks.py   task list, logs, events, control
   logs.py    log access
@@ -65,6 +65,12 @@ Two app operations answer inline instead of returning a task id, because both ar
 
 - `DELETE /sites/<name>/apps/<app>?mode=disable` returns `{"app": ..., "disabled": true}`. Without the parameter the route queues an uninstall as before.
 - `POST /sites/<name>/apps` for an app the site only has disabled returns `{"app": ..., "enabled": true}`. It falls through to the install queue when a required app has to be installed first.
+
+### Site Storage
+
+`GET /sites/storage` returns every site's `private_bytes`, `public_bytes`, `database_bytes`, and `total_bytes`, plus the `collected_at` of the reading. `database_bytes` is what the schema holds on disk, allocated-but-freed pages included, since nothing else can use that space until the tables are rebuilt.
+
+Measuring means a `du` per site directory and one schema-size query, so the route serves `logs/site-storage.json` instead - written by the `site-storage` systemd timer every six hours (`pilot.core.site.storage_config`). It measures inline only when that file is missing, unreadable, or older than the collection interval, so a bench without the timer still answers. `?refresh=true` measures unconditionally.
 
 ### Setup
 
