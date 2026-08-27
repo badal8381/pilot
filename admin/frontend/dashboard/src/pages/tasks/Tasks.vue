@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, Dropdown, ErrorMessage, TabButtons } from 'frappe-ui'
+import { Badge, Button, ErrorMessage, Select, TabButtons } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
@@ -74,31 +74,26 @@ const rows = computed(() =>
 const getRowRoute = (row) => taskDetailRoute(row.id)
 
 // "Other" is a fallback for unknown commands; listed only once one exists.
-const typeMenu = computed(() => {
+const typeOptions = computed(() => {
   const present = new Set(tasks.value.map(taskType))
   return [
-    { label: 'All types', value: '' },
+    { label: 'All types', value: '', icon: 'lucide-shapes' },
     ...TASK_TYPES.filter(
       ({ value }) => value !== 'other' || present.has('other') || typeFilter.value === 'other',
     ),
-  ].map(({ value, label }) => ({ label, onClick: () => onTypeChange(value) }))
+  ]
 })
 
 // Built from the loaded tasks; a site arriving via the URL is kept even
 // when nothing matches, so the trigger still names what is filtering.
-const siteMenu = computed(() => {
+const siteOptions = computed(() => {
   const sites = new Set(tasks.value.map(siteLabel))
   if (siteFilter.value) sites.add(siteFilter.value)
   return [
     { label: 'All sites', value: '' },
     ...[...sites].sort().map((site) => ({ label: site, value: site })),
-  ].map(({ value, label }) => ({ label, onClick: () => onSiteChange(value) }))
+  ]
 })
-
-const typeLabel = computed(
-  () => TASK_TYPES.find(({ value }) => value === typeFilter.value)?.label || 'All types',
-)
-const siteLabelText = computed(() => siteFilter.value || 'All sites')
 
 // Patch, not replace: changing one filter must not clear the other.
 const setFilterQuery = (patch) => {
@@ -126,7 +121,7 @@ onMounted(() => load(statusFilter.value))
 
 <template>
   <div class="p-3 md:p-4 mx-auto max-w-3xl">
-    <StickyToolbar class="flex flex-wrap gap-2 py-2 md:py-3">
+    <StickyToolbar class="flex flex-wrap gap-2 lg:py-2">
       <TabButtons
         class="w-full sm:w-auto"
         :size="isMobile ? 'md' : 'sm'"
@@ -135,31 +130,24 @@ onMounted(() => load(statusFilter.value))
         @update:modelValue="onFilterChange"
       />
 
-      <Dropdown :options="typeMenu">
-        <template #default="{ open }">
-          <Button
-            :size="isMobile ? 'md' : 'sm'"
-            :active="open"
-            class="[&>.truncate]:text-left text-base"
-          >
-            <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-            {{ typeLabel }}
-          </Button>
-        </template>
-      </Dropdown>
+      <Select
+        :model-value="typeFilter"
+        :options="typeOptions"
+        :size="isMobile ? 'md' : 'sm'"
+        side="bottom"
+        align="start"
+        @update:model-value="onTypeChange"
+      />
 
-      <Dropdown :options="siteMenu">
-        <template #default="{ open }">
-          <Button
-            :size="isMobile ? 'md' : 'sm'"
-            :active="open"
-            class="[&>.truncate]:flex-1 [&>.truncate]:text-left text-base flex-1 sm:flex-none min-w-0"
-          >
-            <template #suffix><span class="size-4 shrink-0 lucide-chevron-down" /></template>
-            {{ siteLabelText }}
-          </Button>
-        </template>
-      </Dropdown>
+      <Select
+        :model-value="siteFilter"
+        :options="siteOptions"
+        :size="isMobile ? 'md' : 'sm'"
+        side="bottom"
+        align="start"
+        class="flex-1 sm:flex-none min-w-0"
+        @update:model-value="onSiteChange"
+      />
 
       <Button
         class="ml-auto"
@@ -192,7 +180,7 @@ onMounted(() => load(statusFilter.value))
 
     <EmptyState
       v-else
-      class="mt-8"
+      class="mt-4"
       icon="lucide-list-checks"
       :title="isFiltered ? 'No matching tasks' : 'No tasks yet'"
       :description="

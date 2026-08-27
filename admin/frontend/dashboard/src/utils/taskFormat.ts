@@ -63,6 +63,7 @@ const COMMAND_LABELS = {
 export const TASK_TYPES = [
   {
     value: 'sites',
+    icon: 'lucide-globe',
     label: 'Sites',
     commands: [
       'new-site',
@@ -76,6 +77,7 @@ export const TASK_TYPES = [
   },
   {
     value: 'apps',
+    icon: 'lucide-package',
     label: 'Apps',
     commands: [
       'install-app',
@@ -90,11 +92,13 @@ export const TASK_TYPES = [
   },
   {
     value: 'backups',
+    icon: 'lucide-archive',
     label: 'Backups',
     commands: ['backup-site', 'delete-backup', 'migration-backup'],
   },
   {
     value: 'updates',
+    icon: 'lucide-git-pull-request-arrow',
     label: 'Updates',
     commands: [
       'update',
@@ -108,11 +112,12 @@ export const TASK_TYPES = [
   },
   {
     value: 'server',
+    icon: 'lucide-server',
     label: 'Server',
     commands: ['setup-nginx', 'setup-letsencrypt', 'restart-services'],
   },
   // Catch-all for commands this table has not learned.
-  { value: 'other', label: 'Other', commands: [] },
+  { value: 'other', icon: 'lucide-ellipsis', label: 'Other', commands: [] },
 ]
 
 const COMMAND_TYPE = Object.fromEntries(
