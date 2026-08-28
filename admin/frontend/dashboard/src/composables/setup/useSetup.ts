@@ -11,6 +11,7 @@ import { generateRandomPassword } from '@/utils/randomPassword'
 const DB_TYPE_OPTIONS = [
   { label: 'MariaDB', value: 'mariadb' },
   { label: 'PostgreSQL', value: 'postgres' },
+  { label: 'SQLite', value: 'sqlite' },
 ]
 const STEP_TITLES = {
   database: 'Database',
@@ -247,6 +248,7 @@ export const useSetup = () => {
   })
 
   const validateDatabaseStep = async () => {
+    if (isServerlessDb.value) return null
     if (dbMode.value !== 'external') return null
     const databaseName = dbType.value === 'postgres' ? 'PostgreSQL' : 'MariaDB'
     if (!dbHost.value) return 'Host is required for an external database'
@@ -301,11 +303,17 @@ export const useSetup = () => {
     currentStep.value = stepSequence.value.at(-1)
   }
 
+  const isServerlessDb = computed(() => dbType.value === 'sqlite')
+
   const buildPayload = () => {
     const base = {
       db_type: dbType.value,
       app_repo: appRepo.value.trim(),
       app_branch: appBranch.value.trim(),
+    }
+    // SQLite has no server: no mode, no credentials, nothing to configure.
+    if (isServerlessDb.value) {
+      return base
     }
     if (dbMode.value === 'existing_local') {
       return { ...base, db_mode: 'existing_local' }
@@ -396,6 +404,7 @@ export const useSetup = () => {
     streamStatus,
     showStreamDetails,
     dbType,
+    isServerlessDb,
     dbUser,
     dbPassword,
     dbMode,

@@ -25,6 +25,7 @@ const {
   streamStatus,
   showStreamDetails,
   dbType,
+  isServerlessDb,
   dbUser,
   dbPassword,
   dbMode,
@@ -84,8 +85,17 @@ const {
         <!-- Database -->
         <div v-show="currentStep === 'database'" class="flex flex-col gap-4">
           <Select label="Database engine" v-model="dbType" :options="dbTypeOptions" />
-          <Select label="Database setup" v-model="dbMode" :options="dbModeOptions" />
-          <template v-if="dbMode === 'external'">
+          <p v-if="isServerlessDb" class="text-ink-gray-6 text-p-sm">
+            No database server needed - each site keeps its data in a single file. Good for
+            prototyping, development, and low-traffic sites.
+          </p>
+          <Select
+            v-if="!isServerlessDb"
+            label="Database setup"
+            v-model="dbMode"
+            :options="dbModeOptions"
+          />
+          <template v-if="!isServerlessDb && dbMode === 'external'">
             <div class="flex gap-4">
               <TextInput
                 class="flex-1"
