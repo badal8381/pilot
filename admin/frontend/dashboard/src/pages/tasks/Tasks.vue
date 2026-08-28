@@ -65,7 +65,7 @@ const rows = computed(() =>
     id: task.task_id,
     title: commandLabel(task.command),
     site: siteLabel(task),
-    badge: task.status === 'success' ? null : statusConfig(task),
+    badge: statusConfig(task),
     duration: taskDuration(task),
     timing: relativeTime(task.started_at || task.queued_at),
   })),

@@ -57,7 +57,6 @@ const onFilterChange = (value) => {
 
 const badge = (op) => {
   if (op.pending_action) return { label: pendingActionLabel(op.pending_action), theme: 'amber' }
-  if (op.state === 'completed') return null
   const tone = stateTone(op.state)
   return { label: stateLabel(op.state), theme: tone === 'orange' ? 'amber' : tone }
 }
