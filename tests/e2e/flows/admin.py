@@ -3,14 +3,24 @@
 from __future__ import annotations
 
 from harness.tasks import run_task_action, wait_for_task
+from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import Page, expect
 
 
 def open_root(page: Page, base_url: str) -> None:
     """`/` redirects to `/sites` in the router, so waiting for load races that redirect and
     Playwright reports the navigation as interrupted. Return once the document commits instead;
-    the callers' own locators wait for whichever page the redirect chain settles on."""
-    page.goto(f"{base_url}/", wait_until="commit")
+    the callers' own locators wait for whichever page the redirect chain settles on.
+
+    Even at "commit" the race is only narrowed, not closed: when the router's redirect
+    lands before the initial navigation commits, goto still raises "interrupted by
+    another navigation". The page is on its way to the redirect target either way, so
+    that specific error is safe to swallow - anything else still raises."""
+    try:
+        page.goto(f"{base_url}/", wait_until="commit")
+    except PlaywrightError as error:
+        if "interrupted by another navigation" not in str(error):
+            raise
 
 
 def login(page: Page, base_url: str, password: str) -> None:
