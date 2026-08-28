@@ -81,7 +81,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
 <template>
   <MobileShell v-if="isMobile">
     <header
-      class="sticky top-0 z-20 flex min-h-12 flex-col justify-center border-b border-outline-gray-2 bg-surface-base px-3 sm:px-5"
+      class="sticky top-0 z-20 flex min-h-12 flex-col justify-center border-b border-outline-gray-2 bg-surface-base px-3 md:px-4"
     >
       <div class="flex items-center justify-between">
         <template v-if="route.name == 'Home'">
@@ -136,7 +136,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
     </template>
 
     <header
-      class="sticky top-0 z-20 flex min-h-12 flex-col justify-center border-b border-outline-gray-2 bg-surface-base px-3 sm:px-5"
+      class="sticky top-0 z-20 flex min-h-12 flex-col justify-center border-b border-outline-gray-2 bg-surface-base px-3 md:px-4"
     >
       <div class="flex items-center justify-between">
         <div class="flex flex-1 items-center gap-1">
