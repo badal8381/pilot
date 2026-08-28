@@ -463,3 +463,24 @@ def test_finish_is_retryable_after_the_marker_was_already_cleared(tmp_path: Path
 
     assert retry.status_code == 204
     assert not (tmp_path / ".wizard-active").exists()
+
+
+def test_configuration_accepts_sqlite_without_credentials(tmp_path: Path) -> None:
+    client = setup_client(tmp_path)
+
+    response = client.put(
+        "/api/v1/setup/configuration",
+        json={"db_type": "sqlite", "app_repo": "https://github.com/frappe/frappe", "app_branch": "develop"},
+    )
+
+    assert response.status_code == 200
+    assert BenchConfig.read(tmp_path).db_type == "sqlite"
+
+
+def test_configuration_rejects_an_unknown_db_type(tmp_path: Path) -> None:
+    client = setup_client(tmp_path)
+
+    response = client.put("/api/v1/setup/configuration", json={"db_type": "oracle"})
+
+    assert response.status_code == 422
+    assert "sqlite" in response.get_json()["error"]["message"]
