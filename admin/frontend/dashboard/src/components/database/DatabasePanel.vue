@@ -56,7 +56,7 @@ const badges = computed(() => [props.badge].flat().filter(Boolean))
       </div>
     </div>
 
-    <div class="border-t border-outline-gray-2">
+    <div class="border-t border-outline-gray-2 overflow-x-auto">
       <slot />
     </div>
   </div>

@@ -13,15 +13,9 @@ import {
   toast,
 } from 'frappe-ui'
 
-import {
-  ListHeader,
-  ListRowItem,
-  ListRows,
-  ListView,
-} from 'frappe-ui/experimental'
-
 import SizeBreakup from '@/components/database/SizeBreakup.vue'
 import DatabasePanel from '@/components/database/DatabasePanel.vue'
+import Table from '@/components/common/Table.vue'
 import TableSizesDialog from '@/components/database/TableSizesDialog.vue'
 
 import { databaseApi } from '@/api/database'
@@ -33,38 +27,38 @@ import { apiErrorMessage } from '@/api/client'
 const AUTO_REFRESH_INTERVAL_MS = 2000
 
 const processColumns = [
-  { label: '#', key: 'number', align: 'left', width: '2.5rem' },
-  { label: 'ID', key: 'id', align: 'left', width: 1 },
-  { label: 'State', key: 'state', align: 'left', width: 1 },
-  { label: 'Time', key: 'time', align: 'right', width: 1 },
-  { label: 'User', key: 'user', align: 'left', width: 1 },
-  { label: 'Host', key: 'host', align: 'left', width: 1.5 },
-  { label: 'Command', key: 'command', align: 'left', width: 1 },
-  { label: 'Query', key: 'query', align: 'left', width: 3 },
-  { label: '', key: 'actions', align: 'right', width: '5rem' },
+  { label: '#', key: 'number' },
+  { label: 'ID', key: 'id' },
+  { label: 'State', key: 'state' },
+  { label: 'Time', key: 'time' },
+  { label: 'User', key: 'user' },
+  { label: 'Host', key: 'host' },
+  { label: 'Command', key: 'command' },
+  { label: 'Query', key: 'query', class: 'w-full' },
+  { label: '', key: 'actions', class: 'text-right' },
 ]
 
 const lockColumns = [
-  { label: '#', key: 'number', align: 'left', width: '2rem' },
-  { label: 'ID', key: 'id', align: 'left', width: 0.8 },
-  { label: 'Type', key: 'type', align: 'left', width: 0.8 },
-  { label: 'Mode', key: 'mode', align: 'left', width: 0.8 },
-  { label: 'Table', key: 'table', align: 'left', width: 1.2 },
-  { label: 'Index', key: 'index', align: 'left', width: 0.8 },
-  { label: 'State', key: 'state', align: 'left', width: 0.8 },
-  { label: 'Started', key: 'started', align: 'left', width: 1.2 },
-  { label: 'Query', key: 'query', align: 'left', width: 1.5 },
-  { label: 'Rows Locked', key: 'rowsLocked', align: 'right', width: 0.9 },
-  { label: 'Rows Modified', key: 'rowsModified', align: 'right', width: 1 },
+  { label: '#', key: 'number' },
+  { label: 'ID', key: 'id' },
+  { label: 'Type', key: 'type' },
+  { label: 'Mode', key: 'mode' },
+  { label: 'Table', key: 'table' },
+  { label: 'Index', key: 'index' },
+  { label: 'State', key: 'state' },
+  { label: 'Started', key: 'started' },
+  { label: 'Query', key: 'query', class: 'w-full' },
+  { label: 'Rows Locked', key: 'rowsLocked', class: 'text-right' },
+  { label: 'Rows Modified', key: 'rowsModified', class: 'text-right' },
 ]
 
 const binlogColumns = [
-  { label: '#', key: 'number', align: 'left', width: '2rem' },
-  { label: '', key: 'selected', align: 'left', width: '2rem' },
-  { label: 'File', key: 'name', align: 'left', width: 2 },
-  { label: 'Date', key: 'date', align: 'left', width: 1.5 },
-  { label: 'Size', key: 'size', align: 'right', width: 1 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: '#', key: 'number' },
+  { label: '', key: 'selected' },
+  { label: 'File', key: 'name', class: 'w-full' },
+  { label: 'Date', key: 'date' },
+  { label: 'Size', key: 'size', class: 'text-right' },
+  { label: '', key: 'actions', class: 'text-right' },
 ]
 
 const route = useRoute()
@@ -477,33 +471,20 @@ onMounted(load)
         @refresh="loadProcesses"
       >
         <ErrorMessage v-if="processesError" :message="processesError" class="m-4" />
-        <ListView
-          v-else
-          class="p-4 !w-full"
+        <Table
+          v-else-if="processRows.length"
+          class="p-4"
           :columns="processColumns"
           :rows="processRows"
-          row-key="number"
-          :options="{ selectable: false, showTooltip: false }"
         >
-          <template #cell="{ column, row, item }">
-            <div v-if="column.key === 'actions'" class="flex justify-end">
-              <Button
-                variant="ghost"
-                theme="red"
-                iconLeft="lucide-x"
-                @click="confirmKill(row.process)"
-              >
-                Kill
-              </Button>
-            </div>
-
-            <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+          <template #actions="{ row }">
+            <Button variant="ghost" theme="red" iconLeft="lucide-x" @click="confirmKill(row.process)">
+              Kill
+            </Button>
           </template>
+        </Table>
 
-          <ListHeader />
-          <ListRows v-if="processRows.length" />
-          <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
-        </ListView>
+        <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
       </DatabasePanel>
 
       <DatabasePanel
@@ -517,22 +498,9 @@ onMounted(load)
         @refresh="loadLockWaits"
       >
         <ErrorMessage v-if="lockWaitsError" :message="lockWaitsError" class="m-4" />
-        <ListView
-          v-else
-          class="p-4 !w-full"
-          :columns="lockColumns"
-          :rows="lockRows"
-          row-key="number"
-          :options="{ selectable: false, showTooltip: false }"
-        >
-          <template #cell="{ column, row, item }">
-            <ListRowItem :column="column" :row="row" :item="item" :align="column.align" />
-          </template>
+        <Table v-else-if="lockRows.length" class="p-4" :columns="lockColumns" :rows="lockRows" />
 
-          <ListHeader />
-          <ListRows v-if="lockRows.length" />
-          <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
-        </ListView>
+        <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
       </DatabasePanel>
 
       <DatabasePanel
@@ -545,39 +513,29 @@ onMounted(load)
       >
         <ErrorMessage v-if="binlogsError" :message="binlogsError" class="m-4" />
         <div v-else class="p-4">
-          <ListView
-            class="!w-full"
-            :columns="binlogColumns"
-            :rows="binlogRows"
-            row-key="number"
-            :options="{ selectable: false, showTooltip: false }"
-          >
-            <template #cell="{ column, row, item }">
+          <Table v-if="binlogRows.length" :columns="binlogColumns" :rows="binlogRows">
+            <template #selected="{ row }">
               <Checkbox
-                v-if="column.key === 'selected'"
                 :modelValue="row.index <= selectedIndex"
                 :disabled="row.isActive"
                 @update:modelValue="toggle(row.index, $event)"
               />
-              <div v-else-if="column.key === 'actions'" class="flex justify-end">
-                <Tooltip v-if="!row.isActive" text="Delete this file and every older one">
-                  <Button
-                    variant="ghost"
-                    theme="red"
-                    icon="lucide-trash-2"
-                    label="Delete binary logs"
-                    @click="confirmPurge(row.index)"
-                  />
-                </Tooltip>
-              </div>
-
-              <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
             </template>
 
-            <ListHeader />
-            <ListRows v-if="binlogRows.length" />
-            <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
-          </ListView>
+            <template #actions="{ row }">
+              <Tooltip v-if="!row.isActive" text="Delete this file and every older one">
+                <Button
+                  variant="ghost"
+                  theme="red"
+                  icon="lucide-trash-2"
+                  label="Delete binary logs"
+                  @click="confirmPurge(row.index)"
+                />
+              </Tooltip>
+            </template>
+          </Table>
+
+          <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
 
           <div v-if="binlogs.length" class="flex flex-wrap justify-between items-center gap-2 mt-3">
             <p class="text-ink-gray-5 text-xs">
