@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, ErrorMessage, TabButtons } from 'frappe-ui'
+import { Badge, Button, ErrorMessage, TabButtons, Tooltip } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
@@ -22,7 +22,7 @@ import {
   UPDATE_FILTERS,
 } from '@/utils/updateFormat'
 import { relativeTime } from '@/utils/time'
-import { fmtDuration } from '@/utils/taskFormat'
+import { fmtDateTime, fmtDuration } from '@/utils/taskFormat'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +78,7 @@ const rows = computed(() =>
     badge: badge(op),
     duration: duration(op),
     timing: relativeTime(op.started_at || op.created_at),
+    timingAt: fmtDateTime(op.started_at || op.created_at),
   })),
 )
 
@@ -156,6 +157,10 @@ onMounted(load)
 
       <template #site="{ row }">
         <span :title="row.siteNames">{{ row.site }}</span>
+      </template>
+
+      <template #timing="{ row }">
+        <Tooltip :text="row.timingAt"><span>{{ row.timing }}</span></Tooltip>
       </template>
 
       <template #badge="{ row }">

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Badge, Button, ErrorMessage, Select, TabButtons } from 'frappe-ui'
+import { Badge, Button, ErrorMessage, Select, TabButtons, Tooltip } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
@@ -16,6 +16,7 @@ import {
   siteLabel,
   statusConfig,
   TASK_TYPES,
+  fmtDateTime,
   taskDuration,
   taskType,
 } from '@/utils/taskFormat'
@@ -68,6 +69,7 @@ const rows = computed(() =>
     badge: statusConfig(task),
     duration: taskDuration(task),
     timing: relativeTime(task.started_at || task.queued_at),
+    timingAt: fmtDateTime(task.started_at || task.queued_at),
   })),
 )
 
@@ -173,6 +175,10 @@ onMounted(() => load(statusFilter.value))
         <router-link :to="getRowRoute(row)" class="after:absolute after:inset-0"
           >{{ row.title }}</router-link
         >
+      </template>
+
+      <template #timing="{ row }">
+        <Tooltip :text="row.timingAt"><span>{{ row.timing }}</span></Tooltip>
       </template>
 
       <template #badge="{ row }">

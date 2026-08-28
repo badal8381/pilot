@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
-import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Skeleton } from 'frappe-ui'
+import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Skeleton, Tooltip } from 'frappe-ui'
 
 import Table from '@/components/common/Table.vue'
 
 import { useActivities } from '@/composables/activities/useActivities'
 import { useSites } from '@/composables/sites/useSites'
 import { relativeTime } from '@/utils/time'
-import { commandLabel } from '@/utils/taskFormat'
+import { commandLabel, fmtDateTime } from '@/utils/taskFormat'
 import type { AuditEntry } from '@/types/audit'
 
 const props = defineProps<{ siteName?: string }>()
@@ -169,6 +169,7 @@ const activityTable = computed(() => ({
         resource: activityResourceLabel(entry) || '-',
         actor: actor.secondary ? `${actor.primary} (${actor.secondary})` : actor.primary,
         time: activityTime(entry),
+        timeAt: fmtDateTime(entry.logged_at),
       }
     }),
 }))
@@ -247,6 +248,10 @@ onMounted(() => {
           </span>
 
           <span class="font-medium text-sm">{{ row.activity }}</span>
+        </template>
+
+        <template #time="{ row }">
+          <Tooltip :text="row.timeAt"><span>{{ row.time }}</span></Tooltip>
         </template>
 
         <template #actions="{ row }">
