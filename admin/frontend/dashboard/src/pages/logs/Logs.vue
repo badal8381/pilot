@@ -211,13 +211,13 @@ onUnmounted(() => stopLive())
 
 <template>
   <div class="p-3 md:p-4 flex flex-col h-[calc(100dvh-3rem)]">
-    <div class="flex flex-1 sm:gap-4 min-h-0 overflow-hidden">
+    <div class="flex flex-1 md:gap-4 min-h-0 overflow-hidden">
       <!-- Sidebar: log list -->
       <div
         class="md:flex flex-col w-full md:w-64 overflow-hidden shrink-0"
         :class="selectedFile ? 'hidden' : 'flex'"
       >
-        <div class="sm:px-2 pt-2 shrink-0">
+        <div class="shrink-0">
           <FormControl
             v-model="fileSearch"
             placeholder="Search log files"
@@ -227,7 +227,7 @@ onUnmounted(() => stopLive())
           </FormControl>
         </div>
 
-        <div class="flex flex-col flex-1 gap-1 p-1.5 sm:p-2 overflow-y-auto">
+        <div class="flex flex-col flex-1 gap-1 py-1.5 md:py-2 overflow-y-auto">
           <LoadingText v-if="logsLoading" class="p-2" />
           <ErrorMessage v-else-if="logsError" :message="logsError" class="p-2" />
           <p v-else-if="!filteredLogs.length" class="p-2 text-ink-gray-4 text-sm">
@@ -238,7 +238,7 @@ onUnmounted(() => stopLive())
             v-else
             v-for="log in filteredLogs"
             :key="log.filename"
-            class="sm:px-3 py-2.5 rounded-4 w-full text-left transition-colors shrink-0"
+            class="md:px-3 py-2.5 rounded-4 w-full text-left transition-colors shrink-0"
             :class="selectedFile === log.filename ? 'bg-surface-gray-3' : 'hover:bg-surface-gray-1'"
             @click="selectedFile = log.filename"
           >
@@ -280,7 +280,7 @@ onUnmounted(() => stopLive())
         </div>
 
         <template v-else>
-          <div class="flex flex-col sm:flex-row sm:items-center gap-2 py-2 shrink-0">
+          <div class="flex flex-col md:flex-row md:items-center gap-2 pb-2 shrink-0">
             <!-- Mobile-only: back + filename, replacing the standalone filename bar -->
             <div class="md:hidden flex items-center gap-2">
               <Button
@@ -329,7 +329,7 @@ onUnmounted(() => stopLive())
             </div>
 
             <div class="flex items-center gap-2 shrink-0">
-              <div class="w-28 sm:w-32 min-w-0 shrink-0">
+              <div class="w-28 md:w-32 min-w-0 shrink-0">
                 <FormControl
                   type="select"
                   v-model="linesCount"
@@ -345,7 +345,7 @@ onUnmounted(() => stopLive())
               </div>
 
               <Button
-                class="ml-auto sm:ml-0"
+                class="ml-auto md:ml-0"
                 icon="lucide-refresh-cw"
                 :size="isSinglePane ? 'md' : 'sm'"
                 label="Refresh"
@@ -382,7 +382,7 @@ onUnmounted(() => stopLive())
           </div>
 
           <!-- Terminal area -->
-          <div ref="viewer" class="flex flex-col flex-1 mt-2 sm:mt-0 overflow-hidden">
+          <div ref="viewer" class="flex flex-col flex-1 mt-2 md:mt-0 overflow-hidden">
             <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
               Error: {{ contentError }}
             </div>
@@ -402,7 +402,7 @@ onUnmounted(() => stopLive())
 
             <div
               v-if="rawLines.length"
-              class="sm:px-4 pt-2 text-ink-gray-4 text-xs shrink-0"
+              class="md:px-4 pt-2 text-ink-gray-4 text-xs shrink-0"
             >
               {{ totalLineCount }} lines in file
               <template v-if="search.trim()">
