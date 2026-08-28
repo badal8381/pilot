@@ -474,7 +474,10 @@ def test_configuration_accepts_sqlite_without_credentials(tmp_path: Path) -> Non
     )
 
     assert response.status_code == 200
-    assert BenchConfig.read(tmp_path).db_type == "sqlite"
+    config = BenchConfig.read(tmp_path)
+    assert config.db_type == "sqlite"
+    # A SQLite bench is a development bench.
+    assert config.allow_developer_mode is True
 
 
 def test_configuration_rejects_an_unknown_db_type(tmp_path: Path) -> None:

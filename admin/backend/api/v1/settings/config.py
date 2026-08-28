@@ -19,7 +19,8 @@ class ConfigPatcher:
         self.data = data
 
     def apply(self) -> str | None:
-        self._apply_bench()
+        if error := self._apply_bench():
+            return error
         self._apply_lite_mode()
         self._apply_workers()
         self._apply_firewall()
@@ -36,7 +37,7 @@ class ConfigPatcher:
             return str(error)
         return None
 
-    def _apply_bench(self) -> None:
+    def _apply_bench(self) -> str | None:
         bench = self.data.get("bench") or {}
         if "http_port" in bench:
             self.config.http_port = int(bench["http_port"])
@@ -45,7 +46,11 @@ class ConfigPatcher:
         if "default_branch" in bench:
             self.config.default_branch = str(bench["default_branch"]).strip()
         if "allow_developer_mode" in bench:
-            self.config.allow_developer_mode = bool(bench["allow_developer_mode"])
+            allowed = bool(bench["allow_developer_mode"])
+            if not allowed and self.config.db_type == "sqlite":
+                return "Developer mode cannot be disallowed on a SQLite bench - it is a development bench by definition."
+            self.config.allow_developer_mode = allowed
+        return None
 
     def _apply_lite_mode(self) -> None:
         lite_mode = self.data.get("lite_mode") or {}

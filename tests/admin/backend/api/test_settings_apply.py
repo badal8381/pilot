@@ -116,3 +116,37 @@ def test_settings_success_has_no_legacy_error_fields(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert response.get_json() == {"restarted": True}
+
+
+def test_developer_mode_cannot_be_disallowed_on_a_sqlite_bench(tmp_path: Path) -> None:
+    def configure(config):
+        config.db_type = "sqlite"
+        config.allow_developer_mode = True
+
+    client = _client(tmp_path / "bench", configure)
+
+    response = client.patch(
+        "/api/v1/settings", json={"bench": {"allow_developer_mode": False}}
+    )
+
+    assert response.status_code == 422
+    assert "SQLite" in response.get_json()["error"]["message"]
+    assert BenchConfig.read(tmp_path / "bench").allow_developer_mode is True
+
+
+def test_developer_mode_can_still_be_toggled_on_a_server_bench(tmp_path: Path) -> None:
+    def configure(config):
+        config.allow_developer_mode = True
+
+    client = _client(tmp_path / "bench", configure)
+
+    with (
+        patch("pilot.core.bench.settings.regenerate_configs"),
+        patch("pilot.core.bench.settings.restart_running_workload"),
+    ):
+        response = client.patch(
+            "/api/v1/settings", json={"bench": {"allow_developer_mode": False}}
+        )
+
+    assert response.status_code == 200
+    assert BenchConfig.read(tmp_path / "bench").allow_developer_mode is False

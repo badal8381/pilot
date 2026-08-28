@@ -87,7 +87,8 @@ const {
           <Select label="Database engine" v-model="dbType" :options="dbTypeOptions" />
           <p v-if="isServerlessDb" class="text-ink-gray-6 text-p-sm">
             No database server needed - each site keeps its data in a single file. Good for
-            prototyping, development, and low-traffic sites.
+            prototyping, development, and low-traffic sites. The bench is created as a
+            development bench with developer mode allowed.
           </p>
           <Select
             v-if="!isServerlessDb"

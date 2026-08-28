@@ -73,6 +73,11 @@ def _update_configuration(bench_root: Path, data: dict):
         )
 
     data = apply_existing_local_database(bench_root, data)
+    if data.get("db_type") == "sqlite":
+        # A SQLite bench is a development bench - no server engine, data in
+        # per-site files. Creating it with developer mode allowed keeps the
+        # setting and the engine choice in step.
+        data = {**data, "allow_developer_mode": True}
     settings = {**current, **data, "admin_enabled": True}
     error = validate_configuration(settings)
     if error:
