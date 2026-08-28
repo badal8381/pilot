@@ -12,10 +12,7 @@ def open_root(page: Page, base_url: str) -> None:
     Playwright reports the navigation as interrupted. Return once the document commits instead;
     the callers' own locators wait for whichever page the redirect chain settles on.
 
-    Even at "commit" the race is only narrowed, not closed: when the router's redirect
-    lands before the initial navigation commits, goto still raises "interrupted by
-    another navigation". The page is on its way to the redirect target either way, so
-    that specific error is safe to swallow - anything else still raises."""
+    """
     try:
         page.goto(f"{base_url}/", wait_until="commit")
     except PlaywrightError as error:
