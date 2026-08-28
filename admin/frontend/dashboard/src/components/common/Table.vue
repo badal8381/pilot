@@ -37,7 +37,7 @@ defineSlots<{
       </thead>
 
       <tbody>
-        <tr v-for="(row, index) in rows" :key="row.id ?? index" class="relative">
+        <tr v-for="(row, index) in rows" :key="row.id ?? index">
           <td
             v-for="column in columns"
             :key="column.key"
@@ -57,10 +57,6 @@ defineSlots<{
 <style scoped>
 tbody tr:not(:last-child) td {
   @apply border-b border-outline-gray-1;
-}
-
-tbody tr:hover td {
-  @apply bg-surface-gray-1;
 }
 
 th:first-child,
