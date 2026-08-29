@@ -322,6 +322,7 @@ def test_restore_in_place_queues_a_restore_task_over_the_upload(tmp_path: Path) 
     assert str(staged / "database.sql.gz") in meta["command_argv"]
     assert str(staged / "private-files.tar") in meta["command_argv"]
     assert upload["upload_id"] in meta["command_argv"]
+    assert (staged / ".claimed").read_text() in meta["command_argv"]
     assert meta["resource_keys"] == ["site:site.localhost"]
 
 

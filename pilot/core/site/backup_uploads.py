@@ -28,6 +28,8 @@ class BackupUpload:
     upload_id: str
     directory: Path
     files: dict[str, str]
+    # Set by claim(): the capability a restore presents to delete this upload.
+    claim: str | None = None
 
     @property
     def db_file(self) -> str:
@@ -87,26 +89,31 @@ class BackupUploads:
         second restore must not be pointed at the same archives. The marker is
         created exclusively, so concurrent claims cannot both succeed."""
         upload = self.get(upload_id)
+        claim = secrets.token_hex(16)
         try:
-            open_private(upload.directory / _CLAIM_MARKER, "w", exclusive=True).close()
+            with open_private(upload.directory / _CLAIM_MARKER, "w", exclusive=True) as marker:
+                marker.write(claim)
         except FileExistsError:
             raise BenchError("This backup upload is already being restored. Upload the files again.") from None
-        return upload
+        return BackupUpload(upload.upload_id, upload.directory, upload.files, claim)
 
     def release(self, upload_id: str) -> None:
         """Undo a claim whose restore never got queued."""
         if _UPLOAD_ID_RE.match(upload_id or ""):
             (self.root / upload_id / _CLAIM_MARKER).unlink(missing_ok=True)
 
-    def remove(self, upload_id: str, archive: str | None = None) -> None:
+    def remove(self, upload_id: str, archive: str | None = None, claim: str | None = None) -> None:
         """Delete an upload. The id is validated, so only a directory under
-        backups-uploads can ever be removed. When `archive` is given, the upload
-        is removed only if that archive lives inside it - a restore may clean up
-        the upload it actually consumed, never someone else's."""
+        backups-uploads can ever be removed. A claimed upload is removed only by
+        the restore holding its claim, and only if `archive` lives inside it -
+        a restore cleans up the upload it consumed, never someone else's."""
         if not _UPLOAD_ID_RE.match(upload_id or ""):
             return
         directory = self.root / upload_id
         if archive is not None and not Path(archive).resolve().is_relative_to(directory.resolve()):
+            return
+        marker = directory / _CLAIM_MARKER
+        if marker.exists() and (not claim or marker.read_text() != claim):
             return
         shutil.rmtree(directory, ignore_errors=True)
 

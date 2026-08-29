@@ -135,6 +135,7 @@ def restore_site(name: str):
             public_files=upload.files.get("public_files"),
             private_files=upload.files.get("private_files"),
             upload_id=upload.upload_id,
+            upload_claim=upload.claim,
             idempotency_key=request.headers.get("Idempotency-Key"),
             resource_key=f"site:{name.lower()}",
         )

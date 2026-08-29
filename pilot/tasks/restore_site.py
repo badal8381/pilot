@@ -22,12 +22,15 @@ class RestoreSiteTask(Task):
     # The staged upload these archives came from; removed once the restore
     # succeeds, kept on failure so a retry still has its inputs.
     upload_id: str | None = None
+    upload_claim: str | None = None
 
     def run(self) -> None:
         self.require_production_privileges()
         self.restore()
         if self.upload_id:
-            BackupUploads(self.bench_root).remove(self.upload_id, archive=self.db_file)
+            BackupUploads(self.bench_root).remove(
+                self.upload_id, archive=self.db_file, claim=self.upload_claim
+            )
 
     @step("restore", lambda self: f"Restore backup into {self.site}")
     def restore(self) -> None:

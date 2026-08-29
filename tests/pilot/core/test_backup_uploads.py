@@ -118,3 +118,17 @@ def test_remove_with_an_archive_only_deletes_the_upload_that_holds_it(tmp_path: 
 
     uploads.remove(mine.upload_id, archive=mine.db_file)
     assert not mine.directory.exists()
+
+
+def test_a_claimed_upload_is_removed_only_by_its_claim_holder(tmp_path: Path) -> None:
+    uploads = BackupUploads(tmp_path)
+    saved = uploads.save({"database": _part("db.sql.gz")})
+    claimed = uploads.claim(saved.upload_id)
+
+    uploads.remove(saved.upload_id, archive=claimed.db_file)
+    assert claimed.directory.exists()
+    uploads.remove(saved.upload_id, archive=claimed.db_file, claim="not-the-claim")
+    assert claimed.directory.exists()
+
+    uploads.remove(saved.upload_id, archive=claimed.db_file, claim=claimed.claim)
+    assert not claimed.directory.exists()
