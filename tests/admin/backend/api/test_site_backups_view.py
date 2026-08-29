@@ -251,3 +251,91 @@ def test_backup_schedule_delete_returns_no_content(tmp_path: Path) -> None:
     assert response.status_code == 204
     assert response.data == b""
     remove_schedule.assert_called_once_with("site.localhost")
+
+
+def _upload(client, **extra_parts):
+    import io
+
+    data = {"database": (io.BytesIO(b"dump"), "site-database.sql.gz"), **extra_parts}
+    response = client.post("/api/v1/sites/backup-uploads", data=data, content_type="multipart/form-data")
+    assert response.status_code == 201, response.get_json()
+    return response.get_json()
+
+
+def test_backup_upload_stages_the_archives(tmp_path: Path) -> None:
+    import io
+
+    bench_root = tmp_path / "benches" / "current"
+    client = _client(bench_root)
+
+    body = _upload(client, public_files=(io.BytesIO(b"tar"), "site-files.tar"))
+
+    assert sorted(body["files"]) == ["database", "public_files"]
+    staged = bench_root / "backups-uploads" / body["upload_id"]
+    assert (staged / "database.sql.gz").read_bytes() == b"dump"
+    assert (staged / "files.tar").read_bytes() == b"tar"
+
+
+def test_backup_upload_rejects_a_missing_database_or_bad_extension(tmp_path: Path) -> None:
+    import io
+
+    client = _client(tmp_path / "benches" / "current")
+
+    missing = client.post(
+        "/api/v1/sites/backup-uploads",
+        data={"public_files": (io.BytesIO(b"tar"), "files.tar")},
+        content_type="multipart/form-data",
+    )
+    wrong = client.post(
+        "/api/v1/sites/backup-uploads",
+        data={"database": (io.BytesIO(b"x"), "dump.zip")},
+        content_type="multipart/form-data",
+    )
+
+    assert missing.status_code == 422
+    assert missing.get_json()["error"]["code"] == "backup_file_missing"
+    assert wrong.status_code == 422
+    assert wrong.get_json()["error"]["code"] == "invalid_backup_file"
+
+
+def test_restore_in_place_queues_a_restore_task_over_the_upload(tmp_path: Path) -> None:
+    import io
+
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site.localhost")
+    client = _client(bench_root)
+    upload = _upload(client, private_files=(io.BytesIO(b"tar"), "private-files.tar"))
+
+    response = _request(
+        client,
+        "post",
+        "/api/v1/sites/site.localhost/actions/restore",
+        json={"upload_id": upload["upload_id"]},
+    )
+
+    body = response.get_json()
+    assert response.status_code == 202
+    assert body["command"] == "restore-site"
+    assert body["args"]["site"] == "site.localhost"
+    meta = json.loads((bench_root / "tasks" / body["task_id"] / "meta.json").read_text())
+    staged = bench_root / "backups-uploads" / upload["upload_id"]
+    assert str(staged / "database.sql.gz") in meta["command_argv"]
+    assert str(staged / "private-files.tar") in meta["command_argv"]
+    assert meta["resource_keys"] == ["site:site.localhost"]
+
+
+def test_restore_in_place_rejects_unknown_uploads_and_sites(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site.localhost")
+    client = _client(bench_root)
+
+    unknown_upload = client.post(
+        "/api/v1/sites/site.localhost/actions/restore", json={"upload_id": "0123456789abcdef"}
+    )
+    unknown_site = client.post(
+        "/api/v1/sites/missing.localhost/actions/restore", json={"upload_id": "0123456789abcdef"}
+    )
+
+    assert unknown_upload.status_code == 404
+    assert unknown_upload.get_json()["error"]["code"] == "backup_upload_not_found"
+    assert unknown_site.status_code == 404

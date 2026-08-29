@@ -29,12 +29,15 @@ from admin.backend.middleware import rate_limit, require_scope
 from admin.backend.providers.apps import AppProvider
 from admin.backend.providers.sites import SiteInfo, SiteProvider
 from pilot.core.bench import Bench
+from pilot.core.site.backup_uploads import BackupUpload, BackupUploads
 from pilot.core.site.login import site_url
+from pilot.exceptions import BenchError
 from pilot.internal.site_paths import site_config_path, site_exists
 from pilot.internal.validators import validate_site_name
 from pilot.tasks.clear_cache import ClearCacheTask
 from pilot.tasks.drop_site import DropSiteTask
 from pilot.tasks.new_site import NewSiteTask
+from pilot.tasks.new_site_from_backup import NewSiteFromBackupTask
 from pilot.tasks.reinstall_site import ReinstallSiteTask
 
 
@@ -130,19 +133,53 @@ def create_site():
     if err:
         return site_name_failure(err)
 
+    upload, failure = _requested_backup_upload(bench_root, data.get("restore_upload_id"))
+    if failure:
+        return failure
+
     try:
-        task_id = NewSiteTask.queue(
-            Bench(bench_root),
-            name=name,
-            admin_password=admin_password,
-            apps=apps,
-            idempotency_key=request.headers.get("Idempotency-Key"),
-            resource_key=f"site:{name.lower()}",
-        )
+        if upload:
+            task_id = _queue_new_site_from_upload(bench_root, name, admin_password, upload)
+        else:
+            task_id = NewSiteTask.queue(
+                Bench(bench_root),
+                name=name,
+                admin_password=admin_password,
+                apps=apps,
+                idempotency_key=request.headers.get("Idempotency-Key"),
+                resource_key=f"site:{name.lower()}",
+            )
     except Exception as error:
         return task_failure(error)
 
     return accepted_task_response(bench_root, task_id)
+
+
+def _requested_backup_upload(bench_root: Path, upload_id) -> tuple[BackupUpload | None, object]:
+    """The staged upload a create request restores from, as (upload, error_response)."""
+    if upload_id is None or upload_id == "":
+        return None, None
+    if not isinstance(upload_id, str):
+        return None, invalid_fields()
+    try:
+        return BackupUploads(bench_root).get(upload_id), None
+    except BenchError as error:
+        return None, error_response("backup_upload_not_found", str(error), 404)
+
+
+def _queue_new_site_from_upload(bench_root: Path, name: str, admin_password: str, upload: BackupUpload) -> str:
+    """A site created from a backup takes its apps from the dump, not the request."""
+    return NewSiteFromBackupTask.queue(
+        Bench(bench_root),
+        name=name,
+        db_file=upload.db_file,
+        admin_password=admin_password,
+        public_files=upload.files.get("public_files"),
+        private_files=upload.files.get("private_files"),
+        staging_dir=str(upload.directory),
+        idempotency_key=request.headers.get("Idempotency-Key"),
+        resource_key=f"site:{name.lower()}",
+    )
 
 
 @sites_bp.delete("/<name>")
