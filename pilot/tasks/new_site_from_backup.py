@@ -25,7 +25,7 @@ class NewSiteFromBackupTask(Task):
         self.require_production_privileges()
         self.restore()
         if self.upload_id:
-            BackupUploads(self.bench_root).remove(self.upload_id)
+            BackupUploads(self.bench_root).remove(self.upload_id, archive=self.db_file)
 
     @step("restore", lambda self: f"Restore site {self.name} from backup")
     def restore(self) -> None:

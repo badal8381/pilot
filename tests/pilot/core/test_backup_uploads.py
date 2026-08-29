@@ -96,3 +96,25 @@ def test_remove_only_ever_touches_an_upload_directory(tmp_path: Path) -> None:
     BackupUploads(tmp_path).remove(str(outside))
 
     assert (outside / "keep").exists()
+
+
+def test_claim_is_exclusive_even_when_called_twice(tmp_path: Path) -> None:
+    uploads = BackupUploads(tmp_path)
+    saved = uploads.save({"database": _part("db.sql.gz")})
+
+    uploads.claim(saved.upload_id)
+    with pytest.raises(BenchError, match="already being restored"):
+        uploads.claim(saved.upload_id)
+
+
+def test_remove_with_an_archive_only_deletes_the_upload_that_holds_it(tmp_path: Path) -> None:
+    uploads = BackupUploads(tmp_path)
+    mine = uploads.save({"database": _part("db.sql.gz")})
+    theirs = uploads.save({"database": _part("db.sql.gz")})
+
+    # A task pointing at its own archives but naming someone else's upload id.
+    uploads.remove(theirs.upload_id, archive=mine.db_file)
+    assert theirs.directory.exists()
+
+    uploads.remove(mine.upload_id, archive=mine.db_file)
+    assert not mine.directory.exists()

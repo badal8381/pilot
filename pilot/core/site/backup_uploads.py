@@ -84,9 +84,13 @@ class BackupUploads:
 
     def claim(self, upload_id: str) -> BackupUpload:
         """Reserve the upload for one restore: a task deletes it when done, so a
-        second restore must not be pointed at the same archives."""
+        second restore must not be pointed at the same archives. The marker is
+        created exclusively, so concurrent claims cannot both succeed."""
         upload = self.get(upload_id)
-        (upload.directory / _CLAIM_MARKER).touch()
+        try:
+            open_private(upload.directory / _CLAIM_MARKER, "w", exclusive=True).close()
+        except FileExistsError:
+            raise BenchError("This backup upload is already being restored. Upload the files again.") from None
         return upload
 
     def release(self, upload_id: str) -> None:
@@ -94,11 +98,17 @@ class BackupUploads:
         if _UPLOAD_ID_RE.match(upload_id or ""):
             (self.root / upload_id / _CLAIM_MARKER).unlink(missing_ok=True)
 
-    def remove(self, upload_id: str) -> None:
+    def remove(self, upload_id: str, archive: str | None = None) -> None:
         """Delete an upload. The id is validated, so only a directory under
-        backups-uploads can ever be removed - callers cannot aim this elsewhere."""
-        if _UPLOAD_ID_RE.match(upload_id or ""):
-            shutil.rmtree(self.root / upload_id, ignore_errors=True)
+        backups-uploads can ever be removed. When `archive` is given, the upload
+        is removed only if that archive lives inside it - a restore may clean up
+        the upload it actually consumed, never someone else's."""
+        if not _UPLOAD_ID_RE.match(upload_id or ""):
+            return
+        directory = self.root / upload_id
+        if archive is not None and not Path(archive).resolve().is_relative_to(directory.resolve()):
+            return
+        shutil.rmtree(directory, ignore_errors=True)
 
 
 def _extension(filename: str, allowed: tuple[str, ...]) -> str:
