@@ -151,7 +151,7 @@ def create_site():
             )
     except Exception as error:
         if upload:
-            BackupUploads(bench_root).release(upload.upload_id)
+            BackupUploads(bench_root).release(upload.upload_id, upload.claim)
         return task_failure(error)
 
     return accepted_task_response(bench_root, task_id)

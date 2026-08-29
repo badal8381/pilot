@@ -140,7 +140,7 @@ def restore_site(name: str):
             resource_key=f"site:{name.lower()}",
         )
     except Exception as error:
-        uploads.release(upload.upload_id)
+        uploads.release(upload.upload_id, upload.claim)
         return task_failure(error)
     return accepted_task_response(bench_root, task_id)
 

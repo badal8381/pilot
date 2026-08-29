@@ -110,10 +110,15 @@ class BackupUploads:
             claim = existing["claim"]
         return BackupUpload(upload.upload_id, upload.directory, upload.files, claim)
 
-    def release(self, upload_id: str) -> None:
-        """Undo a claim whose restore never got queued."""
-        if _UPLOAD_ID_RE.match(upload_id or ""):
-            (self.root / upload_id / _CLAIM_MARKER).unlink(missing_ok=True)
+    def release(self, upload_id: str, claim: str | None) -> None:
+        """Undo a claim whose restore never got queued. Only the claim's holder
+        may release it, so a failed request cannot discard a reservation that a
+        concurrent request has since made or reused."""
+        if not _UPLOAD_ID_RE.match(upload_id or "") or not claim:
+            return
+        marker = self.root / upload_id / _CLAIM_MARKER
+        if marker.exists() and _read_marker(marker).get("claim") == claim:
+            marker.unlink(missing_ok=True)
 
     def remove(self, upload_id: str, archive: str | None = None, claim: str | None = None) -> None:
         """Delete an upload. The id is validated, so only a directory under

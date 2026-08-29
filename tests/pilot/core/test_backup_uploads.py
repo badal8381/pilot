@@ -81,7 +81,7 @@ def test_claim_reserves_the_upload_until_released(tmp_path: Path) -> None:
     claimed = uploads.claim(saved.upload_id)
     with pytest.raises(BenchError, match="already being restored"):
         uploads.get(saved.upload_id)
-    uploads.release(saved.upload_id)
+    uploads.release(saved.upload_id, claimed.claim)
 
     assert claimed.files == saved.files
     assert uploads.get(saved.upload_id).files == saved.files
@@ -146,3 +146,17 @@ def test_a_retry_with_the_same_key_gets_the_same_claim(tmp_path: Path) -> None:
         uploads.claim(saved.upload_id, retry_key="req-2")
     with pytest.raises(BenchError, match="already being restored"):
         uploads.claim(saved.upload_id)
+
+
+def test_release_only_by_the_claim_holder(tmp_path: Path) -> None:
+    uploads = BackupUploads(tmp_path)
+    saved = uploads.save({"database": _part("db.sql.gz")})
+    claimed = uploads.claim(saved.upload_id)
+
+    uploads.release(saved.upload_id, "someone-elses-claim")
+    uploads.release(saved.upload_id, None)
+    with pytest.raises(BenchError, match="already being restored"):
+        uploads.get(saved.upload_id)
+
+    uploads.release(saved.upload_id, claimed.claim)
+    assert uploads.get(saved.upload_id).files == saved.files
