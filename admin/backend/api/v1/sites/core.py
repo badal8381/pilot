@@ -150,8 +150,6 @@ def create_site():
                 resource_key=f"site:{name.lower()}",
             )
     except Exception as error:
-        if upload:
-            BackupUploads(bench_root).release(upload.upload_id, upload.claim)
         return task_failure(error)
 
     return accepted_task_response(bench_root, task_id)
@@ -171,19 +169,27 @@ def _requested_backup_upload(bench_root: Path, upload_id) -> tuple[BackupUpload 
 
 
 def _queue_new_site_from_upload(bench_root: Path, name: str, admin_password: str, upload: BackupUpload) -> str:
-    """A site created from a backup takes its apps from the dump, not the request."""
-    return NewSiteFromBackupTask.queue(
-        Bench(bench_root),
-        name=name,
-        db_file=upload.db_file,
-        admin_password=admin_password,
-        public_files=upload.files.get("public_files"),
-        private_files=upload.files.get("private_files"),
-        upload_id=upload.upload_id,
-        upload_claim=upload.claim,
-        idempotency_key=request.headers.get("Idempotency-Key"),
-        resource_key=f"site:{name.lower()}",
-    )
+    """A site created from a backup takes its apps from the dump, not the request.
+    The upload's claim is released if queueing fails and locked in once it succeeds."""
+    uploads = BackupUploads(bench_root)
+    try:
+        task_id = NewSiteFromBackupTask.queue(
+            Bench(bench_root),
+            name=name,
+            db_file=upload.db_file,
+            admin_password=admin_password,
+            public_files=upload.files.get("public_files"),
+            private_files=upload.files.get("private_files"),
+            upload_id=upload.upload_id,
+            upload_claim=upload.claim,
+            idempotency_key=request.headers.get("Idempotency-Key"),
+            resource_key=f"site:{name.lower()}",
+        )
+    except Exception:
+        uploads.release(upload.upload_id, upload.claim)
+        raise
+    uploads.mark_queued(upload.upload_id, upload.claim)
+    return task_id
 
 
 @sites_bp.delete("/<name>")

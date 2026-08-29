@@ -142,6 +142,7 @@ def restore_site(name: str):
     except Exception as error:
         uploads.release(upload.upload_id, upload.claim)
         return task_failure(error)
+    uploads.mark_queued(upload.upload_id, upload.claim)
     return accepted_task_response(bench_root, task_id)
 
 

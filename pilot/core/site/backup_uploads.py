@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import IO
 
 from pilot.exceptions import BenchError
-from pilot.utils import make_private_directory, open_private
+from pilot.utils import make_private_directory, open_private, write_private_text
 
 UPLOADS_DIR = "backups-uploads"
 
@@ -110,14 +110,25 @@ class BackupUploads:
             claim = existing["claim"]
         return BackupUpload(upload.upload_id, upload.directory, upload.files, claim)
 
+    def mark_queued(self, upload_id: str, claim: str | None) -> None:
+        """Record that a restore holding this claim was accepted. From here the
+        claim can no longer be released - only the task's cleanup ends it."""
+        marker = self.root / upload_id / _CLAIM_MARKER
+        data = _read_marker(marker)
+        if claim and data.get("claim") == claim:
+            data["queued"] = True
+            write_private_text(marker, json.dumps(data))
+
     def release(self, upload_id: str, claim: str | None) -> None:
         """Undo a claim whose restore never got queued. Only the claim's holder
-        may release it, so a failed request cannot discard a reservation that a
-        concurrent request has since made or reused."""
+        may release it, and not once any submission carrying the claim has been
+        accepted - a failed request cannot discard a reservation that a
+        concurrent same-key retry has since turned into a task."""
         if not _UPLOAD_ID_RE.match(upload_id or "") or not claim:
             return
         marker = self.root / upload_id / _CLAIM_MARKER
-        if marker.exists() and _read_marker(marker).get("claim") == claim:
+        data = _read_marker(marker)
+        if data.get("claim") == claim and not data.get("queued"):
             marker.unlink(missing_ok=True)
 
     def remove(self, upload_id: str, archive: str | None = None, claim: str | None = None) -> None:

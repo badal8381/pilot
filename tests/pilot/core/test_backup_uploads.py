@@ -160,3 +160,19 @@ def test_release_only_by_the_claim_holder(tmp_path: Path) -> None:
 
     uploads.release(saved.upload_id, claimed.claim)
     assert uploads.get(saved.upload_id).files == saved.files
+
+
+def test_an_accepted_claim_can_no_longer_be_released(tmp_path: Path) -> None:
+    """A same-key retry may share the claim; once either submission is accepted,
+    the other's failure must not discard the reservation the task relies on."""
+    uploads = BackupUploads(tmp_path)
+    saved = uploads.save({"database": _part("db.sql.gz")})
+    claimed = uploads.claim(saved.upload_id, retry_key="req-1")
+
+    uploads.mark_queued(saved.upload_id, claimed.claim)
+    uploads.release(saved.upload_id, claimed.claim)
+
+    with pytest.raises(BenchError, match="already being restored"):
+        uploads.get(saved.upload_id)
+    uploads.remove(saved.upload_id, archive=claimed.db_file, claim=claimed.claim)
+    assert not claimed.directory.exists()
