@@ -164,7 +164,8 @@ def _requested_backup_upload(bench_root: Path, upload_id) -> tuple[BackupUpload 
     if not isinstance(upload_id, str):
         return None, invalid_fields()
     try:
-        return BackupUploads(bench_root).claim(upload_id), None
+        retry_key = request.headers.get("Idempotency-Key")
+        return BackupUploads(bench_root).claim(upload_id, retry_key=retry_key), None
     except BenchError as error:
         return None, error_response("backup_upload_not_found", str(error), 404)
 

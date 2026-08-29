@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 import secrets
 import shutil
@@ -68,13 +69,17 @@ class BackupUploads:
         return BackupUpload(upload_id, directory, files)
 
     def get(self, upload_id: str) -> BackupUpload:
+        upload = self._read(upload_id)
+        if (upload.directory / _CLAIM_MARKER).exists():
+            raise BenchError("This backup upload is already being restored. Upload the files again.")
+        return upload
+
+    def _read(self, upload_id: str) -> BackupUpload:
         if not _UPLOAD_ID_RE.match(upload_id or ""):
             raise BenchError("Invalid backup upload id.")
         directory = self.root / upload_id
         if not directory.is_dir():
             raise BenchError("Backup upload not found. Upload the files again.")
-        if (directory / _CLAIM_MARKER).exists():
-            raise BenchError("This backup upload is already being restored. Upload the files again.")
         files = {}
         for kind, (stem, _allowed) in _KINDS.items():
             match = next((p for p in directory.iterdir() if p.name.startswith(stem + ".")), None)
@@ -84,17 +89,25 @@ class BackupUploads:
             raise BenchError("Backup upload is missing its database file. Upload the files again.")
         return BackupUpload(upload_id, directory, files)
 
-    def claim(self, upload_id: str) -> BackupUpload:
+    def claim(self, upload_id: str, retry_key: str | None = None) -> BackupUpload:
         """Reserve the upload for one restore: a task deletes it when done, so a
         second restore must not be pointed at the same archives. The marker is
-        created exclusively, so concurrent claims cannot both succeed."""
-        upload = self.get(upload_id)
+        created exclusively, so concurrent claims cannot both succeed. A retry
+        carrying the Idempotency-Key that made the claim gets the same claim
+        back, so task submission can return the restore already accepted."""
+        upload = self._read(upload_id)
+        marker = upload.directory / _CLAIM_MARKER
         claim = secrets.token_hex(16)
         try:
-            with open_private(upload.directory / _CLAIM_MARKER, "w", exclusive=True) as marker:
-                marker.write(claim)
+            with open_private(marker, "w", exclusive=True) as handle:
+                handle.write(json.dumps({"claim": claim, "retry_key": retry_key}))
         except FileExistsError:
-            raise BenchError("This backup upload is already being restored. Upload the files again.") from None
+            existing = _read_marker(marker)
+            if not retry_key or existing.get("retry_key") != retry_key:
+                raise BenchError(
+                    "This backup upload is already being restored. Upload the files again."
+                ) from None
+            claim = existing["claim"]
         return BackupUpload(upload.upload_id, upload.directory, upload.files, claim)
 
     def release(self, upload_id: str) -> None:
@@ -113,9 +126,17 @@ class BackupUploads:
         if archive is not None and not Path(archive).resolve().is_relative_to(directory.resolve()):
             return
         marker = directory / _CLAIM_MARKER
-        if marker.exists() and (not claim or marker.read_text() != claim):
+        if marker.exists() and (not claim or _read_marker(marker).get("claim") != claim):
             return
         shutil.rmtree(directory, ignore_errors=True)
+
+
+def _read_marker(marker: Path) -> dict:
+    try:
+        data = json.loads(marker.read_text())
+    except (OSError, ValueError):
+        return {}
+    return data if isinstance(data, dict) else {}
 
 
 def _extension(filename: str, allowed: tuple[str, ...]) -> str:

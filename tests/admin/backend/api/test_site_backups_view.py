@@ -322,7 +322,7 @@ def test_restore_in_place_queues_a_restore_task_over_the_upload(tmp_path: Path) 
     assert str(staged / "database.sql.gz") in meta["command_argv"]
     assert str(staged / "private-files.tar") in meta["command_argv"]
     assert upload["upload_id"] in meta["command_argv"]
-    assert (staged / ".claimed").read_text() in meta["command_argv"]
+    assert json.loads((staged / ".claimed").read_text())["claim"] in meta["command_argv"]
     assert meta["resource_keys"] == ["site:site.localhost"]
 
 
@@ -382,3 +382,26 @@ def test_restore_in_place_rejects_unknown_uploads_and_sites(tmp_path: Path) -> N
     assert unknown_upload.status_code == 404
     assert unknown_upload.get_json()["error"]["code"] == "backup_upload_not_found"
     assert unknown_site.status_code == 404
+
+
+def test_restore_retries_with_the_same_idempotency_key_return_the_accepted_task(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site.localhost")
+    client = _client(bench_root)
+    upload = _upload(client)
+
+    def submit():
+        return _request(
+            client,
+            "post",
+            "/api/v1/sites/site.localhost/actions/restore",
+            json={"upload_id": upload["upload_id"]},
+            headers={"Idempotency-Key": "restore-once"},
+        )
+
+    first = submit()
+    second = submit()
+
+    assert first.status_code == 202
+    assert second.status_code == 202
+    assert first.get_json()["task_id"] == second.get_json()["task_id"]

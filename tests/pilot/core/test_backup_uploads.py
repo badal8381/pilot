@@ -132,3 +132,17 @@ def test_a_claimed_upload_is_removed_only_by_its_claim_holder(tmp_path: Path) ->
 
     uploads.remove(saved.upload_id, archive=claimed.db_file, claim=claimed.claim)
     assert not claimed.directory.exists()
+
+
+def test_a_retry_with_the_same_key_gets_the_same_claim(tmp_path: Path) -> None:
+    uploads = BackupUploads(tmp_path)
+    saved = uploads.save({"database": _part("db.sql.gz")})
+
+    first = uploads.claim(saved.upload_id, retry_key="req-1")
+    retried = uploads.claim(saved.upload_id, retry_key="req-1")
+
+    assert retried.claim == first.claim
+    with pytest.raises(BenchError, match="already being restored"):
+        uploads.claim(saved.upload_id, retry_key="req-2")
+    with pytest.raises(BenchError, match="already being restored"):
+        uploads.claim(saved.upload_id)

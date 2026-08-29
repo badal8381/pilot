@@ -124,7 +124,7 @@ def restore_site(name: str):
         return invalid_fields()
     uploads = BackupUploads(bench_root)
     try:
-        upload = uploads.claim(fields["upload_id"])
+        upload = uploads.claim(fields["upload_id"], retry_key=request.headers.get("Idempotency-Key"))
     except BenchError as error:
         return error_response("backup_upload_not_found", str(error), 404)
     try:
