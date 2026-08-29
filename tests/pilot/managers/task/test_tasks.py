@@ -640,7 +640,7 @@ def test_command_argv_restore_site_carries_archives_and_staging(tmp_path: Path) 
             "site": "mysite.localhost",
             "db_file": "/uploads/x/database.sql.gz",
             "public_files": "/uploads/x/files.tar",
-            "staging_dir": "/uploads/x",
+            "upload_id": "0123456789abcdef",
         },
     )
 
@@ -648,5 +648,5 @@ def test_command_argv_restore_site_carries_archives_and_staging(tmp_path: Path) 
     assert "mysite.localhost" in argv
     assert "/uploads/x/database.sql.gz" in argv
     assert "/uploads/x/files.tar" in argv
-    assert "/uploads/x" in argv
+    assert "0123456789abcdef" in argv
     assert "--private-files" not in argv

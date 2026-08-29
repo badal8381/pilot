@@ -321,7 +321,49 @@ def test_restore_in_place_queues_a_restore_task_over_the_upload(tmp_path: Path) 
     staged = bench_root / "backups-uploads" / upload["upload_id"]
     assert str(staged / "database.sql.gz") in meta["command_argv"]
     assert str(staged / "private-files.tar") in meta["command_argv"]
+    assert upload["upload_id"] in meta["command_argv"]
     assert meta["resource_keys"] == ["site:site.localhost"]
+
+
+def test_an_upload_feeds_exactly_one_restore(tmp_path: Path) -> None:
+    """The restoring task deletes the upload when done, so a second restore
+    pointed at the same archives would lose its inputs - refuse it up front."""
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site.localhost")
+    _make_site(bench_root, "other.localhost")
+    client = _client(bench_root)
+    upload = _upload(client)
+
+    first = _request(
+        client, "post", "/api/v1/sites/site.localhost/actions/restore", json={"upload_id": upload["upload_id"]}
+    )
+    second = _request(
+        client, "post", "/api/v1/sites/other.localhost/actions/restore", json={"upload_id": upload["upload_id"]}
+    )
+
+    assert first.status_code == 202
+    assert second.status_code == 404
+    assert "already being restored" in second.get_json()["error"]["message"]
+
+
+def test_a_failed_queue_releases_the_upload_claim(tmp_path: Path) -> None:
+    bench_root = tmp_path / "benches" / "current"
+    _make_site(bench_root, "site.localhost")
+    client = _client(bench_root)
+    upload = _upload(client)
+
+    with patch(
+        "admin.backend.api.v1.sites.backups.RestoreSiteTask.queue", side_effect=RuntimeError("boom")
+    ):
+        failed = client.post(
+            "/api/v1/sites/site.localhost/actions/restore", json={"upload_id": upload["upload_id"]}
+        )
+    retried = _request(
+        client, "post", "/api/v1/sites/site.localhost/actions/restore", json={"upload_id": upload["upload_id"]}
+    )
+
+    assert failed.status_code == 500
+    assert retried.status_code == 202
 
 
 def test_restore_in_place_rejects_unknown_uploads_and_sites(tmp_path: Path) -> None:

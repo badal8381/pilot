@@ -13,6 +13,7 @@ from pilot.utils import make_private_directory, open_private
 UPLOADS_DIR = "backups-uploads"
 
 _UPLOAD_ID_RE = re.compile(r"^[a-f0-9]{16}$")
+_CLAIM_MARKER = ".claimed"
 
 # kind -> (stored stem, accepted suffixes, longest first)
 _KINDS = {
@@ -70,6 +71,8 @@ class BackupUploads:
         directory = self.root / upload_id
         if not directory.is_dir():
             raise BenchError("Backup upload not found. Upload the files again.")
+        if (directory / _CLAIM_MARKER).exists():
+            raise BenchError("This backup upload is already being restored. Upload the files again.")
         files = {}
         for kind, (stem, _allowed) in _KINDS.items():
             match = next((p for p in directory.iterdir() if p.name.startswith(stem + ".")), None)
@@ -79,7 +82,21 @@ class BackupUploads:
             raise BenchError("Backup upload is missing its database file. Upload the files again.")
         return BackupUpload(upload_id, directory, files)
 
+    def claim(self, upload_id: str) -> BackupUpload:
+        """Reserve the upload for one restore: a task deletes it when done, so a
+        second restore must not be pointed at the same archives."""
+        upload = self.get(upload_id)
+        (upload.directory / _CLAIM_MARKER).touch()
+        return upload
+
+    def release(self, upload_id: str) -> None:
+        """Undo a claim whose restore never got queued."""
+        if _UPLOAD_ID_RE.match(upload_id or ""):
+            (self.root / upload_id / _CLAIM_MARKER).unlink(missing_ok=True)
+
     def remove(self, upload_id: str) -> None:
+        """Delete an upload. The id is validated, so only a directory under
+        backups-uploads can ever be removed - callers cannot aim this elsewhere."""
         if _UPLOAD_ID_RE.match(upload_id or ""):
             shutil.rmtree(self.root / upload_id, ignore_errors=True)
 

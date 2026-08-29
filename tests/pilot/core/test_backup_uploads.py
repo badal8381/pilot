@@ -72,3 +72,27 @@ def test_remove_deletes_the_upload(tmp_path: Path) -> None:
     uploads.remove(saved.upload_id)
 
     assert not saved.directory.exists()
+
+
+def test_claim_reserves_the_upload_until_released(tmp_path: Path) -> None:
+    uploads = BackupUploads(tmp_path)
+    saved = uploads.save({"database": _part("db.sql.gz")})
+
+    claimed = uploads.claim(saved.upload_id)
+    with pytest.raises(BenchError, match="already being restored"):
+        uploads.get(saved.upload_id)
+    uploads.release(saved.upload_id)
+
+    assert claimed.files == saved.files
+    assert uploads.get(saved.upload_id).files == saved.files
+
+
+def test_remove_only_ever_touches_an_upload_directory(tmp_path: Path) -> None:
+    outside = tmp_path / "precious"
+    outside.mkdir()
+    (outside / "keep").write_text("x")
+
+    BackupUploads(tmp_path).remove("../precious")
+    BackupUploads(tmp_path).remove(str(outside))
+
+    assert (outside / "keep").exists()

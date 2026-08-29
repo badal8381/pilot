@@ -122,8 +122,9 @@ def restore_site(name: str):
     fields = text_fields(data, "upload_id")
     if fields is None:
         return invalid_fields()
+    uploads = BackupUploads(bench_root)
     try:
-        upload = BackupUploads(bench_root).get(fields["upload_id"])
+        upload = uploads.claim(fields["upload_id"])
     except BenchError as error:
         return error_response("backup_upload_not_found", str(error), 404)
     try:
@@ -133,11 +134,12 @@ def restore_site(name: str):
             db_file=upload.db_file,
             public_files=upload.files.get("public_files"),
             private_files=upload.files.get("private_files"),
-            staging_dir=str(upload.directory),
+            upload_id=upload.upload_id,
             idempotency_key=request.headers.get("Idempotency-Key"),
             resource_key=f"site:{name.lower()}",
         )
     except Exception as error:
+        uploads.release(upload.upload_id)
         return task_failure(error)
     return accepted_task_response(bench_root, task_id)
 

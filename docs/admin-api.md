@@ -88,7 +88,7 @@ Measuring means a `du` per site directory and one schema-size query, so the rout
 
 `POST /sites/backup-uploads` takes a multipart upload - `database` (`.sql.gz` or `.sql`, required) plus optional `public_files` and `private_files` archives (`.tar`, `.tar.gz`, `.tgz`) - stages them privately under `backups-uploads/<id>`, and returns `{"upload_id": ..., "files": [...]}`. It needs a bench session. Uploads are bounded by nginx's `client_max_body_size` (50m by default) in production.
 
-`POST /sites` with `restore_upload_id` creates the site from that upload via `new-site-from-backup`; the apps come from the dump, so `apps` is ignored. `POST /sites/<name>/actions/restore` with `upload_id` queues `restore-site`, which restores the upload into the existing site in place. Both tasks delete the upload after a successful restore and keep it on failure so a retry still has its inputs.
+`POST /sites` with `restore_upload_id` creates the site from that upload via `new-site-from-backup`; the apps come from the dump, so `apps` is ignored. `POST /sites/<name>/actions/restore` with `upload_id` queues `restore-site`, which restores the upload into the existing site in place. Queueing claims the upload for that one restore - a second restore against the same id is refused - and the task deletes the upload after a successful restore, keeping it on failure so a retry still has its inputs. Tasks identify the upload by id, so cleanup can only ever remove a directory under `backups-uploads`.
 
 ### Setup
 

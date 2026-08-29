@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// Picks the archives of one frappe backup set for a restore: the database dump
-// is required, the public and private file archives optional.
 const files = defineModel({
   default: () => ({ database: null, public_files: null, private_files: null }),
 })

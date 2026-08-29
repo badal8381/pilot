@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import shutil
 from dataclasses import dataclass
 from typing import Annotated, ClassVar
 
 from pilot.core.site import provision_from_backup
+from pilot.core.site.backup_uploads import BackupUploads
 from pilot.tasks import Arg, Task, step
 
 
@@ -17,15 +17,15 @@ class NewSiteFromBackupTask(Task):
     admin_password: Annotated[str, Arg(cli=False)]
     public_files: str | None = None
     private_files: str | None = None
-    # Directory of uploaded archives for this restore; removed once it succeeds.
-    # Kept on failure so a retry still has its inputs.
-    staging_dir: str | None = None
+    # The staged upload these archives came from; removed once the restore
+    # succeeds, kept on failure so a retry still has its inputs.
+    upload_id: str | None = None
 
     def run(self) -> None:
         self.require_production_privileges()
         self.restore()
-        if self.staging_dir:
-            shutil.rmtree(self.staging_dir, ignore_errors=True)
+        if self.upload_id:
+            BackupUploads(self.bench_root).remove(self.upload_id)
 
     @step("restore", lambda self: f"Restore site {self.name} from backup")
     def restore(self) -> None:

@@ -150,6 +150,8 @@ def create_site():
                 resource_key=f"site:{name.lower()}",
             )
     except Exception as error:
+        if upload:
+            BackupUploads(bench_root).release(upload.upload_id)
         return task_failure(error)
 
     return accepted_task_response(bench_root, task_id)
@@ -162,7 +164,7 @@ def _requested_backup_upload(bench_root: Path, upload_id) -> tuple[BackupUpload 
     if not isinstance(upload_id, str):
         return None, invalid_fields()
     try:
-        return BackupUploads(bench_root).get(upload_id), None
+        return BackupUploads(bench_root).claim(upload_id), None
     except BenchError as error:
         return None, error_response("backup_upload_not_found", str(error), 404)
 
@@ -176,7 +178,7 @@ def _queue_new_site_from_upload(bench_root: Path, name: str, admin_password: str
         admin_password=admin_password,
         public_files=upload.files.get("public_files"),
         private_files=upload.files.get("private_files"),
-        staging_dir=str(upload.directory),
+        upload_id=upload.upload_id,
         idempotency_key=request.headers.get("Idempotency-Key"),
         resource_key=f"site:{name.lower()}",
     )
