@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Button, Dialog, FormControl } from 'frappe-ui'
+import { Button, Dialog, TextInput } from 'frappe-ui'
 
 import Table from '@/components/common/Table.vue'
 
@@ -43,11 +43,11 @@ const preview = (table) => {
 
 <template>
   <Dialog v-model="show" title="Tables" size="3xl">
-    <FormControl v-model="search" placeholder="Search tables" autocomplete="off">
+    <TextInput v-model="search" placeholder="Search tables" autocomplete="off">
       <template #prefix>
         <span class="size-4 text-ink-gray-5 lucide-search" />
       </template>
-    </FormControl>
+    </TextInput>
 
     <div class="flex flex-col sm:flex-row gap-4 mt-3 sm:h-[380px]">
       <!-- Table list -->

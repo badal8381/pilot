@@ -2,16 +2,7 @@
 import { useRoute } from 'vue-router'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 
-import {
-  Button,
-  Checkbox,
-  Dialog,
-  ErrorMessage,
-  FormControl,
-  LoadingText,
-  Tooltip,
-  toast,
-} from 'frappe-ui'
+import { Button, Checkbox, Dialog, ErrorMessage, LoadingText, TextInput, Tooltip, toast } from 'frappe-ui'
 
 import SizeBreakup from '@/components/database/SizeBreakup.vue'
 import DatabasePanel from '@/components/database/DatabasePanel.vue'
@@ -418,7 +409,7 @@ onMounted(load)
 
 <template>
   <Teleport defer to="#header-actions">
-    <FormControl
+    <TextInput
       v-if="siteOptions.length > 1"
       type="select"
       v-model="selectedSite"

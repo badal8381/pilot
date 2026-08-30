@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Dialog, ErrorMessage, FormControl, Spinner, Switch, Tooltip } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, Spinner, Switch, TextInput, Tooltip } from 'frappe-ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -181,7 +181,7 @@ onMounted(load)
         {{ snapshot.edit_reason }}
       </div>
 
-      <FormControl
+      <TextInput
         v-model="search"
         placeholder="Search variables"
         autocomplete="off"
@@ -257,7 +257,7 @@ onMounted(load)
         />
       </div>
 
-      <FormControl
+      <TextInput
         v-else
         v-model.number="draftValue"
         type="number"

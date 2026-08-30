@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Button, Combobox, ErrorMessage, FormControl, LoadingText, Tooltip } from 'frappe-ui'
+import { Button, Combobox, ErrorMessage, LoadingText, Select, TextInput, Tooltip } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import LogView from '@/components/logs/LogView.vue'
@@ -227,9 +227,9 @@ onUnmounted(() => stopLive())
   <div class="p-3 md:p-4 flex h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-3rem)] overflow-hidden">
     <!-- search logs  -->
     <aside class="hidden md:flex flex-col w-64 shrink-0">
-      <FormControl v-model="fileSearch" placeholder="Search log files" class="shrink-0 mr-4">
+      <TextInput v-model="fileSearch" placeholder="Search log files" class="shrink-0 mr-4">
         <template #prefix><span class="size-4 text-ink-gray-5 lucide-search" /></template>
-      </FormControl>
+      </TextInput>
 
       <Scrollbar class="flex-1 min-h-0 pr-4">
         <div class="flex flex-col gap-1 py-2">
@@ -314,7 +314,7 @@ onUnmounted(() => stopLive())
       <!-- terminal output filters -->
       <template v-else>
         <div class="flex items-center gap-2 pb-2 shrink-0">
-          <FormControl
+          <TextInput
             v-model="search"
             placeholder="Search this log"
             :size="isMobile ? 'md' : 'sm'"
@@ -348,8 +348,7 @@ onUnmounted(() => stopLive())
           </div>
 
           <div class="flex items-center gap-2 shrink-0">
-            <FormControl
-              type="select"
+            <Select
               v-model="linesCount"
               :size="isMobile ? 'md' : 'sm'"
               :disabled="liveMode"

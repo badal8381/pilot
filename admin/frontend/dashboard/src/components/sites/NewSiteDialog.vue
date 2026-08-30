@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
-import { Button, Checkbox, Dialog, ErrorMessage, FormControl, Spinner } from 'frappe-ui'
+import { Button, Checkbox, Dialog, ErrorMessage, Select, Spinner, TextInput } from 'frappe-ui'
 
 import AppIcon from '@/components/apps/AppIcon.vue'
 
@@ -150,7 +150,7 @@ const submit = async () => {
       <!-- Site name -->
       <div>
         <!-- Without wildcard site name -->
-        <FormControl
+        <TextInput
           v-if="!wildcardDomains.length"
           v-model="newSiteName"
           label="Site name"
@@ -160,7 +160,7 @@ const submit = async () => {
         <div v-else class="space-y-1.5">
           <span class="text-ink-gray-7 text-p-sm-medium">Site name</span>
           <div class="flex items-stretch gap-2">
-            <FormControl
+            <TextInput
               v-model="sitePrefix"
               class="flex-1 min-w-0"
               :class="hasSingleDomain ? '[&_[data-slot=control]]:pe-28' : ''"
@@ -172,14 +172,13 @@ const submit = async () => {
                   {{ wildcardDomains[0] }}
                 </span>
               </template>
-            </FormControl>
+            </TextInput>
 
             <!-- Multiple wildcards available -->
-            <FormControl
+            <Select
               v-if="!hasSingleDomain"
               v-model="selectedSuffix"
               class="w-48 shrink-0"
-              type="select"
               :options="wildcardDomains.map((d) => ({ label: d, value: d }))"
             />
           </div>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, h } from 'vue'
-import { Button, Dropdown, FormControl, TabButtons } from 'frappe-ui'
+import { Button, Dropdown, TabButtons, TextInput } from 'frappe-ui'
 import LucideSearch from '~icons/lucide/search'
 
 import AppIcon from '@/components/apps/AppIcon.vue'
@@ -50,7 +50,7 @@ const worksWithLabel = computed(() => {
 <template>
   <StickyToolbar class="px-3 sm:px-4 py-2 sm:py-3">
     <div class="mx-auto w-full max-w-3xl flex sm:flex-row flex-col gap-2">
-      <FormControl
+      <TextInput
         v-model="searchModel"
         class="flex-1"
         placeholder="Search for any app"
@@ -59,7 +59,7 @@ const worksWithLabel = computed(() => {
         <template #prefix>
           <LucideSearch class="size-4 text-ink-gray-5" />
         </template>
-      </FormControl>
+      </TextInput>
 
       <div class="flex gap-2 w-full sm:w-auto">
         <div class="flex-1 sm:flex-none min-w-0">

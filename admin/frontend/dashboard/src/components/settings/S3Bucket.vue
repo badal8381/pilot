@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, Select, Spinner, toast } from 'frappe-ui'
+import { Alert, Button, ErrorMessage, Select, Spinner, TextInput, toast } from 'frappe-ui'
 
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
@@ -150,20 +150,20 @@ onMounted(load)
     </div>
 
     <div class="space-y-4">
-      <FormControl label="Bucket" v-model="bucket" placeholder="storage-bucket" />
+      <TextInput label="Bucket" v-model="bucket" placeholder="storage-bucket" />
       <div class="flex sm:flex-row flex-col gap-4">
         <Select label="Provider" v-model="provider" :options="providerOptions" class="w-full" />
         <Select label="Region" v-model="region" :options="regionOptions" class="w-full" />
       </div>
 
       <div class="flex sm:flex-row flex-col gap-4">
-        <FormControl
+        <TextInput
           label="Access Key"
           v-model="accessKey"
           placeholder="AKIA…"
           class="w-full"
         />
-        <FormControl
+        <TextInput
           label="Secret Key"
           type="password"
           v-model="secretKey"

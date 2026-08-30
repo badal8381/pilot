@@ -2,7 +2,7 @@
 import { useRoute, useRouter } from 'vue-router'
 import { computed, onMounted, ref, watch } from 'vue'
 
-import { Badge, Button, Dropdown, ErrorMessage, FormControl, TabButtons, toast } from 'frappe-ui'
+import { Badge, Button, Dropdown, ErrorMessage, Select, TabButtons, TextInput, toast } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import Table from '@/components/common/Table.vue'
@@ -160,7 +160,7 @@ onMounted(() => {
 <template>
   <div class="p-3 md:p-4 mx-auto max-w-3xl">
     <StickyToolbar v-if="sites.length > 10" class="flex items-center gap-2 py-2 md:py-3">
-      <FormControl
+      <TextInput
         v-model="search"
         placeholder="Search"
         :size="isMobile ? 'md' : 'sm'"
@@ -169,11 +169,10 @@ onMounted(() => {
         <template #prefix>
           <span class="size-4 text-ink-gray-5 lucide-search" />
         </template>
-      </FormControl>
+      </TextInput>
 
-      <FormControl
+      <Select
         v-model="statusFilter"
-        type="select"
         :options="statusOptions"
         :size="isMobile ? 'md' : 'sm'"
         class="max-w-24 sm:max-w-32"

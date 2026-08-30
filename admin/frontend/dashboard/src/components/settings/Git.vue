@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Alert, Button, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
+import { Alert, Button, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
 
 import { apiErrorMessage } from '@/api/client'
 import { gitApi } from '@/api/git'
@@ -121,8 +121,8 @@ onMounted(load)
     </div>
 
     <div class="space-y-4">
-      <FormControl label="GitHub Username" v-model="username" placeholder="octocat" />
-      <FormControl
+      <TextInput label="GitHub Username" v-model="username" placeholder="octocat" />
+      <TextInput
         label="Personal Access Token"
         type="password"
         v-model="token"

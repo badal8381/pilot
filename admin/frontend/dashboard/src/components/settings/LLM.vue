@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Alert, Button, Combobox, ErrorMessage, FormControl, Spinner, toast } from 'frappe-ui'
+import { Alert, Button, Combobox, ErrorMessage, Spinner, TextInput, Textarea, toast } from 'frappe-ui'
 
 import { apiErrorMessage } from '@/api/client'
 import { settingsApi } from '@/api/settings'
@@ -211,7 +211,7 @@ onMounted(load)
       />
 
       <div v-if="needsApiBase" class="space-y-1.5">
-        <FormControl
+        <TextInput
           label="API Base URL"
           v-model="apiBase"
           placeholder="http://your-host:8000/v1"
@@ -219,14 +219,14 @@ onMounted(load)
         <p v-if="apiBaseError" class="text-ink-red-5 text-p-sm">{{ apiBaseError }}</p>
       </div>
 
-      <FormControl
+      <TextInput
         label="API Key"
         type="password"
         v-model="apiKey"
         :placeholder="apiKeySet ? '••••••••' : 'Provider API key'"
       />
 
-      <FormControl
+      <TextInput
         v-if="freeTextModel"
         label="Model"
         v-model="model"
@@ -245,9 +245,8 @@ onMounted(load)
         <p v-else-if="modelsHint" class="text-ink-gray-5 text-p-sm">{{ modelsHint }}</p>
       </div>
 
-      <FormControl
+      <Textarea
         label="System Prompt"
-        type="textarea"
         v-model="systemPrompt"
         :rows="6"
         placeholder="Instructions sent with every request"
@@ -264,13 +263,13 @@ onMounted(load)
         </summary>
 
         <div class="space-y-4 pt-4">
-          <FormControl
+          <TextInput
             v-if="!needsApiBase"
             label="API Base URL"
             v-model="apiBase"
             placeholder="Leave blank to use the provider default"
           />
-          <FormControl label="Max Tokens" type="number" v-model="maxTokens" placeholder="4096" />
+          <TextInput label="Max Tokens" type="number" v-model="maxTokens" placeholder="4096" />
         </div>
       </details>
 

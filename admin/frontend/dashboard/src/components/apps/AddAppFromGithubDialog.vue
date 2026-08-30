@@ -2,16 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
-import {
-  Alert,
-  Button,
-  Combobox,
-  Dialog,
-  ErrorMessage,
-  FormControl,
-  LoadingText,
-  TabButtons,
-} from 'frappe-ui'
+import { Alert, Button, Combobox, Dialog, ErrorMessage, LoadingText, TabButtons, TextInput } from 'frappe-ui'
 import { apiErrorMessage } from '@/api/client'
 import { appsApi } from '@/api/apps'
 import { gitApi } from '@/api/git'
@@ -210,7 +201,7 @@ const submit = async () => {
       <div>
         <template v-if="tab === 'public'">
           <div class="flex items-end gap-2">
-            <FormControl
+            <TextInput
               label="Repository URL"
               v-model="repo"
               class="flex-1"

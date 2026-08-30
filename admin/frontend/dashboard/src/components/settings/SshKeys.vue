@@ -3,14 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import { ListRowItem, ListView } from 'frappe-ui/experimental'
 
-import {
-  Button,
-  Dialog,
-  ErrorMessage,
-  FormControl,
-  Spinner,
-  toast,
-} from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, Spinner, Textarea, toast } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 
@@ -153,8 +146,7 @@ onMounted(load)
   </div>
 
   <Dialog v-model="showAdd" title="Add SSH key" size="md">
-    <FormControl
-      type="textarea"
+    <Textarea
       label="Public key"
       v-model="newKey"
       :rows="3"

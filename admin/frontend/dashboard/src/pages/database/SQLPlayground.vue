@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Alert, Button, Dialog, FormControl, TabButtons } from 'frappe-ui'
+import { Alert, Button, Dialog, Select, TabButtons } from 'frappe-ui'
 
 import SQLCodeEditor from '@/components/database/SQLCodeEditor.vue'
 import SQLSchemaDialog from '@/components/database/SQLSchemaDialog.vue'
@@ -226,8 +226,7 @@ onMounted(async () => {
 
 <template>
   <Teleport v-if="selectedSite" defer to="#header-actions">
-    <FormControl
-      type="select"
+    <Select
       v-model="selectedSite"
       :options="siteOptions"
       class="w-28 sm:w-44 max-w-[140px] sm:max-w-[180px]"
@@ -252,9 +251,7 @@ onMounted(async () => {
       </p>
     </div>
 
-    <div class="w-56">
-      <FormControl type="select" v-model="selectedSite" :options="siteOptions" />
-    </div>
+    <Select v-model="selectedSite" :options="siteOptions" class="w-56" />
   </div>
 
   <div v-else class="p-3 md:p-4 flex flex-col gap-3">
@@ -275,7 +272,7 @@ onMounted(async () => {
       >
         <div class="flex flex-wrap items-center gap-2">
           <div class="sm:hidden">
-            <FormControl type="select" v-model="modeStr" :options="modeOptions" />
+            <Select v-model="modeStr" :options="modeOptions" />
           </div>
 
           <div class="hidden sm:block">
@@ -364,8 +361,7 @@ onMounted(async () => {
                 class="hidden sm:flex items-center gap-1.5 pr-3 border-r-2 border-outline-gray-2"
               >
                 <span class="text-ink-gray-5 text-xs shrink-0">Per Page</span>
-                <FormControl
-                  type="select"
+                <Select
                   v-model="perPage"
                   class="max-w-16"
                   :options="pageOptions"

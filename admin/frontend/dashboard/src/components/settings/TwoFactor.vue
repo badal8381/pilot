@@ -3,14 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import { ListRowItem, ListView } from 'frappe-ui/experimental'
 
-import {
-  Button,
-  Dialog,
-  ErrorMessage,
-  FormControl,
-  Spinner,
-  toast,
-} from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
 
 import QrcodeVue from 'qrcode.vue'
 
@@ -278,7 +271,7 @@ onMounted(load)
 
   <Dialog v-model="showAdd" title="Add device" size="md">
     <div class="space-y-3">
-      <FormControl
+      <TextInput
         v-if="!enrollment"
         v-model="deviceName"
         label="Device name"
@@ -314,7 +307,7 @@ onMounted(load)
           </div>
         </details>
 
-        <FormControl v-model="otp" label="Code from the app" placeholder="123456" autofocus />
+        <TextInput v-model="otp" label="Code from the app" placeholder="123456" autofocus />
       </template>
     </div>
 

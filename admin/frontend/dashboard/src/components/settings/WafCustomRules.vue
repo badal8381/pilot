@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref } from 'vue'
-import { Badge, Button, Dialog, FormControl, Select, Switch, TextInput } from 'frappe-ui'
+import { Badge, Button, Dialog, Select, Switch, TextInput } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 
@@ -238,7 +238,7 @@ const confirmRemove = () => {
         </div>
 
         <div v-if="isOpen(rule)" class="space-y-4 pt-1 pr-2.5 pb-5 pl-[2.375rem]">
-        <FormControl
+        <TextInput
           label="Rule name"
           v-model="rule.name"
           placeholder="Block /admin from outside the office"

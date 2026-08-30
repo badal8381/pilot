@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Button, Dialog, ErrorMessage, FormControl, Switch, Tooltip } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, Switch, TextInput, Tooltip } from 'frappe-ui'
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -337,7 +337,7 @@ onMounted(load)
 
   <Dialog v-model="sizingOpen" :title="sizingTitle" size="sm">
     <div v-if="sizingAction" class="space-y-4">
-      <FormControl
+      <TextInput
         v-model.number="sizingValue"
         type="number"
         :label="sizingAction.inputLabel"

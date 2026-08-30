@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Button, Dialog, ErrorMessage, FormControl, LoadingIndicator, Select } from 'frappe-ui'
+import { Button, Dialog, ErrorMessage, LoadingIndicator, Select, TextInput } from 'frappe-ui'
 
 import { apiErrorMessage } from '@/api/client'
 import { authApi } from '@/api/auth'
@@ -283,7 +283,7 @@ const createBench = async () => {
       <!-- Production bench: a process manager is configured, so we create the
            bench and route its domain to the setup wizard. -->
       <template v-else-if="isProduction === true">
-        <FormControl
+        <TextInput
           label="Bench name"
           v-model="name"
           placeholder="my-bench"
@@ -311,7 +311,7 @@ const createBench = async () => {
 
         <div>
           <template v-if="wildcardDomains.length === 0">
-            <FormControl
+            <TextInput
               label="Admin domain"
               v-model="adminDomain"
               placeholder="my-admin.example.com"
@@ -327,7 +327,7 @@ const createBench = async () => {
           <div v-else>
             <span class="block mb-1.5 text-ink-gray-5 text-xs">Admin domain</span>
             <div class="flex items-stretch gap-2">
-              <FormControl
+              <TextInput
                 class="flex-1 min-w-0"
                 v-model="adminPrefix"
                 placeholder="my-admin"

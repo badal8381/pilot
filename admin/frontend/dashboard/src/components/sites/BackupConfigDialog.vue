@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Button, Checkbox, Dialog, ErrorMessage, FormControl, Select } from 'frappe-ui'
+import { Button, Checkbox, Dialog, ErrorMessage, Select, TextInput } from 'frappe-ui'
 
 import { apiErrorMessage } from '@/api/client'
 import { sitesApi } from '@/api/sites'
@@ -187,7 +187,7 @@ defineExpose({ open })
             <p class="text-ink-gray-5 text-p-sm">{{ schemeHint }}</p>
           </div>
 
-          <FormControl
+          <TextInput
             v-if="scheme === 'fifo'"
             label="Backups to keep"
             type="number"
@@ -195,10 +195,10 @@ defineExpose({ open })
             v-model.number="keepLast"
           />
           <div v-else class="gap-4 grid grid-cols-2 sm:grid-cols-4">
-            <FormControl label="Daily" type="number" min="0" v-model.number="keepDaily" />
-            <FormControl label="Weekly" type="number" min="0" v-model.number="keepWeekly" />
-            <FormControl label="Monthly" type="number" min="0" v-model.number="keepMonthly" />
-            <FormControl label="Yearly" type="number" min="0" v-model.number="keepYearly" />
+            <TextInput label="Daily" type="number" min="0" v-model.number="keepDaily" />
+            <TextInput label="Weekly" type="number" min="0" v-model.number="keepWeekly" />
+            <TextInput label="Monthly" type="number" min="0" v-model.number="keepMonthly" />
+            <TextInput label="Yearly" type="number" min="0" v-model.number="keepYearly" />
           </div>
         </div>
       </template>

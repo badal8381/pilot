@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { Button, ErrorMessage, FormControl, Spinner, TabButtons, toast } from 'frappe-ui'
+import { Button, ErrorMessage, Select, Spinner, TabButtons, TextInput, Textarea, toast } from 'frappe-ui'
 
 import SettingsSwitch from '@/components/settings/SettingsSwitch.vue'
 import WafCustomRules from '@/components/settings/WafCustomRules.vue'
@@ -184,7 +184,7 @@ onMounted(async () => {
 
       <div class="items-start gap-4 grid md:grid-cols-2">
         <div class="space-y-1.5">
-          <FormControl type="select" label="Action" :options="ACTION_OPTIONS" v-model="mode" />
+          <Select label="Action" :options="ACTION_OPTIONS" v-model="mode" />
           <p v-if="mode === 'DetectionOnly'" class="text-ink-gray-5 text-p-sm">
             Matches are logged, not blocked. Review
             <RouterLink
@@ -227,7 +227,7 @@ onMounted(async () => {
       <div class="space-y-4 mt-4">
         <div class="gap-4 grid md:grid-cols-2 items-start">
           <div class="space-y-1.5">
-            <FormControl
+            <TextInput
               type="number"
               label="Anomaly threshold"
               min="1"
@@ -240,14 +240,13 @@ onMounted(async () => {
           </div>
 
           <div class="space-y-1.5">
-            <FormControl label="Max inspected body size" v-model="bodyLimit" />
+            <TextInput label="Max inspected body size" v-model="bodyLimit" />
             <p class="text-ink-gray-5 text-p-sm">Number with a k, m or g suffix, e.g. 50m.</p>
           </div>
         </div>
 
         <div class="space-y-1.5">
-          <FormControl
-            type="textarea"
+          <Textarea
             label="Exempt paths"
             :rows="3"
             placeholder="/api/method/frappe.ping"
@@ -259,8 +258,7 @@ onMounted(async () => {
         </div>
 
         <div class="space-y-1.5">
-          <FormControl
-            type="textarea"
+          <Textarea
             label="Rule exclusions (SecLang)"
             :rows="3"
             placeholder="SecRuleRemoveById 942100"
