@@ -27,38 +27,38 @@ import { apiErrorMessage } from '@/api/client'
 const AUTO_REFRESH_INTERVAL_MS = 2000
 
 const processColumns = [
-  { label: '#', key: 'number' },
-  { label: 'ID', key: 'id' },
-  { label: 'State', key: 'state' },
-  { label: 'Time', key: 'time' },
-  { label: 'User', key: 'user' },
-  { label: 'Host', key: 'host' },
-  { label: 'Command', key: 'command' },
-  { label: 'Query', key: 'query', class: 'w-full' },
-  { label: '', key: 'actions', class: 'text-right' },
+  { label: '#', key: 'number', class: 'w-10' },
+  { label: 'ID', key: 'id', class: 'w-[10%]' },
+  { label: 'State', key: 'state', class: 'w-[10%]' },
+  { label: 'Time', key: 'time', class: 'w-[10%] text-right' },
+  { label: 'User', key: 'user', class: 'w-[10%]' },
+  { label: 'Host', key: 'host', class: 'w-[16%]' },
+  { label: 'Command', key: 'command', class: 'w-[10%]' },
+  { label: 'Query', key: 'query', class: 'w-[32%]' },
+  { label: '', key: 'actions', class: 'w-20 text-right' },
 ]
 
 const lockColumns = [
-  { label: '#', key: 'number' },
-  { label: 'ID', key: 'id' },
-  { label: 'Type', key: 'type' },
-  { label: 'Mode', key: 'mode' },
-  { label: 'Table', key: 'table' },
-  { label: 'Index', key: 'index' },
-  { label: 'State', key: 'state' },
-  { label: 'Started', key: 'started' },
-  { label: 'Query', key: 'query', class: 'w-full' },
-  { label: 'Rows Locked', key: 'rowsLocked', class: 'text-right' },
-  { label: 'Rows Modified', key: 'rowsModified', class: 'text-right' },
+  { label: '#', key: 'number', class: 'w-10' },
+  { label: 'ID', key: 'id', class: 'w-[8%]' },
+  { label: 'Type', key: 'type', class: 'w-[8%]' },
+  { label: 'Mode', key: 'mode', class: 'w-[8%]' },
+  { label: 'Table', key: 'table', class: 'w-[12%]' },
+  { label: 'Index', key: 'index', class: 'w-[8%]' },
+  { label: 'State', key: 'state', class: 'w-[8%]' },
+  { label: 'Started', key: 'started', class: 'w-[12%]' },
+  { label: 'Query', key: 'query', class: 'w-[15%]' },
+  { label: 'Rows Locked', key: 'rowsLocked', class: 'w-[9%] text-right' },
+  { label: 'Rows Modified', key: 'rowsModified', class: 'w-[10%] text-right' },
 ]
 
 const binlogColumns = [
-  { label: '#', key: 'number' },
-  { label: '', key: 'selected' },
-  { label: 'File', key: 'name', class: 'w-full' },
-  { label: 'Date', key: 'date' },
-  { label: 'Size', key: 'size', class: 'text-right' },
-  { label: '', key: 'actions', class: 'text-right' },
+  { label: '#', key: 'number', class: 'w-10' },
+  { label: '', key: 'selected', class: 'w-10' },
+  { label: 'File', key: 'name', class: 'w-[44%]' },
+  { label: 'Date', key: 'date', class: 'w-[33%]' },
+  { label: 'Size', key: 'size', class: 'w-[23%] text-right' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 const route = useRoute()
