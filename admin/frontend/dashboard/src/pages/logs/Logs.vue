@@ -366,6 +366,7 @@ onUnmounted(() => stopLive())
               label="Refresh"
               tooltip="Refresh"
               :loading="contentLoading"
+              :disabled="liveMode"
               @click="loadContent"
             />
 
