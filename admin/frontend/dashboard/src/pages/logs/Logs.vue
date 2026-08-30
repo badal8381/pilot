@@ -422,7 +422,6 @@ onUnmounted(() => stopLive())
   background: var(--surface-amber-3);
   color: var(--ink-gray-9);
   border-radius: 2px;
-  padding: 0 1px;
 }
 :deep(.log-match--active) {
   background: var(--surface-amber-5);
