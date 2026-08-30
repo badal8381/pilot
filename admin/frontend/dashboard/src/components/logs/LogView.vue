@@ -35,10 +35,8 @@ const scrollToBottom = () => {
 // bottom resumes it.
 const follow = ref(true)
 
-const onScroll = () => {
-  const box = el.value
-  if (!box) return
-  follow.value = box.scrollHeight - box.scrollTop - box.clientHeight < 8
+const onScroll = ({ target }) => {
+  follow.value = target.scrollHeight - target.scrollTop - target.clientHeight < 8
 }
 
 watch(
@@ -64,9 +62,9 @@ defineExpose({ scrollToBottom })
 <template>
   <div
     ref="el"
-    class="bg-surface-gray-2 overflow-auto font-mono text-ink-gray-8 text-p-sm"
-    @scroll="onScroll"
+    class="bg-surface-gray-1 overflow-auto font-mono text-ink-gray-8 text-p-sm"
     :class="[wrap ? 'whitespace-pre-wrap' : 'whitespace-pre', rounded ? 'rounded-4' : '', fill ? 'flex-1 h-0' : 'max-h-[50vh]', rows ? '' : 'px-4 py-3']"
+    @scroll="onScroll"
   >
     <p v-if="!lines.length" class="text-ink-gray-4" :class="rows ? 'px-4 py-3' : ''">
       {{ emptyText }}
