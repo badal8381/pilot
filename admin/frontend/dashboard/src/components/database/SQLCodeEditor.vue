@@ -84,6 +84,7 @@ const theme = EditorView.theme({
     backgroundColor: 'var(--surface-base, white)',
   },
   '&.cm-focused': { outline: 'none' },
+  '.cm-foldGutter .cm-gutterElement': { padding: '0 4px' },
   '.cm-scroller': {
     fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
     lineHeight: '22px',

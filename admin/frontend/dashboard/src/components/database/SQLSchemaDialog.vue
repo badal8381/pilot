@@ -51,7 +51,7 @@ const preview = (table) => {
 
     <div class="flex flex-col sm:flex-row gap-4 mt-3 sm:h-[380px]">
       <!-- Table list -->
-      <div
+      <aside
         class="border-b sm:border-b-0 sm:border-r border-outline-gray-2 sm:w-52 shrink-0 pb-2 sm:pb-0 max-h-40 sm:max-h-none overflow-y-auto"
       >
         <button
@@ -69,7 +69,7 @@ const preview = (table) => {
         <p v-if="!filteredTables.length" class="px-2 py-1.5 text-ink-gray-4 text-sm">
           No tables found.
         </p>
-      </div>
+      </aside>
 
       <!-- Column details -->
       <div class="flex-1 min-w-0 overflow-y-auto">

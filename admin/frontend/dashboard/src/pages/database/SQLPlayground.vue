@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Alert, Button, Dialog, Select, TabButtons } from 'frappe-ui'
 
+import EmptyState from '@/components/common/EmptyState.vue'
 import SQLCodeEditor from '@/components/database/SQLCodeEditor.vue'
 import SQLSchemaDialog from '@/components/database/SQLSchemaDialog.vue'
 import Table from '@/components/common/Table.vue'
@@ -24,7 +25,6 @@ const running = ref(false)
 const results = ref([])
 const activeTab = ref(0)
 const error = ref('')
-const showSql = ref(false)
 const showSchema = ref(false)
 const schema = ref([])
 const editorRef = ref(null)
@@ -136,7 +136,6 @@ const executeQuery = async (raw) => {
   results.value = []
   activeTab.value = 0
   page.value = 1
-  showSql.value = false
 
   try {
     const executed = []
@@ -233,30 +232,20 @@ onMounted(async () => {
     />
   </Teleport>
 
-  <div
+  <EmptyState
     v-if="!selectedSite"
-    class="p-3 md:p-4 flex flex-col justify-center items-center gap-4 text-center"
-    style="height: 75vh;"
+    class="justify-center h-[calc(100dvh-6.5rem)] md:h-[calc(100dvh-3rem)]"
+    icon="lucide-database"
+    title="Select a site to get started"
+    description="Queries run against that site's database."
+    :bordered="false"
   >
-    <span
-      class="place-items-center grid bg-surface-gray-2 rounded-6 size-10 text-ink-gray-5 shrink-0"
-    >
-      <span class="size-5 lucide-database" />
-    </span>
-
-    <div>
-      <p class="font-medium text-ink-gray-7">Select a site to get started</p>
-      <p class="mt-1 max-w-xs text-ink-gray-5 text-p-sm">
-        Queries run against that site's database.
-      </p>
-    </div>
-
     <Select v-model="selectedSite" :options="siteOptions" class="w-56" />
-  </div>
+  </EmptyState>
 
-  <div v-else class="p-3 md:p-4 flex flex-col gap-3">
-    <!-- Editor card -->
-    <div class="border rounded-6 border-outline-gray-2 overflow-hidden transition-colors">
+  <main v-else class="p-3 md:p-4 flex flex-col gap-3">
+    <!-- editor -->
+    <div class="border rounded-4 border-outline-gray-2 overflow-hidden transition-colors">
       <div class="h-44 sm:h-[220px]">
         <SQLCodeEditor
           ref="editorRef"
@@ -267,44 +256,34 @@ onMounted(async () => {
         />
       </div>
 
+      <!-- actions toolbar footer -->
       <div
-        class="flex flex-wrap justify-between items-center gap-2 bg-surface-base px-2 py-2 border-t border-outline-gray-2"
+        class="flex flex-wrap items-center gap-2 bg-surface-base px-2 py-2 border-t border-outline-gray-2"
       >
-        <div class="flex flex-wrap items-center gap-2">
-          <div class="sm:hidden">
-            <Select v-model="modeStr" :options="modeOptions" />
-          </div>
+        <TabButtons v-model="modeStr" :options="modeOptions" />
 
-          <div class="hidden sm:block">
-            <TabButtons v-model="modeStr" :options="modeOptions" />
-          </div>
+        <Button
+          variant="outline"
+          iconLeft="lucide-table"
+          :disabled="!schema.length"
+          @click="showSchema = true"
+        >
+          Tables
+          <template v-if="schema.length" #suffix>
+            <span class="text-ink-gray-4 text-xs">{{ schema.length }}</span>
+          </template>
+        </Button>
 
-          <div class="hidden sm:block">
-            <Button
-              variant="outline"
-              iconLeft="lucide-table"
-              :disabled="!schema.length"
-              @click="showSchema = true"
-            >
-              Tables
-              <template v-if="schema.length" #suffix>
-                <span class="text-ink-gray-4 text-xs">{{ schema.length }}</span>
-              </template>
-            </Button>
-          </div>
-        </div>
-
-        <div class="flex items-center gap-3 ml-auto">
-          <Button
-            variant="solid"
-            iconLeft="lucide-play"
-            :loading="running"
-            :disabled="!selectedSite || !query.trim()"
-            @click="runQuery"
-          >
-            Execute
-          </Button>
-        </div>
+        <Button
+          class="md:ml-auto"
+          variant="solid"
+          iconLeft="lucide-play"
+          :loading="running"
+          :disabled="!selectedSite || !query.trim()"
+          @click="runQuery"
+        >
+          Execute
+        </Button>
       </div>
     </div>
 
@@ -315,12 +294,15 @@ onMounted(async () => {
     </Alert>
 
     <template v-if="results.length && !error">
-      <div v-if="results.length > 1" class="overflow-x-auto hover-scrollbar">
-        <TabButtons v-model="activeTab" type="underline" :options="tabOptions" />
-      </div>
+      <TabButtons
+        v-if="results.length > 1"
+        class="overflow-x-auto hover-scrollbar"
+        v-model="activeTab"
+        type="underline"
+        :options="tabOptions"
+      />
 
       <div v-if="currentResult" class="border rounded-4 overflow-hidden">
-        <!-- Write query success (no result set) -->
         <div
           v-if="!currentResult.columns.length"
           class="flex justify-center items-center gap-2 py-8 text-ink-gray-6 text-sm"
@@ -347,7 +329,6 @@ onMounted(async () => {
             No rows returned.
           </p>
 
-          <!-- Table footer -->
           <div
             v-if="currentResult.row_count"
             class="flex flex-wrap justify-between items-center gap-2 bg-surface-base px-1 py-1 border-t border-outline-gray-2"
@@ -361,11 +342,7 @@ onMounted(async () => {
                 class="hidden sm:flex items-center gap-1.5 pr-3 border-r-2 border-outline-gray-2"
               >
                 <span class="text-ink-gray-5 text-xs shrink-0">Per Page</span>
-                <Select
-                  v-model="perPage"
-                  class="max-w-16"
-                  :options="pageOptions"
-                />
+                <Select v-model="perPage" class="max-w-16" :options="pageOptions" />
               </div>
 
               <span class="hidden sm:inline tabular-nums text-ink-gray-5 text-xs whitespace-nowrap">
@@ -374,7 +351,7 @@ onMounted(async () => {
                 <span v-if="currentResult.truncated">(truncated)</span>
               </span>
 
-              <div class="flex items-center ">
+              <div class="flex items-center">
                 <Button
                   variant="ghost"
                   size="xs"
@@ -397,23 +374,20 @@ onMounted(async () => {
         </template>
       </div>
 
-      <div v-if="currentResult">
-        <button
-          class="flex items-center gap-1.5 text-ink-gray-5 hover:text-ink-gray-8 text-xs transition-colors"
-          @click="showSql = !showSql"
+      <details v-if="results.length > 1 && currentResult" class="group">
+        <summary
+          class="flex items-center gap-1.5 list-none text-ink-gray-5 hover:text-ink-gray-8 text-xs cursor-pointer"
         >
-          <span class="size-3" :class="showSql ? 'lucide-chevron-down' : 'lucide-chevron-right'" />
+          <span class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right" />
           View SQL Query
-        </button>
+        </summary>
 
         <pre
-          v-if="showSql"
-          class="bg-surface-gray-1 mt-1.5 px-3 py-2 border rounded-6 border-outline-gray-2 overflow-x-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
-          style="font-family: ui-monospace, SFMono-Regular, monospace;"
+          class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-4  overflow-auto font-mono text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
         >{{ currentResult.query }}</pre>
-      </div>
+      </details>
     </template>
-  </div>
+  </main>
 
   <SQLSchemaDialog v-model="showSchema" :schema="schema" @preview="previewTable" />
 
@@ -424,8 +398,7 @@ onMounted(async () => {
     </p>
 
     <pre
-      class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-6 border-outline-gray-2 max-h-40 overflow-y-auto text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
-      style="font-family: ui-monospace, SFMono-Regular, monospace;"
+      class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-4 border-outline-gray-2 max-h-40 overflow-y-auto font-mono text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
     >{{ pendingQuery }}</pre>
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="outline" @click="showConfirm = false">Cancel</Button>
