@@ -25,7 +25,7 @@ const processColumns = [
   { label: 'User', key: 'user', class: 'w-[10%]' },
   { label: 'Host', key: 'host', class: 'w-[24%]' },
   { label: 'Command', key: 'command', class: 'w-[10%]' },
-  { label: 'Query', key: 'query', class: 'w-[24%]' },
+  { label: 'Query', key: 'query', class: 'w-[12%]' },
   { label: '', key: 'actions', class: 'w-20 text-right' },
 ]
 
@@ -187,7 +187,7 @@ const siteOptions = computed(() => [
 
 const scopeBadge = computed(() => selectedSite.value)
 
-const MAX_QUERY_LENGTH = 60
+const MAX_QUERY_LENGTH = 30
 
 // Long queries can be arbitrarily large single-line strings that would
 // otherwise force the table wider than the page.

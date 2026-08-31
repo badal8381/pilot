@@ -58,7 +58,7 @@ const columns = [
   { label: 'Site', key: 'site' },
   { label: 'Status', key: 'badge' },
   { label: 'Duration', key: 'duration' },
-  { label: 'Last run', key: 'timing', class: 'text-right' },
+  { label: 'Last run', key: 'timing' },
 ]
 
 const rows = computed(() =>
