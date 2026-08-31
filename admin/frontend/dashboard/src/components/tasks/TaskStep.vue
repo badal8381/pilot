@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { Spinner } from 'frappe-ui'
 
 import LogView from '@/components/logs/LogView.vue'
@@ -41,15 +41,6 @@ const toggle = () => {
   userOverridden = true
   expanded.value = !expanded.value
 }
-
-const STATUS_ICON_BG = {
-  done: 'bg-surface-gray-2 text-ink-gray-6',
-  running: 'bg-surface-amber-2 text-ink-amber-7',
-  failed: 'bg-surface-red-2 text-ink-red-7',
-  pending: 'bg-surface-gray-2',
-}
-
-const iconBg = computed(() => STATUS_ICON_BG[props.status] || STATUS_ICON_BG.pending)
 </script>
 
 <template>
@@ -59,12 +50,10 @@ const iconBg = computed(() => STATUS_ICON_BG[props.status] || STATUS_ICON_BG.pen
       :class="hasOutput ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
       @click="toggle"
     >
-      <span class="place-items-center grid rounded-full size-6 shrink-0" :class="iconBg">
-        <span v-if="status === 'done'" class="size-3.5 lucide-check" />
-        <Spinner v-else-if="status === 'running'" size="sm" />
-        <span v-else-if="status === 'failed'" class="size-3.5 lucide-x" />
-        <span v-else class="bg-ink-gray-3 rounded-full size-1.5" />
-      </span>
+      <span v-if="status === 'done'" class="size-5 text-ink-gray-5 shrink-0 lucide-circle-check" />
+      <Spinner v-else-if="status === 'running'" size="md" class="text-ink-amber-6 shrink-0" />
+      <span v-else-if="status === 'failed'" class="size-5 text-ink-red-6 shrink-0 lucide-circle-x" />
+      <span v-else class="size-5 text-ink-gray-3 shrink-0 lucide-circle-dashed" />
 
       <span
         class="flex-1 min-w-0 truncate"
