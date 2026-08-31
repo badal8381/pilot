@@ -573,7 +573,7 @@ onMounted(load)
 
     <pre
       v-if="killQuery"
-      class="bg-surface-gray-2 p-3 rounded-4 max-h-40 overflow-auto font-mono text-ink-gray-8 text-xs leading-relaxed whitespace-pre-wrap break-words"
+      class="bg-surface-gray-2 p-3 rounded-4 max-h-40 overflow-auto font-mono text-ink-gray-8 text-sm leading-relaxed whitespace-pre-wrap break-words"
     >{{ killQuery }}</pre>
 
     <ErrorMessage v-if="killError" :message="killError" class="mt-4" />

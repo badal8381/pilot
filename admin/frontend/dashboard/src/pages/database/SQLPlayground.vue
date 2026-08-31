@@ -383,7 +383,7 @@ onMounted(async () => {
         </summary>
 
         <pre
-          class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-4  overflow-auto font-mono text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
+          class="bg-surface-gray-1 mt-3 p-3 border rounded-4 border-outline-gray-2 overflow-auto font-mono text-ink-gray-8 text-sm leading-relaxed whitespace-pre-wrap break-words"
         >{{ currentResult.query }}</pre>
       </details>
     </template>
@@ -398,7 +398,7 @@ onMounted(async () => {
     </p>
 
     <pre
-      class="bg-surface-gray-1 mt-3 px-3 py-2 border rounded-4 border-outline-gray-2 max-h-40 overflow-y-auto font-mono text-ink-gray-7 text-xs break-words whitespace-pre-wrap"
+      class="bg-surface-gray-1 mt-3 p-3 border rounded-4 border-outline-gray-2 max-h-40 overflow-auto font-mono text-ink-gray-8 text-sm leading-relaxed whitespace-pre-wrap break-words"
     >{{ pendingQuery }}</pre>
     <div class="flex justify-end gap-2 mt-4">
       <Button variant="outline" @click="showConfirm = false">Cancel</Button>
