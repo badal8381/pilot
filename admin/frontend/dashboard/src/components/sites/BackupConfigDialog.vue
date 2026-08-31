@@ -160,7 +160,10 @@ defineExpose({ open })
     <div class="space-y-5">
       <Checkbox v-model="isEnabled" label="Enable automated backups" />
 
-      <template v-if="isEnabled">
+      <fieldset
+        :disabled="!isEnabled"
+        class="space-y-5 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+      >
         <div
           class="gap-4 grid"
           :class="frequency === 'daily' ? 'md:grid-cols-2' : 'md:grid-cols-3'"
@@ -201,7 +204,7 @@ defineExpose({ open })
             <TextInput label="Yearly" type="number" min="0" v-model.number="keepYearly" />
           </div>
         </div>
-      </template>
+      </fieldset>
 
       <ErrorMessage v-if="error" :message="error" />
     </div>
