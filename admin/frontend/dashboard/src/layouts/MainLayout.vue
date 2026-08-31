@@ -100,7 +100,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
           <span class="size-4 text-ink-gray-5 shrink-0 lucide-chevron-down" />
         </button>
 
-        <div id="header-badge" class="flex items-center" />
+        <div id="header-badge" class="flex items-center pl-1" />
         <div id="header-actions" class="flex items-center gap-2 ml-auto">
           <UpdateStatusButton v-if="route.meta.showUpdateStatus" />
         </div>
