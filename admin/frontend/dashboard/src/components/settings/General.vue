@@ -72,8 +72,9 @@ onMounted(async () => {
     <component :is="openSection.component" />
   </div>
 
-  <div v-else>
+  <template v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
+
     <div class="-mx-2.5 divide-y divide-outline-alpha-gray-1 hover-merges-dividers">
       <SettingsRow
         label="Allow developer mode"
@@ -118,5 +119,5 @@ onMounted(async () => {
 
       <Version />
     </div>
-  </div>
+  </template>
 </template>
