@@ -147,7 +147,7 @@ const goBack = () => {
             :key="section.id"
             :variant="             isMobile ? 'subtle' : 'ghost'"
             :size="isMobile ? 'md' : 'sm'"
-            class="!justify-start border sm:border-0 w-full"
+            class="!justify-start border sm:border-0 w-full mt-0.5"
             :class="
                 currentSection === section.id
                   ? 'sm:!bg-surface-elevation-3 sm:!shadow-sm sm:!text-ink-gray-9 !text-ink-gray-6'
@@ -170,8 +170,8 @@ const goBack = () => {
           <div class="flex items-center gap-2 pb-4">
             <Button
               v-if="subSection || sessionJti || activeSection"
-              :class="{ 'sm:hidden': !subSection && !sessionJti }"
               class="-ml-2"
+              :class="{ 'sm:hidden': !subSection && !sessionJti }"
               variant="ghost"
               icon="lucide-arrow-left"
               label="Back"
@@ -179,7 +179,9 @@ const goBack = () => {
               @click="goBack"
             />
 
-            <div id="settings-header-actions" class="contents"></div>
+            <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
+
+            <div id="settings-header-actions" class="flex items-center gap-2 ml-auto"></div>
           </div>
 
           <General v-if="currentSection === 'general'" v-model:open-section="guardedSubSection" />
