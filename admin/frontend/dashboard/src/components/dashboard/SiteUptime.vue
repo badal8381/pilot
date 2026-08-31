@@ -94,7 +94,7 @@ onMounted(load)
     >
       <span class="size-6 text-ink-gray-3 lucide-server-off" />
       <p class="font-medium text-ink-gray-7 text-sm">Uptime monitoring is production-only</p>
-      <p class="max-w-xs text-ink-gray-5 text-xs">
+      <p class="max-w-xs text-ink-gray-5 text-p-xs">
         This bench isn't in production, so its sites are never pinged. Deploy to production to start
         tracking uptime.
       </p>

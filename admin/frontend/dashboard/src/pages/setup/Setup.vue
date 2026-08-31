@@ -71,7 +71,7 @@ const {
           Step {{ stepNumber }} of {{ stepSequence.length }}
         </p>
 
-        <h1 class="font-semibold text-lg">{{ stepTitle }}</h1>
+        <h1 class="text-lg-semibold">{{ stepTitle }}</h1>
         <p v-show="stepSubtitle" class="mt-0.5 text-ink-gray-5 text-p-base">{{ stepSubtitle }}</p>
       </div>
 
@@ -129,7 +129,7 @@ const {
           </Combobox>
           <TextInput label="Frappe repository" v-model="appRepo" />
           <ErrorMessage v-if="errorMessage" :message="errorMessage" />
-          <p v-else-if="validatingFramework" class="text-ink-gray-5 text-sm">
+          <p v-else-if="validatingFramework" class="text-ink-gray-5 text-p-sm">
             Checking repository…
           </p>
           <p
@@ -175,14 +175,14 @@ const {
           class="flex flex-col justify-center items-center gap-3 py-10"
         >
           <LoadingText />
-          <p class="text-ink-gray-6 text-sm text-center">
+          <p class="text-ink-gray-6 text-p-sm text-center">
             Finishing production setup. This page will reload automatically once your bench is live.
           </p>
         </div>
 
         <!-- Done: plain dev bench, production is a deliberate step the user runs later -->
         <div v-show="isDone && !isProductionHandoff" class="flex flex-col gap-4 py-2">
-          <p class="text-ink-gray-7 text-sm">
+          <p class="text-ink-gray-7 text-p-sm">
             Your bench is ready. Run one of these in your terminal:
           </p>
 

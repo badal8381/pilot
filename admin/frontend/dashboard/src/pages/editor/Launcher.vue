@@ -46,7 +46,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <p v-if="!session.developerMode" class="mt-16 text-ink-gray-5 text-sm text-center">
+    <p v-if="!session.developerMode" class="mt-16 text-ink-gray-5 text-p-sm text-center">
       Enable Developer mode in Settings to use the code editor.
     </p>
 

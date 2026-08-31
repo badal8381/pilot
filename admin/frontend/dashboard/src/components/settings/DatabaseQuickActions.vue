@@ -319,7 +319,7 @@ onMounted(load)
   </div>
 
   <Dialog v-model="confirmationOpen" :title="confirmationTitle" size="sm">
-    <p v-if="confirmation?.message" class="text-ink-gray-7 text-sm">
+    <p v-if="confirmation?.message" class="text-ink-gray-7 text-p-sm">
       {{ confirmation.message }}
     </p>
 
@@ -358,7 +358,7 @@ onMounted(load)
         </p>
       </div>
 
-      <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-sm">
+      <p v-if="sizingRequiresRestart" class="text-ink-orange-6 text-p-sm">
         MariaDB will restart because this value is above its current live Buffer Pool ceiling of
         {{ formatSizingValue(sizingAction.dynamicMax, 'MB') }}.
       </p>

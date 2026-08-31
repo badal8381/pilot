@@ -114,7 +114,7 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
 
 <template>
   <div v-if="rows.length" class='mt-3'>
-    <h2 class="mb-3 font-semibold text-ink-gray-8 text-base">Actions</h2>
+    <h2 class="mb-3 text-base-semibold text-ink-gray-8">Actions</h2>
     <div
       v-for="row in rows"
       :key="row.key"
@@ -139,7 +139,7 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
 
   <!-- Let's Encrypt email dialog -->
   <Dialog v-model="showSslEmail" title="Enable SSL" size="md">
-    <p class="text-ink-gray-7 text-sm">
+    <p class="text-ink-gray-7 text-p-sm">
       A Let's Encrypt email is required to issue and renew certificates.
     </p>
 

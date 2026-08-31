@@ -247,7 +247,7 @@ const createBench = async () => {
       <div v-if="provisioning" class="flex flex-col items-center gap-5 py-8 text-center">
         <LoadingIndicator class="w-10 h-10 text-ink-gray-5" />
         <div class="flex flex-col gap-2">
-          <p class="font-semibold text-lg">This may take a few minutes</p>
+          <p class="text-lg-semibold">This may take a few minutes</p>
           <p class="max-w-xs text-ink-gray-6 text-sm">Opens automatically when ready.</p>
         </div>
 
@@ -270,7 +270,7 @@ const createBench = async () => {
       <!-- Dev bench: guide to the CLI rather than auto-provisioning a
            managed bench the host probably can't run. -->
       <div v-else-if="isProduction === false" class="flex flex-col gap-3">
-        <p class="text-ink-gray-7 text-sm">
+        <p class="text-ink-gray-7 text-p-sm">
           This bench is running in development mode, so new benches can be created from the
           command line :
         </p>
@@ -348,7 +348,7 @@ const createBench = async () => {
             </div>
           </div>
 
-          <p class="mt-1.5 text-ink-gray-5 text-xs">
+          <p class="mt-1.5 text-ink-gray-5 text-p-xs">
             The web address you'll use to open this bench.
           </p>
         </div>

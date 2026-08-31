@@ -429,7 +429,7 @@ onMounted(load)
     >
       <span class="size-6 text-ink-gray-3 lucide-database" />
       <p class="font-medium text-ink-gray-7 text-sm">No database server</p>
-      <p class="max-w-sm text-ink-gray-5 text-xs">{{ diagnostics.reason }}</p>
+      <p class="max-w-sm text-ink-gray-5 text-p-xs">{{ diagnostics.reason }}</p>
     </div>
 
     <ErrorMessage v-else-if="error" :message="error" />
@@ -529,7 +529,7 @@ onMounted(load)
           <p v-else class="py-6 text-ink-gray-5 text-sm text-center">No results to display</p>
 
           <div v-if="binlogs.length" class="flex flex-wrap justify-between items-center gap-2 mt-3">
-            <p class="text-ink-gray-5 text-xs">
+            <p class="text-ink-gray-5 text-p-xs">
               The newest log is in use and cannot be deleted. Selecting a file also selects every
               older one, because the server can only purge them together.
             </p>
