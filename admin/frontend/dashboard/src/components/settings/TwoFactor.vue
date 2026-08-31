@@ -1,25 +1,21 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-
-import { ListRowItem, ListView } from 'frappe-ui/experimental'
-
 import { Button, Dialog, ErrorMessage, Spinner, TextInput, toast } from 'frappe-ui'
 
 import QrcodeVue from 'qrcode.vue'
 
 import EmptyState from '@/components/common/EmptyState.vue'
+import Table from '@/components/common/Table.vue'
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 
 import { twoFactorApi } from '@/api/twoFactor'
 import { fmtDateTime } from '@/utils/taskFormat'
 
 const columns = [
-  // Fixed widths, not fractions: ListView's row wrapper is `w-max`, so a fractional
-  // track sizes to its content and a long device name would stretch the table instead.
-  { label: 'Device', key: 'name', align: 'left', width: '12rem' },
-  { label: 'Added', key: 'confirmed_at', align: 'left', width: '9rem' },
-  { label: 'Last used', key: 'last_used_at', align: 'left', width: '9rem' },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: 'Device', key: 'name', class: 'w-48' },
+  { label: 'Added', key: 'confirmed_at', class: 'w-36' },
+  { label: 'Last used', key: 'last_used_at', class: 'w-36' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 const loading = ref(true)
@@ -218,44 +214,32 @@ onMounted(load)
       description="Sign-in needs only the admin password. Add a device to require a code from an authenticator app as well."
     />
 
-    <ListView
-      v-else
-      :columns="columns"
-      :rows="devices"
-      row-key="name"
-      :options="{ selectable: false, showTooltip: false }"
-    >
-      <template #cell="{ column, row, item }">
-        <span
-          v-if="column.key === 'name'"
-          class="block min-w-0 max-w-full text-ink-gray-7 truncate"
-          :title="row.name"
-        >
+    <Table v-else :columns="columns" :rows="devices" height="max-h-96">
+      <template #name="{ row }">
+        <span class="block max-w-full text-ink-gray-7 truncate" :title="row.name">
           {{ row.name }}
         </span>
-
-        <span v-else-if="column.key === 'confirmed_at'" class="text-ink-gray-6 text-sm">
-          {{ fmtTimestamp(row.confirmed_at) }}
-        </span>
-
-        <span v-else-if="column.key === 'last_used_at'" class="text-ink-gray-6 text-sm">
-          {{ fmtTimestamp(row.last_used_at) }}
-        </span>
-
-        <div v-else-if="column.key === 'actions'" class="flex justify-end">
-          <Button
-            variant="ghost"
-            theme="red"
-            icon="lucide-trash-2"
-            label="Remove device"
-            tooltip="Remove device"
-            @click="promptRemove(row)"
-          />
-        </div>
-
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
       </template>
-    </ListView>
+
+      <template #confirmed_at="{ row }">
+        <span class="text-ink-gray-6 text-sm">{{ fmtTimestamp(row.confirmed_at) }}</span>
+      </template>
+
+      <template #last_used_at="{ row }">
+        <span class="text-ink-gray-6 text-sm">{{ fmtTimestamp(row.last_used_at) }}</span>
+      </template>
+
+      <template #actions="{ row }">
+        <Button
+          variant="ghost"
+          theme="red"
+          icon="lucide-trash-2"
+          label="Remove device"
+          tooltip="Remove device"
+          @click="promptRemove(row)"
+        />
+      </template>
+    </Table>
 
     <div v-if="status.enabled" class="pt-2 border-t border-outline-gray-1">
       <div class="-mx-2.5">

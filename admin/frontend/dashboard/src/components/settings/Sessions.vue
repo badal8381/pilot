@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { Button, Dialog, Dropdown, Spinner, Tooltip, toast } from 'frappe-ui'
 
-import { ListRowItem, ListView } from 'frappe-ui/experimental'
-
-import {
-  Button,
-  Dialog,
-  Dropdown,
-  Spinner,
-  toast,
-} from 'frappe-ui'
+import Table from '@/components/common/Table.vue'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 
@@ -64,20 +57,18 @@ watch(
   { immediate: true },
 )
 
-// Numeric widths are fr units (ListView convention) so columns stretch to fill the
-// row instead of leaving dead space; actions stays a fixed icon-sized column.
 const columns = [
-  { label: 'IP address', key: 'ip', align: 'left', width: 1 },
-  { label: 'Last activity', key: 'activity', align: 'left', width: 1, getTooltip: (row) => row.activityTooltip },
-  { label: 'Expires', key: 'exp', align: 'left', width: 1 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: 'IP address', key: 'ip' },
+  { label: 'Last activity', key: 'activity' },
+  { label: 'Expires', key: 'exp' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 const activityColumns = [
-  { label: 'Event', key: 'event', align: 'left', width: 2, getTooltip: (row) => row.eventTooltip },
-  { label: 'IP address', key: 'ip', align: 'left', width: 1 },
-  { label: 'Time', key: 'time', align: 'left', width: 1, getTooltip: (row) => row.timeExact },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: 'Event', key: 'event', class: 'w-2/5' },
+  { label: 'IP address', key: 'ip' },
+  { label: 'Time', key: 'time' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 // All display formatting happens here, not in the template - rows already hold the
@@ -235,27 +226,29 @@ onMounted(load)
       title="No activity recorded"
       description="Actions taken by this session will show up here."
     />
-    <ListView
-      v-else
-      :columns="activityColumns"
-      :rows="activityRows"
-      row-key="key"
-      :options="{ selectable: false, showTooltip: true }"
-    >
-      <template #cell="{ column, row, item }">
-        <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Button
-            variant="ghost"
-            icon="lucide-info"
-            label="Activity details"
-            tooltip="Details"
-            @click="openDetail(row)"
-          />
-        </div>
-
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+    <Table v-else :columns="activityColumns" :rows="activityRows" height="max-h-96">
+      <template #event="{ row }">
+        <Tooltip :text="row.eventTooltip">
+          <span class="block truncate">{{ row.event }}</span>
+        </Tooltip>
       </template>
-    </ListView>
+
+      <template #time="{ row }">
+        <Tooltip :text="row.timeExact">
+          <span class="block truncate">{{ row.time }}</span>
+        </Tooltip>
+      </template>
+
+      <template #actions="{ row }">
+        <Button
+          variant="ghost"
+          icon="lucide-info"
+          label="Activity details"
+          tooltip="Details"
+          @click="openDetail(row)"
+        />
+      </template>
+    </Table>
   </div>
 
   <div v-else class="space-y-5">
@@ -275,31 +268,27 @@ onMounted(load)
         description="Sign-ins appear here while their tokens are valid."
       />
 
-      <ListView
-        v-else
-        :columns="columns"
-        :rows="rows"
-        row-key="jti"
-        :options="{ selectable: false, showTooltip: true }"
-      >
-        <template #cell="{ column, row, item }">
-          <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row)">
-              <template #default="{ open }">
-                <Button
-                  variant="ghost"
-                  :active="open"
-                  icon="lucide-ellipsis"
-                  label="Session actions"
-                  tooltip="Actions"
-                />
-              </template>
-            </Dropdown>
-          </div>
-
-          <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      <Table v-else :columns="columns" :rows="rows" height="max-h-96">
+        <template #activity="{ row }">
+          <Tooltip :text="row.activityTooltip">
+            <span class="block truncate">{{ row.activity }}</span>
+          </Tooltip>
         </template>
-      </ListView>
+
+        <template #actions="{ row }">
+          <Dropdown :options="menuOptions(row)">
+            <template #default="{ open }">
+              <Button
+                variant="ghost"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="Session actions"
+                tooltip="Actions"
+              />
+            </template>
+          </Dropdown>
+        </template>
+      </Table>
     </template>
   </div>
 

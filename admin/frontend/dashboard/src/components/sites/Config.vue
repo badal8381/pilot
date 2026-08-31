@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { Button, Dialog, Dropdown, ErrorMessage, TextInput } from 'frappe-ui'
 
-import { ListView, ListRowItem } from 'frappe-ui/experimental'
-
-import {
-  Button,
-  Dialog,
-  Dropdown,
-  ErrorMessage,
-  TextInput,
-} from 'frappe-ui'
+import Table from '@/components/common/Table.vue'
 
 import { sitesApi } from '@/api/sites'
 import { useSite } from '@/composables/sites/useSite'
@@ -23,9 +16,9 @@ const props = defineProps<Props>()
 const { site, reload } = useSite(props.siteName)
 
 const columns = [
-  { label: 'Key', key: 'key', align: 'left', width: 2 },
-  { label: 'Value', key: 'value', align: 'left', width: 3 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: 'Key', key: 'key', class: 'w-2/5' },
+  { label: 'Value', key: 'value' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 const isPassword = (key) => /password|secret|token|key/i.test(key)
@@ -171,31 +164,21 @@ const refresh = async () => {
       No config keys.
     </div>
 
-    <ListView
-      v-else
-      :columns="columns"
-      :rows="rows"
-      row-key="name"
-      :options="{ selectable: false, showTooltip: false }"
-    >
-      <template #cell="{ column, row, item }">
-        <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Dropdown v-if="!row.readonly" :options="menuOptions(row)">
-            <template #default="{ open }">
-              <Button
-                variant="ghost"
-                :active="open"
-                icon="lucide-ellipsis"
-                label="Config actions"
-                tooltip="Actions"
-              />
-            </template>
-          </Dropdown>
-        </div>
-
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+    <Table v-else :columns="columns" :rows="rows" height="max-h-96">
+      <template #actions="{ row }">
+        <Dropdown v-if="!row.readonly" :options="menuOptions(row)">
+          <template #default="{ open }">
+            <Button
+              variant="ghost"
+              :active="open"
+              icon="lucide-ellipsis"
+              label="Config actions"
+              tooltip="Actions"
+            />
+          </template>
+        </Dropdown>
       </template>
-    </ListView>
+    </Table>
   </div>
 
   <Dialog v-model="showAddDialog" title="Add config" size="sm">

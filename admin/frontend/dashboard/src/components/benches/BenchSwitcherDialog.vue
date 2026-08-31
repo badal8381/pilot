@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { Badge, Button, Dialog, ErrorMessage, Spinner } from 'frappe-ui'
 
-import { ListView } from 'frappe-ui/experimental'
-
-import {
-  Badge,
-  Button,
-  Dialog,
-  ErrorMessage,
-  Spinner,
-} from 'frappe-ui'
+import Table from '@/components/common/Table.vue'
 
 import LucidePlus from '~icons/lucide/plus'
 import LucidePlay from '~icons/lucide/play'
@@ -58,12 +51,12 @@ const showDropConfirm = computed({
 })
 
 const columns = [
-  { label: 'Bench', key: 'name', align: 'left', width: 2 },
-  { label: 'Mode', key: 'mode', align: 'left', width: 1 },
-  { label: 'Manager', key: 'manager', align: 'left', width: 1 },
-  { label: 'Sites', key: 'sites', align: 'left', width: 1 },
-  { label: 'Status', key: 'status', align: 'center', width: 1 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: 'Bench', key: 'name', class: 'w-1/3' },
+  { label: 'Mode', key: 'mode', class: 'text-ink-gray-6 text-sm' },
+  { label: 'Manager', key: 'manager', class: 'text-ink-gray-6 text-sm' },
+  { label: 'Sites', key: 'sites', class: 'text-ink-gray-6 text-sm' },
+  { label: 'Status', key: 'status', class: 'text-center' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 const rows = computed(() =>
@@ -229,44 +222,27 @@ watch(show, (open) => {
         No benches found.
       </div>
 
-      <ListView
-        v-else
-        :columns="columns"
-        :rows="rows"
-        row-key="name"
-        :options="{ selectable: false, showTooltip: false, rowHeight: 48 }"
-      >
-        <template #cell="{ column, row, item }">
-          <div
-            v-if="column.key === 'name'"
-            class="flex items-center gap-2 w-full min-w-0 text-left"
-          >
+      <Table v-else :columns="columns" :rows="rows" height="max-h-96">
+        <template #name="{ row }">
+          <div class="flex items-center gap-2 min-w-0">
             <span class="font-medium text-sm truncate">{{ row.name }}</span>
             <Badge v-if="isCurrentBench(row.bench)" theme="green" size="sm" label="Current" />
           </div>
-
-          <div v-else-if="column.key === 'status'" class="flex justify-center w-full">
-            <Badge :theme="statusTheme(row.bench)" :label="row.status" />
-          </div>
-
-          <div v-else-if="column.key === 'actions'" class="flex justify-end w-full">
-            <span
-              v-if="controlLoading === row.name"
-              class="flex justify-center items-center w-7 h-7"
-            >
-              <Spinner size="md" class="text-ink-gray-5" />
-            </span>
-
-            <ActionMenu
-              v-else-if="menuOptions(row.bench).length"
-              :options="menuOptions(row.bench)"
-            />
-          </div>
-
-          <!-- Mode / Manager -->
-          <div v-else class="w-full text-ink-gray-6 text-sm truncate">{{ item }}</div>
         </template>
-      </ListView>
+
+        <template #status="{ row }">
+          <Badge :theme="statusTheme(row.bench)" :label="row.status" />
+        </template>
+
+        <template #actions="{ row }">
+          <Spinner v-if="controlLoading === row.name" size="md" class="text-ink-gray-5" />
+
+          <ActionMenu
+            v-else-if="menuOptions(row.bench).length"
+            :options="menuOptions(row.bench)"
+          />
+        </template>
+      </Table>
     </div>
   </Dialog>
 

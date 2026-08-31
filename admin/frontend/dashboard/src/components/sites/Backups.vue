@@ -1,18 +1,10 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
-
-import { ListFooter, ListView, ListRowItem } from 'frappe-ui/experimental'
-
-import {
-  Button,
-  Dialog,
-  Dropdown,
-  ErrorMessage,
-  LoadingText,
-} from 'frappe-ui'
+import { Button, Dialog, Dropdown, ErrorMessage, LoadingText, Select } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
+import Table from '@/components/common/Table.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
 
 import { sitesApi } from '@/api/sites'
@@ -40,14 +32,7 @@ const {
   setBackupsPageLength,
 } = useSite(props.siteName)
 
-const footerOptions = computed(() => ({
-  rowCount: backups.value.length,
-  // ListFooter shows "Load More" only when rowCount < totalCount; we don't know
-  // the true total (S3 metadata is read lazily), so nudge it past rowCount
-  // whenever the backend signals there may be another page.
-  totalCount: backupsHasMore.value ? backups.value.length + 1 : backups.value.length,
-  pageLengthOptions: [20, 50, 100],
-}))
+const pageLengths = [20, 50, 100].map((n) => ({ label: `${n} per page`, value: n }))
 
 const backingUp = ref(false)
 const error = ref('')
@@ -85,12 +70,12 @@ const backupNow = async () => {
 }
 
 const columns = [
-  { label: 'Date', key: 'timestamp', align: 'left', width: 2 },
-  { label: 'Database', key: 'database', align: 'center', width: 1 },
-  { label: 'Public', key: 'public', align: 'center', width: 1 },
-  { label: 'Private', key: 'private', align: 'center', width: 1 },
-  { label: 'Offsite', key: 'offsite', align: 'center', width: 1 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: 'Date', key: 'timestamp', class: 'w-1/3' },
+  { label: 'Database', key: 'database', class: 'text-center' },
+  { label: 'Public', key: 'public', class: 'text-center' },
+  { label: 'Private', key: 'private', class: 'text-center' },
+  { label: 'Offsite', key: 'offsite', class: 'text-center' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 const fileOf = (set, kind) => set.files?.find((f) => f.kind === kind) ?? null
@@ -243,49 +228,46 @@ onMounted(() => {
         </Button>
       </EmptyState>
 
-      <ListView
-        v-else
-        :columns="columns"
-        :rows="rows"
-        row-key="name"
-        :options="{ selectable: false, showTooltip: false }"
-      >
-        <template #cell="{ column, row, item }">
-          <div v-if="column.key === 'actions'" class="flex justify-end">
-            <Dropdown :options="menuOptions(row.set)">
-              <template #default="{ open }">
-                <Button
-                  variant="ghost"
-                  :active="open"
-                  icon="lucide-ellipsis"
-                  label="Backup actions"
-                  tooltip="Actions"
-                />
-              </template>
-            </Dropdown>
-          </div>
-
-          <div v-else-if="column.key === 'offsite'" class="flex justify-center">
-            <span
-              v-if="row.set.is_offsite"
-              class="size-4 text-ink-gray-6 lucide-check"
-              title="Backed up offsite"
-            />
-            <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
-          </div>
-
-          <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+      <Table v-else :columns="columns" :rows="rows" height="max-h-[32rem]">
+        <template #offsite="{ row }">
+          <span
+            v-if="row.set.is_offsite"
+            class="size-4 text-ink-gray-6 lucide-check"
+            title="Backed up offsite"
+          />
+          <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
         </template>
-      </ListView>
 
-      <ListFooter
+        <template #actions="{ row }">
+          <Dropdown :options="menuOptions(row.set)">
+            <template #default="{ open }">
+              <Button
+                variant="ghost"
+                :active="open"
+                icon="lucide-ellipsis"
+                label="Backup actions"
+                tooltip="Actions"
+              />
+            </template>
+          </Dropdown>
+        </template>
+      </Table>
+
+      <div
         v-if="backupsHasMore || backups.length > 20"
-        class="mt-2 px-1"
-        :model-value="backupsLimit"
-        :options="footerOptions"
-        @update:model-value="setBackupsPageLength"
-        @load-more="loadMoreBackups"
-      />
+        class="flex items-center gap-3 mt-2 px-1"
+      >
+        <Select
+          size="sm"
+          :model-value="backupsLimit"
+          :options="pageLengths"
+          @update:model-value="setBackupsPageLength"
+        />
+
+        <span class="text-ink-gray-5 text-sm">{{ backups.length }} backups</span>
+
+        <Button v-if="backupsHasMore" class="ml-auto" @click="loadMoreBackups">Load more</Button>
+      </div>
     </div>
   </div>
 

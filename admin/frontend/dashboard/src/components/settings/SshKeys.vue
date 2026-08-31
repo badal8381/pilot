@@ -1,21 +1,17 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-
-import { ListRowItem, ListView } from 'frappe-ui/experimental'
-
 import { Button, Dialog, ErrorMessage, Spinner, Textarea, toast } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
+import Table from '@/components/common/Table.vue'
 
 import { sshKeysApi } from '@/api/sshKeys'
 import { apiErrorMessage } from '@/api/client'
 
-// Numeric widths are fr units (ListView convention) so Name/Fingerprint stretch to
-// fill the row instead of leaving dead space; actions stays a fixed icon-sized column.
 const columns = [
-  { label: 'Name', key: 'label', align: 'left', width: 1 },
-  { label: 'Fingerprint', key: 'fingerprint', align: 'left', width: 2 },
-  { label: '', key: 'actions', align: 'right', width: '3rem' },
+  { label: 'Name', key: 'label', class: 'w-1/3' },
+  { label: 'Fingerprint', key: 'fingerprint' },
+  { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
 
 const loading = ref(true)
@@ -121,28 +117,18 @@ onMounted(load)
       title="No SSH keys"
       description="Add a public key to give its holder SSH access to this server."
     />
-    <ListView
-      v-else
-      :columns="columns"
-      :rows="rows"
-      row-key="fingerprint"
-      :options="{ selectable: false, showTooltip: false }"
-    >
-      <template #cell="{ column, row, item }">
-        <div v-if="column.key === 'actions'" class="flex justify-end">
-          <Button
-            variant="ghost"
-            theme="red"
-            icon="lucide-trash-2"
-            label="Remove SSH key"
-            tooltip="Remove SSH key"
-            @click="promptRemove(row)"
-          />
-        </div>
-
-        <ListRowItem v-else :column="column" :row="row" :item="item" :align="column.align" />
+    <Table v-else :columns="columns" :rows="rows" height="max-h-96">
+      <template #actions="{ row }">
+        <Button
+          variant="ghost"
+          theme="red"
+          icon="lucide-trash-2"
+          label="Remove SSH key"
+          tooltip="Remove SSH key"
+          @click="promptRemove(row)"
+        />
       </template>
-    </ListView>
+    </Table>
   </div>
 
   <Dialog v-model="showAdd" title="Add SSH key" size="md">

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { Dialog, ErrorMessage, LoadingText } from 'frappe-ui'
-import { ListView } from 'frappe-ui/experimental'
+
+import Table from '@/components/common/Table.vue'
 
 import { apiErrorMessage } from '@/api/client'
 import { databaseApi } from '@/api/database'
@@ -18,11 +19,11 @@ const props = withDefaults(defineProps<Props>(), {
 const open = defineModel('open', { type: Boolean, default: false })
 
 const columns = [
-  { label: 'Table', key: 'name', align: 'left', width: 3 },
-  { label: 'Data', key: 'data', align: 'right', width: 1 },
-  { label: 'Index', key: 'index', align: 'right', width: 1 },
-  { label: 'Claimable', key: 'claimable', align: 'right', width: 1 },
-  { label: 'Total', key: 'total', align: 'right', width: 1 },
+  { label: 'Table', key: 'name', class: 'w-[44%]' },
+  { label: 'Data', key: 'data', class: 'w-[14%] text-right' },
+  { label: 'Index', key: 'index', class: 'w-[14%] text-right' },
+  { label: 'Claimable', key: 'claimable', class: 'w-[14%] text-right' },
+  { label: 'Total', key: 'total', class: 'w-[14%] text-right' },
 ]
 
 const tables = ref([])
@@ -71,14 +72,6 @@ const load = async () => {
       No results to display
     </p>
 
-    <div v-else class="max-h-[60vh] overflow-y-auto">
-      <ListView
-        class="!w-full"
-        :columns="columns"
-        :rows="rows"
-        row-key="name"
-        :options="{ selectable: false, showTooltip: false }"
-      />
-    </div>
+    <Table v-else :columns="columns" :rows="rows" height="max-h-[60vh]" />
   </Dialog>
 </template>
