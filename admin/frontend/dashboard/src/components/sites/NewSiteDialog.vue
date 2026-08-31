@@ -49,9 +49,7 @@ const updateFadeEdges = () => {
   fadeEdges.value = top && bottom ? 'both' : top ? 'top' : bottom ? 'bottom' : ''
 }
 
-const availableApps = computed(() =>
-  buildSiteAppChoices(registry.value, benchApps.value),
-)
+const availableApps = computed(() => buildSiteAppChoices(registry.value, benchApps.value))
 
 // Also `loading`: apps resolve while the spinner is still up, so the rows only
 // exist once it flips.
@@ -202,14 +200,19 @@ const submit = async () => {
         <div
           ref="appList"
           :data-fade="fadeEdges"
-          class="gap-x-4 grid grid-cols-1 md:grid-cols-2 -mx-4 sm:-mx-6 px-4 sm:px-6 max-h-72 overflow-y-auto app-list"
+          class="gap-2 grid grid-cols-1 md:grid-cols-2 -mx-4 sm:-mx-6 px-4 sm:px-6 max-h-72 overflow-y-auto app-list"
           @scroll.passive="updateFadeEdges"
         >
           <button
             v-for="app in availableApps"
             :key="app.name"
             type="button"
-            class="flex items-center gap-3 hover:bg-surface-alpha-gray-1 px-2 py-2 rounded-4 min-w-0 text-left transition-colors"
+            class="flex items-center gap-3 px-2 py-2 border rounded-4 min-w-0 text-left transition-colors hover:bg-surface-alpha-gray-1"
+            :class="
+              selectedApps.includes(app.name)
+                ? 'border-outline-gray-2'
+                : 'border-transparent '
+            "
             @click="toggleApp(app.name)"
           >
             <AppIcon :name="app.name" size="lg" />
@@ -249,15 +252,15 @@ const submit = async () => {
   --fade: 1rem;
 }
 
-.app-list[data-fade='top'] {
+.app-list[data-fade="top"] {
   mask-image: linear-gradient(to bottom, transparent, #000 var(--fade));
 }
 
-.app-list[data-fade='bottom'] {
+.app-list[data-fade="bottom"] {
   mask-image: linear-gradient(to top, transparent, #000 var(--fade));
 }
 
-.app-list[data-fade='both'] {
+.app-list[data-fade="both"] {
   mask-image: linear-gradient(
     to bottom,
     transparent,
