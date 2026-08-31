@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, h } from 'vue'
 import { Button, Dropdown, TabButtons, TextInput } from 'frappe-ui'
-import LucideSearch from '~icons/lucide/search'
 
 import AppIcon from '@/components/apps/AppIcon.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
@@ -57,7 +56,7 @@ const worksWithLabel = computed(() => {
         :size="isMobile ? 'md' : 'sm'"
       >
         <template #prefix>
-          <LucideSearch class="size-4 text-ink-gray-5" />
+          <span class="size-4 text-ink-gray-5 lucide-search" />
         </template>
       </TextInput>
 

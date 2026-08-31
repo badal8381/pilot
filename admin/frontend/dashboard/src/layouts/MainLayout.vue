@@ -97,7 +97,7 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
           @click="mobileNavDrawer = true"
         >
           <Breadcrumbs :items="breadcrumbs" class="min-w-0" />
-          <lucide-chevron-down class="size-4 text-ink-gray-5 shrink-0" />
+          <span class="size-4 text-ink-gray-5 shrink-0 lucide-chevron-down" />
         </button>
 
         <div id="header-badge" class="flex items-center" />

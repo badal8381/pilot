@@ -4,12 +4,10 @@ import { Badge, Button, Dialog, ErrorMessage, Spinner } from 'frappe-ui'
 
 import Table from '@/components/common/Table.vue'
 
-import LucidePlus from '~icons/lucide/plus'
 import LucidePlay from '~icons/lucide/play'
 import LucideSquare from '~icons/lucide/square'
 import LucideTrash2 from '~icons/lucide/trash-2'
 import LucideRotateCw from '~icons/lucide/rotate-cw'
-import LucideRefreshCw from '~icons/lucide/refresh-cw'
 import LucideExternalLink from '~icons/lucide/external-link'
 
 import ActionMenu from '@/components/common/ActionMenu.vue'
@@ -200,13 +198,13 @@ watch(show, (open) => {
       <div class="flex justify-end items-center gap-1 mb-4">
         <Button variant="ghost" :loading="loading" @click="loadBenches" title="Refresh">
           <template #icon>
-            <LucideRefreshCw class="w-4 h-4" />
+            <span class="w-4 h-4 lucide-refresh-cw" />
           </template>
         </Button>
 
         <Button @click="newBench">
           <template #prefix>
-            <LucidePlus class="w-4 h-4" />
+            <span class="w-4 h-4 lucide-plus" />
           </template>
           New Bench
         </Button>

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { Badge, Button, Dialog, Tooltip } from 'frappe-ui'
-import LucideDownload from '~icons/lucide/download'
 
 import AppIcon from '@/components/apps/AppIcon.vue'
 
@@ -55,16 +54,14 @@ const incompatibleReason = computed(
             class="!text-ink-gray-4"
             @click="showIncompatible = true"
           >
-            <template #icon><LucideDownload class="size-4" /></template>
+            <template #icon><span class="size-4 lucide-download" /></template>
           </Button>
         </Tooltip>
 
         <Tooltip v-else :text="`Install ${app.title}`">
           <Button variant="ghost" label="Install" class="group" @click="$emit('install', app)">
             <template #icon>
-              <LucideDownload
-                class="size-4 transition-transform duration-150 ease-[var(--ease-out)] group-active:scale-95 group-active:duration-100"
-              />
+              <span class="size-4 transition-transform duration-150 ease-[var(--ease-out)] group-active:scale-95 group-active:duration-100 lucide-download" />
             </template>
           </Button>
         </Tooltip>

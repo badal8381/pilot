@@ -2,10 +2,6 @@
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Button, Dialog, TextInput, ErrorMessage } from 'frappe-ui'
-import LucideLock from '~icons/lucide/lock'
-import LucideShield from '~icons/lucide/shield'
-import LucideEye from '~icons/lucide/eye'
-import LucideEyeOff from '~icons/lucide/eye-off'
 
 import PilotLogo from '@/components/icons/Pilot.vue'
 
@@ -91,7 +87,7 @@ const login = async () => {
           @keydown.enter="login"
         >
           <template #prefix>
-            <LucideLock class="size-4 text-ink-gray-5" />
+            <span class="size-4 text-ink-gray-5 lucide-lock" />
           </template>
 
           <template #suffix>
@@ -101,8 +97,8 @@ const login = async () => {
               class="text-ink-gray-5 hover:text-ink-gray-7"
               @click="showPassword = !showPassword"
             >
-              <LucideEyeOff v-if="showPassword" class="size-4" />
-              <LucideEye v-else class="size-4" />
+              <span v-if="showPassword" class="size-4 lucide-eye-off" />
+              <span v-else class="size-4 lucide-eye" />
             </button>
           </template>
         </TextInput>
@@ -116,7 +112,7 @@ const login = async () => {
           @keydown.enter="login"
         >
           <template #prefix>
-            <LucideShield class="size-4 text-ink-gray-5" />
+            <span class="size-4 text-ink-gray-5 lucide-shield" />
           </template>
         </TextInput>
 

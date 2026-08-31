@@ -75,7 +75,7 @@ const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
         >
           {{ item.label }}
 
-          <lucide-chevron-right v-if="isMobile" class="size-4 text-ink-gray-4 ml-auto mr-1" />
+          <span v-if="isMobile" class="size-4 text-ink-gray-4 ml-auto mr-1 lucide-chevron-right" />
         </SidebarItem>
       </template>
     </nav>

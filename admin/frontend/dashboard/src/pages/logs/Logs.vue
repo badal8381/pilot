@@ -282,7 +282,7 @@ onUnmounted(() => stopLive())
         :options="fileOptions"
         @update:model-value="selectedFile = $event"
       >
-        <template #prefix><lucide-search class="size-4 text-ink-gray-5" /></template>
+        <template #prefix><span class="size-4 text-ink-gray-5 lucide-search" /></template>
 
         <template #item-label="{ item }">
           <div class="flex items-center gap-2">
