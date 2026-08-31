@@ -119,7 +119,13 @@ onMounted(async () => {
   </div>
 
   <div v-else class="space-y-6">
-    <Alert v-if="!production" title="Not enforced yet" theme="amber" :dismissible="false">
+    <Alert
+      v-if="!production"
+      class="border border-outline-gray-2"
+      title="Not enforced yet"
+      theme="amber"
+      :dismissible="false"
+    >
       <template #description>
         <span class="text-ink-gray-6 text-p-sm"
           >These rules take effect only in production (they're applied by nginx). This bench isn't
