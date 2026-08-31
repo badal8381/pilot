@@ -1,3 +1,5 @@
+import { relativeTime } from './time.ts'
+
 const STATUS_CONFIG = {
   queued: {
     label: 'Queued',
@@ -85,7 +87,6 @@ export const TASK_TYPES = [
       'get-app',
       'remove-app',
       'get-and-install-app',
-      'fetch-all-app-updates',
       'switch-branch',
       'revert-apps',
     ],
@@ -227,4 +228,8 @@ export const taskDuration = (task) => {
     return task.queue_position ? `#${task.queue_position} in queue` : ''
   }
   return fmtDuration(task.duration_seconds)
+}
+
+export const taskLastRun = (task) => {
+  return relativeTime(task.status === 'queued' ? task.queued_at : task.started_at || task.queued_at)
 }

@@ -10,8 +10,11 @@ import {
   siteRoute,
   statusConfig,
   taskDuration,
+  taskLastRun,
   taskScope,
 } from './taskFormat.ts'
+
+import { relativeTime } from './time.ts'
 
 test('queued tasks have their own presentation', () => {
   assert.equal(statusConfig({ status: 'queued' }).label, 'Queued')
@@ -118,4 +121,9 @@ test('taskDuration is empty when the queue has not reported a position', () => {
 
 test('taskDuration reports how long a finished task took', () => {
   assert.equal(taskDuration({ status: 'success', duration_seconds: 93 }), '1m 33s')
+})
+
+test('taskLastRun falls back to the queued time when a task never started', () => {
+  const queuedAt = new Date(Date.now() - 3 * 60 * 1000).toISOString()
+  assert.equal(taskLastRun({ status: 'killed', queued_at: queuedAt }), relativeTime(queuedAt))
 })

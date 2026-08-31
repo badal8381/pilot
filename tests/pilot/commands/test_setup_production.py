@@ -197,6 +197,7 @@ def test_require_production_inputs_passes_with_domain_and_email(tmp_path: Path) 
 def test_setup_monitoring_runs_privileged_setup_at_provision_time(tmp_path: Path, monkeypatch) -> None:
     """Privileged log-dir/logrotate setup must run here, not in the user-service daemons."""
     from pilot.core.server.monitoring import MonitorConfigurator
+    from pilot.core.site.storage.systemd import SiteStorageConfigurator
     from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
     bench = _make_bench(tmp_path, process_manager="systemd")
@@ -206,6 +207,7 @@ def test_setup_monitoring_runs_privileged_setup_at_provision_time(tmp_path: Path
     called = []
     monkeypatch.setattr(MonitorConfigurator, "install", lambda self: None)
     monkeypatch.setattr(UptimeMonitorConfigurator, "install", lambda self: None)
+    monkeypatch.setattr(SiteStorageConfigurator, "install", lambda self: None)
     monkeypatch.setattr(MonitorConfigurator, "setup", lambda self: called.append("monitor"))
     monkeypatch.setattr(UptimeMonitorConfigurator, "setup", lambda self: called.append("uptime"))
 
@@ -223,11 +225,13 @@ class _BlockPsutil:
 def test_setup_monitoring_runs_without_psutil(tmp_path: Path, monkeypatch) -> None:
     """The CLI runs on the system python, which has no third-party packages."""
     from pilot.core.server.monitoring_config import MonitorConfigurator
+    from pilot.core.site.storage.systemd import SiteStorageConfigurator
     from pilot.core.site.uptime_monitoring_config import UptimeMonitorConfigurator
 
     bench = _make_bench(tmp_path, process_manager="systemd")
     cmd = ProductionSetup(bench)
 
+    monkeypatch.setattr(SiteStorageConfigurator, "install", lambda self: None)
     for configurator in (MonitorConfigurator, UptimeMonitorConfigurator):
         monkeypatch.setattr(configurator, "install", lambda self: None)
         monkeypatch.setattr(configurator, "setup", lambda self: None)
