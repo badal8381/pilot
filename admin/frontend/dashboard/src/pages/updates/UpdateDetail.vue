@@ -77,13 +77,11 @@ const sitesCount = computed(() => {
   return `${sites.length}`
 })
 
-const metaLine = computed(() => {
-  const parts = []
-  if (op.value.started_at) parts.push(`Started ${fmtDateTime(op.value.started_at)}`)
-  const duration = fmtDuration(durationSeconds.value)
-  if (duration) parts.push(isActive(op.value) ? `running for ${duration}` : `took ${duration}`)
-  return parts.join(' · ')
-})
+const startedAt = computed(() =>
+  op.value.started_at ? fmtDateTime(op.value.started_at) : '',
+)
+
+const duration = computed(() => fmtDuration(durationSeconds.value))
 
 const openTaskLog = (log) => router.push({ name: 'TaskDetail', params: { taskId: log.id } })
 
@@ -242,7 +240,17 @@ onUnmounted(() => clearTimeout(timer))
         />
       </Teleport>
 
-      <p class="mt-5 px-2 font-medium text-ink-gray-8 truncate">{{ metaLine }}</p>
+      <div class="flex items-center gap-3 mt-5 px-2 text-sm">
+        <span v-if="startedAt" class="flex items-center gap-1.5 text-ink-gray-7">
+          <span class="size-3.5 lucide-clock" />
+          {{ startedAt }}
+        </span>
+
+        <span v-if="duration" class="flex items-center gap-1.5 ml-auto text-ink-gray-5">
+          <span class="size-3.5 lucide-timer" />
+          <span class="tabular-nums">{{ duration }}</span>
+        </span>
+      </div>
 
       <ErrorMessage v-if="error" class="mt-4" :message="error" />
 
