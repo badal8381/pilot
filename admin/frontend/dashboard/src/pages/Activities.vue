@@ -199,7 +199,10 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="p-3 md:p-4 flex flex-col" :class="siteName ? '' : 'mx-auto max-w-4xl h-[calc(100vh-3rem)]'">
+  <div
+    class="flex flex-col"
+    :class="siteName ? '' : 'p-3 md:p-4 mx-auto max-w-4xl h-[calc(100vh-3rem)]'"
+  >
     <div v-if="!siteName">
       <h1 class="font-semibold text-xl">Activity</h1>
       <p class="mt-1 text-ink-gray-5 text-p-base">
@@ -207,7 +210,7 @@ onMounted(() => {
       </p>
     </div>
 
-    <div class="flex flex-wrap items-center gap-3 shrink-0 mt-4">
+    <div class="flex flex-wrap items-center gap-3 shrink-0" :class="siteName ? '' : 'mt-4'">
       <Combobox
         v-model="typeFilter"
         class="w-48"

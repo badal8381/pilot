@@ -12,10 +12,8 @@ defineProps<Props>()
 </script>
 
 <template>
-  <div class="space-y-9 mt-5">
-    <SettingsGeneral :site-name="siteName" />
-    <SettingsDomains :site-name="siteName" />
-    <SettingsActions :site-name="siteName" />
-    <SettingsDanger :site-name="siteName" />
-  </div>
+  <SettingsGeneral :site-name="siteName" />
+  <SettingsDomains :site-name="siteName" />
+  <SettingsActions :site-name="siteName" />
+  <SettingsDanger :site-name="siteName" />
 </template>

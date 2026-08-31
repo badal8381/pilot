@@ -208,7 +208,7 @@ onMounted(() => {
     </PageHero>
 
     <div class="px-3 md:px-4 pb-3 md:pb-4 mx-auto w-full max-w-3xl">
-      <StickyToolbar class="py-2 md:py-3">
+      <StickyToolbar class="pt-2 md:pt-3 pb-4 md:pb-5">
         <Skeleton class="rounded-4 w-64 h-7 sm:h-8" />
       </StickyToolbar>
     </div>
@@ -257,8 +257,8 @@ onMounted(() => {
       </template>
     </PageHero>
 
-    <div class="px-3 md:px-4 pb-3 md:pb-4 mx-auto w-full max-w-3xl">
-      <StickyToolbar class="py-2 md:py-3">
+    <div class="px-4 lg:px-0 pb-3 md:pb-4 mx-auto w-full max-w-3xl">
+      <StickyToolbar class="pt-2 md:pt-3 pb-4 md:pb-5">
         <TabButtons v-model="activeTab" :options="tabs" :size="isMobile ? 'md' : 'sm'" />
       </StickyToolbar>
 

@@ -88,27 +88,25 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
 </script>
 
 <template>
-  <div v-if="rows.length">
-    <p class="font-semibold text-ink-gray-8">Actions</p>
-    <div class="mt-1">
-      <div
-        v-for="row in rows"
-        :key="row.key"
-        class="flex justify-between items-start gap-x-2.5 py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
-      >
-        <div class="flex flex-col gap-1">
-          <p class="font-medium text-ink-gray-8">{{ row.label }}</p>
-          <p class="text-ink-gray-6 text-p-sm">{{ row.description }}</p>
-        </div>
-
-        <Button
-          class="ml-4 shrink-0"
-          :loading="row.loading()"
-          @click="row.onClick"
-        >
-          {{ row.buttonLabel || row.label }}
-        </Button>
+  <div v-if="rows.length" class='mt-3'>
+    <h2 class="mb-3 font-semibold text-ink-gray-8 text-base">Actions</h2>
+    <div
+      v-for="row in rows"
+      :key="row.key"
+      class="flex justify-between items-start gap-x-2.5 py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
+    >
+      <div class="flex flex-col gap-1">
+        <p class="font-medium text-ink-gray-8">{{ row.label }}</p>
+        <p class="text-ink-gray-6 text-p-sm">{{ row.description }}</p>
       </div>
+
+      <Button
+        class="ml-4 shrink-0"
+        :loading="row.loading()"
+        @click="row.onClick"
+      >
+        {{ row.buttonLabel || row.label }}
+      </Button>
     </div>
 
     <ErrorMessage v-if="error" :message="error" class="mt-2" />

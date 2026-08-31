@@ -184,92 +184,84 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4 mt-5">
-    <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
-      <div>
-        <p class="font-medium text-ink-gray-8">Automated backups</p>
-        <p class="mt-0.5 text-ink-gray-5 text-p-sm">{{ scheduleSummary }}</p>
-      </div>
-
-      <div class="flex items-center gap-2 shrink-0">
-        <Button @click="configRef.open()"
-          >{{ enabled ? 'Configure' : 'Enable' }}</Button
-        >
-        <Button :loading="backingUp" @click="backupNow">
-          <template #prefix><span class="size-4 lucide-archive" /></template>
-          Back up now
-        </Button>
-      </div>
+  <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3 mb-4">
+    <div>
+      <p class="font-medium text-ink-gray-8">Automated backups</p>
+      <p class="mt-0.5 text-ink-gray-5 text-p-sm">{{ scheduleSummary }}</p>
     </div>
 
-    <BackupConfigDialog ref="configRef" :site-name="siteName" @saved="loadConfig" />
-
-    <ErrorMessage v-if="error" :message="error" />
-
-    <div :class="backups.length ? '' : 'rounded-7 border border-dashed border-outline-gray-2'">
-      <div v-if="backupsLoading" class="flex justify-center py-12">
-        <LoadingText />
-      </div>
-
-      <EmptyState
-        v-else-if="!backups.length"
-        :bordered="false"
-        icon="lucide-archive"
-        title="No backups yet"
-        :description="
-          enabled
-            ? 'Automatic backups run on schedule. You can also back up now.'
-            : 'Enable automatic backups to start protecting your site.'
-        "
-      >
-        <Button :loading="backingUp" @click="backupNow">
-          <template #prefix><span class="size-4 lucide-archive" /></template>
-          Back up now
-        </Button>
-      </EmptyState>
-
-      <Table v-else :columns="columns" :rows="rows" height="max-h-[32rem]">
-        <template #offsite="{ row }">
-          <span
-            v-if="row.set.is_offsite"
-            class="size-4 text-ink-gray-6 lucide-check"
-            title="Backed up offsite"
-          />
-          <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
-        </template>
-
-        <template #actions="{ row }">
-          <Dropdown :options="menuOptions(row.set)">
-            <template #default="{ open }">
-              <Button
-                variant="ghost"
-                :active="open"
-                icon="lucide-ellipsis"
-                label="Backup actions"
-                tooltip="Actions"
-              />
-            </template>
-          </Dropdown>
-        </template>
-      </Table>
-
-      <div
-        v-if="backupsHasMore || backups.length > 20"
-        class="flex items-center gap-3 mt-2 px-1"
-      >
-        <Select
-          size="sm"
-          :model-value="backupsLimit"
-          :options="pageLengths"
-          @update:model-value="setBackupsPageLength"
-        />
-
-        <span class="text-ink-gray-5 text-sm">{{ backups.length }} backups</span>
-
-        <Button v-if="backupsHasMore" class="ml-auto" @click="loadMoreBackups">Load more</Button>
-      </div>
+    <div class="flex items-center gap-2 shrink-0">
+      <Button @click="configRef.open()">{{ enabled ? 'Configure' : 'Enable' }}</Button>
+      <Button :loading="backingUp" @click="backupNow">
+        <template #prefix><span class="size-4 lucide-archive" /></template>
+        Back up now
+      </Button>
     </div>
   </div>
+
+  <BackupConfigDialog ref="configRef" :site-name="siteName" @saved="loadConfig" />
+
+  <ErrorMessage v-if="error" :message="error" class="mb-4" />
+
+  <div v-if="backupsLoading" class="flex justify-center py-12">
+    <LoadingText />
+  </div>
+
+  <EmptyState
+    v-else-if="!backups.length"
+    icon="lucide-archive"
+    title="No backups yet"
+    :description="
+      enabled
+        ? 'Automatic backups run on schedule. You can also back up now.'
+        : 'Enable automatic backups to start protecting your site.'
+    "
+  >
+    <Button :loading="backingUp" @click="backupNow">
+      <template #prefix><span class="size-4 lucide-archive" /></template>
+      Back up now
+    </Button>
+  </EmptyState>
+
+  <template v-else>
+    <Table :columns="columns" :rows="rows" height="max-h-[32rem]">
+      <template #offsite="{ row }">
+        <span
+          v-if="row.set.is_offsite"
+          class="size-4 text-ink-gray-6 lucide-check"
+          title="Backed up offsite"
+        />
+        <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
+      </template>
+
+      <template #actions="{ row }">
+        <Dropdown :options="menuOptions(row.set)">
+          <template #default="{ open }">
+            <Button
+              variant="ghost"
+              :active="open"
+              icon="lucide-ellipsis"
+              label="Backup actions"
+              tooltip="Actions"
+            />
+          </template>
+        </Dropdown>
+      </template>
+    </Table>
+
+    <div v-if="backupsHasMore || backups.length > 20" class="flex items-center gap-3 mt-2 px-1">
+      <Select
+        size="sm"
+        :model-value="backupsLimit"
+        :options="pageLengths"
+        @update:model-value="setBackupsPageLength"
+      />
+
+      <span class="text-ink-gray-5 text-sm">{{ backups.length }} backups</span>
+
+      <Button v-if="backupsHasMore" class="ml-auto" @click="loadMoreBackups">Load more</Button>
+    </div>
+  </template>
 
   <Dialog v-model="showDelete" title="Delete Backup" size="sm">
     <p class="text-ink-gray-7 text-sm">

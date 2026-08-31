@@ -104,7 +104,7 @@ watch(nginxEnabled, (enabled) => {
 
 <template>
   <div v-if="nginxEnabled">
-    <p class="font-semibold text-ink-gray-8">Domains</p>
+    <h2 class="mb-3 font-semibold text-ink-gray-8 text-base">Domains</h2>
     <div v-if="loading" class="flex justify-center py-8">
       <LoadingText />
     </div>

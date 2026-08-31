@@ -134,7 +134,7 @@ const refresh = async () => {
 </script>
 
 <template>
-  <div class="space-y-4 mt-5">
+  <div class="space-y-4">
     <div class="flex sm:flex-row flex-col sm:justify-between sm:items-center gap-3">
       <p class="text-ink-gray-5 text-sm">
         Keys passed to this site's <code class="font-mono text-ink-gray-7">site_config.json</code>.
