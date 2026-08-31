@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { AxisChart } from 'frappe-ui'
+import { BarChart } from 'frappe-ui/charts'
 
 import ChartCard from '@/components/common/ChartCard.vue'
 
@@ -28,12 +28,14 @@ const seriesConfig = (rows, keys, yLabel) => {
   const bucketMs = rows.length > 1 ? rows[1].bucket - rows[0].bucket : 300_000
   return {
     data: rows.map((row) => ({ ...row, bucket: bucketLabel(row.bucket, bucketMs) })),
+    x: 'bucket',
+    y: keys,
     stacked: true,
-    xAxis: { key: 'bucket', type: 'category', echartOptions: { splitLine: GRID } },
-    yAxis: { yMin: 0, echartOptions: { name: yLabel, splitLine: GRID } },
-    series: keys.map((key, i) => ({ name: key, type: 'bar', color: PALETTE[i % PALETTE.length] })),
-    // frappe-ui only auto-shows the legend when a chart has more than one series; force it on so a single key still gets its legend.
-    echartOptions: { legend: { show: true }, grid: { bottom: 40 } },
+    xAxis: { type: 'category', echartOptions: { splitLine: GRID } },
+    yAxis: { min: 0, title: yLabel, echartOptions: { splitLine: GRID } },
+    seriesConfig: Object.fromEntries(
+      keys.map((key, i) => [key, { color: PALETTE[i % PALETTE.length] }]),
+    ),
   }
 }
 
@@ -69,10 +71,6 @@ const charts = computed(() => {
       No slow queries recorded yet
     </div>
 
-    <AxisChart
-      v-else
-      :config="chart.config"
-      class="min-h-[320px]"
-    />
+    <BarChart v-else v-bind="chart.config" class="min-h-[320px]" />
   </ChartCard>
 </template>

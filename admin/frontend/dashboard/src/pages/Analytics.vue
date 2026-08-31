@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ErrorMessage, AxisChart, Select, Skeleton } from 'frappe-ui'
+import { ErrorMessage, Select, Skeleton } from 'frappe-ui'
+import { AreaChart } from 'frappe-ui/charts'
 
 import ChartCard from '@/components/common/ChartCard.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
@@ -365,17 +366,13 @@ const showCharts = computed(() =>
 // Chart helpers
 
 const GRID = { show: true, lineStyle: { type: 'dashed', color: 'var(--outline-gray-2)' } }
-const LEGEND = { itemWidth: 12, itemHeight: 12, textStyle: { padding: [0, 0, 0, 1] } }
-
 const fixedXAxis = computed(() => ({
-  key: 'time',
   type: 'time',
   timeGrain: TIME_GRAIN[activeWindow.value],
   echartOptions: { min: axisMin.value, max: axisMax.value, splitLine: GRID },
 }))
 
 const liveXAxis = computed(() => ({
-  key: 'time',
   type: 'time',
   timeGrain: 'second',
   echartOptions: { min: liveNow.value - LIVE_WINDOW_MS, max: liveNow.value, splitLine: GRID },
@@ -384,23 +381,16 @@ const liveXAxis = computed(() => ({
 const currentPoints = computed(() => (isHistorical.value ? system.value.points : liveHistory.value))
 const currentXAxis = computed(() => (isHistorical.value ? fixedXAxis.value : liveXAxis.value))
 
-const lineSeries = (name, color, stacked) => {
-  return {
-    name,
-    type: 'line',
-    color,
-    echartOptions: {
-      smooth: true,
-      symbol: 'circle',
-      symbolSize: 6,
-      showSymbol: false,
-      stack: stacked ? 'total' : undefined,
-      lineStyle: { width: 1.5 },
-      areaStyle: { color, opacity: 0.25 },
-      emphasis: { focus: 'series' },
-    },
-  }
-}
+const lineSeries = (color) => ({
+  color,
+  smooth: true,
+  lineWidth: 1.5,
+  showDataPoints: false,
+  fillOpacity: 0.25,
+})
+
+const styleFor = (names, colorAt) =>
+  Object.fromEntries(names.map((name, i) => [name, lineSeries(colorAt(name, i))]))
 
 const scaleFields = (points, keys, divisor) => {
   return points.map((p) => ({
@@ -430,9 +420,11 @@ const cpuChartConfig = computed(() => ({
       'Busy Other': p['Busy Other'] ?? 0,
     })),
     xAxis: currentXAxis.value,
-    yAxis: { yMin: 0, yMax: 100, echartOptions: { name: '%', splitLine: GRID } },
-    echartOptions: { legend: LEGEND },
-    series: CPU_SERIES.map((name) => lineSeries(name, CPU_COLORS[name], true)),
+    yAxis: { min: 0, max: 100, echartOptions: { name: '%', splitLine: GRID } },
+    x: 'time',
+    y: CPU_SERIES,
+    stacked: true,
+    seriesConfig: styleFor(CPU_SERIES, (name) => CPU_COLORS[name]),
   },
 }))
 
@@ -446,13 +438,14 @@ const loadChartConfig = computed(() => ({
       'Load Average 15': p.Load15 ?? 0,
     })),
     xAxis: currentXAxis.value,
-    yAxis: { yMin: 0, echartOptions: { name: '', splitLine: GRID } },
-    echartOptions: { legend: LEGEND },
-    series: [
-      lineSeries('Load Average 1', 'var(--ink-green-5)'),
-      lineSeries('Load Average 5', 'var(--ink-yellow-5)'),
-      lineSeries('Load Average 15', 'var(--ink-red-5)'),
-    ],
+    yAxis: { min: 0, echartOptions: { name: '', splitLine: GRID } },
+    x: 'time',
+    y: ['Load Average 1', 'Load Average 5', 'Load Average 15'],
+    seriesConfig: {
+      'Load Average 1': lineSeries('var(--ink-green-5)'),
+      'Load Average 5': lineSeries('var(--ink-yellow-5)'),
+      'Load Average 15': lineSeries('var(--ink-red-5)'),
+    },
   },
 }))
 
@@ -476,7 +469,10 @@ const memChartConfig = computed(() => {
         yMax: peak > 0 ? peak * 1.1 : undefined,
         echartOptions: { name: 'GB', splitLine: GRID },
       },
-      series: MEMORY_SERIES.map((name) => lineSeries(name, MEMORY_COLORS[name], true)),
+      x: 'time',
+      y: MEMORY_SERIES,
+      stacked: true,
+      seriesConfig: styleFor(MEMORY_SERIES, (name) => MEMORY_COLORS[name]),
     },
   }
 })
@@ -494,9 +490,10 @@ const diskChartConfig = computed(() => ({
   config: {
     data: currentPoints.value,
     xAxis: currentXAxis.value,
-    yAxis: { yMin: 0, yMax: 100, echartOptions: { name: '%', splitLine: GRID } },
-    echartOptions: { legend: LEGEND },
-    series: [lineSeries(DISK_SERIES, PALETTE[0])],
+    yAxis: { min: 0, max: 100, echartOptions: { name: '%', splitLine: GRID } },
+    x: 'time',
+    y: DISK_SERIES,
+    seriesConfig: { [DISK_SERIES]: lineSeries(PALETTE[0]) },
   },
 }))
 
@@ -505,9 +502,10 @@ const networkChartConfig = computed(() => ({
   config: {
     data: scaleFields(currentPoints.value, NETWORK_SERIES, 1024 ** 2),
     xAxis: currentXAxis.value,
-    yAxis: { yMin: 0, echartOptions: { name: 'MB/s', splitLine: GRID } },
-    echartOptions: { legend: LEGEND },
-    series: NETWORK_SERIES.map((name, i) => lineSeries(name, PALETTE[i])),
+    yAxis: { min: 0, echartOptions: { name: 'MB/s', splitLine: GRID } },
+    x: 'time',
+    y: NETWORK_SERIES,
+    seriesConfig: styleFor(NETWORK_SERIES, (_, i) => PALETTE[i]),
   },
 }))
 
@@ -516,9 +514,10 @@ const diskIoChartConfig = computed(() => ({
   config: {
     data: scaleFields(currentPoints.value, DISK_IO_SERIES, 1024 ** 2),
     xAxis: currentXAxis.value,
-    yAxis: { yMin: 0, echartOptions: { name: 'MB/s', splitLine: GRID } },
-    echartOptions: { legend: LEGEND },
-    series: DISK_IO_SERIES.map((name, i) => lineSeries(name, PALETTE[i])),
+    yAxis: { min: 0, echartOptions: { name: 'MB/s', splitLine: GRID } },
+    x: 'time',
+    y: DISK_IO_SERIES,
+    seriesConfig: styleFor(DISK_IO_SERIES, (_, i) => PALETTE[i]),
   },
 }))
 
@@ -540,9 +539,10 @@ const appCpuConfig = computed(() => ({
   config: {
     data: normalizeAppData(appWindowData.value.cpu, appWindowData.value.services),
     xAxis: currentXAxis.value,
-    yAxis: { yMin: 0, yMax: 100, echartOptions: { name: '%', splitLine: GRID } },
-    echartOptions: { legend: LEGEND },
-    series: appWindowData.value.services.map((name, i) => lineSeries(name, PALETTE[i])),
+    yAxis: { min: 0, max: 100, echartOptions: { name: '%', splitLine: GRID } },
+    x: 'time',
+    y: appWindowData.value.services,
+    seriesConfig: styleFor(appWindowData.value.services, (_, i) => PALETTE[i]),
   },
 }))
 
@@ -555,9 +555,10 @@ const appMemConfig = computed(() => ({
       1024 ** 2,
     ),
     xAxis: currentXAxis.value,
-    yAxis: { yMin: 0, echartOptions: { name: 'MB', splitLine: GRID } },
-    echartOptions: { legend: LEGEND },
-    series: appWindowData.value.services.map((name, i) => lineSeries(name, PALETTE[i])),
+    yAxis: { min: 0, echartOptions: { name: 'MB', splitLine: GRID } },
+    x: 'time',
+    y: appWindowData.value.services,
+    seriesConfig: styleFor(appWindowData.value.services, (_, i) => PALETTE[i]),
   },
 }))
 
@@ -702,10 +703,7 @@ onUnmounted(() => clearTimeout(statsTimer))
       <div class="gap-4 grid md:grid-cols-2">
         <template v-if="showCharts">
           <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
-            <AxisChart
-              :config="chart.config"
-              class="min-h-[300px]"
-            />
+            <AreaChart v-bind="chart.config" class="min-h-[300px]" />
           </ChartCard>
         </template>
 
