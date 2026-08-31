@@ -162,7 +162,7 @@ onUnmounted(() => clearInterval(badgeTimer))
         <Select v-model="category" class="ml-auto" :options="categories" />
       </div>
 
-      <Alert v-if="error" theme="red" title="Couldn't load notifications" :dismissible="false">
+      <Alert class="border border-outline-gray-2" v-if="error" theme="red" title="Couldn't load notifications" :dismissible="false">
         <template #description>{{ error }}</template>
       </Alert>
 

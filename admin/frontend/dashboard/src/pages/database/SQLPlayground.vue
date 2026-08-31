@@ -287,7 +287,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <Alert v-if="error" theme="red" title="Query failed" :dismissible="false">
+    <Alert class="border border-outline-gray-2" v-if="error" theme="red" title="Query failed" :dismissible="false">
       <template #description>
         <p class="font-mono text-xs break-words whitespace-pre-wrap">{{ error }}</p>
       </template>

@@ -70,7 +70,7 @@ onBeforeUnmount(close)
         <LoadingText text="Analyzing the failure…" />
       </div>
 
-      <Alert v-if="error" theme="red" title="Couldn't debug this task" :dismissible="false">
+      <Alert class="border border-outline-gray-2" v-if="error" theme="red" title="Couldn't debug this task" :dismissible="false">
         <template #description>{{ error }}</template>
       </Alert>
 

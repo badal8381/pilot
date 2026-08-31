@@ -222,7 +222,7 @@ const submit = async () => {
 
         <template v-else>
           <p v-if="!gitStatus" class="text-ink-gray-5 text-sm">Loading…</p>
-          <Alert
+          <Alert class="border border-outline-gray-2"
             v-else-if="!gitConnected"
             theme="amber"
             title="No GitHub account connected"

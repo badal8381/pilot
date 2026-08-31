@@ -175,7 +175,7 @@ onMounted(load)
   </div>
 
   <div v-else class="space-y-6">
-    <Alert v-if="!connected" theme="blue" title="Why connect an AI assistant?" :dismissible="false">
+    <Alert class="border border-outline-gray-2" v-if="!connected" theme="blue" title="Why connect an AI assistant?" :dismissible="false">
       <template #description>
         <p class="text-ink-gray-6 text-p-sm">
           Connect any LLM provider supported by litellm to power assistant features, like explaining

@@ -82,7 +82,13 @@ onMounted(load)
   </div>
 
   <div v-else class="space-y-6">
-    <Alert v-if="!connected" theme="blue" title="Connect GitHub" :dismissible="false">
+    <Alert
+      v-if="!connected"
+      theme="blue"
+      title="Connect GitHub"
+      :dismissible="false"
+      class="border-outline-gray-2 border"
+    >
       <template #description>
         <p class="text-ink-gray-6 text-p-sm">
           Install private apps and browse your repos. Paste a
@@ -108,15 +114,10 @@ onMounted(load)
       </div>
 
       <div class="flex items-center gap-2">
-        <Button
-          class="flex-1 sm:flex-none"
-          :loading="verifying"
-          @click="verifyConnection"
+        <Button class="flex-1 sm:flex-none" :loading="verifying" @click="verifyConnection"
           >Verify</Button
         >
-        <Button class="flex-1 sm:flex-none" theme="red" @click="disconnect"
-          >Disconnect</Button
-        >
+        <Button class="flex-1 sm:flex-none" theme="red" @click="disconnect">Disconnect</Button>
       </div>
     </div>
 
@@ -131,7 +132,12 @@ onMounted(load)
       />
       <ErrorMessage v-if="error" :message="error" />
       <div class="flex justify-end">
-        <Button variant="solid" :loading="connecting" :disabled="!token.trim()" @click="verifyAndConnect">
+        <Button
+          variant="solid"
+          :loading="connecting"
+          :disabled="!token.trim()"
+          @click="verifyAndConnect"
+        >
           {{ connected ? 'Update Token' : 'Verify & Connect' }}
         </Button>
       </div>

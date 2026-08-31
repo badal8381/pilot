@@ -94,7 +94,7 @@ const purge = async () => {
     v-if="show"
     title="Binary logs are taking up space"
     :dismissible="false"
-    class="mt-4 !bg-surface-blue-1"
+    class="mt-4 !bg-surface-blue-1 border border-outline-gray-2"
   >
     <template #description>
       <p class="text-ink-gray-6 prose-sm">
