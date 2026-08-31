@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
-import { Button, Dialog, Dropdown, ErrorMessage, LoadingText, Select } from 'frappe-ui'
+import { Badge, Button, Dialog, Dropdown, ErrorMessage, LoadingText, Select } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
 import Table from '@/components/common/Table.vue'
@@ -71,9 +71,9 @@ const backupNow = async () => {
 
 const columns = [
   { label: 'Date', key: 'timestamp', class: 'w-1/3' },
-  { label: 'Database', key: 'database', class: 'text-center' },
-  { label: 'Public', key: 'public', class: 'text-center' },
-  { label: 'Private', key: 'private', class: 'text-center' },
+  { label: 'Database', key: 'database', class: 'tabular-nums' },
+  { label: 'Public', key: 'public', class: 'tabular-nums' },
+  { label: 'Private', key: 'private', class: 'tabular-nums' },
   { label: 'Offsite', key: 'offsite', class: 'text-center' },
   { label: '', key: 'actions', class: 'w-12 text-right' },
 ]
@@ -191,7 +191,9 @@ onMounted(() => {
     </div>
 
     <div class="flex items-center gap-2 shrink-0">
-      <Button @click="configRef.open()">{{ enabled ? 'Configure' : 'Enable' }}</Button>
+      <Button @click="configRef.open()">
+        {{ enabled ? 'Configure' : 'Enable' }}
+      </Button>
       <Button :loading="backingUp" @click="backupNow">
         <template #prefix><span class="size-4 lucide-archive" /></template>
         Back up now
@@ -226,12 +228,13 @@ onMounted(() => {
   <template v-else>
     <Table :columns="columns" :rows="rows" height="max-h-[32rem]">
       <template #offsite="{ row }">
-        <span
+        <Badge
           v-if="row.set.is_offsite"
-          class="size-4 text-ink-gray-6 lucide-check"
-          title="Backed up offsite"
+          theme="green"
+          size="sm"
+          label="Uploaded"
         />
-        <span v-else class="size-4 text-ink-gray-4 lucide-x" title="Not backed up offsite" />
+        <Badge v-else theme="gray" size="sm" label="Local only" />
       </template>
 
       <template #actions="{ row }">
