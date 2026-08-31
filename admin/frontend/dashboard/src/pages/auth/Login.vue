@@ -71,7 +71,7 @@ const login = async () => {
       <div class="flex flex-col gap-4">
         <PilotLogo class="size-8" />
         <div class="flex flex-col gap-1">
-          <h1 class="font-semibold text-lg">Sign In</h1>
+          <h1 class="text-lg-semibold">Sign In</h1>
           <p class="text-ink-gray-5 text-p-base">Welcome! Please sign in to continue.</p>
         </div>
       </div>

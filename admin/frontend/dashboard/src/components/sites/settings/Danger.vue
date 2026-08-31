@@ -122,7 +122,7 @@ const confirmDrop = async () => {
 </script>
 
 <template>
-  <h2 class="mb-3 mt-3 font-semibold text-ink-gray-8 text-base">Danger</h2>
+  <h2 class="mb-3 mt-3 text-base-semibold text-ink-gray-8">Danger</h2>
 
   <div
     v-for="d in DangerActions"

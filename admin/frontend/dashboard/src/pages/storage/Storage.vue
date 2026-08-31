@@ -34,7 +34,7 @@ onMounted(load)
 <template>
   <section class="p-3 md:p-4 mx-auto max-w-5xl">
     <div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-      <h2 class="flex items-center gap-2 font-medium text-ink-gray-8 text-lg">
+      <h2 class="flex items-center gap-2 text-lg-medium text-ink-gray-8">
         <span class="size-4 lucide-hard-drive" />
         Disk usage
       </h2>

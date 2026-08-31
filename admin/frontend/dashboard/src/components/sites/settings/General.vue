@@ -74,7 +74,7 @@ const toggle = async (s, value) => {
 </script>
 
 <template>
-  <h2 class="mb-3 font-semibold text-ink-gray-8 text-base">General</h2>
+  <h2 class="mb-3 text-base-semibold text-ink-gray-8">General</h2>
 
   <SettingsSwitch
     v-for="(s, i) in visibleSettings"

@@ -179,7 +179,7 @@ const goBack = () => {
               @click="goBack"
             />
 
-            <h3 class="font-semibold text-ink-gray-9 text-lg">{{ headerTitle }}</h3>
+            <h3 class="text-lg-semibold text-ink-gray-9">{{ headerTitle }}</h3>
 
             <div id="settings-header-actions" class="flex items-center gap-2 ml-auto"></div>
           </div>

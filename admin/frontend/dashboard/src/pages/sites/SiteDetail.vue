@@ -221,7 +221,7 @@ onMounted(() => {
   <template v-else-if="site">
     <PageHero icon="lucide-globe">
       <template #title>
-        <h1 class="font-medium text-lg truncate">
+        <h1 class="text-lg-medium truncate">
           {{ site.name }}
         </h1>
 

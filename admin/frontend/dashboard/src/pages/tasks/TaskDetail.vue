@@ -160,7 +160,7 @@ onMounted(() => {
     <div class="flex justify-between items-center gap-4 mt-5 px-2 min-w-0">
       <RouterLink
         :to="scope.route"
-        class="group flex items-center gap-2 min-w-0 font-medium text-ink-gray-9 text-lg no-underline"
+        class="group flex items-center gap-2 min-w-0 text-lg-medium text-ink-gray-9 no-underline"
       >
         <span class="size-4 text-ink-gray-5 shrink-0" :class="scopeIcon" />
         <span class="truncate">{{ scope.label }}</span>
