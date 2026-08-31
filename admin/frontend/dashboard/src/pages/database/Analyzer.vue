@@ -23,9 +23,9 @@ const processColumns = [
   { label: 'State', key: 'state', class: 'w-[10%]' },
   { label: 'Time', key: 'time', class: 'w-[10%] text-right' },
   { label: 'User', key: 'user', class: 'w-[10%]' },
-  { label: 'Host', key: 'host', class: 'w-[16%]' },
+  { label: 'Host', key: 'host', class: 'w-[24%]' },
   { label: 'Command', key: 'command', class: 'w-[10%]' },
-  { label: 'Query', key: 'query', class: 'w-[32%]' },
+  { label: 'Query', key: 'query', class: 'w-[24%]' },
   { label: '', key: 'actions', class: 'w-20 text-right' },
 ]
 
@@ -187,7 +187,7 @@ const siteOptions = computed(() => [
 
 const scopeBadge = computed(() => selectedSite.value)
 
-const MAX_QUERY_LENGTH = 120
+const MAX_QUERY_LENGTH = 60
 
 // Long queries can be arbitrarily large single-line strings that would
 // otherwise force the table wider than the page.
@@ -553,12 +553,12 @@ onMounted(load)
   <TableSizesDialog v-model:open="showTableSizes" :site="selectedSite" />
 
   <Dialog v-model="showKillDialog" title="Kill database process" size="sm">
-    <p class="text-ink-gray-7 text-sm">
+    <p class="text-ink-gray-7 text-sm leading-relaxed">
       Close connection <strong>{{ killTarget?.id }}</strong> and roll back whatever it is running?
       Any bench sharing this server may own it.
     </p>
 
-    <dl class="space-y-1.5 bg-surface-gray-1 mt-3 p-3 rounded-6 text-xs">
+    <dl class="flex flex-col gap-2 mt-4 text-sm">
       <div
         v-for="item in killDetails"
         :key="item.label"
@@ -567,18 +567,19 @@ onMounted(load)
         <dt class="text-ink-gray-5 shrink-0">{{ item.label }}</dt>
         <dd class="font-medium text-ink-gray-8 truncate">{{ item.value }}</dd>
       </div>
-
-      <div v-if="killQuery" class="space-y-1.5 pt-1.5 border-t border-outline-gray-2">
-        <dt class="text-ink-gray-5">Query</dt>
-        <dd class="max-h-24 overflow-y-auto font-mono font-medium text-ink-gray-8 break-all">
-          {{ killQuery }}
-        </dd>
-      </div>
     </dl>
 
-    <ErrorMessage v-if="killError" :message="killError" class="mt-3" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showKillDialog = false">Cancel</Button>
+    <p v-if="killQuery" class="mt-4 mb-1.5 text-ink-gray-5 text-sm">Query</p>
+
+    <pre
+      v-if="killQuery"
+      class="bg-surface-gray-2 p-3 rounded-4 max-h-40 overflow-auto font-mono text-ink-gray-8 text-xs leading-relaxed whitespace-pre-wrap break-words"
+    >{{ killQuery }}</pre>
+
+    <ErrorMessage v-if="killError" :message="killError" class="mt-4" />
+
+    <div class="flex justify-end gap-2 mt-6">
+      <Button @click="showKillDialog = false">Cancel</Button>
       <Button variant="solid" theme="red" :loading="killing" @click="kill">Kill process</Button>
     </div>
   </Dialog>
