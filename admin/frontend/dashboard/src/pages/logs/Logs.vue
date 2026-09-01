@@ -232,42 +232,40 @@ onUnmounted(() => stopLive())
       </TextInput>
 
       <Scrollbar class="flex-1 min-h-0 pr-4">
-        <div class="flex flex-col gap-1 py-2">
-          <LoadingText v-if="logsLoading" class="p-2" />
-          <ErrorMessage v-else-if="logsError" :message="logsError" class="p-2" />
-          <p v-else-if="!filteredLogs.length" class="p-2 text-ink-gray-4 text-sm">
-            No log files found.
-          </p>
+        <LoadingText v-if="logsLoading" class="p-2" />
+        <ErrorMessage v-else-if="logsError" :message="logsError" class="p-2" />
+        <p v-else-if="!filteredLogs.length" class="p-2 text-ink-gray-4 text-sm">
+          No log files found.
+        </p>
 
-          <button
-            v-else
-            v-for="log in filteredLogs"
-            :key="log.filename"
-            class="flex flex-wrap items-center gap-x-2 px-3 py-2.5 rounded-4 w-full text-left transition-colors shrink-0"
-            :class="selectedFile === log.filename ? 'bg-surface-gray-2' : 'hover:bg-surface-gray-1'"
-            @click="selectedFile = log.filename"
+        <button
+          v-else
+          v-for="log in filteredLogs"
+          :key="log.filename"
+          class="flex flex-wrap items-center gap-x-2 mt-1 first:mt-2 px-3 py-2.5 rounded-4 w-full text-left transition-colors"
+          :class="selectedFile === log.filename ? 'bg-surface-gray-2' : 'hover:bg-surface-gray-1'"
+          @click="selectedFile = log.filename"
+        >
+          <span class="flex-1 min-w-0 font-medium text-ink-gray-8 truncate">
+            {{ log.filename }}
+          </span>
+
+          <Tooltip v-if="hasErrors(log)" text="Contains errors">
+            <span
+              class="bg-surface-red-5 rounded-full size-1.5 shrink-0"
+              role="img"
+              aria-label="Contains errors"
+            />
+          </Tooltip>
+
+          <span class="text-ink-gray-4 text-sm shrink-0">
+            {{ relativeTime(log.last_modified) }}
+          </span>
+
+          <span class="mt-1.5 w-full text-ink-gray-4 text-xs"
+            >{{ formatBytes(log.size_bytes) }}</span
           >
-            <span class="flex-1 min-w-0 font-medium text-ink-gray-8 truncate">
-              {{ log.filename }}
-            </span>
-
-            <Tooltip v-if="hasErrors(log)" text="Contains errors">
-              <span
-                class="bg-surface-red-5 rounded-full size-1.5 shrink-0"
-                role="img"
-                aria-label="Contains errors"
-              />
-            </Tooltip>
-
-            <span class="text-ink-gray-4 text-sm shrink-0">
-              {{ relativeTime(log.last_modified) }}
-            </span>
-
-            <span class="mt-1.5 w-full text-ink-gray-4 text-xs"
-              >{{ formatBytes(log.size_bytes) }}</span
-            >
-          </button>
-        </div>
+        </button>
       </Scrollbar>
     </aside>
 
@@ -322,14 +320,13 @@ onUnmounted(() => stopLive())
             @keydown.enter.exact.prevent="gotoMatch(1)"
             @keydown.enter.shift.prevent="gotoMatch(-1)"
           />
-          <div
-            v-if="search.trim()"
-            class="flex items-center gap-1 text-ink-gray-5 text-xs shrink-0"
-          >
-            <span class="tabular-nums"
+
+          <template v-if="isSearching">
+            <span class="text-ink-gray-5 text-xs tabular-nums"
               >{{ matchTotal ? activeMatch + 1 : 0 }}/{{ matchTotal }}</span
             >
             <Button
+              class="-ms-1"
               icon="lucide-chevron-up"
               :size="isMobile ? 'md' : 'sm'"
               label="Previous match"
@@ -338,6 +335,7 @@ onUnmounted(() => stopLive())
               @click="gotoMatch(-1)"
             />
             <Button
+              class="-ms-1"
               icon="lucide-chevron-down"
               :size="isMobile ? 'md' : 'sm'"
               label="Next match"
@@ -345,49 +343,46 @@ onUnmounted(() => stopLive())
               :disabled="!matchTotal"
               @click="gotoMatch(1)"
             />
-          </div>
+          </template>
 
-          <div class="flex items-center gap-2 shrink-0">
-            <Select
-              v-model="linesCount"
-              :size="isMobile ? 'md' : 'sm'"
-              :disabled="liveMode"
-              :options="[
-                  { label: '100 lines', value: 100 },
-                  { label: '200 lines', value: 200 },
-                  { label: '500 lines', value: 500 },
-                  { label: '1000 lines', value: 1000 },
-                ]"
-            />
+          <Select
+            v-model="linesCount"
+            :size="isMobile ? 'md' : 'sm'"
+            :disabled="liveMode"
+            :options="[
+                { label: '100 lines', value: 100 },
+                { label: '200 lines', value: 200 },
+                { label: '500 lines', value: 500 },
+                { label: '1000 lines', value: 1000 },
+              ]"
+          />
 
-            <Button
-              icon="lucide-refresh-cw"
-              :size="isMobile ? 'md' : 'sm'"
-              label="Refresh"
-              tooltip="Refresh"
-              :loading="contentLoading"
-              :disabled="liveMode"
-              @click="loadContent"
-            />
+          <Button
+            icon="lucide-refresh-cw"
+            :size="isMobile ? 'md' : 'sm'"
+            label="Refresh"
+            tooltip="Refresh"
+            :loading="contentLoading"
+            :disabled="liveMode"
+            @click="loadContent"
+          />
 
-            <Button
-              :icon="liveMode ? 'lucide-square' : 'lucide-radio'"
-              :theme="liveMode ? 'red' : 'gray'"
-              :size="isMobile ? 'md' : 'sm'"
-              :label="liveMode ? 'Stop ' : '' + 'live tail'"
-              :tooltip="(liveMode ? 'Stop ' : '') + 'live tail'"
-              @click="toggleLive"
-            />
+          <Button
+            :icon="liveMode ? 'lucide-square' : 'lucide-radio'"
+            :theme="liveMode ? 'red' : 'gray'"
+            :size="isMobile ? 'md' : 'sm'"
+            :label="liveMode ? 'Stop ' : '' + 'live tail'"
+            :tooltip="(liveMode ? 'Stop ' : '') + 'live tail'"
+            @click="toggleLive"
+          />
 
-            <a :href="logsApi.downloadUrl(selectedFile)" class="contents">
-              <Button
-                icon="lucide-download"
-                :size="isMobile ? 'md' : 'sm'"
-                label="Download"
-                tooltip="Download"
-              />
-            </a>
-          </div>
+          <Button
+            :link="logsApi.downloadUrl(selectedFile)"
+            icon="lucide-download"
+            :size="isMobile ? 'md' : 'sm'"
+            label="Download"
+            tooltip="Download"
+          />
         </div>
 
         <div v-if="contentError" class="p-4 font-mono text-ink-red-5 text-sm">
