@@ -122,7 +122,7 @@ onMounted(load)
       />
     </Teleport>
 
-    <StickyToolbar class="py-4" :class="isMobile ? '' : 'flex items-center gap-2'">
+    <StickyToolbar :class="isMobile ? '' : 'flex items-center gap-2'">
       <TabButtons
         :size="isMobile ? 'md' : 'sm'"
         :options="UPDATE_FILTERS"

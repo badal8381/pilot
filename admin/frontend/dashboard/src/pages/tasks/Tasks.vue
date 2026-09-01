@@ -123,7 +123,7 @@ onMounted(() => load(statusFilter.value))
 
 <template>
   <div class="px-3 md:px-4">
-    <StickyToolbar class="flex flex-wrap gap-2 py-4">
+    <StickyToolbar class="flex flex-wrap gap-2">
       <TabButtons
         class="w-full sm:w-auto"
         :size="isMobile ? 'md' : 'sm'"

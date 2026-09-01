@@ -47,7 +47,7 @@ const worksWithLabel = computed(() => {
 </script>
 
 <template>
-  <StickyToolbar class="px-3 sm:px-4 py-2 sm:py-3">
+  <StickyToolbar class="px-3 md:px-4 top-11.5">
     <div class="mx-auto w-full max-w-3xl flex sm:flex-row flex-col gap-2">
       <TextInput
         v-model="searchModel"

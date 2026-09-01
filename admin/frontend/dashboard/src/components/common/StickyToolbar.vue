@@ -6,7 +6,7 @@ const scrolled = useShellScrolled({ threshold: 1 })
 
 <template>
   <div
-    class="top-12 z-10 sticky bg-surface-base"
+    class="top-12 z-10 sticky bg-surface-base py-4"
     :class="scrolled ? 'after:opacity-100' : 'after:opacity-0'"
   >
     <slot />
