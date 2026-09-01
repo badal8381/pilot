@@ -80,6 +80,6 @@ const isActive = (to) => route.path === to || route.path.startsWith(`${to}/`)
       </template>
     </nav>
 
-    <SidebarCollapseToggle class="mt-auto mx-2 mb-2" />
+    <SidebarCollapseToggle v-if="!isMobile" class="mt-auto mx-2 mb-2" />
   </Sidebar>
 </template>
