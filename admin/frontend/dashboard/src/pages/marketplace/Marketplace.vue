@@ -153,7 +153,7 @@ onMounted(load)
     </template>
 
     <template v-else>
-      <section v-if="otherBenchApps.length" class="mt-12">
+      <section v-if="otherBenchApps.length" class="mt-4">
         <h2 class="font-medium">Your custom apps</h2>
         <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
           <MarketplaceAppCard
