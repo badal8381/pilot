@@ -77,10 +77,9 @@ const toggle = async (s, value) => {
   <h2 class="mb-3 text-base-semibold text-ink-gray-8">General</h2>
 
   <SettingsSwitch
-    v-for="(s, i) in visibleSettings"
+    v-for="s in visibleSettings"
     :key="s.key"
-    class="py-4"
-    :class="i < visibleSettings.length - 1 ? 'border-b border-outline-alpha-gray-1' : ''"
+    class="py-4 border-b last:border-b-0 border-outline-alpha-gray-1"
     :label="s.label"
     :description="s.description"
     :model-value="getValue(s)"

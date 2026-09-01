@@ -146,52 +146,50 @@ const submit = async () => {
 
     <div v-else @pointerdown.stop class="space-y-5">
       <!-- Site name -->
-      <div>
-        <!-- Without wildcard site name -->
-        <TextInput
-          v-if="!wildcardDomains.length"
-          v-model="newSiteName"
-          label="Site name"
-          placeholder="mysite.localhost"
-          @keyup.enter="submit"
-        />
-        <div v-else class="space-y-1.5">
-          <span class="text-ink-gray-7 text-p-sm-medium">Site name</span>
-          <div class="flex items-stretch gap-2">
-            <TextInput
-              v-model="sitePrefix"
-              class="flex-1 min-w-0"
-              :class="hasSingleDomain ? '[&_[data-slot=control]]:pe-28' : ''"
-              placeholder="mysite"
-              @keyup.enter="submit"
-            >
-              <template v-if="hasSingleDomain" #suffix>
-                <span class="text-ink-gray-5 text-p-sm truncate max-w-24">
-                  {{ wildcardDomains[0] }}
-                </span>
-              </template>
-            </TextInput>
+      <!-- Without wildcard site name -->
+      <TextInput
+        v-if="!wildcardDomains.length"
+        v-model="newSiteName"
+        label="Site name"
+        placeholder="mysite.localhost"
+        @keyup.enter="submit"
+      />
+      <div v-else class="space-y-1.5">
+        <span class="text-ink-gray-7 text-p-sm-medium">Site name</span>
+        <div class="flex items-stretch gap-2">
+          <TextInput
+            v-model="sitePrefix"
+            class="flex-1 min-w-0"
+            :class="hasSingleDomain ? '[&_[data-slot=control]]:pe-28' : ''"
+            placeholder="mysite"
+            @keyup.enter="submit"
+          >
+            <template v-if="hasSingleDomain" #suffix>
+              <span class="text-ink-gray-5 text-p-sm truncate max-w-24">
+                {{ wildcardDomains[0] }}
+              </span>
+            </template>
+          </TextInput>
 
-            <!-- Multiple wildcards available -->
-            <Select
-              v-if="!hasSingleDomain"
-              v-model="selectedSuffix"
-              class="w-48 shrink-0"
-              :options="wildcardDomains.map((d) => ({ label: d, value: d }))"
-            />
-          </div>
-
-          <p class="mt-1.5 text-ink-gray-5 text-p-sm">
-            Web address:
-            <span class="font-medium text-ink-gray-7"
-              >{{ newSiteName || `mysite${selectedSuffix}` }}</span
-            >
-          </p>
+          <!-- Multiple wildcards available -->
+          <Select
+            v-if="!hasSingleDomain"
+            v-model="selectedSuffix"
+            class="w-48 shrink-0"
+            :options="wildcardDomains.map((d) => ({ label: d, value: d }))"
+          />
         </div>
+
+        <p class="mt-1.5 text-ink-gray-5 text-p-sm">
+          Web address:
+          <span class="font-medium text-ink-gray-7"
+            >{{ newSiteName || `mysite${selectedSuffix}` }}</span
+          >
+        </p>
       </div>
 
       <!-- Choose apps -->
-      <div v-if="!loading && availableApps.length">
+      <div v-if="availableApps.length">
         <div class="flex justify-between items-center mb-2">
           <span class="text-ink-gray-7 text-p-sm-medium">Choose apps</span>
           <span class="text-ink-gray-5 text-xs"> {{ selectedApps.length }} selected </span>
@@ -229,7 +227,7 @@ const submit = async () => {
       </div>
 
       <p class="flex items-start gap-1.5 text-ink-gray-5 text-p-sm">
-        <span class="mt-0.5 size-3.5 lucide-info shrink-0"></span>
+        <span class="mt-0.5 size-3.5 lucide-info shrink-0" />
         Runs on this server - no extra cost; sites share its compute and storage.
       </p>
 

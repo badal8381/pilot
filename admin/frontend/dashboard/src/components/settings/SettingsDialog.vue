@@ -145,7 +145,7 @@ const goBack = () => {
           <Button
             v-for="section in sections"
             :key="section.id"
-            :variant="             isMobile ? 'subtle' : 'ghost'"
+            :variant="isMobile ? 'subtle' : 'ghost'"
             :size="isMobile ? 'md' : 'sm'"
             class="!justify-start border sm:border-0 w-full mt-0.5"
             :class="
@@ -156,7 +156,7 @@ const goBack = () => {
             @click="guarded(() => (activeSection = section.id))"
           >
             <template #prefix>
-              <span :class="section.icon" class="size-4"></span>
+              <span :class="section.icon" class="size-4" />
             </template>
             {{ section.label }}
           </Button>
@@ -181,7 +181,7 @@ const goBack = () => {
 
             <h3 class="text-lg-semibold text-ink-gray-9">{{ headerTitle }}</h3>
 
-            <div id="settings-header-actions" class="flex items-center gap-2 ml-auto"></div>
+            <div id="settings-header-actions" class="flex items-center gap-2 ml-auto" />
           </div>
 
           <General v-if="currentSection === 'general'" v-model:open-section="guardedSubSection" />
@@ -209,9 +209,11 @@ const goBack = () => {
       You have changes here that have not been saved. Leaving loses them.
     </p>
 
-    <div class="flex justify-end gap-2 mt-4">
-      <Button @click="showDiscard = false">Keep editing</Button>
-      <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button @click="showDiscard = false">Keep editing</Button>
+        <Button variant="solid" theme="red" @click="discardAndGo">Discard</Button>
+      </div>
+    </template>
   </Dialog>
 </template>

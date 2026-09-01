@@ -83,9 +83,7 @@ onMounted(load)
 <template>
   <Skeleton v-if="loading" class="rounded-6 h-full min-h-[340px]" />
   <div v-else class="flex flex-col bg-surface-white border rounded-6 border-outline-gray-2 h-full">
-    <div class="flex items-center px-4 py-3 border-b border-outline-gray-2">
-      <h3 class="font-medium text-ink-gray-8">Uptime</h3>
-    </div>
+    <h3 class="px-4 py-3 border-b border-outline-gray-2 font-medium text-ink-gray-8">Uptime</h3>
 
     <ErrorMessage v-if="error" :message="error" class="m-4" />
     <div
@@ -119,8 +117,7 @@ onMounted(load)
           <span>{{ formatFullTime(data.buckets[hovered].time) }}</span>
         </div>
 
-        <div v-else />
-        <div class="flex items-center gap-1 shrink-0">
+        <div class="flex items-center gap-1 ml-auto shrink-0">
           <span>{{ formatPercent(data.overall_percent) }}</span>
           <span class="text-base leading-none">·</span>
           <span>Overall Uptime</span>

@@ -43,7 +43,7 @@ const incompatibleReason = computed(
       <slot name="actions">
         <Tooltip v-if="app.installed" text="Installed">
           <span class="place-items-center grid size-7 shrink-0" role="img" aria-label="Installed">
-            <span class="size-4 lucide-check"></span>
+            <span class="size-4 lucide-check" />
           </span>
         </Tooltip>
 

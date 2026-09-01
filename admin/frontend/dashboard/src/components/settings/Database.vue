@@ -17,16 +17,15 @@ const configurationSection = DATABASE_SECTIONS.find((section) => section.id === 
       <DatabaseQuickActions />
     </section>
 
-    <div class="-mx-2.5 mt-2 border-t rounded border-outline-alpha-gray-1">
-      <SettingsRow
-        as="button"
-        interactive
-        :label="configurationSection.label"
-        :description="configurationSection.description"
-        @click="openSection = configurationSection"
-      >
-        <span class="size-4 text-ink-gray-5 lucide-chevron-right" aria-hidden="true" />
-      </SettingsRow>
-    </div>
+    <SettingsRow
+      class="-mx-2.5 mt-2 border-t rounded border-outline-alpha-gray-1"
+      as="button"
+      interactive
+      :label="configurationSection.label"
+      :description="configurationSection.description"
+      @click="openSection = configurationSection"
+    >
+      <span class="size-4 text-ink-gray-5 lucide-chevron-right" aria-hidden="true" />
+    </SettingsRow>
   </template>
 </template>

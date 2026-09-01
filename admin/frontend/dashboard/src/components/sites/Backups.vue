@@ -273,11 +273,13 @@ onMounted(() => {
     </p>
 
     <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-        >Delete</Button
-      >
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+          >Delete</Button
+        >
+      </div>
+    </template>
   </Dialog>
 </template>

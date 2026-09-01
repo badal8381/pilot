@@ -149,7 +149,13 @@ onMounted(async () => {
       @update:model-value="(v) => (defaultPolicy = v ? 'deny' : 'allow')"
     />
 
-    <Alert class="border border-outline-gray-2" v-if="lockoutRisk" title="Heads up" theme="amber" :dismissible="false">
+    <Alert
+      v-if="lockoutRisk"
+      class="border border-outline-gray-2"
+      title="Heads up"
+      theme="amber"
+      :dismissible="false"
+    >
       <template #description>
         <span class="text-ink-gray-6 text-p-sm"
           >Everyone is blocked by default. Add an <b>Allow</b> rule for your own IP<template

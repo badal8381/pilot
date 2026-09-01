@@ -66,9 +66,19 @@ onBeforeUnmount(close)
 <template>
   <Dialog v-model="show" title="Debug with AI Assistant" size="2xl">
     <div class="space-y-3">
-      <LoadingText v-if="streaming && !text" text="Analyzing the failure…" class="justify-center py-10" />
+      <LoadingText
+        v-if="streaming && !text"
+        text="Analyzing the failure…"
+        class="justify-center py-10"
+      />
 
-      <Alert class="border border-outline-gray-2" v-if="error" theme="red" title="Couldn't debug this task" :dismissible="false">
+      <Alert
+        v-if="error"
+        class="border border-outline-gray-2"
+        theme="red"
+        title="Couldn't debug this task"
+        :dismissible="false"
+      >
         <template #description>{{ error }}</template>
       </Alert>
 
@@ -76,7 +86,7 @@ onBeforeUnmount(close)
         v-if="text"
         class="bg-surface-gray-2 p-4 rounded-6 max-h-[60vh] overflow-y-auto prose prose-sm dark:prose-invert max-w-none"
       >
-        <span v-html="html"></span>
+        <span v-html="html" />
         <span
           v-if="streaming"
           class="inline-block bg-ink-gray-6 ml-0.5 w-2 h-4 align-text-bottom animate-pulse"

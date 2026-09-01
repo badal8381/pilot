@@ -183,36 +183,29 @@ const refresh = async () => {
 
   <Dialog v-model="showAddDialog" title="Add config" size="sm">
     <div class="space-y-3">
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Key</p>
-        <TextInput v-model="entryKey" placeholder="config_key" class="w-full" />
-      </div>
-
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Value</p>
-        <TextInput v-model="entryValue" placeholder="value" class="w-full" />
-      </div>
-
+      <TextInput label="Key" v-model="entryKey" placeholder="config_key" class="w-full" />
+      <TextInput label="Value" v-model="entryValue" placeholder="value" class="w-full" />
       <ErrorMessage v-if="dialogError" :message="dialogError" />
     </div>
 
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
-      <Button variant="solid" :loading="saving" @click="save">Save</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showAddDialog = false">Cancel</Button>
+        <Button variant="solid" :loading="saving" @click="save">Save</Button>
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showEditDialog" :title="`Edit ${entryKey}`" size="sm">
-    <div class="space-y-1.5">
-      <p class="font-medium text-ink-gray-7 text-sm">Value</p>
-      <TextInput v-model="entryValue" placeholder="value" class="w-full" />
-    </div>
+    <TextInput label="Value" v-model="entryValue" placeholder="value" class="w-full" />
 
     <ErrorMessage v-if="dialogError" :message="dialogError" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
-      <Button variant="solid" :loading="saving" @click="save">Save</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showEditDialog = false">Cancel</Button>
+        <Button variant="solid" :loading="saving" @click="save">Save</Button>
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showDelete" title="Remove config" size="sm">
@@ -222,11 +215,13 @@ const refresh = async () => {
     </p>
 
     <ErrorMessage v-if="deleteError" :message="deleteError" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showDelete = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
-        >Remove</Button
-      >
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showDelete = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="deleting" @click="confirmDelete"
+          >Remove</Button
+        >
+      </div>
+    </template>
   </Dialog>
 </template>

@@ -245,44 +245,48 @@ defineExpose({ disabled, currentScheduleLabel, loading, enable })
   <!-- Custom schedule dialog -->
   <Dialog v-model="showCustomDialog" :title="`Custom ${noun} schedule`" size="sm">
     <div class="space-y-4">
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Frequency</p>
-        <Select v-model="schedFrequency" :options="FREQ_OPTIONS" class="w-full" />
-      </div>
+      <Select label="Frequency" v-model="schedFrequency" :options="FREQ_OPTIONS" class="w-full" />
 
-      <div v-if="schedFrequency === 'weekly'" class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Day of week</p>
-        <Select v-model="schedWeekday" :options="WEEKDAY_OPTIONS" class="w-full" />
-      </div>
+      <Select
+        v-if="schedFrequency === 'weekly'"
+        label="Day of week"
+        v-model="schedWeekday"
+        :options="WEEKDAY_OPTIONS"
+        class="w-full"
+      />
 
-      <div v-if="schedFrequency === 'monthly'" class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Day of month</p>
-        <Select v-model="schedMonthDay" :options="monthDayOptions" class="w-full" />
-      </div>
+      <Select
+        v-if="schedFrequency === 'monthly'"
+        label="Day of month"
+        v-model="schedMonthDay"
+        :options="monthDayOptions"
+        class="w-full"
+      />
 
-      <div class="space-y-1.5">
-        <p class="font-medium text-ink-gray-7 text-sm">Time</p>
-        <Select v-model.number="schedHourPick" :options="hourOptions" class="w-full" />
-      </div>
+      <Select label="Time" v-model.number="schedHourPick" :options="hourOptions" class="w-full" />
 
       <p v-if="retentionHint" class="text-ink-gray-4 text-p-sm">{{ retentionHint }}</p>
       <ErrorMessage v-if="error" :message="error" />
     </div>
 
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showCustomDialog = false">Cancel</Button>
-      <Button variant="solid" :loading="scheduleSaving" @click="saveCustomSchedule"
-        >Save schedule</Button
-      >
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showCustomDialog = false">Cancel</Button>
+        <Button variant="solid" :loading="scheduleSaving" @click="saveCustomSchedule"
+          >Save schedule</Button
+        >
+      </div>
+    </template>
   </Dialog>
 
   <!-- Disable confirmation -->
   <Dialog v-model="showDisableConfirm" :title="`Disable ${noun}`" size="sm">
     <p class="text-ink-gray-7 text-sm">{{ disableBody }}</p>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showDisableConfirm = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="loading" @click="disable">Disable</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showDisableConfirm = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="loading" @click="disable">Disable</Button>
+      </div>
+    </template>
   </Dialog>
 </template>

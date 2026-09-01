@@ -40,14 +40,16 @@ const revokeOtherSessions = async () => {
       immediately — this browser stays signed in.
     </p>
 
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" :disabled="revoking" @click="showRevokePrompt = false">
-        Not now
-      </Button>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" :disabled="revoking" @click="showRevokePrompt = false">
+          Not now
+        </Button>
 
-      <Button variant="solid" theme="red" :loading="revoking" @click="revokeOtherSessions">
-        Revoke other sessions
-      </Button>
-    </div>
+        <Button variant="solid" theme="red" :loading="revoking" @click="revokeOtherSessions">
+          Revoke other sessions
+        </Button>
+      </div>
+    </template>
   </Dialog>
 </template>

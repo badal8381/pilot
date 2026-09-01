@@ -214,9 +214,7 @@ onMounted(() => {
     </div>
   </template>
 
-  <div v-else-if="error" class="p-3 md:p-4 py-12">
-    <ErrorMessage :message="error" />
-  </div>
+  <ErrorMessage v-else-if="error" class="px-3 md:px-4 py-12" :message="error" />
 
   <template v-else-if="site">
     <PageHero icon="lucide-globe">

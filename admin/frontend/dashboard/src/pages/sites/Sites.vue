@@ -187,9 +187,7 @@ onMounted(() => {
       />
     </StickyToolbar>
 
-    <div v-if="error" class="mt-16">
-      <ErrorMessage :message="error" />
-    </div>
+    <ErrorMessage v-if="error" class="mt-16" :message="error" />
 
     <template v-else-if="loading || filteredSites.length">
       <div
@@ -209,7 +207,7 @@ onMounted(() => {
           :to="{ name: 'SiteDetail', params: { name: site.name } }"
         >
           <div class="bg-surface-gray-2 flex rounded-4 p-2 text-ink-gray-6 shrink-0">
-            <span class="size-4 lucide-globe m-auto"></span>
+            <span class="size-4 lucide-globe m-auto" />
           </div>
 
           <div class="flex flex-1 flex-wrap items-center gap-x-1.5 min-w-0">

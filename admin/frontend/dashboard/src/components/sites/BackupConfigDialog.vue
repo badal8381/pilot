@@ -209,9 +209,11 @@ defineExpose({ open })
       <ErrorMessage v-if="error" :message="error" />
     </div>
 
-    <div class="flex justify-end gap-2 mt-6">
-      <Button variant="ghost" @click="show = false">Cancel</Button>
-      <Button variant="solid" :loading="saving" @click="save">Save</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="show = false">Cancel</Button>
+        <Button variant="solid" :loading="saving" @click="save">Save</Button>
+      </div>
+    </template>
   </Dialog>
 </template>

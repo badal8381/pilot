@@ -287,7 +287,13 @@ onMounted(async () => {
       </div>
     </div>
 
-    <Alert class="border border-outline-gray-2" v-if="error" theme="red" title="Query failed" :dismissible="false">
+    <Alert
+      v-if="error"
+      class="border border-outline-gray-2"
+      theme="red"
+      title="Query failed"
+      :dismissible="false"
+    >
       <template #description>
         <p class="font-mono text-xs break-words whitespace-pre-wrap">{{ error }}</p>
       </template>
@@ -400,9 +406,11 @@ onMounted(async () => {
     <pre
       class="bg-surface-gray-1 mt-3 p-3 border rounded-4 border-outline-gray-2 max-h-40 overflow-auto font-mono text-ink-gray-8 text-sm leading-relaxed whitespace-pre-wrap break-words"
     >{{ pendingQuery }}</pre>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="outline" @click="showConfirm = false">Cancel</Button>
-      <Button variant="solid" @click="confirmRunQuery">Execute</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="outline" @click="showConfirm = false">Cancel</Button>
+        <Button variant="solid" @click="confirmRunQuery">Execute</Button>
+      </div>
+    </template>
   </Dialog>
 </template>

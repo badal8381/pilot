@@ -179,30 +179,28 @@ onUnmounted(() => clearInterval(refreshTimer))
 </script>
 
 <template>
-  <div>
-    <div v-if="loading" class="gap-4 grid md:grid-cols-2">
-      <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
-    </div>
+  <div v-if="loading" class="gap-4 grid md:grid-cols-2">
+    <Skeleton v-for="i in 6" :key="i" class="rounded-6 h-[340px]" />
+  </div>
 
-    <ErrorMessage v-else-if="error" :message="error" />
-    <EmptyState
-      v-else-if="unsupported"
-      icon="lucide-database"
-      title="DB analyzer supports MariaDB only"
-    />
-    <EmptyState
-      v-else-if="empty"
-      icon="lucide-database"
-      title="No data for the selected range"
-      description="The monitor hasn't sampled the database in this range yet."
-    />
+  <ErrorMessage v-else-if="error" :message="error" />
+  <EmptyState
+    v-else-if="unsupported"
+    icon="lucide-database"
+    title="DB analyzer supports MariaDB only"
+  />
+  <EmptyState
+    v-else-if="empty"
+    icon="lucide-database"
+    title="No data for the selected range"
+    description="The monitor hasn't sampled the database in this range yet."
+  />
 
-    <div v-else class="gap-4 grid md:grid-cols-2">
-      <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
-        <AreaChart v-bind="chart.config" class="min-h-[300px]" />
-      </ChartCard>
+  <div v-else class="gap-4 grid md:grid-cols-2">
+    <ChartCard v-for="chart in charts" :key="chart.title" :title="chart.title">
+      <AreaChart v-bind="chart.config" class="min-h-[300px]" />
+    </ChartCard>
 
-      <SlowQueries v-if="!unsupported" :overview="data?.slow_queries" />
-    </div>
+    <SlowQueries :overview="data?.slow_queries" />
   </div>
 </template>

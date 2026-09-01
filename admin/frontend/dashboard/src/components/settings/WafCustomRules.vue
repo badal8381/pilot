@@ -238,99 +238,102 @@ const confirmRemove = () => {
         </div>
 
         <div v-if="isOpen(rule)" class="space-y-4 pt-1 pr-2.5 pb-5 pl-[2.375rem]">
-        <TextInput
-          label="Rule name"
-          v-model="rule.name"
-          placeholder="Block /admin from outside the office"
-        />
+          <TextInput
+            label="Rule name"
+            v-model="rule.name"
+            placeholder="Block /admin from outside the office"
+          />
 
-        <div class="space-y-3">
-          <div class="flex flex-wrap items-center gap-1 text-ink-gray-7">
-            <template v-if="rule.conditions.length > 1">
-              <span>When</span>
-              <Select v-model="rule.match" :options="MATCH_OPTIONS" />
-              <span>of the following match:</span>
-            </template>
+          <div class="space-y-3">
+            <div class="flex flex-wrap items-center gap-1 text-ink-gray-7">
+              <template v-if="rule.conditions.length > 1">
+                <span>When</span>
+                <Select v-model="rule.match" :options="MATCH_OPTIONS" />
+                <span>of the following match:</span>
+              </template>
 
-            <span v-else>When this matches:</span>
-          </div>
-
-          <div class="relative space-y-3">
-            <span
-              aria-hidden="true"
-              class="absolute left-1 -top-2 bottom-0 border-l border-outline-gray-3"
-            />
-
-            <div class="space-y-2 pl-5">
-              <div
-                v-for="(cond, ci) in rule.conditions"
-                :key="keyOf(cond)"
-                class="gap-2 grid sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
-              >
-                <div class="space-y-1.5 min-w-0">
-                  <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
-                  <TextInput
-                    v-if="cond.field === 'header'"
-                    v-model="cond.header_name"
-                    placeholder="Header name"
-                    class="w-full"
-                  />
-                </div>
-
-                <Select v-model="cond.operator" :options="operatorOptions" class="w-full" />
-                <TextInput
-                  v-model="cond.value"
-                  :placeholder="placeholder(cond.field)"
-                  class="w-full"
-                />
-                <!-- Conditionless rules are dropped silently; the last one cannot go. -->
-                <Button
-                  variant="ghost"
-                  icon="lucide-x"
-                  label="Remove condition"
-                  tooltip="Remove condition"
-                  :disabled="rule.conditions.length === 1"
-                  @click="removeCondition(rule, ci)"
-                />
-              </div>
+              <span v-else>When this matches:</span>
             </div>
 
-            <div class="pl-5">
-              <Button variant="ghost" icon-left="lucide-plus" @click="addCondition(rule)">
+            <div class="relative space-y-3">
+              <span
+                aria-hidden="true"
+                class="absolute left-1 -top-2 bottom-0 border-l border-outline-gray-3"
+              />
+
+              <div class="space-y-2 pl-5">
+                <div
+                  v-for="(cond, ci) in rule.conditions"
+                  :key="keyOf(cond)"
+                  class="gap-2 grid sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
+                >
+                  <div class="space-y-1.5 min-w-0">
+                    <Select v-model="cond.field" :options="fieldOptions" class="w-full" />
+                    <TextInput
+                      v-if="cond.field === 'header'"
+                      v-model="cond.header_name"
+                      placeholder="Header name"
+                      class="w-full"
+                    />
+                  </div>
+
+                  <Select v-model="cond.operator" :options="operatorOptions" class="w-full" />
+                  <TextInput
+                    v-model="cond.value"
+                    :placeholder="placeholder(cond.field)"
+                    class="w-full"
+                  />
+                  <!-- Conditionless rules are dropped silently; the last one cannot go. -->
+                  <Button
+                    variant="ghost"
+                    icon="lucide-x"
+                    label="Remove condition"
+                    tooltip="Remove condition"
+                    :disabled="rule.conditions.length === 1"
+                    @click="removeCondition(rule, ci)"
+                  />
+                </div>
+              </div>
+
+              <Button
+                class="ml-5"
+                variant="ghost"
+                icon-left="lucide-plus"
+                @click="addCondition(rule)"
+              >
                 Add condition
               </Button>
             </div>
           </div>
-        </div>
 
-        <div class="relative space-y-1.5 pl-5">
-          <span
-            aria-hidden="true"
-            class="absolute left-1 -top-4 h-[1.875rem] w-2.5 border-l border-b rounded-bl-6 border-outline-gray-3"
-          />
-          <div class="flex flex-wrap items-center gap-2 text-ink-gray-7">
-            <span>Then</span>
-            <Select v-model="rule.action" :options="actionOptions" class="w-48" />
-            <Button
-              class="ml-auto"
-              variant="ghost"
-              theme="red"
-              icon-left="lucide-trash-2"
-              @click="promptRemove(rule)"
+          <div class="relative space-y-1.5 pl-5">
+            <span
+              aria-hidden="true"
+              class="absolute left-1 -top-4 h-[1.875rem] w-2.5 border-l border-b rounded-bl-6 border-outline-gray-3"
+            />
+            <div class="flex flex-wrap items-center gap-2 text-ink-gray-7">
+              <span>Then</span>
+              <Select v-model="rule.action" :options="actionOptions" class="w-48" />
+              <Button
+                class="ml-auto"
+                variant="ghost"
+                theme="red"
+                icon-left="lucide-trash-2"
+                @click="promptRemove(rule)"
+              >
+                Delete rule
+              </Button>
+            </div>
+
+            <p
+              v-if="rule.action === 'skip'"
+              class="flex items-start gap-1.5 text-ink-amber-6 text-p-sm"
             >
-              Delete rule
-            </Button>
+              <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
+              Matching requests bypass the firewall entirely - no managed rules, no inspection.
+            </p>
           </div>
-
-          <p
-            v-if="rule.action === 'skip'"
-            class="flex items-start gap-1.5 text-ink-amber-6 text-p-sm"
-          >
-            <span class="shrink-0 mt-0.5 size-3.5 lucide-triangle-alert" />
-            Matching requests bypass the firewall entirely - no managed rules, no inspection.
-          </p>
-        </div>
-        </div>
+          </div>
       </div>
     </div>
 
@@ -340,10 +343,12 @@ const confirmRemove = () => {
         >? Requests it was matching fall through to the managed ruleset.
       </p>
 
-      <div class="flex justify-end gap-2 mt-4">
-        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-        <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
-      </div>
+      <template #actions>
+        <div class="flex justify-end gap-2">
+          <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+          <Button variant="solid" theme="red" @click="confirmRemove">Delete</Button>
+        </div>
+      </template>
     </Dialog>
   </div>
 </template>

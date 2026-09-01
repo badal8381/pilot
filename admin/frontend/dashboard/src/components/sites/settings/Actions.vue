@@ -113,7 +113,7 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
 </script>
 
 <template>
-  <div v-if="rows.length" class='mt-3'>
+  <div v-if="rows.length" class="mt-3">
     <h2 class="mb-3 text-base-semibold text-ink-gray-8">Actions</h2>
     <div
       v-for="row in rows"
@@ -156,16 +156,18 @@ const rows = computed(() => Actions.filter((row) => row.condition()))
     </TextInput>
 
     <ErrorMessage v-if="sslEmailError" :message="sslEmailError" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="outline" @click="showSslEmail = false">Cancel</Button>
-      <Button
-        variant="solid"
-        :loading="sslLoading"
-        :disabled="!sslEmail"
-        @click="enableSsl(sslEmail)"
-      >
-        Enable SSL
-      </Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="outline" @click="showSslEmail = false">Cancel</Button>
+        <Button
+          variant="solid"
+          :loading="sslLoading"
+          :disabled="!sslEmail"
+          @click="enableSsl(sslEmail)"
+        >
+          Enable SSL
+        </Button>
+      </div>
+    </template>
   </Dialog>
 </template>

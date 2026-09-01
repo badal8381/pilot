@@ -134,7 +134,7 @@ const {
             v-else-if="frameworkIsValid"
             class="flex items-center gap-1 text-ink-green-7 text-sm"
           >
-            <span class="size-3.5 shrink-0 lucide-check"></span>
+            <span class="size-3.5 shrink-0 lucide-check" />
             Found frappe
           </p>
         </div>

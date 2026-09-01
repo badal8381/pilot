@@ -666,25 +666,23 @@ onUnmounted(() => clearTimeout(statsTimer))
       <!-- Live stats bar: CPU / Memory / Storage -->
       <div
         v-else-if="liveStats"
-        class="bg-surface-white mb-4 border rounded-6 border-outline-gray-2 overflow-hidden"
+        class="flex sm:flex-row flex-col bg-surface-white mb-4 border rounded-6 border-outline-gray-2 divide-outline-gray-2 sm:divide-x overflow-hidden"
       >
-        <div class="flex sm:flex-row flex-col divide-outline-gray-2 sm:divide-x">
-          <div
-            v-for="meter in liveMeters"
-            :key="meter.label"
-            class="flex-1 px-4 sm:px-5 py-3 sm:py-4 border-t first:border-t-0 sm:border-t-0 border-outline-gray-2"
-          >
-            <div class="flex justify-between items-baseline gap-2 mb-2">
-              <span class="text-ink-gray-6 text-sm">{{ meter.label }}</span>
-              <span class="text-ink-gray-6 text-sm shrink-0">{{ meter.value }}</span>
-            </div>
+        <div
+          v-for="meter in liveMeters"
+          :key="meter.label"
+          class="flex-1 px-4 sm:px-5 py-3 sm:py-4 border-t first:border-t-0 sm:border-t-0 border-outline-gray-2"
+        >
+          <div class="flex justify-between items-baseline gap-2 mb-2">
+            <span class="text-ink-gray-6 text-sm">{{ meter.label }}</span>
+            <span class="text-ink-gray-6 text-sm shrink-0">{{ meter.value }}</span>
+          </div>
 
-            <div class="bg-surface-gray-2 rounded-full h-1 overflow-hidden">
-              <div
-                class="bg-surface-gray-9 rounded-full h-full"
-                :style="{ width: Math.min(meter.percent, 100) + '%' }"
-              />
-            </div>
+          <div class="bg-surface-gray-2 rounded-full h-1 overflow-hidden">
+            <div
+              class="bg-surface-gray-9 rounded-full h-full"
+              :style="{ width: Math.min(meter.percent, 100) + '%' }"
+            />
           </div>
         </div>
       </div>

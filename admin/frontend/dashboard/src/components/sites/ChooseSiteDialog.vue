@@ -30,38 +30,36 @@ const choose = (name) => {
       No sites on this bench yet. Create a site to install apps.
     </p>
 
-    <template v-else>
-      <div class="gap-1.5 grid max-h-96 overflow-y-auto">
-        <SiteRow
-          label="All sites"
-          icon="lucide-layout-grid"
-          :selected="!site"
-          @click="choose('')"
-        >
-          <template #suffix>
-            <span v-if="!site" class="size-4 shrink-0 lucide-check" />
-          </template>
-        </SiteRow>
+    <div v-else class="gap-1.5 grid max-h-96 overflow-y-auto">
+      <SiteRow
+        label="All sites"
+        icon="lucide-layout-grid"
+        :selected="!site"
+        @click="choose('')"
+      >
+        <template #suffix>
+          <span v-if="!site" class="size-4 shrink-0 lucide-check" />
+        </template>
+      </SiteRow>
 
-        <SiteRow
-          v-for="s in sites"
-          :key="s.name"
-          :label="s.name"
-          :selected="s.name === site"
-          @click="choose(s.name)"
-        >
-          <template #suffix>
-            <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
-              {{ siteMeta(s) }}
-            </span>
+      <SiteRow
+        v-for="s in sites"
+        :key="s.name"
+        :label="s.name"
+        :selected="s.name === site"
+        @click="choose(s.name)"
+      >
+        <template #suffix>
+          <span class="w-20 text-ink-gray-5 text-sm text-right shrink-0">
+            {{ siteMeta(s) }}
+          </span>
 
-            <span
-              v-if="s.name === site"
-              class="size-4 shrink-0 lucide-check"
-            />
-          </template>
-        </SiteRow>
-      </div>
-    </template>
+          <span
+            v-if="s.name === site"
+            class="size-4 shrink-0 lucide-check"
+          />
+        </template>
+      </SiteRow>
+    </div>
   </Dialog>
 </template>

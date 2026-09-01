@@ -576,10 +576,12 @@ onMounted(load)
 
     <ErrorMessage v-if="killError" :message="killError" class="mt-4" />
 
-    <div class="flex justify-end gap-2 mt-6">
-      <Button @click="showKillDialog = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="killing" @click="kill">Kill process</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button @click="showKillDialog = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="killing" @click="kill">Kill process</Button>
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showPurgeDialog" title="Delete binary logs" size="sm">
@@ -604,10 +606,12 @@ onMounted(load)
     </dl>
 
     <ErrorMessage v-if="purgeError" :message="purgeError" class="mt-3" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showPurgeDialog = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="purging" @click="purge">Delete</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showPurgeDialog = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="purging" @click="purge">Delete</Button>
+      </div>
+    </template>
   </Dialog>
 </template>
 

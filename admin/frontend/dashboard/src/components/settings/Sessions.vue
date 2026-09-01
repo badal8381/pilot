@@ -299,12 +299,14 @@ onMounted(load)
     </p>
 
     <p class="mt-2 font-mono text-ink-gray-5 text-sm">{{ revoking?.ip }}</p>
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
-        Revoke
-      </Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showRevoke = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="revokeBusy" @click="confirmRevoke">
+          Revoke
+        </Button>
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showDetail" title="Activity details" size="md">

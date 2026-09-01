@@ -82,6 +82,9 @@ const emit = defineEmits(['confirm'])
 
       <ErrorMessage v-if="error" :message="error" />
 
+    </div>
+
+    <template #actions>
       <div class="flex justify-end gap-2">
         <Button variant="subtle" @click="open = false">{{ cancelLabel }}</Button>
         <Button
@@ -94,6 +97,6 @@ const emit = defineEmits(['confirm'])
           {{ confirmLabel }}
         </Button>
       </div>
-    </div>
+    </template>
   </Dialog>
 </template>

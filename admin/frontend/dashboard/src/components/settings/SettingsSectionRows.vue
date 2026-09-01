@@ -16,9 +16,11 @@ const handlePasswordChanged = () => {
 </script>
 
 <template>
-  <div v-if="openSection">
-    <component :is="openSection.component" @passwordChanged="handlePasswordChanged" />
-  </div>
+  <component
+    v-if="openSection"
+    :is="openSection.component"
+    @passwordChanged="handlePasswordChanged"
+  />
 
   <div v-else class="-mx-2.5 divide-y divide-outline-alpha-gray-1 hover-merges-dividers">
     <SettingsRow

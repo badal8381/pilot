@@ -108,48 +108,46 @@ watch(nginxEnabled, (enabled) => {
     <LoadingText v-if="loading" class="justify-center py-8" />
 
     <template v-else>
-      <div class="mt-1">
-        <div
-          v-for="row in domainRows"
-          :key="row.domain"
-          class="flex justify-between items-start gap-x-2.5 py-4 border-b border-outline-alpha-gray-1"
-        >
-          <div class="flex items-start gap-2.5 min-w-0">
-            <Tooltip :text="site?.ssl ? 'SSL active' : 'SSL inactive'">
-              <span
-                class="mt-0.5 size-4 text-ink-gray-5 shrink-0"
-                :class="site?.ssl ? 'lucide-lock text-ink-green-5' : 'lucide-lock-open'"
-              />
-            </Tooltip>
+      <div
+        v-for="row in domainRows"
+        :key="row.domain"
+        class="flex justify-between items-start gap-x-2.5 first:mt-1 py-4 border-b border-outline-alpha-gray-1"
+      >
+        <div class="flex items-start gap-2.5 min-w-0">
+          <Tooltip :text="site?.ssl ? 'SSL active' : 'SSL inactive'">
+            <span
+              class="mt-0.5 size-4 text-ink-gray-5 shrink-0"
+              :class="site?.ssl ? 'lucide-lock text-ink-green-5' : 'lucide-lock-open'"
+            />
+          </Tooltip>
 
-            <div class="flex items-center gap-2 min-w-0">
-              <p class="font-medium text-ink-gray-8 truncate">{{ row.domain }}</p>
-              <Badge
-                v-if="row.isPrimary"
-                label="Primary"
-                theme="green"
-                size="sm"
-                class="shrink-0"
-              />
-              <Badge v-else-if="row.isSite" label="Included" size="sm" class="shrink-0" />
-            </div>
+          <div class="flex items-center gap-2 min-w-0">
+            <p class="font-medium text-ink-gray-8 truncate">{{ row.domain }}</p>
+            <Badge
+              v-if="row.isPrimary"
+              label="Primary"
+              theme="green"
+              size="sm"
+              class="shrink-0"
+            />
+            <Badge v-else-if="row.isSite" label="Included" size="sm" class="shrink-0" />
           </div>
-
-          <Dropdown
-            v-if="domainMenuOptions(row).length"
-            :options="domainMenuOptions(row)"
-          >
-            <template #default="{ open }">
-              <Button
-                variant="ghost"
-                :active="open"
-                icon="lucide-ellipsis"
-                label="Domain actions"
-                tooltip="Actions"
-              />
-            </template>
-          </Dropdown>
         </div>
+
+        <Dropdown
+          v-if="domainMenuOptions(row).length"
+          :options="domainMenuOptions(row)"
+        >
+          <template #default="{ open }">
+            <Button
+              variant="ghost"
+              :active="open"
+              icon="lucide-ellipsis"
+              label="Domain actions"
+              tooltip="Actions"
+            />
+          </template>
+        </Dropdown>
       </div>
 
       <ErrorMessage v-if="error" :message="error" class="mt-2" />

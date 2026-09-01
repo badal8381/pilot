@@ -123,7 +123,13 @@ onMounted(load)
   </div>
 
   <div v-else class="space-y-6">
-    <Alert class="border border-outline-gray-2" v-if="!connected" theme="blue" title="Why connect object storage?" :dismissible="false">
+    <Alert
+      v-if="!connected"
+      class="border border-outline-gray-2"
+      theme="blue"
+      title="Why connect object storage?"
+      :dismissible="false"
+    >
       <template #description>
         <p class="text-ink-gray-6 text-p-sm">
           Connect S3-compatible object storage to send offsite backups and snapshots.

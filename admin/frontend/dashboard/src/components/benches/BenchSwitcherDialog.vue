@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Badge, Button, Dialog, ErrorMessage, Spinner } from 'frappe-ui'
+import { Badge, Button, Dialog, ErrorMessage, LoadingText, Spinner } from 'frappe-ui'
 
 import Table from '@/components/common/Table.vue'
 
@@ -212,13 +212,11 @@ watch(show, (open) => {
 
       <ErrorMessage v-if="controlError" :message="controlError" class="mb-2" />
 
-      <div v-if="loading && !benches.length" class="py-10 text-ink-gray-5 text-sm text-center">
-        Loading…
-      </div>
+      <LoadingText v-if="loading && !benches.length" class="justify-center py-10" />
 
-      <div v-else-if="!benches.length" class="py-10 text-ink-gray-4 text-sm text-center">
+      <p v-else-if="!benches.length" class="py-10 text-ink-gray-4 text-sm text-center">
         No benches found.
-      </div>
+      </p>
 
       <Table v-else :columns="columns" :rows="rows" height="max-h-96">
         <template #name="{ row }">
@@ -258,12 +256,15 @@ watch(show, (open) => {
       </div>
 
       <ErrorMessage v-if="controlError" :message="controlError" />
+    </div>
+
+    <template #actions>
       <div class="flex justify-end gap-2">
         <Button variant="ghost" @click="showDropConfirm = false">Cancel</Button>
         <Button variant="solid" theme="red" :loading="dropping" @click="dropBench"
           >Drop Bench</Button
         >
       </div>
-    </div>
+    </template>
   </Dialog>
 </template>

@@ -36,6 +36,6 @@ defineEmits(['update:open'])
       />
     </summary>
 
-    <div><slot /></div>
+    <slot />
   </details>
 </template>

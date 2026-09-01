@@ -103,11 +103,9 @@ const purge = async () => {
     </template>
 
     <template #footer>
-      <div class="flex col-span-2 items-center gap-3">
-        <Button  theme='blue' class="ml-auto" @click="openDialog"
-          >Purge binary logs</Button
-        >
-      </div>
+      <Button theme="blue" class="col-span-2 ml-auto" @click="openDialog"
+        >Purge binary logs</Button
+      >
     </template>
   </Alert>
 
@@ -129,17 +127,19 @@ const purge = async () => {
     <ErrorMessage v-if="loadError" :message="loadError" />
     <ErrorMessage v-if="purgeError" :message="purgeError" class="mt-3" />
 
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="dialogOpen = false">Cancel</Button>
-      <Button
-        v-if="!loading && !loadError"
-        variant="solid"
-        :loading="purging"
-        :disabled="!canPurge"
-        @click="purge"
-      >
-        Purge
-      </Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="dialogOpen = false">Cancel</Button>
+        <Button
+          v-if="!loading && !loadError"
+          variant="solid"
+          :loading="purging"
+          :disabled="!canPurge"
+          @click="purge"
+        >
+          Purge
+        </Button>
+      </div>
+    </template>
   </Dialog>
 </template>

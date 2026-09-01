@@ -113,9 +113,7 @@ onMounted(() => {
 <template>
   <LoadingText v-if="loading" class="p-3 md:p-4 justify-center py-12" />
 
-  <div v-else-if="error" class="p-3 md:p-4 py-12">
-    <ErrorMessage :message="error" />
-  </div>
+  <ErrorMessage v-else-if="error" class="px-3 md:px-4 py-12" :message="error" />
 
   <div v-else-if="task" class="p-3 md:p-4 mx-auto max-w-3xl">
     <Teleport defer to="#header-badge">

@@ -220,8 +220,7 @@ onMounted(async () => {
         @click="(e) => e.currentTarget.blur()"
       >
         <span
-          class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
-        ></span>Advanced
+          class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right" />Advanced
       </summary>
 
       <div class="space-y-4 mt-4">

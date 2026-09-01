@@ -84,12 +84,10 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
       class="sticky top-0 z-20 flex min-h-12 flex-col justify-center border-b border-outline-gray-2 bg-surface-base px-3 md:px-4"
     >
       <div class="flex items-center justify-between">
-        <template v-if="route.name == 'Home'">
-          <div class="flex items-center gap-2">
-            <PilotLogo class="size-6 rounded-1" />
-            <span>Home</span>
-          </div>
-        </template>
+        <div v-if="route.name == 'Home'" class="flex items-center gap-2">
+          <PilotLogo class="size-6 rounded-1" />
+          <span>Home</span>
+        </div>
 
         <button
           v-else
@@ -138,13 +136,11 @@ const breadcrumbsFromRouteMeta = ({ title = '' }) => {
     <header
       class="sticky top-0 z-20 flex min-h-12 flex-col justify-center border-b border-outline-gray-2 bg-surface-base px-3 md:px-4"
     >
-      <div class="flex items-center justify-between">
-        <div class="flex flex-1 items-center gap-1">
-          <Breadcrumbs :items="breadcrumbs" />
-          <div id="header-badge" class="flex items-center" />
-          <div id="header-actions" class="flex items-center gap-2 ml-auto">
-            <UpdateStatusButton v-if="route.meta.showUpdateStatus" />
-          </div>
+      <div class="flex flex-1 items-center gap-1">
+        <Breadcrumbs :items="breadcrumbs" />
+        <div id="header-badge" class="flex items-center" />
+        <div id="header-actions" class="flex items-center gap-2 ml-auto">
+          <UpdateStatusButton v-if="route.meta.showUpdateStatus" />
         </div>
       </div>
     </header>

@@ -162,7 +162,7 @@ onUnmounted(() => clearInterval(badgeTimer))
         <Select v-model="category" class="ml-auto" :options="categories" />
       </div>
 
-      <Alert class="border border-outline-gray-2" v-if="error" theme="red" title="Couldn't load notifications" :dismissible="false">
+      <Alert v-if="error" class="border border-outline-gray-2" theme="red" title="Couldn't load notifications" :dismissible="false">
         <template #description>{{ error }}</template>
       </Alert>
 
@@ -210,16 +210,13 @@ onUnmounted(() => clearInterval(badgeTimer))
 
       <div v-else class="flex-1 px-4 pb-3 min-h-0">
         <EmptyState
-          v-if="activeTab === 'unread'"
-          icon="lucide-check-check"
-          title="You're all caught up"
-          description="Every notification on this bench has been read."
-        />
-        <EmptyState
-          v-else
-          icon="lucide-bell-off"
-          title="Nothing here yet"
-          description="Failed tasks and resource alerts for this bench show up here."
+          :icon="activeTab === 'unread' ? 'lucide-check-check' : 'lucide-bell-off'"
+          :title="activeTab === 'unread' ? `You're all caught up` : 'Nothing here yet'"
+          :description="
+            activeTab === 'unread'
+              ? 'Every notification on this bench has been read.'
+              : 'Failed tasks and resource alerts for this bench show up here.'
+          "
         />
       </div>
 

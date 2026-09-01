@@ -26,6 +26,13 @@ const appNames = computed(() => {
 })
 
 const selected = ref(new Set())
+
+const updateLabel = computed(() => {
+  const count = selected.value.size
+  if (!count) return 'Update'
+  if (count === appNames.value.length) return 'Update all'
+  return count === 1 ? 'Update 1 app' : `Update ${count} apps`
+})
 const safeguard = ref(true)
 const updating = ref(false)
 const error = ref('')
@@ -127,17 +134,18 @@ const runUpdate = async () => {
           </div>
         </div>
 
-        <div class="flex flex-col gap-2 pt-2">
-          <label class="flex items-center gap-2 cursor-pointer">
-            <Checkbox v-model="safeguard" />
-            <span class="text-ink-gray-7 text-sm">Take backup of sites</span>
-          </label>
-        </div>
+        <label class="flex items-center gap-2 pt-2 cursor-pointer">
+          <Checkbox v-model="safeguard" />
+          <span class="text-ink-gray-7 text-sm">Take backup of sites</span>
+        </label>
       </template>
 
       <ErrorMessage v-if="error" :message="error" />
 
-      <div class="flex justify-end gap-2 pt-2">
+    </div>
+
+    <template #actions>
+      <div class="flex justify-end gap-2">
         <Button variant="ghost" @click="open = false">Cancel</Button>
         <Button
           v-if="appNames.length"
@@ -146,14 +154,9 @@ const runUpdate = async () => {
           :disabled="!selected.size"
           @click="runUpdate"
         >
-          {{ selected.size == 0 ? 'Update' : (
-              appNames.length == selected.size ? 'Update all' :
-                (
-                  selected.size == 1 ? 'Update 1 app' : `Update ${selected.size} apps`
-                )
-            ) }}
+          {{ updateLabel }}
         </Button>
       </div>
-    </div>
+    </template>
   </Dialog>
 </template>

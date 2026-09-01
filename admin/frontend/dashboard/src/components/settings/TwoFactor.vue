@@ -278,8 +278,7 @@ onMounted(load)
             class="flex items-center gap-1.5 text-ink-gray-6 cursor-pointer select-none"
           >
             <span
-              class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right"
-            ></span>
+              class="size-4 transition-transform group-open:rotate-90 lucide-chevron-right" />
             Can't scan? Enter the key by hand
           </summary>
 
@@ -296,20 +295,22 @@ onMounted(load)
     </div>
 
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-      <Button
-        v-if="!enrollment"
-        variant="solid"
-        :loading="busy"
-        :disabled="!deviceName.trim()"
-        @click="startEnrollment"
-        >Get QR code</Button
-      >
-      <Button v-else variant="solid" :loading="busy" :disabled="!otp" @click="confirmEnrollment"
-        >Verify</Button
-      >
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showAdd = false">Cancel</Button>
+        <Button
+          v-if="!enrollment"
+          variant="solid"
+          :loading="busy"
+          :disabled="!deviceName.trim()"
+          @click="startEnrollment"
+          >Get QR code</Button
+        >
+        <Button v-else variant="solid" :loading="busy" :disabled="!otp" @click="confirmEnrollment"
+          >Verify</Button
+        >
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showCodes" title="Save your recovery codes" size="md">
@@ -328,12 +329,14 @@ onMounted(load)
       </span>
     </div>
 
-    <div class="flex justify-end gap-2 mt-4">
-      <Button @click="copy(codes.join('\n'))">Copy all</Button>
-      <Button variant="solid" icon-left="lucide-download" @click="downloadCodes">
-        Download
-      </Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button @click="copy(codes.join('\n'))">Copy all</Button>
+        <Button variant="solid" icon-left="lucide-download" @click="downloadCodes">
+          Download
+        </Button>
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showRemove" title="Remove device" size="md">
@@ -343,10 +346,12 @@ onMounted(load)
     </p>
 
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="busy" @click="confirmRemove">Remove</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="busy" @click="confirmRemove">Remove</Button>
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showRegenerate" title="Regenerate recovery codes" size="md">
@@ -356,9 +361,11 @@ onMounted(load)
     </p>
 
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showRegenerate = false">Cancel</Button>
-      <Button variant="solid" :loading="busy" @click="regenerate">Regenerate</Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showRegenerate = false">Cancel</Button>
+        <Button variant="solid" :loading="busy" @click="regenerate">Regenerate</Button>
+      </div>
+    </template>
   </Dialog>
 </template>

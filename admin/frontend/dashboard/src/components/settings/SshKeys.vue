@@ -139,12 +139,14 @@ onMounted(load)
       placeholder="ssh-ed25519 AAAA… user@host"
     />
     <ErrorMessage v-if="error" :message="error" class="mt-2" />
-    <div class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showAdd = false">Cancel</Button>
-      <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
-        Add key
-      </Button>
-    </div>
+    <template #actions>
+      <div class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showAdd = false">Cancel</Button>
+        <Button variant="solid" :loading="adding" :disabled="!newKey.trim()" @click="add">
+          Add key
+        </Button>
+      </div>
+    </template>
   </Dialog>
 
   <Dialog v-model="showRemove" title="Remove SSH key" size="md">
@@ -158,11 +160,13 @@ onMounted(load)
       Whoever holds the matching private key loses SSH access.
     </p>
 
-    <div v-if="!isLastKey" class="flex justify-end gap-2 mt-4">
-      <Button variant="ghost" @click="showRemove = false">Cancel</Button>
-      <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
-        >Remove</Button
-      >
-    </div>
+    <template #actions>
+      <div v-if="!isLastKey" class="flex justify-end gap-2">
+        <Button variant="ghost" @click="showRemove = false">Cancel</Button>
+        <Button variant="solid" theme="red" :loading="removingBusy" @click="confirmRemove"
+          >Remove</Button
+        >
+      </div>
+    </template>
   </Dialog>
 </template>
