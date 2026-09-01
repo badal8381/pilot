@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
 import { computed, onMounted, ref } from 'vue'
-import { Badge, Button, Dialog, Dropdown, ErrorMessage, LoadingText, Select } from 'frappe-ui'
+import { Badge, Button, Dialog, Dropdown, ErrorMessage, Select } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
+import ListSkeleton from '@/components/common/ListSkeleton.vue'
 import Table from '@/components/common/Table.vue'
 import BackupConfigDialog from '@/components/sites/BackupConfigDialog.vue'
 
@@ -205,9 +206,7 @@ onMounted(() => {
 
   <ErrorMessage v-if="error" :message="error" class="mb-4" />
 
-  <div v-if="backupsLoading" class="flex justify-center py-12">
-    <LoadingText />
-  </div>
+  <ListSkeleton v-if="backupsLoading" :rows="5" />
 
   <EmptyState
     v-else-if="!backups.length"
