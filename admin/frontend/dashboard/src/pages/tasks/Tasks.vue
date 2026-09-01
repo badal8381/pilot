@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Badge, Button, ErrorMessage, Select, TabButtons, Tooltip } from 'frappe-ui'
 
 import EmptyState from '@/components/common/EmptyState.vue'
-import ListRowSkeleton from '@/components/common/ListRowSkeleton.vue'
+import ListSkeleton from '@/components/common/ListSkeleton.vue'
 import Table from '@/components/common/Table.vue'
 import StickyToolbar from '@/components/common/StickyToolbar.vue'
 
@@ -162,9 +162,7 @@ onMounted(() => load(statusFilter.value))
       />
     </StickyToolbar>
 
-    <template v-if="loading">
-      <ListRowSkeleton v-for="index in 6" :key="index" :index="index - 1" />
-    </template>
+    <ListSkeleton v-if="loading" />
 
     <template v-else-if="error">
       <ErrorMessage :message="error" />

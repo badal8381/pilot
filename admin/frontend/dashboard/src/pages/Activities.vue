@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { type RouteLocationRaw, useRoute, useRouter } from 'vue-router'
-import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Skeleton, Tooltip } from 'frappe-ui'
+import { Button, Combobox, Dialog, Dropdown, ErrorMessage, Tooltip } from 'frappe-ui'
 
+import ListSkeleton from '@/components/common/ListSkeleton.vue'
 import Table from '@/components/common/Table.vue'
 
 import { useActivities } from '@/composables/activities/useActivities'
@@ -229,14 +230,7 @@ onMounted(() => {
       </Button>
     </div>
 
-    <div v-if="loading" class="flex flex-col gap-1 mt-4">
-      <div v-for="i in 8" :key="i" class="flex items-center gap-3 px-4 py-3">
-        <Skeleton class="rounded-full size-6 shrink-0" />
-        <Skeleton class="h-3 rounded-4" :class="i % 2 ? 'w-48' : 'w-36'" />
-        <Skeleton class="ml-auto h-3 w-24 rounded-4 shrink-0" />
-        <Skeleton class="h-3 w-16 rounded-4 shrink-0" />
-      </div>
-    </div>
+    <ListSkeleton v-if="loading" class="first:mt-4" />
 
     <ErrorMessage :message="'error'" v-else-if="error" class="mt-4" />
 
