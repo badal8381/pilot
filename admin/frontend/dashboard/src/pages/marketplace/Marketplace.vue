@@ -124,7 +124,7 @@ onMounted(load)
         <Skeleton class="rounded-4 w-32 h-3.5" />
       </div>
 
-      <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+      <div class="gap-x-6 gap-y-4 grid md:grid-cols-2 mt-3">
         <MarketplaceAppCardSkeleton v-for="i in 8" :key="i" :index="i - 1" />
       </div>
     </section>
@@ -139,7 +139,7 @@ onMounted(load)
           {{ filteredHeading }}
         </h2>
 
-        <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+        <div class="gap-x-6 gap-y-4 grid md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in filteredApps"
             :key="app.name"
@@ -155,7 +155,7 @@ onMounted(load)
     <template v-else>
       <section v-if="otherBenchApps.length" class="mt-4">
         <h2 class="font-medium">Your custom apps</h2>
-        <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+        <div class="gap-x-6 gap-y-4 grid md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in otherBenchApps"
             :key="app.name"
@@ -167,7 +167,7 @@ onMounted(load)
 
       <section v-if="frappeApps.length" :class="otherBenchApps.length ? 'mt-10' : 'mt-12'">
         <h2 class="font-medium">From Frappe</h2>
-        <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+        <div class="gap-x-6 gap-y-4 grid md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in frappeApps"
             :key="app.name"
@@ -179,7 +179,7 @@ onMounted(load)
 
       <section v-if="communityApps.length" class="mt-10">
         <h2 class="font-medium">Community</h2>
-        <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+        <div class="gap-x-6 gap-y-4 grid md:grid-cols-2 mt-3">
           <MarketplaceAppCard
             v-for="app in communityApps"
             :key="app.name"

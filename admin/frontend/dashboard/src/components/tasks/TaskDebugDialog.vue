@@ -66,9 +66,7 @@ onBeforeUnmount(close)
 <template>
   <Dialog v-model="show" title="Debug with AI Assistant" size="2xl">
     <div class="space-y-3">
-      <div v-if="streaming && !text" class="flex justify-center py-10">
-        <LoadingText text="Analyzing the failure…" />
-      </div>
+      <LoadingText v-if="streaming && !text" text="Analyzing the failure…" class="justify-center py-10" />
 
       <Alert class="border border-outline-gray-2" v-if="error" theme="red" title="Couldn't debug this task" :dismissible="false">
         <template #description>{{ error }}</template>

@@ -111,9 +111,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="loading" class="p-3 md:p-4 flex justify-center py-12">
-    <LoadingText />
-  </div>
+  <LoadingText v-if="loading" class="p-3 md:p-4 justify-center py-12" />
 
   <div v-else-if="error" class="p-3 md:p-4 py-12">
     <ErrorMessage :message="error" />

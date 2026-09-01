@@ -265,7 +265,7 @@ const confirmRemove = () => {
               <div
                 v-for="(cond, ci) in rule.conditions"
                 :key="keyOf(cond)"
-                class="gap-2 grid grid-cols-1 sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
+                class="gap-2 grid sm:grid-cols-[10rem_11rem_minmax(0,1fr)_2rem] items-start"
               >
                 <div class="space-y-1.5 min-w-0">
                   <Select v-model="cond.field" :options="fieldOptions" class="w-full" />

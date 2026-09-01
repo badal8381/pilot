@@ -73,9 +73,7 @@ const runUpdate = async () => {
 <template>
   <Dialog v-model="open" title="Updates" size="md">
     <div class="flex flex-col gap-4">
-      <div v-if="checking" class="flex justify-center py-8">
-        <LoadingText />
-      </div>
+      <LoadingText v-if="checking" class="justify-center py-8" />
 
       <p v-else-if="!appNames.length" class="py-6 text-ink-gray-5 text-sm text-center">
         Your bench is up to date.

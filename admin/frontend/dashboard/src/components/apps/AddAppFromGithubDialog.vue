@@ -238,9 +238,7 @@ const submit = async () => {
               </span>
             </div>
 
-            <div v-if="reposLoading" class="flex justify-center items-center h-32">
-              <LoadingText />
-            </div>
+            <LoadingText v-if="reposLoading" class="justify-center h-32" />
 
             <div v-else class="flex items-end gap-2 mt-2">
               <Combobox

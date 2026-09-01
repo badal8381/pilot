@@ -62,9 +62,7 @@ const load = async () => {
 
 <template>
   <Dialog v-model="open" :title="`Table sizes on ${site}`" size="3xl">
-    <div v-if="loading" class="flex justify-center py-10">
-      <LoadingText />
-    </div>
+    <LoadingText v-if="loading" class="justify-center py-10" />
 
     <ErrorMessage v-else-if="error" :message="error" />
 

@@ -37,29 +37,23 @@ onMounted(async () => {
 
 <template>
   <div class="p-3 md:p-4 mx-auto max-w-3xl">
-    <!-- Header -->
-    <div class="flex justify-between items-center gap-3">
-      <div>
-        <h1 class="font-semibold text-xl">Code editor</h1>
-        <p class="mt-1 text-ink-gray-5 text-p-sm sm:hidden">Edit installed app files.</p>
-        <p class="mt-1 text-ink-gray-5 text-p-base hidden sm:block">Browse and edit the files of installed apps.</p>
-      </div>
-    </div>
+    <h1 class="font-semibold text-xl">Code editor</h1>
+    <p class="mt-1 text-ink-gray-5 text-p-sm sm:text-p-base">
+      Browse and edit the files of installed apps.
+    </p>
 
     <p v-if="!session.developerMode" class="mt-16 text-ink-gray-5 text-p-sm text-center">
       Enable Developer mode in Settings to use the code editor.
     </p>
 
-    <div v-else-if="loading" class="flex justify-center mt-16">
-      <LoadingText />
-    </div>
+    <LoadingText v-else-if="loading" class="justify-center mt-16" />
 
     <section v-else-if="appObjects.length" class="mt-6">
       <p class="font-medium">
         Installed apps · {{ appObjects.length }}
       </p>
 
-      <div class="gap-x-6 gap-y-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+      <div class="gap-x-6 gap-y-4 grid md:grid-cols-2 mt-3">
         <a
           v-for="app in appObjects"
           :key="app.name"

@@ -76,9 +76,7 @@ const {
       </div>
 
       <div class="flex-1 p-5 overflow-y-auto">
-        <div v-show="currentStep === 'loading'" class="flex justify-center items-center py-10">
-          <LoadingText />
-        </div>
+        <LoadingText v-show="currentStep === 'loading'" class="justify-center py-10" />
 
         <div v-show="currentStep === 'database'" class="flex flex-col gap-4">
           <Select label="Database engine" v-model="dbType" :options="dbTypeOptions" />
@@ -155,16 +153,15 @@ const {
             {{ showStreamDetails ? 'Hide details' : 'Show details' }}
           </button>
 
-          <div v-show="showStreamDetails">
-            <TaskStream
-              ref="terminal"
-              :url="streamUrl"
-              :guard-hidden-tab="true"
-              @line="updateStreamStatus"
-              @done="onStreamDone"
-              @error="failInstall('Lost connection to the setup process.')"
-            />
-          </div>
+          <TaskStream
+            v-show="showStreamDetails"
+            ref="terminal"
+            :url="streamUrl"
+            :guard-hidden-tab="true"
+            @line="updateStreamStatus"
+            @done="onStreamDone"
+            @error="failInstall('Lost connection to the setup process.')"
+          />
 
           <ErrorMessage v-show="errorMessage" :message="errorMessage" />
         </div>

@@ -366,42 +366,40 @@ onUnmounted(() => clearTimeout(timer))
           title="Target apps"
           :count="op.apps.length"
         >
-          <div>
-            <div
-              v-for="app in op.apps"
-              :key="app.name"
-              class="flex items-center justify-between gap-4 px-2.5 py-2"
-            >
-              <div class="flex items-center gap-2 min-w-0 flex-1">
-                <AppIcon :name="app.name" class="!rounded-1 size-5" initial-class="text-xs" />
-                <p class="min-w-0 truncate">
-                  {{ app.name }}
-                </p>
-              </div>
-
-              <Tooltip :text="revisionHint(app)">
-                <component
-                  :is="app.compare_url ? 'a' : 'div'"
-                  :href="app.compare_url || undefined"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="flex shrink-0 items-center gap-2 font-mono text-xs text-ink-gray-6"
-                  :class="app.compare_url ? 'hover:text-ink-gray-8' : ''"
-                >
-                  <span>{{ shortSha(app.sha) }}</span>
-                  <span class="lucide-arrow-right size-3.5 text-ink-gray-4" aria-hidden="true" />
-                  <span :class="app.updated_sha ? 'text-ink-green-6' : 'text-ink-gray-5'">
-                    {{ shortSha(app.updated_sha || app.target_sha) }}
-                  </span>
-
-                  <span
-                    v-if="app.compare_url"
-                    class="lucide-external-link size-3.5 text-ink-gray-4"
-                    aria-hidden="true"
-                  />
-                </component>
-              </Tooltip>
+          <div
+            v-for="app in op.apps"
+            :key="app.name"
+            class="flex items-center justify-between gap-4 px-2.5 py-2"
+          >
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+              <AppIcon :name="app.name" class="!rounded-1 size-5" initial-class="text-xs" />
+              <p class="min-w-0 truncate">
+                {{ app.name }}
+              </p>
             </div>
+
+            <Tooltip :text="revisionHint(app)">
+              <component
+                :is="app.compare_url ? 'a' : 'div'"
+                :href="app.compare_url || undefined"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="flex shrink-0 items-center gap-2 font-mono text-xs text-ink-gray-6"
+                :class="app.compare_url ? 'hover:text-ink-gray-8' : ''"
+              >
+                <span>{{ shortSha(app.sha) }}</span>
+                <span class="lucide-arrow-right size-3.5 text-ink-gray-4" aria-hidden="true" />
+                <span :class="app.updated_sha ? 'text-ink-green-6' : 'text-ink-gray-5'">
+                  {{ shortSha(app.updated_sha || app.target_sha) }}
+                </span>
+
+                <span
+                  v-if="app.compare_url"
+                  class="lucide-external-link size-3.5 text-ink-gray-4"
+                  aria-hidden="true"
+                />
+              </component>
+            </Tooltip>
           </div>
         </UpdateSection>
 
@@ -428,45 +426,43 @@ onUnmounted(() => clearTimeout(timer))
           title="Sites"
           :count="sitesCount"
         >
-          <div>
-            <div v-for="site in op.sites" :key="site.name">
-              <div
-                class="flex items-center gap-2 px-2.5 py-2 rounded-4 transition-colors"
-                :class="siteJobs(site.name).length ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
-                @click="toggleSiteJobs(site.name)"
-              >
-                <span
-                  class="size-4 text-ink-gray-5 transition-transform shrink-0 lucide-chevron-right"
-                  :class="[
-                    siteJobs(site.name).length ? '' : 'invisible',
-                    expandedSites.has(site.name) ? 'rotate-90' : '',
-                  ]"
-                />
-                <p class="flex-1 min-w-0 truncate">
-                  {{ site.name }}
-                </p>
+          <div v-for="site in op.sites" :key="site.name">
+            <div
+              class="flex items-center gap-2 px-2.5 py-2 rounded-4 transition-colors"
+              :class="siteJobs(site.name).length ? 'cursor-pointer hover:bg-surface-gray-1' : ''"
+              @click="toggleSiteJobs(site.name)"
+            >
+              <span
+                class="size-4 text-ink-gray-5 transition-transform shrink-0 lucide-chevron-right"
+                :class="[
+                  siteJobs(site.name).length ? '' : 'invisible',
+                  expandedSites.has(site.name) ? 'rotate-90' : '',
+                ]"
+              />
+              <p class="flex-1 min-w-0 truncate">
+                {{ site.name }}
+              </p>
 
-                <span
-                  v-if="siteCaption(site)"
-                  class="flex items-center gap-1.5 text-sm shrink-0"
-                  :class="siteStatus(site).value === 'failed' ? 'text-ink-red-6' : 'text-ink-gray-5'"
-                >
-                  <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-6" />
-                  {{ siteCaption(site) }}
-                </span>
-              </div>
-
-              <div
-                v-if="expandedSites.has(site.name)"
-                class="mb-1 ml-4 pl-3 border-l border-outline-gray-2"
+              <span
+                v-if="siteCaption(site)"
+                class="flex items-center gap-1.5 text-sm shrink-0"
+                :class="siteStatus(site).value === 'failed' ? 'text-ink-red-6' : 'text-ink-gray-5'"
               >
-                <JobRow
-                  v-for="job in siteJobs(site.name)"
-                  :key="job.id"
-                  :job="job"
-                  @click="openTaskLog(job)"
-                />
-              </div>
+                <Spinner v-if="siteStatus(site).busy" size="sm" class="text-ink-amber-6" />
+                {{ siteCaption(site) }}
+              </span>
+            </div>
+
+            <div
+              v-if="expandedSites.has(site.name)"
+              class="mb-1 ml-4 pl-3 border-l border-outline-gray-2"
+            >
+              <JobRow
+                v-for="job in siteJobs(site.name)"
+                :key="job.id"
+                :job="job"
+                @click="openTaskLog(job)"
+              />
             </div>
           </div>
         </UpdateSection>
@@ -500,11 +496,9 @@ onUnmounted(() => clearTimeout(timer))
         </p>
 
         <template #actions>
-          <div class="flex flex-row justify-end">
-            <Button variant="solid" theme="red" :loading="acting" @click="doSkip"
-              >Skip patch</Button
-            >
-          </div>
+          <Button variant="solid" theme="red" :loading="acting" @click="doSkip"
+            >Skip patch</Button
+          >
         </template>
       </Dialog>
 
