@@ -395,7 +395,6 @@ onUnmounted(() => stopLive())
           :streaming="liveMode"
           fill
           wrap
-          rows
           rounded
           :empty-text="contentLoading ? 'Loading…' : 'Log file is empty.'"
         />
