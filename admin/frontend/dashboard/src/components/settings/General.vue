@@ -4,12 +4,17 @@ import { ErrorMessage, Spinner, Switch, toast } from 'frappe-ui'
 
 import SettingsRow from '@/components/settings/SettingsRow.vue'
 import Version from '@/components/settings/Version.vue'
+import Git from '@/components/settings/Git.vue'
+import S3Bucket from '@/components/settings/S3Bucket.vue'
+import LLM from '@/components/settings/LLM.vue'
+import Notifications from '@/components/settings/Notifications.vue'
+import Workers from '@/components/settings/Workers.vue'
 
 import { settingsApi } from '@/api/settings'
 import { useSession } from '@/composables/auth/useSession'
 import { GENERAL_SECTIONS as sections } from '@/components/settings/sections'
 
-const openSection = defineModel('openSection')
+const openSection = defineModel<{ id: string } | null>('openSection')
 
 const { session } = useSession()
 
@@ -68,7 +73,11 @@ onMounted(async () => {
     <Spinner size="lg" class="text-ink-gray-4" />
   </div>
 
-  <component v-else-if="openSection" :is="openSection.component" />
+  <Git v-else-if="openSection?.id === 'github'" />
+  <S3Bucket v-else-if="openSection?.id === 's3-bucket'" />
+  <LLM v-else-if="openSection?.id === 'llm'" />
+  <Notifications v-else-if="openSection?.id === 'notifications'" />
+  <Workers v-else-if="openSection?.id === 'workers'" />
 
   <template v-else>
     <ErrorMessage v-if="error" :message="error" class="mb-4" />
