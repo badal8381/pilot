@@ -176,3 +176,36 @@ def test_an_accepted_claim_can_no_longer_be_released(tmp_path: Path) -> None:
         uploads.get(saved.upload_id)
     uploads.remove(saved.upload_id, archive=claimed.db_file, claim=claimed.claim)
     assert not claimed.directory.exists()
+
+
+def test_release_waits_for_the_marker_lock_and_honors_a_queued_claim(tmp_path: Path) -> None:
+    """The loser of a shared-claim race releases while the winner marks queued.
+    Marker operations serialize on the marker lock: a release that starts during
+    the winner's critical section blocks, then sees the queued flag and refuses."""
+    import json
+    import threading
+
+    from pilot.internal.atomic_file import exclusive_file_lock
+
+    uploads = BackupUploads(tmp_path)
+    saved = uploads.save({"database": _part("db.sql.gz")})
+    claimed = uploads.claim(saved.upload_id, retry_key="req-1")
+    marker = claimed.directory / ".claimed"
+
+    released = threading.Event()
+
+    def racing_release():
+        uploads.release(saved.upload_id, claimed.claim)
+        released.set()
+
+    with exclusive_file_lock(marker):
+        thread = threading.Thread(target=racing_release)
+        thread.start()
+        # The release must block on the lock, not proceed on its stale read.
+        assert not released.wait(timeout=0.3)
+        # The winner records acceptance inside its critical section.
+        marker.write_text(json.dumps({"claim": claimed.claim, "retry_key": "req-1", "queued": True}))
+
+    thread.join(timeout=10)
+    assert released.is_set()
+    assert marker.exists()

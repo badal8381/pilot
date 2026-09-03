@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import IO
 
 from pilot.exceptions import BenchError
+from pilot.internal.atomic_file import exclusive_file_lock
 from pilot.utils import make_private_directory, open_private, write_private_text
 
 UPLOADS_DIR = "backups-uploads"
@@ -89,6 +90,11 @@ class BackupUploads:
             raise BenchError("Backup upload is missing its database file. Upload the files again.")
         return BackupUpload(upload_id, directory, files)
 
+    def _marker_lock(self, upload_id: str):
+        """Marker reads and writes race across workers - a same-key retry can be
+        queued while the original request is failing. Serialize them."""
+        return exclusive_file_lock(self.root / upload_id / _CLAIM_MARKER)
+
     def claim(self, upload_id: str, retry_key: str | None = None) -> BackupUpload:
         """Reserve the upload for one restore: a task deletes it when done, so a
         second restore must not be pointed at the same archives. The marker is
@@ -98,26 +104,28 @@ class BackupUploads:
         upload = self._read(upload_id)
         marker = upload.directory / _CLAIM_MARKER
         claim = secrets.token_hex(16)
-        try:
-            with open_private(marker, "w", exclusive=True) as handle:
-                handle.write(json.dumps({"claim": claim, "retry_key": retry_key}))
-        except FileExistsError:
-            existing = _read_marker(marker)
-            if not retry_key or existing.get("retry_key") != retry_key:
-                raise BenchError(
-                    "This backup upload is already being restored. Upload the files again."
-                ) from None
-            claim = existing["claim"]
+        with self._marker_lock(upload_id):
+            try:
+                with open_private(marker, "w", exclusive=True) as handle:
+                    handle.write(json.dumps({"claim": claim, "retry_key": retry_key}))
+            except FileExistsError:
+                existing = _read_marker(marker)
+                if not retry_key or existing.get("retry_key") != retry_key:
+                    raise BenchError(
+                        "This backup upload is already being restored. Upload the files again."
+                    ) from None
+                claim = existing["claim"]
         return BackupUpload(upload.upload_id, upload.directory, upload.files, claim)
 
     def mark_queued(self, upload_id: str, claim: str | None) -> None:
         """Record that a restore holding this claim was accepted. From here the
         claim can no longer be released - only the task's cleanup ends it."""
-        marker = self.root / upload_id / _CLAIM_MARKER
-        data = _read_marker(marker)
-        if claim and data.get("claim") == claim:
-            data["queued"] = True
-            write_private_text(marker, json.dumps(data))
+        with self._marker_lock(upload_id):
+            marker = self.root / upload_id / _CLAIM_MARKER
+            data = _read_marker(marker)
+            if claim and data.get("claim") == claim:
+                data["queued"] = True
+                write_private_text(marker, json.dumps(data))
 
     def release(self, upload_id: str, claim: str | None) -> None:
         """Undo a claim whose restore never got queued. Only the claim's holder
@@ -126,10 +134,11 @@ class BackupUploads:
         concurrent same-key retry has since turned into a task."""
         if not _UPLOAD_ID_RE.match(upload_id or "") or not claim:
             return
-        marker = self.root / upload_id / _CLAIM_MARKER
-        data = _read_marker(marker)
-        if data.get("claim") == claim and not data.get("queued"):
-            marker.unlink(missing_ok=True)
+        with self._marker_lock(upload_id):
+            marker = self.root / upload_id / _CLAIM_MARKER
+            data = _read_marker(marker)
+            if data.get("claim") == claim and not data.get("queued"):
+                marker.unlink(missing_ok=True)
 
     def remove(self, upload_id: str, archive: str | None = None, claim: str | None = None) -> None:
         """Delete an upload. The id is validated, so only a directory under
